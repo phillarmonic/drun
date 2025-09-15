@@ -1,0 +1,208 @@
+# Docker/DevOps Operations Example
+# Usage: drun -f examples/docker-devops.yml <recipe>
+
+version: 0.1
+
+shell:
+  linux: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }
+  darwin: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }
+
+vars:
+  registry: "ghcr.io"
+  org: "mycompany"
+  app_name: "myapp"
+  
+env:
+  DOCKER_BUILDKIT: "1"
+  REGISTRY: "{{ .registry }}"
+  IMAGE_NAME: "{{ .registry }}/{{ .org }}/{{ .app_name }}"
+  BUILD_DATE: "{{ now \"2006-01-02T15:04:05Z07:00\" }}"
+  GIT_COMMIT: "{{ env \"GITHUB_SHA\" | default \"local\" }}"
+
+snippets:
+  docker_login: |
+    if ! docker info >/dev/null 2>&1; then
+      echo "❌ Docker is not running"
+      exit 1
+    fi
+    echo "🔐 Logging into {{ .REGISTRY }}..."
+    echo "$REGISTRY_TOKEN" | docker login {{ .REGISTRY }} --username "$REGISTRY_USER" --password-stdin
+
+  check_env: |
+    if [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_TOKEN:-}" ]; then
+      echo "❌ REGISTRY_USER and REGISTRY_TOKEN environment variables must be set"
+      exit 1
+    fi
+
+recipes:
+  # Building
+  build:
+    help: "Build Docker image"
+    positionals:
+      - name: tag
+        default: "{{ .GIT_COMMIT | trunc 8 }}"
+    run: |
+      echo "🏗️  Building {{ .IMAGE_NAME }}:{{ .tag }}..."
+      docker build \
+        --build-arg BUILD_DATE="{{ .BUILD_DATE }}" \
+        --build-arg GIT_COMMIT="{{ .GIT_COMMIT }}" \
+        --tag "{{ .IMAGE_NAME }}:{{ .tag }}" \
+        --tag "{{ .IMAGE_NAME }}:latest" \
+        .
+      echo "✅ Build complete"
+
+  # Multi-arch build
+  build-multiarch:
+    help: "Build multi-architecture image"
+    positionals:
+      - name: tag
+        default: "{{ .GIT_COMMIT | trunc 8 }}"
+      - name: platforms
+        default: "linux/amd64,linux/arm64"
+    run: |
+      echo "🏗️  Building multi-arch {{ .IMAGE_NAME }}:{{ .tag }} for {{ .platforms }}..."
+      docker buildx create --use --name multiarch || true
+      docker buildx build \
+        --platform {{ .platforms }} \
+        --build-arg BUILD_DATE="{{ .BUILD_DATE }}" \
+        --build-arg GIT_COMMIT="{{ .GIT_COMMIT }}" \
+        --tag "{{ .IMAGE_NAME }}:{{ .tag }}" \
+        --tag "{{ .IMAGE_NAME }}:latest" \
+        --push \
+        .
+      echo "✅ Multi-arch build complete"
+
+  # Testing
+  test:
+    help: "Run container tests"
+    deps: [build]
+    run: |
+      echo "🧪 Running container tests..."
+      # Security scan
+      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+        aquasec/trivy image "{{ .IMAGE_NAME }}:latest"
+      
+      # Basic functionality test
+      echo "Testing container startup..."
+      CONTAINER_ID=$(docker run -d "{{ .IMAGE_NAME }}:latest")
+      sleep 5
+      if docker ps | grep -q "$CONTAINER_ID"; then
+        echo "✅ Container started successfully"
+        docker stop "$CONTAINER_ID"
+        docker rm "$CONTAINER_ID"
+      else
+        echo "❌ Container failed to start"
+        docker logs "$CONTAINER_ID"
+        docker rm "$CONTAINER_ID"
+        exit 1
+      fi
+
+  # Publishing
+  push:
+    help: "Push image to registry"
+    positionals:
+      - name: tag
+        default: "{{ .GIT_COMMIT | trunc 8 }}"
+    deps: [build]
+    run: |
+      {{ snippet "check_env" }}
+      {{ snippet "docker_login" }}
+      echo "📤 Pushing {{ .IMAGE_NAME }}:{{ .tag }}..."
+      docker push "{{ .IMAGE_NAME }}:{{ .tag }}"
+      docker push "{{ .IMAGE_NAME }}:latest"
+      echo "✅ Push complete"
+
+  # Deployment
+  deploy:
+    help: "Deploy to environment"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "production"]
+      - name: tag
+        default: "latest"
+    run: |
+      echo "🚀 Deploying {{ .IMAGE_NAME }}:{{ .tag }} to {{ .environment }}..."
+      
+      {{ if eq .environment "production" }}
+      echo "⚠️  PRODUCTION DEPLOYMENT - Proceeding with caution..."
+      kubectl set image deployment/{{ .app_name }} \
+        {{ .app_name }}="{{ .IMAGE_NAME }}:{{ .tag }}" \
+        --namespace=production
+      {{ else if eq .environment "staging" }}
+      echo "🧪 Deploying to staging..."
+      kubectl set image deployment/{{ .app_name }} \
+        {{ .app_name }}="{{ .IMAGE_NAME }}:{{ .tag }}" \
+        --namespace=staging
+      {{ else }}
+      echo "🔧 Deploying to development..."
+      kubectl set image deployment/{{ .app_name }} \
+        {{ .app_name }}="{{ .IMAGE_NAME }}:{{ .tag }}" \
+        --namespace=dev
+      {{ end }}
+      
+      echo "Waiting for rollout to complete..."
+      kubectl rollout status deployment/{{ .app_name }} --namespace={{ .environment }}
+      echo "✅ Deployment complete"
+
+  # Local development
+  run-local:
+    help: "Run container locally"
+    positionals:
+      - name: port
+        default: "8080"
+    deps: [build]
+    run: |
+      echo "🏃 Running {{ .IMAGE_NAME }}:latest locally on port {{ .port }}..."
+      docker run --rm -it -p {{ .port }}:8080 "{{ .IMAGE_NAME }}:latest"
+
+  # Maintenance
+  clean:
+    help: "Clean up Docker resources"
+    run: |
+      echo "🧹 Cleaning up Docker resources..."
+      docker system prune -f
+      docker image prune -f
+      echo "✅ Cleanup complete"
+
+  logs:
+    help: "Show application logs"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "production"]
+      - name: lines
+        default: "100"
+    run: |
+      echo "📋 Showing last {{ .lines }} lines from {{ .environment }}..."
+      kubectl logs -n {{ .environment }} \
+        deployment/{{ .app_name }} \
+        --tail={{ .lines }} \
+        --follow
+
+  # CI/CD Pipeline
+  ci:
+    help: "Run full CI pipeline"
+    deps: [build, test, push]
+    parallel_deps: false
+    run: |
+      echo "✅ CI pipeline completed successfully!"
+
+  cd:
+    help: "Run CD pipeline"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["staging", "production"]
+    deps: [ci]
+    run: |
+      echo "🚀 Starting CD pipeline for {{ .environment }}..."
+      # In a real scenario, this might trigger additional checks
+      {{ if eq .environment "production" }}
+      echo "⚠️  Production deployment requires manual approval"
+      read -p "Deploy to production? (yes/no): " confirm
+      if [ "$confirm" != "yes" ]; then
+        echo "❌ Deployment cancelled"
+        exit 1
+      fi
+      {{ end }}
