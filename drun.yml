@@ -1,0 +1,203 @@
+version: 0.1
+
+# Default shell and options per OS
+shell:
+  linux: { cmd: "/bin/sh", args: ["-ceu"] }
+  darwin: { cmd: "/bin/zsh", args: ["-ceu"] }
+  windows: { cmd: "pwsh", args: ["-NoLogo", "-Command"] }
+
+env:
+  # Static env
+  REGISTRY: ghcr.io
+  ORG: phillarmonic
+  # Computed env (evaluated at runtime)
+  DATE: "{{ now \"2006-01-02\" }}"
+
+vars:
+  go_version: "1.25"
+  app_name: "drun"
+  # Can reference env and other vars
+  image_tag: "{{ .go_version }}-{{ .DATE }}"
+
+# Global options applied to all recipes (can be overridden)
+defaults:
+  working_dir: "."
+  shell: auto
+  export_env: true
+  timeout: "2h"
+
+# Reusable snippets
+snippets:
+  ensure_deps: |
+    echo "Ensuring dependencies are up to date..."
+    go mod tidy
+    go mod download
+
+recipes:
+  # Default recipe - shows help
+  default:
+    help: "Show available recipes"
+    run: |
+      echo "Available drun recipes:"
+      echo "  build    - Build the application"
+      echo "  test     - Run tests"
+      echo "  clean    - Clean build artifacts"
+      echo "  release  - Build and release (usage: release <version> <arch>)"
+
+  # Simple build recipe
+  build:
+    help: "Build the drun application"
+    deps: [deps]
+    cache_key: "build-{{ sha256 \"go.mod go.sum\" }}-{{ now \"2006-01-02\" }}"
+    run: |
+      {{ snippet "ensure_deps" }}
+      echo "Building {{ .app_name }}..."
+      go build -o bin/{{ .app_name }} ./cmd/{{ .app_name }}
+      echo "Build complete: bin/{{ .app_name }}"
+
+  # Test recipe with optional filter
+  test:
+    help: "Run tests (usage: test [--unit=pattern])"
+    flags:
+      unit: 
+        type: string
+        default: ""
+        help: "Run specific unit tests matching pattern"
+    deps: [deps]
+    run: |
+      {{ snippet "ensure_deps" }}
+      {{ if .unit }}
+      echo "Running tests matching: {{ .unit }}"
+      go test -v -run "{{ .unit }}" ./...
+      {{ else }}
+      echo "Running all tests..."
+      go test -v ./...
+      {{ end }}
+
+  # Clean build artifacts
+  clean:
+    help: "Clean build artifacts"
+    run: |
+      echo "Cleaning build artifacts..."
+      rm -rf bin/
+      go clean -cache
+      echo "Clean complete"
+
+  # Release with positionals
+  release:
+    help: "Build & optionally push release. Usage: release <version> <arch> [--push]"
+    positionals:
+      - name: version
+        required: true
+      - name: arch
+        required: true
+        one_of: ["amd64", "arm64", "both"]
+    flags:
+      push:
+        type: bool
+        default: false
+        help: "Push the release to registry"
+      platform:
+        type: string
+        default: "{{ if eq .arch \"both\" }}linux/amd64,linux/arm64{{ else }}linux/{{ .arch }}{{ end }}"
+    env:
+      VERSION: "{{ .version }}"
+      GOOS: linux
+      GOARCH: "{{ if eq .arch \"both\" }}amd64{{ else }}{{ .arch }}{{ end }}"
+    deps: [clean, deps]
+    run: |
+      echo "Building release {{ .version }} for {{ .arch }}"
+      {{ if eq .arch "both" }}
+      echo "Building for multiple architectures..."
+      GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-amd64 ./cmd/{{ .app_name }}
+      GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-arm64 ./cmd/{{ .app_name }}
+      {{ else }}
+      echo "Building for {{ .arch }}..."
+      go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-{{ .arch }} ./cmd/{{ .app_name }}
+      {{ end }}
+      {{ if .push }}
+      echo "Would push to registry (not implemented in example)"
+      {{ else }}
+      echo "Built locally (use --push to upload)"
+      {{ end }}
+
+  # Dependency management
+  deps:
+    help: "Ensure dependencies are up to date"
+    run: |
+      {{ snippet "ensure_deps" }}
+
+  # Lint code
+  lint:
+    help: "Run linting"
+    deps: [deps]
+    run: |
+      echo "Running linters..."
+      go fmt ./...
+      go vet ./...
+      echo "Linting complete"
+
+  # Run all checks in parallel
+  all:
+    help: "Run all checks (parallel)"
+    deps:
+      - lint
+      - test
+      - build
+    parallel_deps: true
+    run: |
+      echo "All checks completed successfully!"
+
+  # Development server (example of long-running task)
+  dev:
+    help: "Start development server"
+    deps: [build]
+    run: |
+      echo "Starting development server..."
+      echo "Press Ctrl+C to stop"
+      ./bin/{{ .app_name }} --help
+
+  # Test recipe with multiple flag types
+  demo-flags:
+    help: "Demonstrate different flag types"
+    flags:
+      name:
+        type: string
+        default: "world"
+        help: "Name to greet"
+      count:
+        type: int
+        default: 1
+        help: "Number of times to greet"
+      verbose:
+        type: bool
+        default: false
+        help: "Enable verbose output"
+      tags:
+        type: "string[]"
+        help: "List of tags"
+    run: |
+      {{ if .verbose }}
+      echo "Verbose mode enabled"
+      echo "Flags received:"
+      echo "  name: {{ .name }}"
+      echo "  count: {{ .count }}"
+      echo "  verbose: {{ .verbose }}"
+      {{ if .tags }}
+      echo "  tags: {{ .tags | join ", " }}"
+      {{ end }}
+      {{ end }}
+      
+      {{ range $i := until .count }}
+      echo "Hello, {{ $.name }}! ({{ add $i 1 }}/{{ $.count }})"
+      {{ end }}
+      
+      {{ if .tags }}
+      echo "Tags: {{ .tags | join ", " }}"
+      {{ end }}
+
+# Artifact cache (optional)
+cache:
+  path: ".drun/cache"
+  keys:
+    - "go-deps-{{ sha256 \"go.mod\" }}"

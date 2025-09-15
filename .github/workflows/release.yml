@@ -1,0 +1,308 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+# Cancel previous runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Lint job runs first (same as test workflow)
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: latest
+        args: --timeout=5m
+
+  # Test job to ensure quality before release
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: ./test-ci.sh
+
+  # Build job for cross-platform binaries
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+        cache: true
+        cache-dependency-path: go.mod
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install UPX
+      run: |
+        UPX_VERSION=5.0.2
+        echo "Installing UPX version $UPX_VERSION"
+        
+        # Download UPX for Linux (we're running on ubuntu-latest)
+        curl -L https://github.com/upx/upx/releases/download/v$UPX_VERSION/upx-$UPX_VERSION-amd64_linux.tar.xz -o upx.tar.xz
+        tar -xf upx.tar.xz
+        sudo mv upx-$UPX_VERSION-amd64_linux/upx /usr/local/bin/
+        rm -rf upx.tar.xz upx-$UPX_VERSION-amd64_linux
+        upx --version
+      shell: bash
+
+    - name: Set binary name
+      id: binary
+      run: |
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          echo "name=drun-${{ matrix.goos }}-${{ matrix.goarch }}.exe" >> $GITHUB_OUTPUT
+          echo "filename=drun.exe" >> $GITHUB_OUTPUT
+        else
+          echo "name=drun-${{ matrix.goos }}-${{ matrix.goarch }}" >> $GITHUB_OUTPUT
+          echo "filename=drun" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        set -ex
+        mkdir -p dist/${{ matrix.goos }}-${{ matrix.goarch }}
+        
+        # Get version from tag or use 'dev'
+        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION="dev"
+        fi
+        
+        # Build with version information
+        go build \
+          -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          -o dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }} \
+          ./cmd/drun
+
+    - name: Verify binary is statically linked (Linux only)
+      if: matrix.goos == 'linux'
+      run: |
+        set -ex
+        BINARY_PATH="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }}"
+        
+        # Display the file type
+        file "$BINARY_PATH"
+        
+        # Run ldd and capture its output
+        ldd_output=$(ldd "$BINARY_PATH" 2>&1 || true)
+        
+        # Display the ldd output for debugging purposes
+        echo "$ldd_output"
+        
+        # Check if the output contains "not a dynamic executable"
+        if echo "$ldd_output" | grep -q "not a dynamic executable"; then
+          echo "✅ Binary is statically linked."
+        else
+          echo "❌ Binary is dynamically linked or ldd encountered an unexpected error."
+          exit 1
+        fi
+      shell: bash
+
+    - name: Compress binary with UPX
+      run: |
+        BINARY_PATH="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }}"
+        echo "Compressing $BINARY_PATH with UPX"
+        
+        # Compress the binary using UPX with platform-specific options
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          # Windows binaries - ARM64 is not supported by UPX yet
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            echo "ℹ️  Skipping UPX compression for Windows ARM64 (not supported by UPX)"
+          else
+            # Windows x64 - use --best compression
+            if upx --best "$BINARY_PATH" 2>/dev/null; then
+              echo "✅ Windows binary compressed successfully"
+            else
+              echo "⚠️  UPX compression failed for Windows ${{ matrix.goarch }} binary"
+            fi
+          fi
+        elif [ "${{ matrix.goos }}" = "darwin" ]; then
+          # macOS binaries - UPX often has issues with macOS binaries
+          if upx --best "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ macOS binary compressed successfully"
+          else
+            echo "⚠️  UPX compression failed for macOS binary (this is normal)"
+          fi
+        else
+          # Linux binaries - use --best compression (should always work)
+          if upx --best "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ Linux binary compressed successfully"
+          else
+            echo "⚠️  UPX compression failed for Linux ${{ matrix.goarch }} binary"
+          fi
+        fi
+        
+        # Display the binary size (compressed or uncompressed)
+        echo "Binary size:"
+        du -h "$BINARY_PATH"
+      shell: bash
+
+    - name: Verify UPX compression
+      run: |
+        BINARY_PATH="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }}"
+        echo "Verifying UPX compression for $BINARY_PATH"
+        
+        # Check the file type
+        file "$BINARY_PATH"
+        
+        # Verify the compressed binary with platform-specific handling
+        if [ "${{ matrix.goos }}" = "windows" ] && [ "${{ matrix.goarch }}" = "arm64" ]; then
+          # Windows ARM64 - UPX compression was skipped
+          echo "ℹ️  Windows ARM64 binary not compressed with UPX (platform not supported)"
+        elif [ "${{ matrix.goos }}" = "darwin" ]; then
+          # For macOS, only verify if UPX compression succeeded
+          if upx -t "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ macOS binary successfully compressed with UPX"
+          else
+            echo "ℹ️  macOS binary not compressed with UPX (this is normal if compression failed)"
+          fi
+        else
+          # For Linux and Windows x64, verify UPX compression
+          if upx -t "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ Binary successfully compressed with UPX"
+          else
+            echo "ℹ️  Binary not compressed with UPX (compression may have failed)"
+          fi
+        fi
+      shell: bash
+
+    - name: Verify binary
+      run: |
+        set -ex
+        BINARY_PATH="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }}"
+        chmod +x "$BINARY_PATH"
+        
+        # Verify binary exists and show file info
+        echo "✅ Binary built successfully: $BINARY_PATH"
+        file "$BINARY_PATH"
+        ls -lh "$BINARY_PATH"
+        
+        # Test native binaries only (same architecture as runner)
+        if [ "${{ matrix.goos }}" = "linux" ] && [ "${{ matrix.goarch }}" = "amd64" ]; then
+          echo "🧪 Testing native Linux binary..."
+          "$BINARY_PATH" --version
+          "$BINARY_PATH" --help >/dev/null
+          echo "✅ Native binary test passed"
+        else
+          echo "ℹ️  Cross-compiled binary verified (cannot test different architecture/OS)"
+        fi
+      shell: bash
+
+    - name: Rename binary for release
+      run: |
+        BINARY_PATH="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }}"
+        RELEASE_NAME="dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.name }}"
+        mv "$BINARY_PATH" "$RELEASE_NAME"
+        
+        # Show file info
+        echo "Release binary info:"
+        ls -la "$RELEASE_NAME"
+        file "$RELEASE_NAME"
+
+    - name: Upload build artifacts (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/${{ matrix.goos }}-${{ matrix.goarch }}
+
+    - name: Upload build artifacts (for PR testing)
+      if: github.event_name == 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: drun-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.name }}
+
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v2
+      if: success() && startsWith(github.ref, 'refs/tags/v')
+      with:
+        files: dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.name }}
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Create release summary
+  release-summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Create release summary
+      run: |
+        echo "## 🚀 drun Release ${GITHUB_REF#refs/tags/}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Available Downloads:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Platform | Architecture | Download |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|--------------|----------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux | amd64 | \`drun-linux-amd64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux | arm64 | \`drun-linux-arm64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| macOS | amd64 | \`drun-darwin-amd64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| macOS | arm64 | \`drun-darwin-arm64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows | amd64 | \`drun-windows-amd64.exe\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows | arm64 | \`drun-windows-arm64.exe\` |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ⚡ Performance Features:" >> $GITHUB_STEP_SUMMARY
+        echo "- **Linux & Windows x64**: UPX compressed for minimal size" >> $GITHUB_STEP_SUMMARY
+        echo "- **All binaries**: Statically linked, no dependencies" >> $GITHUB_STEP_SUMMARY
+        echo "- **High performance**: Microsecond-level operations" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cross-platform**: Native binaries for all major platforms" >> $GITHUB_STEP_SUMMARY

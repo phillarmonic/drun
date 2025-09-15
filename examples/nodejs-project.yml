@@ -1,0 +1,146 @@
+# Node.js/JavaScript Project Example
+# Usage: drun -f examples/nodejs-project.yml <recipe>
+
+version: 0.1
+
+vars:
+  node_version: "18"
+  app_name: "my-app"
+  port: "3000"
+
+env:
+  NODE_ENV: development
+  PORT: "{{ .port }}"
+
+snippets:
+  install_deps: |
+    if [ ! -d "node_modules" ]; then
+      echo "Installing dependencies..."
+      npm install
+    fi
+
+recipes:
+  # Development
+  dev:
+    help: "Start development server"
+    run: |
+      {{ snippet "install_deps" }}
+      echo "Starting development server on port {{ .port }}..."
+      npm run dev
+
+  start:
+    help: "Start production server"
+    env:
+      NODE_ENV: production
+    run: |
+      echo "Starting production server..."
+      npm start
+
+  # Building
+  build:
+    help: "Build for production"
+    deps: [install]
+    run: |
+      echo "Building for production..."
+      npm run build
+      echo "✅ Build complete"
+
+  install:
+    help: "Install dependencies"
+    run: |
+      echo "Installing dependencies..."
+      npm ci
+
+  # Testing
+  test:
+    help: "Run tests"
+    flags:
+      watch:
+        type: bool
+        default: false
+      coverage:
+        type: bool
+        default: false
+    deps: [install]
+    run: |
+      {{ if .watch }}
+      echo "Running tests in watch mode..."
+      npm run test:watch
+      {{ else if .coverage }}
+      echo "Running tests with coverage..."
+      npm run test:coverage
+      {{ else }}
+      echo "Running tests..."
+      npm test
+      {{ end }}
+
+  lint:
+    help: "Lint code"
+    flags:
+      fix:
+        type: bool
+        default: false
+    deps: [install]
+    run: |
+      {{ if .fix }}
+      echo "Linting and fixing code..."
+      npm run lint:fix
+      {{ else }}
+      echo "Linting code..."
+      npm run lint
+      {{ end }}
+
+  # Docker operations
+  docker-build:
+    help: "Build Docker image"
+    positionals:
+      - name: tag
+        default: "latest"
+    run: |
+      echo "Building Docker image with tag: {{ .tag }}"
+      docker build -t {{ .app_name }}:{{ .tag }} .
+
+  docker-run:
+    help: "Run Docker container"
+    positionals:
+      - name: tag
+        default: "latest"
+    deps: [docker-build]
+    run: |
+      echo "Running Docker container..."
+      docker run -p {{ .port }}:{{ .port }} {{ .app_name }}:{{ .tag }}
+
+  # Deployment
+  deploy:
+    help: "Deploy to production"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["staging", "production"]
+    deps: [build, test]
+    run: |
+      echo "Deploying to {{ .environment }}..."
+      {{ if eq .environment "production" }}
+      echo "🚀 Deploying to production - this is serious!"
+      npm run deploy:prod
+      {{ else }}
+      echo "🧪 Deploying to staging"
+      npm run deploy:staging
+      {{ end }}
+
+  # Maintenance
+  clean:
+    help: "Clean build artifacts and dependencies"
+    run: |
+      echo "Cleaning..."
+      rm -rf node_modules dist build .next
+      npm cache clean --force
+      echo "✅ Clean complete"
+
+  update:
+    help: "Update dependencies"
+    run: |
+      echo "Updating dependencies..."
+      npm update
+      npm audit fix
+      echo "✅ Dependencies updated"
