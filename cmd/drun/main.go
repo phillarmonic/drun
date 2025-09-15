@@ -67,6 +67,96 @@ Named arguments can be specified as:
 	DisableFlagParsing: false,
 }
 
+// Completion command for generating shell completion scripts
+var completionCmd = &cobra.Command{
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate completion script",
+	Long: `To load completions:
+
+Bash:
+
+  $ source <(drun completion bash)
+
+  # To load completions for each session, execute once:
+  # Linux:
+  $ drun completion bash > /etc/bash_completion.d/drun
+  # macOS:
+  $ drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+
+Zsh:
+
+  # If shell completion is not already enabled in your environment,
+  # you will need to enable it.  You can execute the following once:
+
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+  # To load completions for each session, execute once:
+  $ drun completion zsh > "${fpath[1]}/_drun"
+
+  # You will need to start a new shell for this setup to take effect.
+
+fish:
+
+  $ drun completion fish | source
+
+  # To load completions for each session, execute once:
+  $ drun completion fish > ~/.config/fish/completions/drun.fish
+
+PowerShell:
+
+  PS> drun completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for every new session, run:
+  PS> drun completion powershell > drun.ps1
+  # and source this file from your PowerShell profile.
+`,
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch args[0] {
+		case "bash":
+			return cmd.Root().GenBashCompletion(os.Stdout)
+		case "zsh":
+			return cmd.Root().GenZshCompletion(os.Stdout)
+		case "fish":
+			return cmd.Root().GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+		return nil
+	},
+}
+
+// Cleanup backups command
+var cleanupBackupsCmd = &cobra.Command{
+	Use:   "cleanup-backups",
+	Short: "Clean up old drun backup files",
+	Long: `Remove old backup files created during drun updates.
+
+This command will:
+- List all drun backup files in ~/.drun/backups/
+- Allow you to selectively delete old backups
+- Keep the most recent backup by default
+
+Examples:
+  drun cleanup-backups          # Interactive cleanup
+  drun cleanup-backups --all    # Remove all backups
+  drun cleanup-backups --keep=3 # Keep only the 3 most recent backups
+`,
+	RunE: cleanupBackups,
+}
+
+var (
+	cleanupAll  bool
+	keepBackups int
+)
+
+func init() {
+	cleanupBackupsCmd.Flags().BoolVar(&cleanupAll, "all", false, "Remove all backup files")
+	cleanupBackupsCmd.Flags().IntVar(&keepBackups, "keep", 1, "Number of recent backups to keep (default: 1)")
+}
+
 // TODO: Cache subcommands temporarily disabled due to command resolution conflicts
 
 func init() {
@@ -81,6 +171,20 @@ func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 	rootCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching and force execution")
 	rootCmd.Flags().BoolVar(&updateSelf, "update", false, "Update drun to the latest version")
+
+	// Add completion command
+	rootCmd.AddCommand(completionCmd)
+
+	// Add backup cleanup command
+	rootCmd.AddCommand(cleanupBackupsCmd)
+
+	// Set up completion for shell type flag
+	_ = rootCmd.RegisterFlagCompletionFunc("shell", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"linux", "darwin", "windows"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	// Set up dynamic completion for recipes
+	rootCmd.ValidArgsFunction = completeRecipes
 
 	// TODO: Add cache subcommand later (causes command resolution issues)
 	// cacheCmd.AddCommand(cacheClearCmd)
@@ -1174,16 +1278,20 @@ func confirmUpdate(newVersion string) bool {
 
 // downloadAndReplace downloads the new binary and replaces the current one
 func downloadAndReplace(asset *GitHubAsset, execPath string) error {
-	// Create backup of current binary
-	backupPath := execPath + ".backup"
+	// Create backup of current binary in user's home directory or temp directory
+	backupPath, err := createBackupPath(execPath)
+	if err != nil {
+		return fmt.Errorf("failed to determine backup path: %w", err)
+	}
+
 	if err := copyFile(execPath, backupPath); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
-	fmt.Println("💾 Created backup of current binary")
+	fmt.Printf("💾 Created backup of current binary at: %s\n", backupPath)
 
 	// Download new binary to temporary file
-	tempPath := execPath + ".tmp"
+	tempPath := filepath.Join(os.TempDir(), filepath.Base(execPath)+".tmp")
 	if err := downloadFile(asset.BrowserDownloadURL, tempPath); err != nil {
 		// Clean up backup on failure
 		_ = os.Remove(backupPath)
@@ -1204,13 +1312,18 @@ func downloadAndReplace(asset *GitHubAsset, execPath string) error {
 	// Replace current binary with new one
 	if err := os.Rename(tempPath, execPath); err != nil {
 		// Try to restore backup on failure
-		_ = os.Rename(backupPath, execPath)
+		if restoreErr := copyFile(backupPath, execPath); restoreErr != nil {
+			fmt.Printf("⚠️  Failed to restore backup: %v\n", restoreErr)
+			fmt.Printf("💾 Backup is available at: %s\n", backupPath)
+		} else {
+			fmt.Println("🔄 Restored backup successfully")
+		}
 		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to replace binary: %w", err)
 	}
 
-	// Clean up backup file
-	_ = os.Remove(backupPath)
+	// Keep backup file for safety - don't auto-delete it
+	fmt.Printf("💾 Backup preserved at: %s\n", backupPath)
 
 	fmt.Println("🔄 Replaced binary successfully")
 	return nil
@@ -1274,4 +1387,341 @@ func copyFile(src, dst string) error {
 	}
 
 	return os.Chmod(dst, sourceInfo.Mode())
+}
+
+// createBackupPath creates a backup path in a user-writable location
+func createBackupPath(execPath string) (string, error) {
+	// Get the executable name
+	execName := filepath.Base(execPath)
+
+	// Try user's home directory first
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		backupDir := filepath.Join(homeDir, ".drun", "backups")
+		if err := os.MkdirAll(backupDir, 0755); err == nil {
+			timestamp := time.Now().Format("2006-01-02_15-04-05")
+			return filepath.Join(backupDir, fmt.Sprintf("%s.%s.backup", execName, timestamp)), nil
+		}
+	}
+
+	// Fallback to system temp directory
+	tempDir := os.TempDir()
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	return filepath.Join(tempDir, fmt.Sprintf("%s.%s.backup", execName, timestamp)), nil
+}
+
+// cleanupBackups handles the cleanup of old backup files
+func cleanupBackups(cmd *cobra.Command, args []string) error {
+	// Get backup directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	backupDir := filepath.Join(homeDir, ".drun", "backups")
+
+	// Check if backup directory exists
+	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
+		fmt.Println("📁 No backup directory found. No backups to clean up.")
+		return nil
+	}
+
+	// List all backup files
+	files, err := filepath.Glob(filepath.Join(backupDir, "*.backup"))
+	if err != nil {
+		return fmt.Errorf("failed to list backup files: %w", err)
+	}
+
+	if len(files) == 0 {
+		fmt.Println("📁 No backup files found.")
+		return nil
+	}
+
+	// Sort files by modification time (newest first)
+	type fileInfo struct {
+		path    string
+		modTime time.Time
+		size    int64
+	}
+
+	var backupFiles []fileInfo
+	for _, file := range files {
+		info, err := os.Stat(file)
+		if err != nil {
+			continue
+		}
+		backupFiles = append(backupFiles, fileInfo{
+			path:    file,
+			modTime: info.ModTime(),
+			size:    info.Size(),
+		})
+	}
+
+	// Sort by modification time (newest first)
+	for i := 0; i < len(backupFiles)-1; i++ {
+		for j := i + 1; j < len(backupFiles); j++ {
+			if backupFiles[i].modTime.Before(backupFiles[j].modTime) {
+				backupFiles[i], backupFiles[j] = backupFiles[j], backupFiles[i]
+			}
+		}
+	}
+
+	fmt.Printf("📁 Found %d backup file(s):\n\n", len(backupFiles))
+
+	var totalSize int64
+	for i, file := range backupFiles {
+		totalSize += file.size
+		sizeStr := fmt.Sprintf("%.1f MB", float64(file.size)/(1024*1024))
+		fmt.Printf("  %d. %s (%s) - %s\n",
+			i+1,
+			filepath.Base(file.path),
+			sizeStr,
+			file.modTime.Format("2006-01-02 15:04:05"))
+	}
+
+	fmt.Printf("\nTotal size: %.1f MB\n\n", float64(totalSize)/(1024*1024))
+
+	// Determine which files to delete
+	var filesToDelete []string
+
+	if cleanupAll {
+		for _, file := range backupFiles {
+			filesToDelete = append(filesToDelete, file.path)
+		}
+		fmt.Println("🗑️  Removing ALL backup files...")
+	} else {
+		// Keep the most recent N backups
+		if len(backupFiles) > keepBackups {
+			for i := keepBackups; i < len(backupFiles); i++ {
+				filesToDelete = append(filesToDelete, backupFiles[i].path)
+			}
+			fmt.Printf("🗑️  Removing %d old backup(s), keeping %d most recent...\n",
+				len(filesToDelete), keepBackups)
+		} else {
+			fmt.Printf("✅ Only %d backup(s) found, keeping all (--keep=%d)\n",
+				len(backupFiles), keepBackups)
+			return nil
+		}
+	}
+
+	if len(filesToDelete) == 0 {
+		return nil
+	}
+
+	// Ask for confirmation unless --all flag is used
+	if !cleanupAll {
+		fmt.Print("Do you want to continue? (y/N): ")
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
+		}
+
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("❌ Cleanup cancelled")
+			return nil
+		}
+	}
+
+	// Delete the files
+	var deletedCount int
+	var deletedSize int64
+
+	for _, file := range filesToDelete {
+		if info, err := os.Stat(file); err == nil {
+			deletedSize += info.Size()
+		}
+
+		if err := os.Remove(file); err != nil {
+			fmt.Printf("⚠️  Failed to delete %s: %v\n", filepath.Base(file), err)
+		} else {
+			deletedCount++
+		}
+	}
+
+	fmt.Printf("✅ Deleted %d backup file(s), freed %.1f MB\n",
+		deletedCount, float64(deletedSize)/(1024*1024))
+
+	return nil
+}
+
+// Completion functions
+
+// completeRecipes provides completion for recipe names and their arguments
+func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Load configuration to get available recipes
+	loader := spec.NewLoader(".")
+	specData, err := loader.Load(configFile)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// If no recipe specified yet, complete recipe names
+	if len(args) == 0 {
+		var recipes []string
+		for name, recipe := range specData.Recipes {
+			help := recipe.Help
+			if help == "" {
+				help = "No description"
+			}
+			recipes = append(recipes, name+"\t"+help)
+		}
+		return recipes, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// If recipe is specified, complete its arguments
+	recipeName := args[0]
+	recipe, exists := specData.Recipes[recipeName]
+	if !exists {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return completeRecipeArguments(recipe, args[1:], toComplete)
+}
+
+// completeRecipeArguments provides completion for recipe-specific arguments
+func completeRecipeArguments(recipe model.Recipe, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var completions []string
+
+	// Check if we're completing a named argument
+	if strings.HasPrefix(toComplete, "--") {
+		// Complete named positional arguments
+		for _, pos := range recipe.Positionals {
+			flag := "--" + pos.Name + "="
+			if strings.HasPrefix(flag, toComplete) {
+				help := "positional argument"
+				if len(pos.OneOf) > 0 {
+					help += " (one of: " + strings.Join(pos.OneOf, ", ") + ")"
+				}
+				if pos.Default != "" {
+					help += " (default: " + pos.Default + ")"
+				}
+				completions = append(completions, flag+"\t"+help)
+			}
+		}
+
+		// Complete recipe flags
+		for flagName, flag := range recipe.Flags {
+			flagStr := "--" + flagName
+			if flag.Type != "bool" {
+				flagStr += "="
+			}
+			if strings.HasPrefix(flagStr, toComplete) {
+				help := flag.Help
+				if help == "" {
+					help = "flag (" + flag.Type + ")"
+				}
+				if flag.Default != nil {
+					help += fmt.Sprintf(" (default: %v)", flag.Default)
+				}
+				completions = append(completions, flagStr+"\t"+help)
+			}
+		}
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Check if we're completing a named argument in key=value format
+	if strings.Contains(toComplete, "=") {
+		parts := strings.SplitN(toComplete, "=", 2)
+		argName := parts[0]
+
+		// Find the positional argument and provide value completion
+		for _, pos := range recipe.Positionals {
+			if pos.Name == argName && len(pos.OneOf) > 0 {
+				var values []string
+				for _, value := range pos.OneOf {
+					if strings.HasPrefix(value, parts[1]) {
+						values = append(values, argName+"="+value)
+					}
+				}
+				return values, cobra.ShellCompDirectiveNoFileComp
+			}
+		}
+
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+
+	// For regular completion, suggest both positional and named arguments
+
+	// Count how many positional arguments have been provided
+	positionalCount := 0
+	namedArgs := make(map[string]bool)
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--") {
+			// Named argument
+			argName := strings.TrimPrefix(arg, "--")
+			if strings.Contains(argName, "=") {
+				argName = strings.SplitN(argName, "=", 2)[0]
+			}
+			namedArgs[argName] = true
+		} else if strings.Contains(arg, "=") && !strings.HasPrefix(arg, "-") {
+			// Assignment-style named argument
+			argName := strings.SplitN(arg, "=", 2)[0]
+			namedArgs[argName] = true
+		} else {
+			// Positional argument
+			positionalCount++
+		}
+	}
+
+	// Suggest next positional argument if available
+	if positionalCount < len(recipe.Positionals) {
+		pos := recipe.Positionals[positionalCount]
+		if !namedArgs[pos.Name] {
+			if len(pos.OneOf) > 0 {
+				// Suggest specific values
+				for _, value := range pos.OneOf {
+					if strings.HasPrefix(value, toComplete) {
+						help := "value for " + pos.Name
+						completions = append(completions, value+"\t"+help)
+					}
+				}
+			} else {
+				// Suggest the argument name
+				help := "positional argument: " + pos.Name
+				if pos.Default != "" {
+					help += " (default: " + pos.Default + ")"
+				}
+				completions = append(completions, pos.Name+"=\t"+help+" (named)")
+			}
+		}
+	}
+
+	// Suggest named arguments that haven't been used
+	for _, pos := range recipe.Positionals {
+		if !namedArgs[pos.Name] {
+			argName := pos.Name + "="
+			if strings.HasPrefix(argName, toComplete) {
+				help := "named argument"
+				if len(pos.OneOf) > 0 {
+					help += " (one of: " + strings.Join(pos.OneOf, ", ") + ")"
+				}
+				if pos.Default != "" {
+					help += " (default: " + pos.Default + ")"
+				}
+				completions = append(completions, argName+"\t"+help)
+			}
+		}
+	}
+
+	// Suggest recipe flags that haven't been used
+	for flagName, flag := range recipe.Flags {
+		if !namedArgs[flagName] {
+			flagStr := "--" + flagName
+			if flag.Type != "bool" {
+				flagStr += "="
+			}
+			if strings.HasPrefix(flagStr, toComplete) {
+				help := flag.Help
+				if help == "" {
+					help = "flag (" + flag.Type + ")"
+				}
+				completions = append(completions, flagStr+"\t"+help)
+			}
+		}
+	}
+
+	return completions, cobra.ShellCompDirectiveNoFileComp
 }

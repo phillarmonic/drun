@@ -306,6 +306,139 @@ recipes:
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)
 - `--shell`: Override shell type (linux/darwin/windows)
+- `completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
+- `cleanup-backups`: Clean up old backup files created during updates
+
+## Shell Completion
+
+drun supports intelligent shell completion for bash, zsh, fish, and PowerShell. The completion includes:
+
+- **Recipe names** with descriptions
+- **Positional arguments** with named syntax support (`--name=value` and `name=value`)
+- **Recipe-specific flags** with type information and defaults
+- **Value completion** for `one_of` constraints
+- **Context-aware suggestions** based on what's already been typed
+
+### Installation
+
+#### Bash
+
+```bash
+# Load completion for current session
+source <(drun completion bash)
+
+# Install permanently (Linux)
+drun completion bash > /etc/bash_completion.d/drun
+
+# Install permanently (macOS with Homebrew)
+drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+```
+
+#### Zsh
+
+```bash
+# Enable completion system (if not already enabled)
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# Load completion for current session
+source <(drun completion zsh)
+
+# Install permanently
+drun completion zsh > "${fpath[1]}/_drun"
+
+# Restart your shell or source ~/.zshrc
+```
+
+#### Fish
+
+```bash
+# Load completion for current session
+drun completion fish | source
+
+# Install permanently
+drun completion fish > ~/.config/fish/completions/drun.fish
+```
+
+#### PowerShell
+
+```powershell
+# Load completion for current session
+drun completion powershell | Out-String | Invoke-Expression
+
+# Install permanently
+drun completion powershell > drun.ps1
+# Then source this file from your PowerShell profile
+```
+
+### Completion Examples
+
+```bash
+# Recipe completion
+drun <TAB>                    # Shows all recipes with descriptions
+drun rel<TAB>                 # Completes to "release"
+
+# Named argument completion  
+drun release <TAB>            # Shows: version= --version= --arch= --push
+drun release --<TAB>          # Shows: --version= --arch= --push
+drun release version=<TAB>    # Shows available values if one_of is defined
+
+# Mixed completion
+drun release v1.0.0 <TAB>     # Shows remaining arguments: --arch= --push
+drun release --arch=<TAB>     # Shows: amd64, arm64, both
+```
+
+## Self-Update & Backup Management
+
+drun includes built-in self-update functionality with intelligent backup management.
+
+### Update Command
+
+```bash
+# Check for and install updates
+drun --update
+```
+
+The update process:
+1. **Checks GitHub releases** for the latest version
+2. **Creates a backup** in `~/.drun/backups/` (user-writable location)
+3. **Downloads** the appropriate binary for your platform
+4. **Replaces** the current binary safely
+5. **Preserves the backup** for safety
+
+### Backup Management
+
+Backups are automatically created during updates and stored in user-writable locations:
+
+- **Primary location**: `~/.drun/backups/`
+- **Fallback location**: System temp directory
+- **Naming format**: `drun.YYYY-MM-DD_HH-MM-SS.backup`
+
+#### Cleanup Command
+
+```bash
+# List and clean up old backups (interactive)
+drun cleanup-backups
+
+# Keep only the 3 most recent backups
+drun cleanup-backups --keep=3
+
+# Remove all backup files
+drun cleanup-backups --all
+```
+
+The cleanup command provides:
+- **Interactive cleanup** with file listing and sizes
+- **Selective retention** (keep N most recent backups)
+- **Safety confirmation** before deletion
+- **Size reporting** (freed disk space)
+
+### Update Safety Features
+
+- ✅ **User-writable backups** (no permission errors)
+- ✅ **Automatic rollback** on update failure
+- ✅ **Backup preservation** (not auto-deleted)
+- ✅ **Platform detection** (correct binary for your system)
+- ✅ **Version validation** (only update when newer version available)
 
 ## Template Functions
 
