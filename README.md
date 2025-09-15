@@ -11,6 +11,7 @@ A **high-performance** YAML-based task runner with first-class positional argume
 
 - **YAML Configuration**: Define tasks in a simple, readable YAML format
 - **Positional Arguments**: First-class support for positional arguments with validation
+- **Named Arguments**: Pass positional arguments by name for clarity (`--name=value` or `name=value`)
 - **Templating**: Powerful Go template engine with custom functions and caching
 - **Dependencies**: Automatic dependency resolution and parallel execution
 - **High Performance**: Microsecond-level operations with intelligent caching
@@ -108,12 +109,24 @@ go test -cover ./internal/...
    ./bin/drun release v1.0.0 amd64
    ```
 
-6. **Dry run to see what would execute**:
+6. **Use named arguments for clarity**:
+   ```bash
+   # Flag-style named arguments
+   ./bin/drun release --version=v1.0.0 --arch=amd64
+   
+   # Assignment-style named arguments
+   ./bin/drun release version=v1.0.0 arch=amd64
+   
+   # Mix positional and named
+   ./bin/drun release v1.0.0 --arch=amd64
+   ```
+
+7. **Dry run to see what would execute**:
    ```bash
    ./bin/drun build --dry-run
    ```
 
-7. **Run performance benchmarks**:
+8. **Run performance benchmarks**:
    ```bash
    ./test.sh -b
    ```
@@ -205,8 +218,65 @@ recipes:
     positionals:
       - name: name
         required: true
+      - name: title
+        default: "friend"
     run: |
-      echo "Hello, {{ .name }}!"
+      echo "Hello, {{ .title }} {{ .name }}!"
+```
+
+**Usage examples:**
+```bash
+# Traditional positional arguments
+drun greet Alice
+drun greet Bob Mr.
+
+# Named arguments (flag-style)
+drun greet --name=Alice --title=Ms.
+
+# Named arguments (assignment-style)  
+drun greet name=Bob title=Dr.
+
+# Mixed usage
+drun greet Alice --title=Ms.
+```
+
+### Advanced Named Arguments
+
+```yaml
+recipes:
+  deploy:
+    help: "Deploy to environment with version"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "prod"]
+      - name: version
+        default: "latest"
+      - name: features
+        variadic: true
+    flags:
+      force:
+        type: bool
+        default: false
+    run: |
+      echo "Deploying {{ .version }} to {{ .environment }}"
+      {{ if .features }}echo "Features: {{ range .features }}{{ . }} {{ end }}"{{ end }}
+      {{ if .force }}echo "Force deployment enabled"{{ end }}
+```
+
+**Usage examples:**
+```bash
+# All positional
+drun deploy prod v1.2.3 feature1 feature2 --force
+
+# All named arguments
+drun deploy --environment=prod --version=v1.2.3 --force
+
+# Mixed style
+drun deploy prod --version=v1.2.3 --force
+
+# Assignment style with variadic
+drun deploy environment=staging version=v1.1.0 features=auth,ui --force
 ```
 
 ### Recipe with Dependencies
@@ -259,8 +329,12 @@ See the included `drun.yml` for a comprehensive example showing:
 
 ## Status
 
-This is an MVP implementation with core functionality working. Future enhancements may include:
-- Recipe-specific command-line flags
+This is a feature-complete implementation with robust functionality. Recent additions include:
+- ✅ **Named Arguments**: Pass positional arguments by name using `--name=value` or `name=value` syntax
+- ✅ **Recipe-specific command-line flags**: Define custom flags per recipe
+- ✅ **High-performance optimizations**: Microsecond-level operations with intelligent caching
+
+Future enhancements may include:
 - File watching and auto-execution
 - Remote includes and caching
 - Matrix builds

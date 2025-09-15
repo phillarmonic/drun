@@ -52,10 +52,13 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "drun [recipe] [positionals...] [flags...]",
+	Use:   "drun [recipe] [positionals...] [--name=value...] [flags...]",
 	Short: "A YAML-based task runner with first-class positional arguments",
 	Long: `drun is a task runner that uses YAML configuration files to define recipes.
-It supports positional arguments, dependencies, templating, and cross-platform execution.`,
+It supports positional arguments (both positional and named), dependencies, templating, and cross-platform execution.
+
+Named arguments can be specified as:
+  --name=value  or  name=value`,
 	RunE: runDrun,
 	// Disable unknown command errors
 	SilenceErrors: true,
@@ -291,6 +294,7 @@ func findDefaultRecipe(specData *model.Spec) string {
 // parseRecipeArgs parses both positional arguments and recipe-specific flags
 func parseRecipeArgs(recipe model.Recipe, args []string) (map[string]any, map[string]any, error) {
 	flags := make(map[string]any)
+	namedArgs := make(map[string]string) // Store named positional arguments
 
 	// Apply default values for flags first
 	for flagName, flagDef := range recipe.Flags {
@@ -315,7 +319,7 @@ func parseRecipeArgs(recipe model.Recipe, args []string) (map[string]any, map[st
 
 	var positionalArgs []string
 
-	// Parse arguments, separating flags from positionals
+	// Parse arguments, separating flags, named args, and positionals
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
@@ -329,9 +333,26 @@ func parseRecipeArgs(recipe model.Recipe, args []string) (map[string]any, map[st
 				flagName = parts[0]
 				flagValue := parts[1]
 
+				// Check if this is a named positional argument
+				if isPositionalArgName(recipe.Positionals, flagName) {
+					namedArgs[flagName] = flagValue
+					continue
+				}
+
 				if err := setRecipeFlag(flags, recipe.Flags, flagName, flagValue); err != nil {
 					return nil, nil, err
 				}
+				continue
+			}
+
+			// Check if this is a named positional argument
+			if isPositionalArgName(recipe.Positionals, flagName) {
+				// For named positional args, we need a value
+				if i+1 >= len(args) {
+					return nil, nil, fmt.Errorf("named argument --%s requires a value", flagName)
+				}
+				i++ // Move to the value
+				namedArgs[flagName] = args[i]
 				continue
 			}
 
@@ -358,14 +379,27 @@ func parseRecipeArgs(recipe model.Recipe, args []string) (map[string]any, map[st
 			if err := setRecipeFlag(flags, recipe.Flags, flagName, flagValue); err != nil {
 				return nil, nil, err
 			}
+		} else if strings.Contains(arg, "=") && !strings.HasPrefix(arg, "-") {
+			// Check if it's a named argument in key=value format
+			parts := strings.SplitN(arg, "=", 2)
+			argName := parts[0]
+			argValue := parts[1]
+
+			if isPositionalArgName(recipe.Positionals, argName) {
+				namedArgs[argName] = argValue
+				continue
+			}
+
+			// If not a named positional arg, treat as regular positional
+			positionalArgs = append(positionalArgs, arg)
 		} else {
 			// It's a positional argument
 			positionalArgs = append(positionalArgs, arg)
 		}
 	}
 
-	// Parse positional arguments
-	parsedPositionals, err := parsePositionals(recipe.Positionals, positionalArgs)
+	// Parse positional arguments (including named ones)
+	parsedPositionals, err := parsePositionalsWithNamed(recipe.Positionals, positionalArgs, namedArgs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -457,6 +491,28 @@ func enhanceRecipeArgsError(err error, recipeName string, recipe model.Recipe) e
 			}
 		}
 
+		// Show named argument syntax if there are positionals
+		if len(recipe.Positionals) > 0 {
+			msg += "\n\nNamed argument syntax:\n"
+			msg += fmt.Sprintf("  drun %s", recipeName)
+			for _, pos := range recipe.Positionals {
+				if pos.Required {
+					msg += fmt.Sprintf(" --%s=<%s>", pos.Name, pos.Name)
+				} else {
+					msg += fmt.Sprintf(" [--%s=<%s>]", pos.Name, pos.Name)
+				}
+			}
+			msg += "\n  or:\n"
+			msg += fmt.Sprintf("  drun %s", recipeName)
+			for _, pos := range recipe.Positionals {
+				if pos.Required {
+					msg += fmt.Sprintf(" %s=<%s>", pos.Name, pos.Name)
+				} else {
+					msg += fmt.Sprintf(" [%s=<%s>]", pos.Name, pos.Name)
+				}
+			}
+		}
+
 		return fmt.Errorf("%s", msg)
 	}
 
@@ -464,11 +520,71 @@ func enhanceRecipeArgsError(err error, recipeName string, recipe model.Recipe) e
 	return enhancePositionalError(err, recipeName, recipe.Positionals, recipe.Help)
 }
 
-func parsePositionals(posArgs []model.PositionalArg, args []string) (map[string]any, error) {
-	result := make(map[string]any)
+// isPositionalArgName checks if a name corresponds to a positional argument
+func isPositionalArgName(positionals []model.PositionalArg, name string) bool {
+	for _, pos := range positionals {
+		if pos.Name == name {
+			return true
+		}
+	}
+	return false
+}
 
+// parsePositionalsWithNamed parses positional arguments, supporting both positional and named syntax
+func parsePositionalsWithNamed(posArgs []model.PositionalArg, args []string, namedArgs map[string]string) (map[string]any, error) {
+	result := make(map[string]any)
+	usedPositional := make([]bool, len(posArgs)) // Track which positional slots are used
+
+	// First, process named arguments
+	for name, value := range namedArgs {
+		// Find the positional argument definition
+		var posArg *model.PositionalArg
+		var index int
+		for i, pa := range posArgs {
+			if pa.Name == name {
+				posArg = &pa
+				index = i
+				break
+			}
+		}
+
+		if posArg == nil {
+			return nil, fmt.Errorf("unknown positional argument: %s", name)
+		}
+
+		// Validate one_of constraint
+		if len(posArg.OneOf) > 0 {
+			valid := false
+			for _, allowed := range posArg.OneOf {
+				if value == allowed {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return nil, fmt.Errorf("positional argument '%s' must be one of: %v", posArg.Name, posArg.OneOf)
+			}
+		}
+
+		if posArg.Variadic {
+			// For variadic named args, split by comma or treat as single value
+			result[posArg.Name] = []string{value}
+		} else {
+			result[posArg.Name] = value
+		}
+
+		usedPositional[index] = true
+	}
+
+	// Then, process regular positional arguments
+	argIndex := 0
 	for i, posArg := range posArgs {
-		if i >= len(args) {
+		if usedPositional[i] {
+			// This position was filled by a named argument, skip
+			continue
+		}
+
+		if argIndex >= len(args) {
 			if posArg.Required {
 				return nil, fmt.Errorf("required positional argument '%s' not provided", posArg.Name)
 			}
@@ -478,7 +594,7 @@ func parsePositionals(posArgs []model.PositionalArg, args []string) (map[string]
 			continue
 		}
 
-		value := args[i]
+		value := args[argIndex]
 
 		// Validate one_of constraint
 		if len(posArg.OneOf) > 0 {
@@ -496,15 +612,27 @@ func parsePositionals(posArgs []model.PositionalArg, args []string) (map[string]
 
 		if posArg.Variadic {
 			// Collect remaining arguments
-			result[posArg.Name] = args[i:]
+			remainingArgs := args[argIndex:]
+			if existing, exists := result[posArg.Name]; exists {
+				// Merge with named args if any
+				if existingSlice, ok := existing.([]string); ok {
+					result[posArg.Name] = append(existingSlice, remainingArgs...)
+				} else {
+					result[posArg.Name] = remainingArgs
+				}
+			} else {
+				result[posArg.Name] = remainingArgs
+			}
+			argIndex = len(args) // Consume all remaining args
 			break
 		} else {
 			result[posArg.Name] = value
+			argIndex++
 		}
 	}
 
 	// Check for excess arguments
-	if len(args) > len(posArgs) && (len(posArgs) == 0 || !posArgs[len(posArgs)-1].Variadic) {
+	if argIndex < len(args) {
 		return nil, fmt.Errorf("too many positional arguments provided")
 	}
 
