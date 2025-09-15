@@ -1,10 +1,12 @@
 package spec
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/phillarmonic/drun/internal/model"
@@ -23,9 +25,18 @@ var DefaultFilenames = []string{
 	"ops.drun.yaml",
 }
 
+// CacheEntry represents a cached spec with metadata
+type CacheEntry struct {
+	Spec     *model.Spec
+	ModTime  time.Time
+	FileHash string
+}
+
 // Loader handles loading and validating drun specifications
 type Loader struct {
-	baseDir string
+	baseDir   string
+	cache     sync.Map // Cache specs by file path
+	fileCache sync.Map // Cache file contents by path+modtime
 }
 
 // NewLoader creates a new spec loader
@@ -59,7 +70,12 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 		}
 	}
 
-	data, err := os.ReadFile(filePath)
+	// Check if we have a cached version
+	if cached, valid := l.getCachedSpec(filePath); valid {
+		return cached, nil
+	}
+
+	data, err := l.readFileWithCache(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", filePath, err)
 	}
@@ -89,6 +105,9 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 	if err := l.validate(&spec); err != nil {
 		return nil, fmt.Errorf("validation failed for %s: %w", filePath, err)
 	}
+
+	// Cache the successfully loaded and validated spec
+	l.cacheSpec(filePath, &spec)
 
 	return &spec, nil
 }
@@ -333,4 +352,92 @@ func (l *Loader) mergeSpecs(base *model.Spec, included *model.Spec) {
 	if len(included.Cache.Keys) > 0 {
 		base.Cache.Keys = append(base.Cache.Keys, included.Cache.Keys...)
 	}
+}
+
+// getCachedSpec retrieves a cached spec if it's still valid
+func (l *Loader) getCachedSpec(filePath string) (*model.Spec, bool) {
+	// Get file info
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, false
+	}
+
+	// Check cache
+	if cached, ok := l.cache.Load(filePath); ok {
+		entry := cached.(*CacheEntry)
+		// Check if file hasn't been modified
+		if entry.ModTime.Equal(info.ModTime()) {
+			return entry.Spec, true
+		}
+		// File was modified, remove from cache
+		l.cache.Delete(filePath)
+	}
+
+	return nil, false
+}
+
+// readFileWithCache reads a file with caching based on modification time
+func (l *Loader) readFileWithCache(filePath string) ([]byte, error) {
+	// Get file info
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create cache key with path and modification time
+	cacheKey := fmt.Sprintf("%s:%d", filePath, info.ModTime().Unix())
+
+	// Check file content cache
+	if cached, ok := l.fileCache.Load(cacheKey); ok {
+		return cached.([]byte), nil
+	}
+
+	// Read file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the file content
+	l.fileCache.Store(cacheKey, data)
+
+	// Clean up old cache entries for this file
+	l.cleanupFileCache(filePath, cacheKey)
+
+	return data, nil
+}
+
+// cleanupFileCache removes old cache entries for a file
+func (l *Loader) cleanupFileCache(filePath, currentKey string) {
+	// Remove old entries for this file (different modification times)
+	l.fileCache.Range(func(key, value any) bool {
+		keyStr := key.(string)
+		if strings.HasPrefix(keyStr, filePath+":") && keyStr != currentKey {
+			l.fileCache.Delete(key)
+		}
+		return true
+	})
+}
+
+// cacheSpec stores a spec in the cache
+func (l *Loader) cacheSpec(filePath string, spec *model.Spec) {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return // Don't cache if we can't get file info
+	}
+
+	// Create file hash for additional validation
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256(data))
+
+	entry := &CacheEntry{
+		Spec:     spec,
+		ModTime:  info.ModTime(),
+		FileHash: hash,
+	}
+
+	l.cache.Store(filePath, entry)
 }

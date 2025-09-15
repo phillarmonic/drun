@@ -315,7 +315,7 @@ func (r *Runner) executeScript(sh *shell.Shell, script, workingDir string, env m
 }
 
 // logf logs a formatted message
-func (r *Runner) logf(format string, args ...interface{}) {
+func (r *Runner) logf(format string, args ...any) {
 	_, _ = fmt.Fprintf(r.output, format+"\n", args...)
 }
 

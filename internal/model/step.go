@@ -37,7 +37,7 @@ func (s *Step) UnmarshalYAML(node *yaml.Node) error {
 }
 
 // MarshalYAML implements custom YAML marshaling for Step
-func (s Step) MarshalYAML() (interface{}, error) {
+func (s Step) MarshalYAML() (any, error) {
 	if len(s.Lines) == 1 {
 		return s.Lines[0], nil
 	}

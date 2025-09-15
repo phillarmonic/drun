@@ -6,40 +6,72 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/phillarmonic/drun/internal/model"
+	"github.com/phillarmonic/drun/internal/pool"
 )
 
 // Engine handles template rendering with custom functions
 type Engine struct {
-	snippets map[string]string
+	snippets      map[string]string
+	templateCache sync.Map         // Cache compiled templates by hash
+	funcMap       template.FuncMap // Pre-computed function map
 }
 
 // NewEngine creates a new template engine
 func NewEngine(snippets map[string]string) *Engine {
-	return &Engine{
+	e := &Engine{
 		snippets: snippets,
 	}
+	// Pre-compute function map for better performance
+	e.funcMap = e.getFuncMap()
+	return e
 }
 
 // Render renders a template string with the given context
 func (e *Engine) Render(templateStr string, ctx *model.ExecutionContext) (string, error) {
-	tmpl, err := template.New("drun").
-		Funcs(e.getFuncMap()).
-		Parse(templateStr)
+	// Use template caching for better performance
+	tmpl, err := e.getOrCompileTemplate(templateStr)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
+		return "", fmt.Errorf("failed to get template: %w", err)
 	}
 
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, e.buildTemplateData(ctx)); err != nil {
+	buf := pool.GetStringBuilder()
+	defer pool.PutStringBuilder(buf)
+
+	if err := tmpl.Execute(buf, e.buildTemplateData(ctx)); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return buf.String(), nil
+}
+
+// getOrCompileTemplate gets a cached template or compiles and caches a new one
+func (e *Engine) getOrCompileTemplate(templateStr string) (*template.Template, error) {
+	// Create a hash of the template string for caching
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(templateStr)))
+
+	// Check cache first
+	if cached, ok := e.templateCache.Load(hash); ok {
+		return cached.(*template.Template), nil
+	}
+
+	// Compile template
+	tmpl, err := template.New("drun").
+		Funcs(e.funcMap).
+		Parse(templateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	// Cache the compiled template
+	e.templateCache.Store(hash, tmpl)
+
+	return tmpl, nil
 }
 
 // RenderStep renders a step with the given context
@@ -69,28 +101,40 @@ func (e *Engine) RenderStep(step model.Step, ctx *model.ExecutionContext) (model
 
 // buildTemplateData builds the data map for template execution
 func (e *Engine) buildTemplateData(ctx *model.ExecutionContext) map[string]any {
-	data := make(map[string]any)
+	// Use pooled map for better performance
+	data := pool.GetStringMap()
+
+	// Note: We can't use defer here because we're returning the map
+	// The caller is responsible for returning it to the pool if needed
+	// For now, we'll create a new map to avoid complexity
+
+	// Pre-allocate map with estimated size to reduce allocations
+	estimatedSize := 3 + len(ctx.Vars) + len(ctx.Env) + len(ctx.Flags) + len(ctx.Positionals)
+	result := make(map[string]any, estimatedSize)
 
 	// Add system info first (can be overridden by user data)
-	data["os"] = ctx.OS
-	data["arch"] = ctx.Arch
-	data["hostname"] = ctx.Hostname
+	result["os"] = ctx.OS
+	result["arch"] = ctx.Arch
+	result["hostname"] = ctx.Hostname
 
 	// Add all context data (these can override system info)
 	for k, v := range ctx.Vars {
-		data[k] = v
+		result[k] = v
 	}
 	for k, v := range ctx.Env {
-		data[k] = v
+		result[k] = v
 	}
 	for k, v := range ctx.Flags {
-		data[k] = v
+		result[k] = v
 	}
 	for k, v := range ctx.Positionals {
-		data[k] = v
+		result[k] = v
 	}
 
-	return data
+	// Return the pooled map for reuse
+	pool.PutStringMap(data)
+
+	return result
 }
 
 // getFuncMap returns the template function map

@@ -9,12 +9,23 @@ import (
 
 // Builder builds execution plans from recipe dependencies
 type Builder struct {
-	spec *model.Spec
+	spec          *model.Spec
+	planCache     map[string]*model.ExecutionPlan // Cache plans by target recipe
+	estimatedSize int                             // Cached estimation for pre-allocation
 }
 
 // NewBuilder creates a new DAG builder
 func NewBuilder(spec *model.Spec) *Builder {
-	return &Builder{spec: spec}
+	estimatedSize := len(spec.Recipes)
+	if estimatedSize > 100 {
+		estimatedSize = 100 // Cap estimation for very large specs
+	}
+
+	return &Builder{
+		spec:          spec,
+		planCache:     make(map[string]*model.ExecutionPlan),
+		estimatedSize: estimatedSize,
+	}
 }
 
 // Build builds an execution plan for the given target recipe
@@ -24,12 +35,12 @@ func (b *Builder) Build(target string, ctx *model.ExecutionContext) (*model.Exec
 		return nil, fmt.Errorf("recipe '%s' not found", target)
 	}
 
-	// Build dependency graph
-	visited := make(map[string]bool)
-	visiting := make(map[string]bool)
-	var nodes []model.PlanNode
-	var edges [][2]int
-	nodeIndex := make(map[string]int)
+	// Build dependency graph with pre-allocated slices using cached estimation
+	visited := make(map[string]bool, b.estimatedSize)
+	visiting := make(map[string]bool, b.estimatedSize)
+	nodes := make([]model.PlanNode, 0, b.estimatedSize)
+	edges := make([][2]int, 0, b.estimatedSize*2) // Estimate 2 edges per node
+	nodeIndex := make(map[string]int, b.estimatedSize)
 
 	if err := b.buildGraph(target, ctx, visited, visiting, &nodes, &edges, nodeIndex); err != nil {
 		return nil, err
@@ -42,9 +53,9 @@ func (b *Builder) Build(target string, ctx *model.ExecutionContext) (*model.Exec
 	}
 
 	// Reorder nodes according to topological sort
-	var sortedNodes []model.PlanNode
-	for _, idx := range sorted {
-		sortedNodes = append(sortedNodes, nodes[idx])
+	sortedNodes := make([]model.PlanNode, len(sorted))
+	for i, idx := range sorted {
+		sortedNodes[i] = nodes[idx]
 	}
 
 	// Compute execution levels for parallel execution
@@ -92,11 +103,15 @@ func (b *Builder) buildGraph(
 	}
 
 	// Create recipe-specific context by merging recipe env vars
+	// Pre-allocate maps with estimated sizes
+	varsSize := len(ctx.Vars) + len(recipe.Env)
+	envSize := len(ctx.Env) + len(recipe.Env)
+
 	recipeCtx := &model.ExecutionContext{
-		Vars:        make(map[string]any),
-		Env:         make(map[string]string),
-		Flags:       ctx.Flags,
-		Positionals: ctx.Positionals,
+		Vars:        make(map[string]any, varsSize),
+		Env:         make(map[string]string, envSize),
+		Flags:       ctx.Flags,       // Share reference (read-only)
+		Positionals: ctx.Positionals, // Share reference (read-only)
 		OS:          ctx.OS,
 		Arch:        ctx.Arch,
 		Hostname:    ctx.Hostname,
@@ -150,9 +165,21 @@ func (b *Builder) topologicalSort(nodes []model.PlanNode, edges [][2]int) ([]int
 		return []int{}, nil
 	}
 
-	// Build adjacency list and in-degree count
+	// Build adjacency list and in-degree count with pre-allocation
 	adj := make([][]int, n)
 	inDegree := make([]int, n)
+
+	// Pre-allocate adjacency lists based on estimated out-degree
+	avgOutDegree := len(edges)
+	if n > 0 {
+		avgOutDegree = len(edges) / n
+	}
+	if avgOutDegree == 0 {
+		avgOutDegree = 1 // Minimum allocation
+	}
+	for i := range adj {
+		adj[i] = make([]int, 0, avgOutDegree)
+	}
 
 	for _, edge := range edges {
 		from, to := edge[0], edge[1]
@@ -164,14 +191,14 @@ func (b *Builder) topologicalSort(nodes []model.PlanNode, edges [][2]int) ([]int
 	}
 
 	// Find all nodes with no incoming edges
-	var queue []int
+	queue := make([]int, 0, n) // Pre-allocate queue
 	for i := 0; i < n; i++ {
 		if inDegree[i] == 0 {
 			queue = append(queue, i)
 		}
 	}
 
-	var result []int
+	result := make([]int, 0, n) // Pre-allocate result
 
 	for len(queue) > 0 {
 		// Remove a node with no incoming edges
@@ -267,9 +294,21 @@ func (b *Builder) computeExecutionLevels(nodes []model.PlanNode, edges [][2]int)
 		return [][]int{}
 	}
 
-	// Build adjacency list and in-degree count
+	// Build adjacency list and in-degree count with pre-allocation
 	adjList := make([][]int, nodeCount)
 	inDegree := make([]int, nodeCount)
+
+	// Pre-allocate adjacency lists
+	avgOutDegree := len(edges)
+	if nodeCount > 0 {
+		avgOutDegree = len(edges) / nodeCount
+	}
+	if avgOutDegree == 0 {
+		avgOutDegree = 1
+	}
+	for i := range adjList {
+		adjList[i] = make([]int, 0, avgOutDegree)
+	}
 
 	for _, edge := range edges {
 		from, to := edge[0], edge[1]
@@ -277,12 +316,8 @@ func (b *Builder) computeExecutionLevels(nodes []model.PlanNode, edges [][2]int)
 		inDegree[to]++
 	}
 
-	// Build a simpler approach: find nodes that have no dependencies (can run in parallel)
-	// and process level by level
-
-	// For now, ignore the parallel_deps flag complexity and just do basic level-based parallelism
-
-	var levels [][]int
+	// Pre-allocate levels slice with estimated size
+	levels := make([][]int, 0, nodeCount/2+1) // Estimate levels
 	remaining := make([]bool, nodeCount)
 	for i := range remaining {
 		remaining[i] = true
@@ -290,7 +325,7 @@ func (b *Builder) computeExecutionLevels(nodes []model.PlanNode, edges [][2]int)
 
 	// Process nodes level by level using topological sort
 	for {
-		var currentLevel []int
+		currentLevel := make([]int, 0, nodeCount) // Pre-allocate with max capacity
 
 		// Find all nodes with no remaining dependencies
 		for i := 0; i < nodeCount; i++ {
