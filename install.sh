@@ -113,7 +113,7 @@ check_dependencies() {
 
 # Get the latest release version from GitHub API
 get_latest_version() {
-    log_info "Fetching latest release information..."
+    log_info "Fetching latest release information..." >&2
     
     local latest_url="${GITHUB_API}/releases/latest"
     local response
