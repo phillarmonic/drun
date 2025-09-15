@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/dag"
 	"github.com/phillarmonic/drun/internal/model"
 	"github.com/phillarmonic/drun/internal/runner"
@@ -24,6 +26,15 @@ var (
 	shellType   string
 	setVars     []string
 	initConfig  bool
+	showVersion bool
+	noCache     bool
+)
+
+// Version information (set at build time)
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
 )
 
 func main() {
@@ -39,7 +50,14 @@ var rootCmd = &cobra.Command{
 	Long: `drun is a task runner that uses YAML configuration files to define recipes.
 It supports positional arguments, dependencies, templating, and cross-platform execution.`,
 	RunE: runDrun,
+	// Disable unknown command errors
+	SilenceErrors: true,
+	SilenceUsage:  true,
+	// Allow any arguments to be passed through
+	DisableFlagParsing: false,
 }
+
+// TODO: Cache subcommands temporarily disabled due to command resolution conflicts
 
 func init() {
 	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "Configuration file (default: drun.yml)")
@@ -50,9 +68,25 @@ func init() {
 	rootCmd.Flags().StringVar(&shellType, "shell", "", "Override shell type (linux/darwin/windows)")
 	rootCmd.Flags().StringArrayVar(&setVars, "set", []string{}, "Set variables (KEY=VALUE)")
 	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new drun.yml configuration file")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
+	rootCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching and force execution")
+
+	// TODO: Add cache subcommand later (causes command resolution issues)
+	// cacheCmd.AddCommand(cacheClearCmd)
+	// cacheCmd.AddCommand(cacheStatsCmd)
+	// rootCmd.AddCommand(cacheCmd)
+
+	// Set up unknown command handling
+	rootCmd.SetArgs(os.Args[1:])
+	rootCmd.FParseErrWhitelist.UnknownFlags = true
 }
 
 func runDrun(cmd *cobra.Command, args []string) error {
+	// Handle --version flag
+	if showVersion {
+		return showVersionInfo()
+	}
+
 	// Handle --init flag
 	if initConfig {
 		return initializeConfig(configFile)
@@ -62,7 +96,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	loader := spec.NewLoader(".")
 	specData, err := loader.Load(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return enhanceConfigError(err, configFile)
 	}
 
 	// Handle --list flag
@@ -91,13 +125,13 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Check if recipe exists
 	recipe, exists := specData.Recipes[target]
 	if !exists {
-		return fmt.Errorf("recipe '%s' not found", target)
+		return recipeNotFoundError(target, specData.Recipes)
 	}
 
 	// Parse positional arguments
 	positionals, err := parsePositionals(recipe.Positionals, positionalArgs)
 	if err != nil {
-		return fmt.Errorf("invalid positional arguments: %w", err)
+		return enhancePositionalError(err, target, recipe.Positionals, recipe.Help)
 	}
 
 	// Parse set variables
@@ -117,8 +151,20 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Create components
 	shellSelector := shell.NewSelector(specData.Shell)
 	templateEngine := tmpl.NewEngine(specData.Snippets)
+
+	// Set up caching
+	cacheDir := ".drun/cache"
+	if specData.Cache.Path != "" {
+		cacheDir = specData.Cache.Path
+	}
+	// Make cache directory absolute
+	if !filepath.IsAbs(cacheDir) {
+		cacheDir = filepath.Join(".", cacheDir)
+	}
+	cacheManager := cache.NewManager(cacheDir, templateEngine, noCache)
+
 	dagBuilder := dag.NewBuilder(specData)
-	taskRunner := runner.NewRunner(shellSelector, templateEngine, os.Stdout)
+	taskRunner := runner.NewRunner(shellSelector, templateEngine, cacheManager, os.Stdout)
 
 	// Set runner modes
 	taskRunner.SetDryRun(dryRun)
@@ -263,6 +309,170 @@ func buildExecutionContext(specData *model.Spec, positionals, flags, setVars map
 	}
 
 	return ctx
+}
+
+func recipeNotFoundError(target string, recipes map[string]model.Recipe) error {
+	var suggestions []string
+
+	// Find similar recipe names (simple string distance)
+	for recipeName := range recipes {
+		if levenshteinDistance(target, recipeName) <= 2 {
+			suggestions = append(suggestions, recipeName)
+		}
+	}
+
+	// If no close matches, suggest some common ones
+	if len(suggestions) == 0 {
+		commonNames := []string{"build", "test", "dev", "start", "deploy", "clean"}
+		for _, common := range commonNames {
+			if _, exists := recipes[common]; exists {
+				suggestions = append(suggestions, common)
+			}
+		}
+	}
+
+	msg := fmt.Sprintf("recipe '%s' not found", target)
+
+	if len(suggestions) > 0 {
+		msg += "\n\nDid you mean one of these?"
+		for _, suggestion := range suggestions {
+			if recipe, exists := recipes[suggestion]; exists && recipe.Help != "" {
+				msg += fmt.Sprintf("\n  %s - %s", suggestion, recipe.Help)
+			} else {
+				msg += fmt.Sprintf("\n  %s", suggestion)
+			}
+		}
+	}
+
+	msg += "\n\nRun 'drun --list' to see all available recipes."
+
+	return fmt.Errorf("%s", msg)
+}
+
+// Simple Levenshtein distance implementation
+func levenshteinDistance(a, b string) int {
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+
+	matrix := make([][]int, len(a)+1)
+	for i := range matrix {
+		matrix[i] = make([]int, len(b)+1)
+		matrix[i][0] = i
+	}
+	for j := range matrix[0] {
+		matrix[0][j] = j
+	}
+
+	for i := 1; i <= len(a); i++ {
+		for j := 1; j <= len(b); j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+
+			matrix[i][j] = min(
+				matrix[i-1][j]+1,      // deletion
+				matrix[i][j-1]+1,      // insertion
+				matrix[i-1][j-1]+cost, // substitution
+			)
+		}
+	}
+
+	return matrix[len(a)][len(b)]
+}
+
+func min(a, b, c int) int {
+	if a < b && a < c {
+		return a
+	}
+	if b < c {
+		return b
+	}
+	return c
+}
+
+func enhancePositionalError(err error, recipeName string, positionals []model.PositionalArg, help string) error {
+	msg := fmt.Sprintf("Error in recipe '%s': %v", recipeName, err)
+
+	if help != "" {
+		msg += fmt.Sprintf("\n\nUsage: %s", help)
+	}
+
+	if len(positionals) > 0 {
+		msg += "\n\nExpected arguments:"
+		for i, pos := range positionals {
+			required := ""
+			if pos.Required {
+				required = " (required)"
+			}
+
+			constraints := ""
+			if len(pos.OneOf) > 0 {
+				constraints = fmt.Sprintf(" [one of: %s]", strings.Join(pos.OneOf, ", "))
+			}
+
+			if pos.Variadic {
+				msg += fmt.Sprintf("\n  %d. %s... %s%s", i+1, pos.Name, required, constraints)
+			} else {
+				msg += fmt.Sprintf("\n  %d. %s%s%s", i+1, pos.Name, required, constraints)
+			}
+		}
+	}
+
+	return fmt.Errorf("%s", msg)
+}
+
+func enhanceConfigError(err error, configFile string) error {
+	errStr := err.Error()
+
+	// Check if it's a "no config file found" error
+	if strings.Contains(errStr, "no drun configuration file found") {
+		msg := "No drun configuration file found.\n\n"
+		msg += "To get started:\n"
+		msg += "  drun --init          # Create a starter configuration\n"
+		msg += "  drun --init -f FILE  # Create with custom filename\n\n"
+		msg += "Or create one of these files manually:\n"
+		for _, filename := range spec.DefaultFilenames {
+			msg += fmt.Sprintf("  %s\n", filename)
+		}
+		return fmt.Errorf("%s", msg)
+	}
+
+	// Check if it's a YAML parsing error
+	if strings.Contains(errStr, "failed to parse YAML") {
+		msg := fmt.Sprintf("Configuration file has invalid YAML syntax: %v\n\n", err)
+		msg += "Common YAML issues:\n"
+		msg += "  - Incorrect indentation (use spaces, not tabs)\n"
+		msg += "  - Missing quotes around strings with special characters\n"
+		msg += "  - Unmatched brackets or quotes\n\n"
+		msg += "Tip: Use a YAML validator or editor with YAML support"
+		return fmt.Errorf("%s", msg)
+	}
+
+	// Check if it's a validation error
+	if strings.Contains(errStr, "validation failed") {
+		return fmt.Errorf("configuration validation failed: %v\n\nCheck your recipe definitions and ensure all required fields are present", err)
+	}
+
+	// Default enhanced error
+	return fmt.Errorf("failed to load configuration: %v\n\nTry 'drun --init' to create a new configuration file", err)
+}
+
+func showVersionInfo() error {
+	fmt.Printf("drun version %s\n", version)
+	if commit != "unknown" {
+		fmt.Printf("commit: %s\n", commit)
+	}
+	if date != "unknown" {
+		fmt.Printf("built: %s\n", date)
+	}
+	fmt.Printf("go: %s\n", runtime.Version())
+	fmt.Printf("platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	return nil
 }
 
 func initializeConfig(filename string) error {

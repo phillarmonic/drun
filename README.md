@@ -2,6 +2,10 @@
 
 A YAML-based task runner with first-class positional arguments, with a powerful templating and dependency management.
 
+## Requirements
+
+- **Go 1.25+** - drun requires Go 1.25 or later
+
 ## Features
 
 - **YAML Configuration**: Define tasks in a simple, readable YAML format
@@ -17,6 +21,40 @@ A YAML-based task runner with first-class positional arguments, with a powerful 
    ```bash
    go build -o bin/drun ./cmd/drun
    ```
+
+## Testing
+
+Run the comprehensive test suite (includes mandatory golangci-lint):
+
+```bash
+# Basic tests (includes linting, unit tests, build verification)
+./test.sh
+
+# With coverage report
+./test.sh -c
+
+# Verbose with race detection
+./test.sh -v -r
+
+# All options
+./test.sh -v -c -r -b
+```
+
+Or run components manually:
+
+```bash
+# Linting (required - auto-installs golangci-lint if needed)
+golangci-lint run ./...
+
+# Unit tests only
+go test ./internal/...
+
+# With coverage
+go test -cover ./internal/...
+
+# CI-optimized test suite
+./test-ci.sh
+```
 
 2. **Initialize a new project**:
    ```bash

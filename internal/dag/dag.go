@@ -47,9 +47,16 @@ func (b *Builder) Build(target string, ctx *model.ExecutionContext) (*model.Exec
 		sortedNodes = append(sortedNodes, nodes[idx])
 	}
 
+	// Compute execution levels for parallel execution
+	levels := b.computeExecutionLevels(sortedNodes, edges)
+
+	// Debug output (can be enabled for troubleshooting)
+	// fmt.Printf("DEBUG: DAG has %d nodes, %d edges\n", len(sortedNodes), len(edges))
+
 	return &model.ExecutionPlan{
-		Nodes: sortedNodes,
-		Edges: edges,
+		Nodes:  sortedNodes,
+		Edges:  edges,
+		Levels: levels,
 	}, nil
 }
 
@@ -82,15 +89,6 @@ func (b *Builder) buildGraph(
 		if err := b.buildGraph(dep, ctx, visited, visiting, nodes, edges, nodeIndex); err != nil {
 			return err
 		}
-
-		// Add edge from dependency to current recipe
-		depIndex, depExists := nodeIndex[dep]
-		if !depExists {
-			return fmt.Errorf("dependency '%s' not found in node index", dep)
-		}
-
-		currentIndex := len(*nodes) // Current recipe will be at this index
-		*edges = append(*edges, [2]int{depIndex, currentIndex})
 	}
 
 	// Create recipe-specific context by merging recipe env vars
@@ -127,7 +125,17 @@ func (b *Builder) buildGraph(
 	}
 
 	*nodes = append(*nodes, node)
-	nodeIndex[recipeName] = len(*nodes) - 1
+	currentIndex := len(*nodes) - 1
+	nodeIndex[recipeName] = currentIndex
+
+	// Add edges from dependencies to current recipe
+	for _, dep := range recipe.Deps {
+		depIndex, depExists := nodeIndex[dep]
+		if !depExists {
+			return fmt.Errorf("dependency '%s' not found in node index", dep)
+		}
+		*edges = append(*edges, [2]int{depIndex, currentIndex})
+	}
 
 	visiting[recipeName] = false
 	visited[recipeName] = true
@@ -250,4 +258,60 @@ func (b *Builder) GetParallelGroups(plan *model.ExecutionPlan) [][]int {
 	}
 
 	return groups
+}
+
+// computeExecutionLevels computes which nodes can be executed in parallel
+func (b *Builder) computeExecutionLevels(nodes []model.PlanNode, edges [][2]int) [][]int {
+	nodeCount := len(nodes)
+	if nodeCount == 0 {
+		return [][]int{}
+	}
+
+	// Build adjacency list and in-degree count
+	adjList := make([][]int, nodeCount)
+	inDegree := make([]int, nodeCount)
+
+	for _, edge := range edges {
+		from, to := edge[0], edge[1]
+		adjList[from] = append(adjList[from], to)
+		inDegree[to]++
+	}
+
+	// Build a simpler approach: find nodes that have no dependencies (can run in parallel)
+	// and process level by level
+
+	// For now, ignore the parallel_deps flag complexity and just do basic level-based parallelism
+
+	var levels [][]int
+	remaining := make([]bool, nodeCount)
+	for i := range remaining {
+		remaining[i] = true
+	}
+
+	// Process nodes level by level using topological sort
+	for {
+		var currentLevel []int
+
+		// Find all nodes with no remaining dependencies
+		for i := 0; i < nodeCount; i++ {
+			if remaining[i] && inDegree[i] == 0 {
+				currentLevel = append(currentLevel, i)
+			}
+		}
+
+		if len(currentLevel) == 0 {
+			break // No more nodes to process
+		}
+
+		// All nodes in this level can run in parallel
+		levels = append(levels, currentLevel)
+		for _, nodeIdx := range currentLevel {
+			remaining[nodeIdx] = false
+			for _, neighbor := range adjList[nodeIdx] {
+				inDegree[neighbor]--
+			}
+		}
+	}
+
+	return levels
 }

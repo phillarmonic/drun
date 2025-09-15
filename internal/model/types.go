@@ -101,6 +101,7 @@ type PlanNode struct {
 
 // ExecutionPlan represents the complete execution plan
 type ExecutionPlan struct {
-	Nodes []PlanNode
-	Edges [][2]int // [from_index, to_index]
+	Nodes  []PlanNode
+	Edges  [][2]int // [from_index, to_index]
+	Levels [][]int  // Groups of node indices that can run in parallel
 }

@@ -48,6 +48,7 @@ recipes:
   build:
     help: "Build the drun application"
     deps: [deps]
+    cache_key: "build-{{ sha256 \"go.mod go.sum\" }}-{{ now \"2006-01-02\" }}"
     run: |
       {{ snippet "ensure_deps" }}
       echo "Building {{ .app_name }}..."

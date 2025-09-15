@@ -22,8 +22,29 @@ type Selector struct {
 
 // NewSelector creates a new shell selector
 func NewSelector(shellConfigs map[string]model.ShellConfig) *Selector {
+	if shellConfigs == nil {
+		shellConfigs = getDefaultShellConfigs()
+	}
 	return &Selector{
 		shellConfigs: shellConfigs,
+	}
+}
+
+// getDefaultShellConfigs returns the default shell configurations
+func getDefaultShellConfigs() map[string]model.ShellConfig {
+	return map[string]model.ShellConfig{
+		"linux": {
+			Cmd:  "/bin/sh",
+			Args: []string{"-ceu"},
+		},
+		"darwin": {
+			Cmd:  "/bin/zsh",
+			Args: []string{"-ceu"},
+		},
+		"windows": {
+			Cmd:  "pwsh",
+			Args: []string{"-NoLogo", "-Command"},
+		},
 	}
 }
 
@@ -40,7 +61,11 @@ func (s *Selector) Select(shellPref string, targetOS string) (*Shell, error) {
 		// Use OS-specific default
 		shellConfig, found = s.shellConfigs[targetOS]
 		if !found {
-			return nil, fmt.Errorf("no shell configuration found for OS: %s", targetOS)
+			// Fall back to Linux default for unknown OS
+			shellConfig, found = s.shellConfigs["linux"]
+			if !found {
+				return nil, fmt.Errorf("no shell configuration found for OS: %s", targetOS)
+			}
 		}
 	} else {
 		// Use specific shell configuration
@@ -59,17 +84,17 @@ func (s *Selector) Select(shellPref string, targetOS string) (*Shell, error) {
 
 // BuildCommand builds the command arguments for executing a script
 func (sh *Shell) BuildCommand(script string) []string {
-	args := make([]string, len(sh.Args))
-	copy(args, sh.Args)
-
 	if sh.OS == "windows" {
 		// For PowerShell, we need to handle the script differently
 		// Convert some common shell idioms
 		script = sh.convertShellIdioms(script)
 	}
 
-	args = append(args, script)
-	return args
+	// Build full command: [cmd, ...args, script]
+	result := []string{sh.Cmd}
+	result = append(result, sh.Args...)
+	result = append(result, script)
+	return result
 }
 
 // convertShellIdioms converts common POSIX shell idioms to PowerShell equivalents
@@ -87,7 +112,23 @@ func (sh *Shell) convertShellIdioms(script string) string {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
+			converted = append(converted, "")
 			continue
+		}
+
+		// Convert export statements to PowerShell
+		if strings.HasPrefix(line, "export ") {
+			// Extract variable assignment: export VAR=value
+			assignment := strings.TrimPrefix(line, "export ")
+			if strings.Contains(assignment, "=") {
+				parts := strings.SplitN(assignment, "=", 2)
+				if len(parts) == 2 {
+					varName := parts[0]
+					varValue := parts[1]
+					converted = append(converted, fmt.Sprintf("$env:%s='%s'", varName, varValue))
+					continue
+				}
+			}
 		}
 
 		// Convert && to PowerShell equivalent

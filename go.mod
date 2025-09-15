@@ -1,6 +1,6 @@
 module github.com/phillarmonic/drun
 
-go 1.25.1
+go 1.25
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3

@@ -46,7 +46,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     run: |
       {{ snippet "check_service" }}
       echo "🚀 Starting {{ .service }} in development mode..."
@@ -68,7 +68,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     run: |
       {{ snippet "check_service" }}
       {{ template "build_service" dict "service" .service }}
@@ -100,7 +100,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     flags:
       watch:
         type: bool
@@ -146,7 +146,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     flags:
       fix:
         type: bool
@@ -182,7 +182,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     run: |
       {{ snippet "check_service" }}
       echo "📦 Installing dependencies for {{ .service }}..."
@@ -208,7 +208,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
       - name: tag
         default: "latest"
     run: |
@@ -267,7 +267,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     run: |
       echo "🔄 Restarting {{ .service }}..."
       docker-compose restart {{ .service }}
@@ -297,7 +297,7 @@ recipes:
     positionals:
       - name: service
         required: true
-        one_of: {{ .services | toJson }}
+        one_of: ["api", "web", "worker", "docs"]
     flags:
       follow:
         type: bool

@@ -67,7 +67,44 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# IDEs
 .idea
 .vscode
-bin
+
+# Build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.xml
+
+# Go workspace file
+go.work
+
+# drun-specific files
+.drun/
+*.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS-specific
 workspace

@@ -111,12 +111,13 @@ func (e *Engine) getFuncMap() template.FuncMap {
 	return funcMap
 }
 
-// snippetFunc returns the content of a snippet
-func (e *Engine) snippetFunc(name string) (string, error) {
+// snippetFunc returns the content of a snippet and renders it with current context
+func (e *Engine) snippetFunc(name string) string {
 	if content, exists := e.snippets[name]; exists {
-		return content, nil
+		// Return the raw content - it will be rendered as part of the template
+		return content
 	}
-	return "", fmt.Errorf("snippet '%s' not found", name)
+	return fmt.Sprintf("{{ERROR: snippet '%s' not found}}", name)
 }
 
 // envFunc gets an environment variable

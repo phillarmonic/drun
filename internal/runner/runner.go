@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/model"
 	"github.com/phillarmonic/drun/internal/shell"
 	"github.com/phillarmonic/drun/internal/tmpl"
@@ -19,16 +20,18 @@ import (
 type Runner struct {
 	shellSelector  *shell.Selector
 	templateEngine *tmpl.Engine
+	cacheManager   *cache.Manager
 	output         io.Writer
 	dryRun         bool
 	explain        bool
 }
 
 // NewRunner creates a new runner
-func NewRunner(shellSelector *shell.Selector, templateEngine *tmpl.Engine, output io.Writer) *Runner {
+func NewRunner(shellSelector *shell.Selector, templateEngine *tmpl.Engine, cacheManager *cache.Manager, output io.Writer) *Runner {
 	return &Runner{
 		shellSelector:  shellSelector,
 		templateEngine: templateEngine,
+		cacheManager:   cacheManager,
 		output:         output,
 	}
 }
@@ -68,11 +71,91 @@ func (r *Runner) executeSequential(plan *model.ExecutionPlan) error {
 	return nil
 }
 
-// executeParallel executes nodes in parallel where possible
+// executeParallel executes nodes in parallel using computed execution levels
 func (r *Runner) executeParallel(plan *model.ExecutionPlan, jobs int) error {
-	// For now, implement a simple parallel execution
-	// In a full implementation, this would use the DAG to determine which nodes can run in parallel
+	// Use computed execution levels if available
+	if len(plan.Levels) > 0 {
+		return r.executeByLevels(plan, jobs)
+	}
 
+	// Fallback to simple parallel execution (ignores dependencies)
+	return r.executeSimpleParallel(plan, jobs)
+}
+
+// executeByLevels executes using the computed execution levels
+func (r *Runner) executeByLevels(plan *model.ExecutionPlan, jobs int) error {
+	totalNodes := len(plan.Nodes)
+	completedNodes := 0
+
+	// r.logf("Executing with %d levels, %d jobs", len(plan.Levels), jobs)
+
+	for _, level := range plan.Levels {
+		// r.logf("Level %d: %d tasks", levelIdx+1, len(level))
+		if len(level) == 1 {
+			// Single task - execute directly
+			nodeIndex := level[0]
+			node := &plan.Nodes[nodeIndex]
+			completedNodes++
+
+			if err := r.executeNode(node, completedNodes, totalNodes); err != nil {
+				return err
+			}
+		} else {
+			// Multiple tasks - execute in parallel with job limit
+			maxConcurrency := jobs
+			if len(level) < maxConcurrency {
+				maxConcurrency = len(level)
+			}
+
+			if err := r.executeLevel(plan, level, maxConcurrency, &completedNodes, totalNodes); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeLevel executes a level of nodes in parallel with concurrency control
+func (r *Runner) executeLevel(plan *model.ExecutionPlan, level []int, maxConcurrency int, completedNodes *int, totalNodes int) error {
+	semaphore := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstError error
+
+	for _, nodeIndex := range level {
+		wg.Add(1)
+		go func(nodeIdx int) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			node := &plan.Nodes[nodeIdx]
+
+			// Thread-safe increment of completed nodes
+			mu.Lock()
+			*completedNodes++
+			currentCount := *completedNodes
+			mu.Unlock()
+
+			if err := r.executeNode(node, currentCount, totalNodes); err != nil {
+				mu.Lock()
+				if firstError == nil {
+					firstError = err
+				}
+				mu.Unlock()
+			}
+		}(nodeIndex)
+	}
+
+	wg.Wait()
+	return firstError
+}
+
+// executeSimpleParallel executes all nodes in parallel (ignores dependencies)
+func (r *Runner) executeSimpleParallel(plan *model.ExecutionPlan, jobs int) error {
 	semaphore := make(chan struct{}, jobs)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -103,6 +186,17 @@ func (r *Runner) executeParallel(plan *model.ExecutionPlan, jobs int) error {
 // executeNode executes a single node
 func (r *Runner) executeNode(node *model.PlanNode, current, total int) error {
 	r.logf("[%d/%d] %s", current, total, node.ID)
+
+	// Check cache before execution
+	if r.cacheManager != nil {
+		cached, err := r.cacheManager.IsValid(node.Recipe, node.Context)
+		if err != nil {
+			r.logf("Cache check failed: %v", err)
+		} else if cached {
+			r.logf("✓ Cached (skipping)")
+			return nil
+		}
+	}
 
 	// Render recipe-specific environment variables
 	if err := r.renderRecipeEnvironment(node.Context); err != nil {
@@ -148,14 +242,28 @@ func (r *Runner) executeNode(node *model.PlanNode, current, total int) error {
 	}
 
 	// Execute the script
-	return r.executeScript(sh, script, node.Recipe.WorkingDir, node.Context.Env, node.Recipe.Timeout, node.Recipe.IgnoreError)
+	if err := r.executeScript(sh, script, node.Recipe.WorkingDir, node.Context.Env, node.Recipe.Timeout, node.Recipe.IgnoreError); err != nil {
+		return err
+	}
+
+	// Mark as cached after successful execution
+	if r.cacheManager != nil && !r.dryRun {
+		if err := r.cacheManager.MarkComplete(node.Recipe, node.Context); err != nil {
+			r.logf("Failed to update cache: %v", err)
+		}
+	}
+
+	return nil
 }
 
 // executeScript executes a script with the given shell
 func (r *Runner) executeScript(sh *shell.Shell, script, workingDir string, env map[string]string, timeout time.Duration, ignoreError bool) error {
 	// Build command
-	args := sh.BuildCommand(script)
-	cmd := exec.Command(sh.Cmd, args...)
+	cmdArgs := sh.BuildCommand(script)
+	if len(cmdArgs) == 0 {
+		return fmt.Errorf("no command arguments generated")
+	}
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 
 	// Set working directory
 	if workingDir != "" {
@@ -200,7 +308,7 @@ func (r *Runner) executeScript(sh *shell.Shell, script, workingDir string, env m
 	case <-ctx.Done():
 		// Timeout occurred, kill the process
 		if cmd.Process != nil {
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 		}
 		return fmt.Errorf("command timed out after %v", timeout)
 	}
@@ -208,7 +316,7 @@ func (r *Runner) executeScript(sh *shell.Shell, script, workingDir string, env m
 
 // logf logs a formatted message
 func (r *Runner) logf(format string, args ...interface{}) {
-	fmt.Fprintf(r.output, format+"\n", args...)
+	_, _ = fmt.Fprintf(r.output, format+"\n", args...)
 }
 
 // renderRecipeEnvironment renders recipe-specific environment variables
