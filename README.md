@@ -231,6 +231,7 @@ recipes:
 - `--list, -l`: List available recipes
 - `--dry-run`: Show what would be executed without running
 - `--explain`: Show rendered scripts and environment variables
+- `--update`: Update drun to the latest version from GitHub releases
 - `--file, -f`: Specify configuration file (default: auto-discover)
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)

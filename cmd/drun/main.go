@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/dag"
@@ -29,6 +34,7 @@ var (
 	initConfig  bool
 	showVersion bool
 	noCache     bool
+	updateSelf  bool
 )
 
 // Version information (set at build time)
@@ -71,6 +77,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new drun.yml configuration file")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 	rootCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching and force execution")
+	rootCmd.Flags().BoolVar(&updateSelf, "update", false, "Update drun to the latest version")
 
 	// TODO: Add cache subcommand later (causes command resolution issues)
 	// cacheCmd.AddCommand(cacheClearCmd)
@@ -96,6 +103,7 @@ func filterGlobalFlags(args []string) []string {
 		"--init":    true,
 		"--version": true, "-v": true,
 		"--no-cache": true,
+		"--update":   true,
 		"--help":     true, "-h": true,
 	}
 
@@ -138,6 +146,11 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Handle --version flag
 	if showVersion {
 		return showVersionInfo()
+	}
+
+	// Handle --update flag
+	if updateSelf {
+		return performSelfUpdate()
 	}
 
 	// Handle --init flag
@@ -884,4 +897,253 @@ func renderEnvironment(ctx *model.ExecutionContext, templateEngine *tmpl.Engine)
 		}
 	}
 	return nil
+}
+
+// GitHub release structures
+type GitHubRelease struct {
+	TagName string        `json:"tag_name"`
+	Name    string        `json:"name"`
+	Assets  []GitHubAsset `json:"assets"`
+}
+
+type GitHubAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+	Size               int64  `json:"size"`
+}
+
+const (
+	githubRepo    = "phillarmonic/drun"
+	githubAPIURL  = "https://api.github.com/repos/" + githubRepo + "/releases/latest"
+	updateTimeout = 30 * time.Second
+)
+
+// performSelfUpdate handles the self-update process
+func performSelfUpdate() error {
+	fmt.Println("🔍 Checking for updates...")
+
+	// Get current executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Fetch latest release info
+	release, err := fetchLatestRelease()
+	if err != nil {
+		return fmt.Errorf("failed to fetch latest release: %w", err)
+	}
+
+	// Check if update is needed
+	if !isUpdateNeeded(release.TagName) {
+		fmt.Printf("✅ Already up to date (version %s)\n", version)
+		return nil
+	}
+
+	fmt.Printf("📦 New version available: %s (current: %s)\n", release.TagName, version)
+
+	// Find appropriate asset for current platform
+	asset, err := findAssetForPlatform(release.Assets)
+	if err != nil {
+		return fmt.Errorf("failed to find binary for platform %s/%s: %w", runtime.GOOS, runtime.GOARCH, err)
+	}
+
+	fmt.Printf("📥 Found binary: %s (%.1f MB)\n", asset.Name, float64(asset.Size)/(1024*1024))
+
+	// Ask for user confirmation
+	if !confirmUpdate(release.TagName) {
+		fmt.Println("❌ Update cancelled by user")
+		return nil
+	}
+
+	// Download and replace binary
+	if err := downloadAndReplace(asset, execPath); err != nil {
+		return fmt.Errorf("failed to update binary: %w", err)
+	}
+
+	fmt.Printf("✅ Successfully updated to version %s!\n", release.TagName)
+	fmt.Println("🚀 Run 'drun --version' to verify the update")
+	return nil
+}
+
+// fetchLatestRelease gets the latest release information from GitHub
+func fetchLatestRelease() (*GitHubRelease, error) {
+	client := &http.Client{Timeout: updateTimeout}
+
+	resp, err := client.Get(githubAPIURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch release info: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("no releases found for %s - this may be a development version or releases haven't been published yet", githubRepo)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release info: %w", err)
+	}
+
+	return &release, nil
+}
+
+// isUpdateNeeded compares current version with latest version
+func isUpdateNeeded(latestVersion string) bool {
+	// Remove 'v' prefix if present
+	latest := strings.TrimPrefix(latestVersion, "v")
+	current := strings.TrimPrefix(version, "v")
+
+	// If current version is "dev", always update
+	if current == "dev" {
+		return true
+	}
+
+	// Simple string comparison - in production you might want semantic version comparison
+	return latest != current
+}
+
+// findAssetForPlatform finds the appropriate binary asset for the current platform
+func findAssetForPlatform(assets []GitHubAsset) (*GitHubAsset, error) {
+	// Determine expected binary name based on platform
+	var expectedName string
+	if runtime.GOOS == "windows" {
+		expectedName = fmt.Sprintf("drun-%s-%s.exe", runtime.GOOS, runtime.GOARCH)
+	} else {
+		expectedName = fmt.Sprintf("drun-%s-%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	// Find matching asset
+	for _, asset := range assets {
+		if asset.Name == expectedName {
+			return &asset, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no binary found for platform %s/%s", runtime.GOOS, runtime.GOARCH)
+}
+
+// confirmUpdate asks the user for confirmation before updating
+func confirmUpdate(newVersion string) bool {
+	fmt.Printf("\n⚠️  This will replace your current drun binary with version %s\n", newVersion)
+	fmt.Print("Do you want to continue? (y/N): ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
+}
+
+// downloadAndReplace downloads the new binary and replaces the current one
+func downloadAndReplace(asset *GitHubAsset, execPath string) error {
+	// Create backup of current binary
+	backupPath := execPath + ".backup"
+	if err := copyFile(execPath, backupPath); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	fmt.Println("💾 Created backup of current binary")
+
+	// Download new binary to temporary file
+	tempPath := execPath + ".tmp"
+	if err := downloadFile(asset.BrowserDownloadURL, tempPath); err != nil {
+		// Clean up backup on failure
+		_ = os.Remove(backupPath)
+		return fmt.Errorf("failed to download new binary: %w", err)
+	}
+
+	fmt.Println("📥 Downloaded new binary")
+
+	// Make the new binary executable (Unix systems)
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(tempPath, 0755); err != nil {
+			_ = os.Remove(tempPath)
+			_ = os.Remove(backupPath)
+			return fmt.Errorf("failed to make binary executable: %w", err)
+		}
+	}
+
+	// Replace current binary with new one
+	if err := os.Rename(tempPath, execPath); err != nil {
+		// Try to restore backup on failure
+		_ = os.Rename(backupPath, execPath)
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to replace binary: %w", err)
+	}
+
+	// Clean up backup file
+	_ = os.Remove(backupPath)
+
+	fmt.Println("🔄 Replaced binary successfully")
+	return nil
+}
+
+// downloadFile downloads a file from URL to the specified path
+func downloadFile(url, filepath string) error {
+	client := &http.Client{Timeout: updateTimeout}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = sourceFile.Close()
+	}()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = destFile.Close()
+	}()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy file permissions
+	sourceInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, sourceInfo.Mode())
 }
