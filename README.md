@@ -18,6 +18,35 @@ A **high-performance** YAML-based task runner with first-class positional argume
 - **Dry Run & Explain**: See what would be executed without running it
 - **Recipe Flags**: Command-line flags specific to individual recipes
 
+## Installation
+
+### Download Pre-built Binaries
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/phillarmonic/drun/releases):
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| **Linux** | x86_64 | `drun-linux-amd64` (UPX compressed) |
+| **Linux** | ARM64 | `drun-linux-arm64` (UPX compressed) |
+| **macOS** | Intel | `drun-darwin-amd64` |
+| **macOS** | Apple Silicon | `drun-darwin-arm64` |
+| **Windows** | x86_64 | `drun-windows-amd64.exe` (UPX compressed) |
+| **Windows** | ARM64 | `drun-windows-arm64.exe` |
+
+All binaries are **statically linked** and have **no dependencies**.
+
+### Install Script
+
+```bash
+# Install latest version (Linux/macOS)
+curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
+
+# Install specific version
+curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v1.0.0
+```
+
+### Build from Source
+
 ## Quick Start
 
 1. **Build drun**:

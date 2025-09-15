@@ -73,6 +73,7 @@ Temporary Items
 
 # Build artifacts
 bin/
+dist/
 *.exe
 *.exe~
 *.dll
