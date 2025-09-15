@@ -2,6 +2,7 @@
 
 A YAML-based task runner with first-class positional arguments, with a powerful templating and dependency management.
 
+
 ## Requirements
 
 - **Go 1.25+** - drun requires Go 1.25 or later

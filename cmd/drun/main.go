@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/cache"
@@ -81,7 +82,59 @@ func init() {
 	rootCmd.FParseErrWhitelist.UnknownFlags = true
 }
 
+// filterGlobalFlags removes global flags from the argument list, leaving recipe and recipe-specific flags
+func filterGlobalFlags(args []string) []string {
+	var filtered []string
+	globalFlags := map[string]bool{
+		"--file": true, "-f": true,
+		"--list": true, "-l": true,
+		"--dry-run": true,
+		"--explain": true,
+		"--jobs":    true, "-j": true,
+		"--shell":   true,
+		"--set":     true,
+		"--init":    true,
+		"--version": true, "-v": true,
+		"--no-cache": true,
+		"--help":     true, "-h": true,
+	}
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// Check if it's a global flag
+		if strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-") {
+			flagName := arg
+			if strings.Contains(arg, "=") {
+				flagName = strings.SplitN(arg, "=", 2)[0]
+			}
+
+			if globalFlags[flagName] {
+				// Skip this flag
+				if !strings.Contains(arg, "=") && i+1 < len(args) {
+					// Also skip the next argument if it's the flag value
+					nextArg := args[i+1]
+					if !strings.HasPrefix(nextArg, "-") {
+						i++ // Skip the value
+					}
+				}
+				continue
+			}
+		}
+
+		// Keep this argument
+		filtered = append(filtered, arg)
+	}
+
+	return filtered
+}
+
 func runDrun(cmd *cobra.Command, args []string) error {
+	// Get raw arguments to handle recipe-specific flags
+	rawArgs := os.Args[1:]
+
+	// Filter out global flags that Cobra has already processed
+	filteredArgs := filterGlobalFlags(rawArgs)
 	// Handle --version flag
 	if showVersion {
 		return showVersionInfo()
@@ -104,12 +157,12 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return listAllRecipes(specData)
 	}
 
-	// Determine target recipe
+	// Determine target recipe using filtered args (which include recipe-specific flags)
 	var target string
-	var positionalArgs []string
+	var recipeArgs []string
 	var flags map[string]any
 
-	if len(args) == 0 {
+	if len(filteredArgs) == 0 {
 		// No arguments - try to find a default recipe or list recipes
 		if defaultRecipe := findDefaultRecipe(specData); defaultRecipe != "" {
 			target = defaultRecipe
@@ -117,8 +170,8 @@ func runDrun(cmd *cobra.Command, args []string) error {
 			return listAllRecipes(specData)
 		}
 	} else {
-		target = args[0]
-		positionalArgs = args[1:]
+		target = filteredArgs[0]
+		recipeArgs = filteredArgs[1:]
 		flags = make(map[string]any)
 	}
 
@@ -128,10 +181,15 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return recipeNotFoundError(target, specData.Recipes)
 	}
 
-	// Parse positional arguments
-	positionals, err := parsePositionals(recipe.Positionals, positionalArgs)
+	// Parse recipe-specific flags and positional arguments
+	positionals, recipeFlags, err := parseRecipeArgs(recipe, recipeArgs)
 	if err != nil {
-		return enhancePositionalError(err, target, recipe.Positionals, recipe.Help)
+		return enhanceRecipeArgsError(err, target, recipe)
+	}
+
+	// Merge recipe flags into flags map
+	for k, v := range recipeFlags {
+		flags[k] = v
 	}
 
 	// Parse set variables
@@ -215,6 +273,182 @@ func findDefaultRecipe(specData *model.Spec) string {
 	}
 
 	return ""
+}
+
+// parseRecipeArgs parses both positional arguments and recipe-specific flags
+func parseRecipeArgs(recipe model.Recipe, args []string) (map[string]any, map[string]any, error) {
+	flags := make(map[string]any)
+
+	// Apply default values for flags first
+	for flagName, flagDef := range recipe.Flags {
+		if flagDef.Default != nil {
+			flags[flagName] = flagDef.Default
+		} else {
+			// Set zero values based on type
+			switch flagDef.Type {
+			case "bool":
+				flags[flagName] = false
+			case "int":
+				flags[flagName] = 0
+			case "string":
+				flags[flagName] = ""
+			case "string[]":
+				flags[flagName] = []string{}
+			default:
+				flags[flagName] = ""
+			}
+		}
+	}
+
+	var positionalArgs []string
+
+	// Parse arguments, separating flags from positionals
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// Check if it's a flag (starts with --)
+		if strings.HasPrefix(arg, "--") {
+			flagName := strings.TrimPrefix(arg, "--")
+
+			// Handle --flag=value format
+			if strings.Contains(flagName, "=") {
+				parts := strings.SplitN(flagName, "=", 2)
+				flagName = parts[0]
+				flagValue := parts[1]
+
+				if err := setRecipeFlag(flags, recipe.Flags, flagName, flagValue); err != nil {
+					return nil, nil, err
+				}
+				continue
+			}
+
+			// Check if this flag is defined for the recipe
+			flagDef, exists := recipe.Flags[flagName]
+			if !exists {
+				return nil, nil, fmt.Errorf("unknown flag: --%s", flagName)
+			}
+
+			// Handle boolean flags
+			if flagDef.Type == "bool" {
+				flags[flagName] = true
+				continue
+			}
+
+			// For non-boolean flags, we need a value
+			if i+1 >= len(args) {
+				return nil, nil, fmt.Errorf("flag --%s requires a value", flagName)
+			}
+
+			i++ // Move to the value
+			flagValue := args[i]
+
+			if err := setRecipeFlag(flags, recipe.Flags, flagName, flagValue); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			// It's a positional argument
+			positionalArgs = append(positionalArgs, arg)
+		}
+	}
+
+	// Parse positional arguments
+	parsedPositionals, err := parsePositionals(recipe.Positionals, positionalArgs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return parsedPositionals, flags, nil
+}
+
+// setRecipeFlag sets a flag value with proper type conversion
+func setRecipeFlag(flags map[string]any, flagDefs map[string]model.Flag, flagName, value string) error {
+	flagDef, exists := flagDefs[flagName]
+	if !exists {
+		return fmt.Errorf("unknown flag: --%s", flagName)
+	}
+
+	switch flagDef.Type {
+	case "string":
+		flags[flagName] = value
+	case "int":
+		intVal, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("flag --%s requires an integer value, got: %s", flagName, value)
+		}
+		flags[flagName] = intVal
+	case "bool":
+		boolVal, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("flag --%s requires a boolean value (true/false), got: %s", flagName, value)
+		}
+		flags[flagName] = boolVal
+	case "string[]":
+		// For string arrays, we append to existing values
+		if existing, ok := flags[flagName].([]string); ok {
+			flags[flagName] = append(existing, value)
+		} else {
+			flags[flagName] = []string{value}
+		}
+	default:
+		return fmt.Errorf("unsupported flag type: %s for flag --%s", flagDef.Type, flagName)
+	}
+
+	return nil
+}
+
+// enhanceRecipeArgsError provides better error messages for recipe argument parsing
+func enhanceRecipeArgsError(err error, recipeName string, recipe model.Recipe) error {
+	errStr := err.Error()
+
+	// Check if it's a flag-related error
+	if strings.Contains(errStr, "unknown flag") {
+		msg := fmt.Sprintf("Error: %s\n\n", err.Error())
+		msg += fmt.Sprintf("Available flags for recipe '%s':\n", recipeName)
+
+		if len(recipe.Flags) == 0 {
+			msg += "  (no flags defined)\n"
+		} else {
+			for flagName, flagDef := range recipe.Flags {
+				msg += fmt.Sprintf("  --%s", flagName)
+				if flagDef.Type != "bool" {
+					msg += fmt.Sprintf(" <%s>", flagDef.Type)
+				}
+				if flagDef.Help != "" {
+					msg += fmt.Sprintf(" - %s", flagDef.Help)
+				}
+				if flagDef.Default != nil {
+					msg += fmt.Sprintf(" (default: %v)", flagDef.Default)
+				}
+				msg += "\n"
+			}
+		}
+
+		msg += "\nUsage:\n"
+		msg += fmt.Sprintf("  drun %s", recipeName)
+
+		// Show positionals
+		for _, pos := range recipe.Positionals {
+			if pos.Required {
+				msg += fmt.Sprintf(" <%s>", pos.Name)
+			} else {
+				msg += fmt.Sprintf(" [%s]", pos.Name)
+			}
+		}
+
+		// Show flags
+		for flagName, flagDef := range recipe.Flags {
+			if flagDef.Type == "bool" {
+				msg += fmt.Sprintf(" [--%s]", flagName)
+			} else {
+				msg += fmt.Sprintf(" [--%s <%s>]", flagName, flagDef.Type)
+			}
+		}
+
+		return fmt.Errorf("%s", msg)
+	}
+
+	// For other errors, use the existing positional error enhancement
+	return enhancePositionalError(err, recipeName, recipe.Positionals, recipe.Help)
 }
 
 func parsePositionals(posArgs []model.PositionalArg, args []string) (map[string]any, error) {

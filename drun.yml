@@ -157,6 +157,45 @@ recipes:
       echo "Press Ctrl+C to stop"
       ./bin/{{ .app_name }} --help
 
+  # Test recipe with multiple flag types
+  demo-flags:
+    help: "Demonstrate different flag types"
+    flags:
+      name:
+        type: string
+        default: "world"
+        help: "Name to greet"
+      count:
+        type: int
+        default: 1
+        help: "Number of times to greet"
+      verbose:
+        type: bool
+        default: false
+        help: "Enable verbose output"
+      tags:
+        type: "string[]"
+        help: "List of tags"
+    run: |
+      {{ if .verbose }}
+      echo "Verbose mode enabled"
+      echo "Flags received:"
+      echo "  name: {{ .name }}"
+      echo "  count: {{ .count }}"
+      echo "  verbose: {{ .verbose }}"
+      {{ if .tags }}
+      echo "  tags: {{ .tags | join ", " }}"
+      {{ end }}
+      {{ end }}
+      
+      {{ range $i := until .count }}
+      echo "Hello, {{ $.name }}! ({{ add $i 1 }}/{{ $.count }})"
+      {{ end }}
+      
+      {{ if .tags }}
+      echo "Tags: {{ .tags | join ", " }}"
+      {{ end }}
+
 # Artifact cache (optional)
 cache:
   path: ".drun/cache"
