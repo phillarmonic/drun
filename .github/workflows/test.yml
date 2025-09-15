@@ -6,10 +6,49 @@ on:
   pull_request:
     branches: [ master, develop ]
 
+# Cancel previous runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Lint job runs first and is required for all other jobs
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.25-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.25-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v8
+      with:
+        version: latest
+        args: --timeout=5m
+
+  # Test job depends on successful lint
   test:
     name: Test
     runs-on: ${{ matrix.os }}
+    needs: lint  # Only run after lint succeeds
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -45,8 +84,6 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         echo "Running CI Test Suite..."
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-        golangci-lint run ./...
         go test -race -cover -coverprofile=coverage.out ./internal/...
         go build -o bin/drun.exe ./cmd/drun
         ./bin/drun.exe --version
@@ -60,27 +97,11 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version: 1.25
-
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v8
-      with:
-        version: latest
-        args: --timeout=5m
-
+  # Build job also depends on successful lint
   build:
     name: Build
     runs-on: ${{ matrix.os }}
+    needs: lint  # Only run after lint succeeds
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -93,6 +114,19 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: 1.25
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.25-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.25-
+
+    - name: Download dependencies
+      run: go mod download
 
     - name: Build binary (Unix)
       if: runner.os != 'Windows'
