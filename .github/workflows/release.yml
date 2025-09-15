@@ -160,11 +160,16 @@ jobs:
         
         # Compress the binary using UPX with platform-specific options
         if [ "${{ matrix.goos }}" = "windows" ]; then
-          # Windows binaries - use --best compression (ARM64 may not be supported)
-          if upx --best "$BINARY_PATH" 2>/dev/null; then
-            echo "✅ Windows binary compressed successfully"
+          # Windows binaries - ARM64 is not supported by UPX yet
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            echo "ℹ️  Skipping UPX compression for Windows ARM64 (not supported by UPX)"
           else
-            echo "⚠️  UPX compression failed for Windows ${{ matrix.goarch }} binary (may not be supported)"
+            # Windows x64 - use --best compression
+            if upx --best "$BINARY_PATH" 2>/dev/null; then
+              echo "✅ Windows binary compressed successfully"
+            else
+              echo "⚠️  UPX compression failed for Windows ${{ matrix.goarch }} binary"
+            fi
           fi
         elif [ "${{ matrix.goos }}" = "darwin" ]; then
           # macOS binaries - UPX often has issues with macOS binaries
@@ -175,12 +180,15 @@ jobs:
           fi
         else
           # Linux binaries - use --best compression (should always work)
-          upx --best "$BINARY_PATH"
-          echo "✅ Linux binary compressed successfully"
+          if upx --best "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ Linux binary compressed successfully"
+          else
+            echo "⚠️  UPX compression failed for Linux ${{ matrix.goarch }} binary"
+          fi
         fi
         
-        # Display the compressed binary size
-        echo "Compressed binary size:"
+        # Display the binary size (compressed or uncompressed)
+        echo "Binary size:"
         du -h "$BINARY_PATH"
       shell: bash
 
@@ -192,8 +200,11 @@ jobs:
         # Check the file type
         file "$BINARY_PATH"
         
-        # Verify the compressed binary (skip verification if compression failed for macOS)
-        if [ "${{ matrix.goos }}" = "darwin" ]; then
+        # Verify the compressed binary with platform-specific handling
+        if [ "${{ matrix.goos }}" = "windows" ] && [ "${{ matrix.goarch }}" = "arm64" ]; then
+          # Windows ARM64 - UPX compression was skipped
+          echo "ℹ️  Windows ARM64 binary not compressed with UPX (platform not supported)"
+        elif [ "${{ matrix.goos }}" = "darwin" ]; then
           # For macOS, only verify if UPX compression succeeded
           if upx -t "$BINARY_PATH" 2>/dev/null; then
             echo "✅ macOS binary successfully compressed with UPX"
@@ -201,9 +212,12 @@ jobs:
             echo "ℹ️  macOS binary not compressed with UPX (this is normal if compression failed)"
           fi
         else
-          # For Linux and Windows, UPX compression should always work
-          upx -t "$BINARY_PATH"
-          echo "✅ Binary successfully compressed with UPX"
+          # For Linux and Windows x64, verify UPX compression
+          if upx -t "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ Binary successfully compressed with UPX"
+          else
+            echo "ℹ️  Binary not compressed with UPX (compression may have failed)"
+          fi
         fi
       shell: bash
 

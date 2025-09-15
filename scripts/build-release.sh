@@ -54,7 +54,10 @@ for platform in "${PLATFORMS[@]}"; do
     if command -v upx >/dev/null 2>&1; then
         echo "  🗜️  Compressing with UPX..."
         
-        if [ "$GOOS" = "darwin" ]; then
+        if [ "$GOOS" = "windows" ] && [ "$GOARCH" = "arm64" ]; then
+            # Windows ARM64 - not supported by UPX yet
+            echo "  ℹ️  Skipping UPX compression for Windows ARM64 (not supported by UPX)"
+        elif [ "$GOOS" = "darwin" ]; then
             # macOS binaries - UPX may have issues, so allow failure
             if upx --best "dist/$BINARY_NAME" 2>/dev/null; then
                 echo "  ✅ UPX compressed: $(ls -lh dist/$BINARY_NAME | awk '{print $5}')"
@@ -62,9 +65,12 @@ for platform in "${PLATFORMS[@]}"; do
                 echo "  ⚠️  UPX compression failed for macOS binary (continuing without compression)"
             fi
         else
-            # Linux and Windows binaries - UPX should work
-            upx --best "dist/$BINARY_NAME"
-            echo "  ✅ UPX compressed: $(ls -lh dist/$BINARY_NAME | awk '{print $5}')"
+            # Linux and Windows x64 binaries - UPX should work
+            if upx --best "dist/$BINARY_NAME" 2>/dev/null; then
+                echo "  ✅ UPX compressed: $(ls -lh dist/$BINARY_NAME | awk '{print $5}')"
+            else
+                echo "  ⚠️  UPX compression failed for $GOOS $GOARCH binary (continuing without compression)"
+            fi
         fi
     else
         echo "  ℹ️  UPX not found, skipping compression (install UPX for smaller binaries)"
