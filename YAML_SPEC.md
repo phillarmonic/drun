@@ -5,14 +5,28 @@ This document provides a complete reference for the drun YAML configuration form
 ## File Structure
 
 drun automatically looks for configuration files in this order:
-- `drun.yml`
-- `drun.yaml` 
-- `.drun.yml`
-- `.drun.yaml`
-- `.drun/drun.yml`
-- `.drun/drun.yaml`
-- `ops.drun.yml`
-- `ops.drun.yaml`
+
+1. **Workspace default** (if configured in `.drun/workspace.yml`)
+2. **Standard locations**:
+   - `drun.yml`
+   - `drun.yaml` 
+   - `.drun.yml`
+   - `.drun.yaml`
+   - `.drun/drun.yml`
+   - `.drun/drun.yaml`
+   - `ops.drun.yml`
+   - `ops.drun.yaml`
+
+### Workspace Configuration
+
+drun supports workspace-specific default configuration files. When you use `drun --init` with a custom file path, you can save it as the workspace default:
+
+```yaml
+# .drun/workspace.yml
+default_config_file: .drun/drun.yml
+```
+
+This allows teams to use consistent configuration file locations across different projects.
 
 ## Complete Configuration Reference
 

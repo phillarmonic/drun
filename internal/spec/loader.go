@@ -29,6 +29,33 @@ var DefaultFilenames = []string{
 	"ops.drun.yaml",
 }
 
+// WorkspaceConfig represents workspace-specific configuration
+type WorkspaceConfig struct {
+	DefaultConfigFile string `yaml:"default_config_file,omitempty"`
+}
+
+// loadWorkspaceConfig loads the workspace configuration from the base directory
+func (l *Loader) loadWorkspaceConfig() (*WorkspaceConfig, error) {
+	configPath := filepath.Join(l.baseDir, ".drun", "workspace.yml")
+
+	// If config doesn't exist, return empty config
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &WorkspaceConfig{}, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	return &config, nil
+}
+
 // CacheEntry represents a cached spec with metadata
 type CacheEntry struct {
 	Spec     *model.Spec
@@ -62,18 +89,46 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 	var filePath string
 
 	if filename == "" {
-		// Try default filenames
-		found := false
-		for _, defaultName := range DefaultFilenames {
-			candidate := filepath.Join(l.baseDir, defaultName)
+		// First, check if there's a workspace-specific default config file
+		workspaceConfig, err := l.loadWorkspaceConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load workspace config: %w", err)
+		}
+
+		// If workspace has a default config file, try it first
+		if workspaceConfig.DefaultConfigFile != "" {
+			candidate := filepath.Join(l.baseDir, workspaceConfig.DefaultConfigFile)
 			if _, err := os.Stat(candidate); err == nil {
 				filePath = candidate
-				found = true
-				break
+			} else {
+				// Workspace default doesn't exist, fall back to standard defaults
+				found := false
+				for _, defaultName := range DefaultFilenames {
+					candidate := filepath.Join(l.baseDir, defaultName)
+					if _, err := os.Stat(candidate); err == nil {
+						filePath = candidate
+						found = true
+						break
+					}
+				}
+				if !found {
+					return nil, fmt.Errorf("no drun configuration file found (tried workspace default '%s' and standard defaults: %s)", workspaceConfig.DefaultConfigFile, strings.Join(DefaultFilenames, ", "))
+				}
 			}
-		}
-		if !found {
-			return nil, fmt.Errorf("no drun configuration file found (tried: %s)", strings.Join(DefaultFilenames, ", "))
+		} else {
+			// No workspace default, try standard default filenames
+			found := false
+			for _, defaultName := range DefaultFilenames {
+				candidate := filepath.Join(l.baseDir, defaultName)
+				if _, err := os.Stat(candidate); err == nil {
+					filePath = candidate
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("no drun configuration file found (tried: %s)", strings.Join(DefaultFilenames, ", "))
+			}
 		}
 	} else {
 		if filepath.IsAbs(filename) {

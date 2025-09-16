@@ -111,16 +111,38 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 drun automatically looks for configuration files in this order:
 
-- `drun.yml`
-- `drun.yaml` 
-- `.drun.yml`
-- `.drun.yaml`
-- `.drun/drun.yml`
-- `.drun/drun.yaml`
-- `ops.drun.yml`
-- `ops.drun.yaml`
+1. **Workspace default** (if configured in `.drun/workspace.yml`)
+2. **Standard locations**:
+   - `drun.yml`
+   - `drun.yaml` 
+   - `.drun.yml`
+   - `.drun.yaml`
+   - `.drun/drun.yml`
+   - `.drun/drun.yaml`
+   - `ops.drun.yml`
+   - `ops.drun.yaml`
 
-Use `drun --init` to create a starter configuration, or see the included examples for comprehensive configurations.
+### Getting Started
+
+Use `drun --init` to create a starter configuration:
+
+```bash
+# Create config in current directory
+drun --init
+
+# Create config in custom location (will prompt to create directory)
+drun --init --file=.drun/drun.yml
+drun --init --file=config/my-project.yml
+
+# Save custom location as workspace default
+# (drun will prompt when using non-standard filenames)
+```
+
+When you specify a custom config file path:
+- **Directory creation**: drun will ask if you want to create missing directories
+- **Workspace default**: drun will ask if you want to save custom paths as the default for this workspace
+
+See the included examples for comprehensive configurations.
 
 📖 **For complete YAML specification**: See [YAML_SPEC.md](YAML_SPEC.md) for detailed field reference and examples.
 

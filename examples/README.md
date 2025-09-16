@@ -5,6 +5,11 @@ This directory contains comprehensive examples showcasing all of drun's powerful
 ## 🎯 Quick Start
 
 ```bash
+# Initialize a new drun configuration
+drun --init                                    # Create drun.yml in current directory
+drun --init --file=.drun/drun.yml             # Create in custom location (prompts for directory creation)
+drun --init --file=config/my-project.yml      # Custom location with workspace default option
+
 # Try the comprehensive feature showcase
 ./bin/drun -f examples/feature-showcase.yml showcase-all
 
@@ -267,9 +272,15 @@ echo "deploy-token-123" > ~/.secrets/deploy-token
 
 ### 1. **Start Here** - Basic Concepts
 ```bash
+# Initialize your first configuration
+drun --init
+
 # Learn the fundamentals
 ./bin/drun -f examples/simple.yml hello
 ./bin/drun -f examples/simple.yml greet Alice
+
+# Try custom configuration locations
+drun --init --file=.drun/drun.yml    # Creates directory and offers workspace default
 ```
 
 ### 2. **New Features (v1.4.0)** - Lifecycle & Namespacing ⭐

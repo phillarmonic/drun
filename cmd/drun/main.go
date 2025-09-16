@@ -22,6 +22,7 @@ import (
 	"github.com/phillarmonic/drun/internal/spec"
 	"github.com/phillarmonic/drun/internal/tmpl"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -44,6 +45,79 @@ var (
 	commit  = "unknown"
 	date    = "unknown"
 )
+
+// WorkspaceConfig represents workspace-specific configuration
+type WorkspaceConfig struct {
+	DefaultConfigFile string `yaml:"default_config_file,omitempty"`
+}
+
+// getWorkspaceConfigPath returns the path to the workspace configuration file
+func getWorkspaceConfigPath() string {
+	return filepath.Join(".drun", "workspace.yml")
+}
+
+// loadWorkspaceConfig loads the workspace configuration
+func loadWorkspaceConfig() (*WorkspaceConfig, error) {
+	configPath := getWorkspaceConfigPath()
+
+	// If config doesn't exist, return empty config
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &WorkspaceConfig{}, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	return &config, nil
+}
+
+// saveWorkspaceConfig saves the workspace configuration
+func saveWorkspaceConfig(config *WorkspaceConfig) error {
+	configPath := getWorkspaceConfigPath()
+	configDir := filepath.Dir(configPath)
+
+	// Create .drun directory if it doesn't exist
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal workspace config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write workspace config: %w", err)
+	}
+
+	return nil
+}
+
+// promptUser prompts the user for a yes/no response
+func promptUser(message string) (bool, error) {
+	fmt.Printf("%s (y/N): ", message)
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			// Handle EOF (e.g., when input is piped or no input available)
+			fmt.Println()     // Add newline for better formatting
+			return false, nil // Default to "no" on EOF
+		}
+		return false, fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes", nil
+}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -168,7 +242,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&jobs, "jobs", "j", 1, "Number of parallel jobs")
 	rootCmd.Flags().StringVar(&shellType, "shell", "", "Override shell type (linux/darwin/windows)")
 	rootCmd.Flags().StringArrayVar(&setVars, "set", []string{}, "Set variables (KEY=VALUE)")
-	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new drun.yml configuration file")
+	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new configuration file (creates directories and workspace defaults as needed)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 	rootCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching and force execution")
 	rootCmd.Flags().BoolVar(&updateSelf, "update", false, "Update drun to the latest version")
@@ -1082,6 +1156,53 @@ func initializeConfig(filename string) error {
 	// Check if file already exists
 	if _, err := os.Stat(targetFile); err == nil {
 		return fmt.Errorf("configuration file '%s' already exists", targetFile)
+	}
+
+	// Check if the directory needs to be created
+	targetDir := filepath.Dir(targetFile)
+	if targetDir != "." && targetDir != "" {
+		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+			// Directory doesn't exist, ask user if they want to create it
+			shouldCreate, err := promptUser(fmt.Sprintf("Directory '%s' doesn't exist. Create it?", targetDir))
+			if err != nil {
+				return fmt.Errorf("failed to get user input: %w", err)
+			}
+
+			if !shouldCreate {
+				return fmt.Errorf("directory creation cancelled")
+			}
+
+			// Create the directory
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				return fmt.Errorf("failed to create directory '%s': %w", targetDir, err)
+			}
+
+			fmt.Printf("📁 Created directory: %s\n", targetDir)
+		}
+	}
+
+	// Check if this is a custom filename (not default) and save it as workspace default
+	isCustomName := filename != "" && filename != "drun.yml" && filename != "drun.yaml"
+	if isCustomName {
+		// Load existing workspace config
+		workspaceConfig, err := loadWorkspaceConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load workspace config: %w", err)
+		}
+
+		// Ask user if they want to save this as the default for this workspace
+		shouldSaveDefault, err := promptUser(fmt.Sprintf("Save '%s' as the default config file for this workspace?", filename))
+		if err != nil {
+			return fmt.Errorf("failed to get user input: %w", err)
+		}
+
+		if shouldSaveDefault {
+			workspaceConfig.DefaultConfigFile = filename
+			if err := saveWorkspaceConfig(workspaceConfig); err != nil {
+				return fmt.Errorf("failed to save workspace config: %w", err)
+			}
+			fmt.Printf("💾 Saved '%s' as default config file for this workspace\n", filename)
+		}
 	}
 
 	// Generate starter configuration
