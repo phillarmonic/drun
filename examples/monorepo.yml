@@ -10,6 +10,9 @@ vars:
 env:
   NODE_ENV: development
   COMPOSE_PROJECT_NAME: "myapp"
+  # Auto-detect Docker commands
+  DOCKER_COMPOSE_CMD: "{{ dockerCompose }}"
+  DOCKER_BUILDX_CMD: "{{ dockerBuildx }}"
 
 snippets:
   check_service: |
@@ -39,7 +42,7 @@ recipes:
     help: "Start all services in development mode"
     run: |
       echo "🚀 Starting all services in development mode..."
-      docker-compose -f docker-compose.dev.yml up --build
+      $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml up --build
 
   dev-service:
     help: "Start specific service in development mode"
@@ -241,11 +244,11 @@ recipes:
     run: |
       echo "🚀 Starting services in {{ .environment }} mode..."
       {{ if eq .environment "development" }}
-      docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+      $DOCKER_COMPOSE_CMD -f docker-compose.yml -f docker-compose.dev.yml up -d
       {{ else if eq .environment "staging" }}
-      docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+      $DOCKER_COMPOSE_CMD -f docker-compose.yml -f docker-compose.staging.yml up -d
       {{ else }}
-      docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+      $DOCKER_COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d
       {{ end }}
       echo "✅ Services started"
 
@@ -253,7 +256,7 @@ recipes:
     help: "Stop all services"
     run: |
       echo "🛑 Stopping all services..."
-      docker-compose down
+      $DOCKER_COMPOSE_CMD down
       echo "✅ Services stopped"
 
   restart:
@@ -270,7 +273,7 @@ recipes:
         one_of: ["api", "web", "worker", "docs"]
     run: |
       echo "🔄 Restarting {{ .service }}..."
-      docker-compose restart {{ .service }}
+      $DOCKER_COMPOSE_CMD restart {{ .service }}
       echo "✅ {{ .service }} restarted"
 
   # Logs
@@ -286,10 +289,10 @@ recipes:
     run: |
       {{ if .follow }}
       echo "📋 Following logs for all services..."
-      docker-compose logs -f --tail={{ .tail }}
+      $DOCKER_COMPOSE_CMD logs -f --tail={{ .tail }}
       {{ else }}
       echo "📋 Showing logs for all services (last {{ .tail }} lines)..."
-      docker-compose logs --tail={{ .tail }}
+      $DOCKER_COMPOSE_CMD logs --tail={{ .tail }}
       {{ end }}
 
   logs-service:
@@ -308,10 +311,10 @@ recipes:
     run: |
       {{ if .follow }}
       echo "📋 Following logs for {{ .service }}..."
-      docker-compose logs -f --tail={{ .tail }} {{ .service }}
+      $DOCKER_COMPOSE_CMD logs -f --tail={{ .tail }} {{ .service }}
       {{ else }}
       echo "📋 Showing logs for {{ .service }} (last {{ .tail }} lines)..."
-      docker-compose logs --tail={{ .tail }} {{ .service }}
+      $DOCKER_COMPOSE_CMD logs --tail={{ .tail }} {{ .service }}
       {{ end }}
 
   # Database operations
@@ -319,7 +322,7 @@ recipes:
     help: "Run database migrations"
     run: |
       echo "🔄 Running database migrations..."
-      docker-compose exec api npm run migrate
+      $DOCKER_COMPOSE_CMD exec api npm run migrate
       echo "✅ Migrations completed"
 
   db-seed:
@@ -330,7 +333,7 @@ recipes:
         one_of: ["development", "staging", "test"]
     run: |
       echo "🌱 Seeding database for {{ .environment }}..."
-      docker-compose exec api npm run seed:{{ .environment }}
+      $DOCKER_COMPOSE_CMD exec api npm run seed:{{ .environment }}
       echo "✅ Database seeded"
 
   db-reset:
@@ -393,7 +396,7 @@ recipes:
       echo "🏥 Checking service health..."
       {{ range .services }}
       echo "Checking {{ . }}..."
-      if docker-compose ps {{ . }} | grep -q "Up"; then
+      if $DOCKER_COMPOSE_CMD ps {{ . }} | grep -q "Up"; then
         echo "✅ {{ . }} is running"
       else
         echo "❌ {{ . }} is not running"

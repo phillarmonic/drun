@@ -1,0 +1,321 @@
+# Next-Level Features Demo
+# Showcasing advanced drun capabilities we could implement
+version: 0.1
+
+# Future: Remote includes (not yet implemented)
+# includes:
+#   - "https://raw.githubusercontent.com/drun-recipes/docker/main/common.yml"
+#   - "git+https://github.com/company/recipes.git@v1.0.0:ci/base.yml"
+
+# Future: Plugin system (not yet implemented)
+# plugins:
+#   - name: "kubernetes"
+#     version: "^1.0.0"
+#   - name: "notifications"
+#     config:
+#       slack_webhook: "{{ env 'SLACK_WEBHOOK' }}"
+
+env:
+  # Current working features
+  PROJECT_TYPE: "{{ packageManager }}"
+  GIT_INFO: "{{ gitBranch }}@{{ gitShortCommit }}"
+  BUILD_ENV: "{{ if isCI }}ci{{ else }}local{{ end }}"
+
+recipes:
+  # Demonstrate current advanced features
+  smart-info:
+    help: "Show intelligent project information"
+    run: |
+      {{ step "Analyzing project" }}
+      
+      echo "🔍 Project Analysis:"
+      echo "  Type: $PROJECT_TYPE"
+      echo "  Git: $GIT_INFO"
+      echo "  Environment: $BUILD_ENV"
+      echo "  OS/Arch: {{ os }}/{{ arch }}"
+      
+      {{ if hasFile "Dockerfile" }}
+      {{ info "Docker configuration detected" }}
+      {{ end }}
+      
+      {{ if hasFile "kubernetes.yml" }}
+      {{ info "Kubernetes configuration detected" }}
+      {{ end }}
+      
+      {{ if hasFile ".github/workflows" }}
+      {{ info "GitHub Actions detected" }}
+      {{ end }}
+      
+      {{ success "Analysis complete" }}
+
+  # Future: Watch mode example (conceptual)
+  dev-watch:
+    help: "Development with file watching (future feature)"
+    # watch: ["src/**/*", "*.yml"]  # Future syntax
+    # debounce: "500ms"             # Future syntax
+    run: |
+      {{ warn "Watch mode not yet implemented" }}
+      {{ info "Would watch: src/**/* and *.yml files" }}
+      {{ info "Would auto-run on changes with 500ms debounce" }}
+      
+      # Current workaround using inotify/fswatch
+      {{ if hasCommand "fswatch" }}
+      {{ step "Starting file watcher (using fswatch)" }}
+      fswatch -o . | while read f; do
+        {{ info "Files changed, rebuilding..." }}
+        {{ if eq (packageManager) "go" }}
+        go build ./...
+        {{ else if eq (packageManager) "npm" }}
+        npm run build
+        {{ end }}
+      done
+      {{ else }}
+      {{ error "fswatch not available - install for file watching" }}
+      {{ end }}
+
+  # Future: Matrix builds (conceptual)
+  test-matrix:
+    help: "Matrix testing across multiple configurations (future)"
+    run: |
+      {{ warn "Matrix builds not yet implemented" }}
+      {{ info "Future syntax would be:" }}
+      echo "matrix:"
+      echo "  os: [ubuntu, macos, windows]"
+      echo "  node: [16, 18, 20]"
+      echo "run: npm test"
+      
+      # Current workaround - manual matrix
+      {{ step "Manual matrix simulation" }}
+      for version in 16 18 20; do
+        {{ info "Testing with Node.js $version" }}
+        # docker run --rm node:$version npm test
+        echo "Would test with Node.js $version"
+      done
+
+  # Future: AI suggestions (conceptual)
+  ai-suggest:
+    help: "AI-powered recipe suggestions (future)"
+    positionals:
+      - name: query
+        required: true
+    run: |
+      {{ warn "AI suggestions not yet implemented" }}
+      {{ info "You asked: {{ .query }}" }}
+      
+      # Future: This would call an AI service
+      echo "🤖 AI would analyze your query and suggest:"
+      
+      {{ if contains .query "deploy" }}
+      echo "  - Consider using 'kubectl apply' for Kubernetes"
+      echo "  - Add health checks with 'kubectl rollout status'"
+      echo "  - Use 'docker build' for containerization"
+      {{ else if contains .query "test" }}
+      echo "  - Run 'npm test' for Node.js projects"
+      echo "  - Use 'go test ./...' for Go projects"
+      echo "  - Consider adding coverage with '--coverage'"
+      {{ else }}
+      echo "  - Break down complex tasks into smaller recipes"
+      echo "  - Use dependencies to ensure proper order"
+      echo "  - Add error handling and validation"
+      {{ end }}
+
+  # Advanced error handling and retry logic
+  resilient-deploy:
+    help: "Deployment with advanced error handling"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "prod"]
+    run: |
+      {{ step "Starting resilient deployment to {{ .environment }}" }}
+      
+      # Pre-flight checks
+      {{ info "Running pre-flight checks" }}
+      
+      {{ if not (hasCommand "kubectl") }}
+      {{ error "kubectl not found - please install Kubernetes CLI" }}
+      exit 1
+      {{ end }}
+      
+      {{ if isDirty }}
+      {{ warn "Working directory has uncommitted changes" }}
+      {{ if eq .environment "prod" }}
+      {{ error "Cannot deploy to production with uncommitted changes" }}
+      exit 1
+      {{ end }}
+      {{ end }}
+      
+      # Retry logic simulation
+      {{ step "Deploying with retry logic" }}
+      for attempt in 1 2 3; do
+        {{ info "Deployment attempt $attempt/3" }}
+        
+        if kubectl apply -f k8s/{{ .environment }}/; then
+          {{ success "Deployment successful on attempt $attempt" }}
+          break
+        else
+          {{ warn "Deployment failed on attempt $attempt" }}
+          if [ $attempt -eq 3 ]; then
+            {{ error "All deployment attempts failed" }}
+            exit 1
+          fi
+          {{ info "Waiting 10 seconds before retry..." }}
+          sleep 10
+        fi
+      done
+      
+      # Post-deployment verification
+      {{ step "Verifying deployment" }}
+      kubectl rollout status deployment/app -n {{ .environment }}
+      {{ success "Deployment to {{ .environment }} completed successfully!" }}
+
+  # Performance monitoring and metrics
+  perf-test:
+    help: "Performance testing with metrics collection"
+    run: |
+      {{ step "Starting performance test suite" }}
+      
+      START_TIME=$(date +%s)
+      
+      {{ info "Running load tests" }}
+      # Simulate load testing
+      for i in {1..5}; do
+        echo "  Load test $i/5..."
+        sleep 1
+      done
+      
+      {{ info "Running stress tests" }}
+      # Simulate stress testing  
+      for i in {1..3}; do
+        echo "  Stress test $i/3..."
+        sleep 1
+      done
+      
+      END_TIME=$(date +%s)
+      DURATION=$((END_TIME - START_TIME))
+      
+      {{ success "Performance tests completed in ${DURATION}s" }}
+      
+      # Metrics collection (future: would send to monitoring system)
+      echo "📊 Metrics Summary:"
+      echo "  Duration: ${DURATION}s"
+      echo "  Tests: 8"
+      echo "  Success Rate: 100%"
+      echo "  Avg Response Time: 150ms"
+
+  # Future: Notification system (conceptual)
+  notify-deploy:
+    help: "Deployment with notifications (future feature)"
+    run: |
+      {{ step "Deploying with notifications" }}
+      
+      # Future: Built-in notification functions
+      {{ warn "Notifications not yet implemented" }}
+      {{ info "Future syntax would be:" }}
+      echo "{{ notify 'slack' '#deployments' 'Starting deployment...' }}"
+      echo "{{ notify 'email' 'team@company.com' 'Deployment complete' }}"
+      
+      # Current workaround using curl
+      {{ if env "SLACK_WEBHOOK" }}
+      {{ info "Sending Slack notification" }}
+      curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"🚀 Deployment started by {{ env "USER" }}"}' \
+        "{{ env "SLACK_WEBHOOK" }}"
+      {{ else }}
+      {{ warn "SLACK_WEBHOOK not set - skipping notification" }}
+      {{ end }}
+
+  # Interactive recipe selection (simulation)
+  interactive-menu:
+    help: "Interactive recipe selection (future TUI)"
+    run: |
+      {{ step "Interactive Menu Simulation" }}
+      {{ warn "Full TUI not yet implemented" }}
+      
+      echo "🎮 Future Interactive Mode would show:"
+      echo "┌─────────────────────────────────────┐"
+      echo "│           drun Recipes              │"
+      echo "├─────────────────────────────────────┤"
+      echo "│ → build     Build the application   │"
+      echo "│   test      Run test suite          │"
+      echo "│   deploy    Deploy to environment   │"
+      echo "│   clean     Clean build artifacts   │"
+      echo "└─────────────────────────────────────┘"
+      echo ""
+      echo "Use ↑↓ arrows to navigate, Enter to select"
+      
+      # Simple menu simulation
+      echo "Select a recipe:"
+      select recipe in "build" "test" "deploy" "clean" "exit"; do
+        case $recipe in
+          build)
+            {{ info "Would run build recipe" }}
+            break
+            ;;
+          test)
+            {{ info "Would run test recipe" }}
+            break
+            ;;
+          deploy)
+            {{ info "Would run deploy recipe" }}
+            break
+            ;;
+          clean)
+            {{ info "Would run clean recipe" }}
+            break
+            ;;
+          exit)
+            {{ info "Goodbye!" }}
+            break
+            ;;
+          *)
+            {{ warn "Invalid selection" }}
+            ;;
+        esac
+      done
+
+  # Showcase all current advanced features
+  showcase-advanced:
+    help: "Showcase all current advanced drun features"
+    run: |
+      {{ step "Advanced drun Features Showcase" }}
+      echo "========================================="
+      echo ""
+      
+      echo "🎯 Smart Detection:"
+      echo "  Project Type: {{ packageManager }}"
+      echo "  Git Branch: {{ gitBranch }}"
+      echo "  Git Commit: {{ gitShortCommit }}"
+      echo "  Is Dirty: {{ isDirty }}"
+      echo "  Is CI: {{ isCI }}"
+      echo ""
+      
+      echo "🐳 Docker Integration:"
+      echo "  Compose: {{ dockerCompose }}"
+      echo "  Buildx: {{ dockerBuildx }}"
+      echo ""
+      
+      echo "📁 File Detection:"
+      echo "  Has Dockerfile: {{ hasFile "Dockerfile" }}"
+      echo "  Has package.json: {{ hasFile "package.json" }}"
+      echo "  Has go.mod: {{ hasFile "go.mod" }}"
+      echo ""
+      
+      echo "💻 System Info:"
+      echo "  OS: {{ os }}"
+      echo "  Arch: {{ arch }}"
+      echo "  Hostname: {{ hostname }}"
+      echo ""
+      
+      {{ success "All features working perfectly!" }}
+      
+      echo ""
+      echo "🚀 Coming Soon:"
+      echo "  - File watching and auto-execution"
+      echo "  - Remote recipe includes"
+      echo "  - Plugin system"
+      echo "  - Matrix builds"
+      echo "  - AI-powered suggestions"
+      echo "  - Web UI and mobile apps"
+      echo "  - Advanced notifications"
+      echo "  - Performance metrics"

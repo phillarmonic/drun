@@ -60,11 +60,11 @@ It supports positional arguments (both positional and named), dependencies, temp
 Named arguments can be specified as:
   --name=value  or  name=value`,
 	RunE: runDrun,
-	// Disable unknown command errors
+	// Disable unknown command errors so recipes can be treated as arguments
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	// Allow any arguments to be passed through
-	DisableFlagParsing: false,
+	// Don't treat unknown arguments as errors
+	Args: cobra.ArbitraryArgs,
 }
 
 // Completion command for generating shell completion scripts
@@ -192,7 +192,6 @@ func init() {
 	// rootCmd.AddCommand(cacheCmd)
 
 	// Set up unknown command handling
-	rootCmd.SetArgs(os.Args[1:])
 	rootCmd.FParseErrWhitelist.UnknownFlags = true
 }
 
@@ -320,6 +319,15 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Build execution context
 	ctx := buildExecutionContext(specData, positionals, flags, setVarsMap)
+
+	// Resolve secrets
+	if len(specData.Secrets) > 0 {
+		resolvedSecrets, err := loader.ResolveSecrets(specData.Secrets)
+		if err != nil {
+			return fmt.Errorf("failed to resolve secrets: %w", err)
+		}
+		ctx.Secrets = resolvedSecrets
+	}
 
 	// Override OS if shell type is specified
 	if shellType != "" {
@@ -761,6 +769,7 @@ func buildExecutionContext(specData *model.Spec, positionals, flags, setVars map
 	ctx := &model.ExecutionContext{
 		Vars:        make(map[string]any),
 		Env:         make(map[string]string),
+		Secrets:     make(map[string]string),
 		Flags:       flags,
 		Positionals: positionals,
 		OS:          runtime.GOOS,

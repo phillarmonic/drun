@@ -1,0 +1,37 @@
+# Shared Docker recipes
+version: 0.1
+
+env:
+  DOCKER_COMPOSE_CMD: "{{ dockerCompose }}"
+  DOCKER_BUILDX_CMD: "{{ dockerBuildx }}"
+
+snippets:
+  docker_check: |
+    if ! docker info >/dev/null 2>&1; then
+      {{ error "Docker daemon not running" }}
+      exit 1
+    fi
+
+recipes:
+  docker-info:
+    help: "Show Docker system information"
+    run: |
+      {{ step "Gathering Docker information" }}
+      {{ snippet "docker_check" }}
+      
+      echo "Docker Version: $(docker --version)"
+      echo "Compose Command: $DOCKER_COMPOSE_CMD"
+      echo "Buildx Command: $DOCKER_BUILDX_CMD"
+      
+      {{ success "Docker info gathered successfully" }}
+
+  docker-cleanup:
+    help: "Clean up Docker resources"
+    run: |
+      {{ step "Cleaning Docker resources" }}
+      {{ snippet "docker_check" }}
+      
+      docker system prune -f
+      docker image prune -f
+      
+      {{ success "Docker cleanup completed" }}
