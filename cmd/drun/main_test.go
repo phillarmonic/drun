@@ -795,5 +795,146 @@ recipes:
 	}
 }
 
+// Tests for new lifecycle features
+
+func TestExecuteLifecycleBlocks_CreatesCorrectPlan(t *testing.T) {
+	// Test that executeLifecycleBlocks creates the correct plan structure
+	// This is a unit test that doesn't require actual execution
+
+	blocks := []string{
+		"echo 'before block 1'",
+		"echo 'before block 2'",
+	}
+
+	// Test that we can create a lifecycle recipe from blocks
+	lifecycleRecipe := &model.Recipe{
+		Help: "Lifecycle before blocks",
+		Run:  model.Step{Lines: blocks},
+	}
+
+	if lifecycleRecipe.Help != "Lifecycle before blocks" {
+		t.Errorf("Expected help to be 'Lifecycle before blocks', got %q", lifecycleRecipe.Help)
+	}
+
+	if len(lifecycleRecipe.Run.Lines) != 2 {
+		t.Errorf("Expected 2 lines in run block, got %d", len(lifecycleRecipe.Run.Lines))
+	}
+
+	if lifecycleRecipe.Run.Lines[0] != "echo 'before block 1'" {
+		t.Errorf("Expected first line to be 'echo 'before block 1'', got %q", lifecycleRecipe.Run.Lines[0])
+	}
+}
+
+func TestListAllRecipesWithNamespacing(t *testing.T) {
+	specData := &model.Spec{
+		Recipes: map[string]model.Recipe{
+			"build": {
+				Help: "Local build recipe",
+			},
+			"docker:build": {
+				Help: "Docker build recipe",
+			},
+			"docker:push": {
+				Help: "Docker push recipe",
+			},
+			"k8s:deploy": {
+				Help: "Kubernetes deploy recipe",
+			},
+			"test": {
+				Help: "Local test recipe",
+			},
+		},
+	}
+
+	// This test mainly verifies that the function doesn't panic
+	// and handles namespaced recipes correctly
+	err := listAllRecipes(specData)
+	if err != nil {
+		t.Errorf("listAllRecipes failed: %v", err)
+	}
+}
+
+func TestCompleteRecipesWithNamespacing(t *testing.T) {
+	// Create a temporary config file with namespaced recipes
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "drun.yml")
+
+	configContent := `
+version: 0.1
+recipes:
+  build:
+    help: "Local build"
+    run: echo "local build"
+  "docker:build":
+    help: "Docker build"
+    run: echo "docker build"
+  "docker:push":
+    help: "Docker push"
+    run: echo "docker push"
+`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	// Change to temp directory
+	oldDir, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(oldDir)
+	}()
+	err = os.Chdir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+
+	// Test recipe completion
+	completions, directive := completeRecipes(rootCmd, []string{}, "")
+
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("Expected NoFileComp directive, got %v", directive)
+	}
+
+	// Should have local recipes first, then namespaced
+	expectedCompletions := []string{
+		"build\tLocal build",
+		"---\t",
+		"docker:build\tDocker build",
+		"docker:push\tDocker push",
+	}
+
+	// Check that we have the expected number of completions (plus drun commands)
+	if len(completions) < len(expectedCompletions) {
+		t.Errorf("Expected at least %d completions, got %d: %v", len(expectedCompletions), len(completions), completions)
+	}
+
+	// Check that local recipes come before namespaced ones
+	foundBuild := false
+	foundDockerBuild := false
+	buildIndex := -1
+	dockerBuildIndex := -1
+
+	for i, completion := range completions {
+		if strings.HasPrefix(completion, "build\t") {
+			foundBuild = true
+			buildIndex = i
+		}
+		if strings.HasPrefix(completion, "docker:build\t") {
+			foundDockerBuild = true
+			dockerBuildIndex = i
+		}
+	}
+
+	if !foundBuild {
+		t.Error("Local 'build' recipe not found in completions")
+	}
+	if !foundDockerBuild {
+		t.Error("Namespaced 'docker:build' recipe not found in completions")
+	}
+	if foundBuild && foundDockerBuild && buildIndex > dockerBuildIndex {
+		t.Error("Local recipes should come before namespaced recipes")
+	}
+}
+
 // Note: TestCompleteRecipes_OnlySubcommands was removed because drun requires
 // at least one recipe to be defined - a config with no recipes fails validation

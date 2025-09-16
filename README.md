@@ -231,7 +231,7 @@ Define snippets that automatically run before every recipe - perfect for colors,
 version: 0.1
 
 # Snippets that run before EVERY recipe
-prerun:
+recipe-prerun:
   - |
     # ANSI color codes - available in all recipes
     RED='\033[0;31m'

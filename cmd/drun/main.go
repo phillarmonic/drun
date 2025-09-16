@@ -337,7 +337,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Create components
 	shellSelector := shell.NewSelector(specData.Shell)
-	templateEngine := tmpl.NewEngine(specData.Snippets, specData.Prerun)
+	templateEngine := tmpl.NewEngine(specData.Snippets, specData.RecipePrerun, specData.RecipePostrun)
 
 	// Set up caching
 	cacheDir := ".drun/cache"
@@ -362,29 +362,137 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to render environment variables: %w", err)
 	}
 
-	// Build execution plan
+	// Execute with lifecycle management
+	return executeWithLifecycle(specData, target, ctx, dagBuilder, taskRunner, jobs)
+}
+
+// executeWithLifecycle manages the complete execution lifecycle with before/after blocks
+func executeWithLifecycle(specData *model.Spec, target string, ctx *model.ExecutionContext, dagBuilder *dag.Builder, taskRunner *runner.Runner, jobs int) error {
+	// Phase 1: Startup (already completed - files imported and parsed)
+
+	// Phase 2: Execute before blocks (once before any recipe execution)
+	if len(specData.Before) > 0 {
+		if err := executeLifecycleBlocks(specData.Before, "before", ctx, taskRunner); err != nil {
+			return fmt.Errorf("failed to execute before blocks: %w", err)
+		}
+	}
+
+	// Phase 3: Build and execute recipe plan
 	plan, err := dagBuilder.Build(target, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to build execution plan: %w", err)
 	}
 
-	// Execute plan
-	return taskRunner.Execute(plan, jobs)
+	if err := taskRunner.Execute(plan, jobs); err != nil {
+		// Even if recipe execution fails, we should still try to run after blocks
+		afterErr := executeAfterBlocks(specData, ctx, taskRunner)
+		if afterErr != nil {
+			return fmt.Errorf("recipe execution failed: %w, and after blocks failed: %w", err, afterErr)
+		}
+		return fmt.Errorf("recipe execution failed: %w", err)
+	}
+
+	// Phase 4: Execute after blocks (once after all recipe execution)
+	return executeAfterBlocks(specData, ctx, taskRunner)
+}
+
+// executeAfterBlocks executes after blocks if they exist
+func executeAfterBlocks(specData *model.Spec, ctx *model.ExecutionContext, taskRunner *runner.Runner) error {
+	if len(specData.After) > 0 {
+		if err := executeLifecycleBlocks(specData.After, "after", ctx, taskRunner); err != nil {
+			return fmt.Errorf("failed to execute after blocks: %w", err)
+		}
+	}
+	return nil
+}
+
+// executeLifecycleBlocks executes a set of lifecycle blocks (before or after)
+func executeLifecycleBlocks(blocks []string, phase string, ctx *model.ExecutionContext, taskRunner *runner.Runner) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	// Create a synthetic recipe for the lifecycle blocks
+	lifecycleRecipe := &model.Recipe{
+		Help: fmt.Sprintf("Lifecycle %s blocks", phase),
+		Run:  model.Step{Lines: blocks},
+	}
+
+	// Create a plan node for the lifecycle blocks
+	planNode := model.PlanNode{
+		ID:      fmt.Sprintf("lifecycle-%s", phase),
+		Recipe:  lifecycleRecipe,
+		Context: ctx,
+		Step:    lifecycleRecipe.Run,
+	}
+
+	// Create a simple plan with just this node
+	plan := &model.ExecutionPlan{
+		Nodes:  []model.PlanNode{planNode},
+		Edges:  [][2]int{},
+		Levels: [][]int{{0}}, // Single level with one node
+	}
+
+	// Execute the lifecycle blocks
+	return taskRunner.Execute(plan, 1) // Always run lifecycle blocks sequentially
 }
 
 func listAllRecipes(specData *model.Spec) error {
 	fmt.Println("Available recipes:")
 
-	for name, recipe := range specData.Recipes {
-		help := recipe.Help
-		if help == "" {
-			help = "No description"
-		}
-		fmt.Printf("  %-20s %s\n", name, help)
+	// Separate local and namespaced recipes
+	localRecipes := make(map[string]model.Recipe)
+	namespacedRecipes := make(map[string]map[string]model.Recipe)
 
-		// Show aliases if any
-		if len(recipe.Aliases) > 0 {
-			fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+	for name, recipe := range specData.Recipes {
+		if strings.Contains(name, ":") {
+			// Namespaced recipe
+			parts := strings.SplitN(name, ":", 2)
+			namespace := parts[0]
+			recipeName := parts[1]
+
+			if namespacedRecipes[namespace] == nil {
+				namespacedRecipes[namespace] = make(map[string]model.Recipe)
+			}
+			namespacedRecipes[namespace][recipeName] = recipe
+		} else {
+			// Local recipe
+			localRecipes[name] = recipe
+		}
+	}
+
+	// Display local recipes first
+	if len(localRecipes) > 0 {
+		fmt.Println("\nLocal recipes:")
+		for name, recipe := range localRecipes {
+			help := recipe.Help
+			if help == "" {
+				help = "No description"
+			}
+			fmt.Printf("  %-20s %s\n", name, help)
+
+			// Show aliases if any
+			if len(recipe.Aliases) > 0 {
+				fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+			}
+		}
+	}
+
+	// Display namespaced recipes by namespace
+	for namespace, recipes := range namespacedRecipes {
+		fmt.Printf("\nNamespace '%s':\n", namespace)
+		for name, recipe := range recipes {
+			help := recipe.Help
+			if help == "" {
+				help = "No description"
+			}
+			fullName := namespace + ":" + name
+			fmt.Printf("  %-20s %s\n", fullName, help)
+
+			// Show aliases if any
+			if len(recipe.Aliases) > 0 {
+				fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+			}
 		}
 	}
 
@@ -1660,14 +1768,32 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 	if len(args) == 0 {
 		var completions []string
 
-		// Add workspace recipes first
+		// Add workspace recipes first, separating local and namespaced
+		localRecipes := make([]string, 0)
+		namespacedRecipes := make([]string, 0)
+
 		for name, recipe := range specData.Recipes {
 			help := recipe.Help
 			if help == "" {
 				help = "No description"
 			}
-			completions = append(completions, name+"\t"+help)
+
+			completion := name + "\t" + help
+			if strings.Contains(name, ":") {
+				// Namespaced recipe
+				namespacedRecipes = append(namespacedRecipes, completion)
+			} else {
+				// Local recipe
+				localRecipes = append(localRecipes, completion)
+			}
 		}
+
+		// Add local recipes first, then namespaced
+		completions = append(completions, localRecipes...)
+		if len(localRecipes) > 0 && len(namespacedRecipes) > 0 {
+			completions = append(completions, "---\t")
+		}
+		completions = append(completions, namespacedRecipes...)
 
 		// Add separator if we have both recipes and subcommands
 		var drunCommands []string

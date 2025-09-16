@@ -6,17 +6,20 @@ import (
 
 // Spec represents the complete drun configuration
 type Spec struct {
-	Version  string                 `yaml:"version"`
-	Shell    map[string]ShellConfig `yaml:"shell,omitempty"`
-	Env      map[string]string      `yaml:"env,omitempty"`
-	Vars     map[string]any         `yaml:"vars,omitempty"`
-	Defaults Defaults               `yaml:"defaults,omitempty"`
-	Snippets map[string]string      `yaml:"snippets,omitempty"`
-	Prerun   []string               `yaml:"prerun,omitempty"`
-	Include  []string               `yaml:"include,omitempty"`
-	Secrets  map[string]Secret      `yaml:"secrets,omitempty"`
-	Recipes  map[string]Recipe      `yaml:"recipes"`
-	Cache    CacheConfig            `yaml:"cache,omitempty"`
+	Version       string                 `yaml:"version"`
+	Shell         map[string]ShellConfig `yaml:"shell,omitempty"`
+	Env           map[string]string      `yaml:"env,omitempty"`
+	Vars          map[string]any         `yaml:"vars,omitempty"`
+	Defaults      Defaults               `yaml:"defaults,omitempty"`
+	Snippets      map[string]string      `yaml:"snippets,omitempty"`
+	RecipePrerun  []string               `yaml:"recipe-prerun,omitempty"`  // Runs before every recipe
+	RecipePostrun []string               `yaml:"recipe-postrun,omitempty"` // NEW: Runs after every recipe
+	Before        []string               `yaml:"before,omitempty"`         // Runs once before any recipe execution
+	After         []string               `yaml:"after,omitempty"`          // Runs once after all recipe execution
+	Include       []string               `yaml:"include,omitempty"`
+	Secrets       map[string]Secret      `yaml:"secrets,omitempty"`
+	Recipes       map[string]Recipe      `yaml:"recipes"`
+	Cache         CacheConfig            `yaml:"cache,omitempty"`
 }
 
 // ShellConfig defines shell configuration per OS
@@ -98,6 +101,7 @@ type ExecutionContext struct {
 	OS          string
 	Arch        string
 	Hostname    string
+	Namespace   string // NEW: Namespace for imported recipes
 }
 
 // PlanNode represents a single execution unit in the DAG
@@ -114,4 +118,22 @@ type ExecutionPlan struct {
 	Nodes  []PlanNode
 	Edges  [][2]int // [from_index, to_index]
 	Levels [][]int  // Groups of node indices that can run in parallel
+}
+
+// LifecyclePhase represents different execution phases
+type LifecyclePhase int
+
+const (
+	PhaseStartup LifecyclePhase = iota // Import and parse files
+	PhaseBefore                        // Run before blocks
+	PhaseRecipes                       // Run recipes
+	PhaseAfter                         // Run after blocks
+)
+
+// LifecycleState tracks the current execution state
+type LifecycleState struct {
+	Phase      LifecyclePhase
+	BeforeRun  bool
+	AfterRun   bool
+	Namespaces map[string]*Spec // Imported specs by namespace
 }

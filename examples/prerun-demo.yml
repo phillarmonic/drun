@@ -1,4 +1,4 @@
-# drun configuration file demonstrating prerun snippets
+# drun configuration file demonstrating recipe-prerun and recipe-postrun snippets
 # Learn more: https://github.com/phillarmonic/drun
 
 version: 0.1
@@ -26,7 +26,7 @@ snippets:
     export PROJECT_VERSION="{{ .version }}"
 
 # Snippets that run before every recipe - perfect for common setup!
-prerun:
+recipe-prerun:
   - '{{ snippet "check_requirements" }}'
   - '{{ snippet "setup_env" }}'
   - |
@@ -55,6 +55,20 @@ prerun:
     log_error() {
       echo -e "${RED}❌ $1${NC}"
     }
+
+# Snippets that run after every recipe - perfect for cleanup and logging!
+recipe-postrun:
+  - |
+    # Log recipe completion status
+    if [ $? -eq 0 ]; then
+      log_success "Recipe completed successfully"
+    else
+      log_error "Recipe failed with exit code $?"
+    fi
+  - |
+    # Per-recipe cleanup and metrics
+    echo "Recipe execution finished at $(date)"
+    echo "Working directory: $(pwd)"
 
 recipes:
   setup:

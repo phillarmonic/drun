@@ -35,19 +35,64 @@ This directory contains comprehensive examples showcasing all of drun's powerful
 ./bin/drun -f examples/simple.yml greet Alice
 ```
 
-#### [`prerun-demo.yml`](prerun-demo.yml) ⭐ **NEW**
-**Prerun snippets for DRY common setup**
+#### [`prerun-demo.yml`](prerun-demo.yml) ⭐ **UPDATED**
+**Recipe-prerun and recipe-postrun snippets for DRY common setup**
 - Universal ANSI color codes for any project type
 - Generic helper functions (log_info, log_success, etc.)
 - Common shell settings and error handling
+- Per-recipe completion logging and cleanup
 - Language-agnostic project workflow examples
 
 ```bash
-# See prerun snippets in action
+# See recipe-prerun and recipe-postrun snippets in action
 ./bin/drun -f examples/prerun-demo.yml setup --dry-run
 ./bin/drun -f examples/prerun-demo.yml build --target=production
 ./bin/drun -f examples/prerun-demo.yml test --coverage
 ./bin/drun -f examples/prerun-demo.yml deploy --environment=staging --dry-run
+```
+
+#### [`lifecycle-demo.yml`](lifecycle-demo.yml) ⭐ **NEW v1.4.0**
+**Complete execution lifecycle with before/after blocks**
+- **Before blocks**: Run once before any recipe execution (setup, validation)
+- **After blocks**: Run once after all recipes complete (cleanup, reporting)
+- **State management**: Shared state across lifecycle phases
+- **Error handling**: After blocks run even when recipes fail
+- **Pipeline reporting**: JSON reports and execution metrics
+
+```bash
+# See lifecycle management in action
+./bin/drun -f examples/lifecycle-demo.yml build
+./bin/drun -f examples/lifecycle-demo.yml deploy staging
+./bin/drun -f examples/lifecycle-demo.yml fail  # After blocks still run!
+```
+
+#### [`namespacing-demo.yml`](namespacing-demo.yml) ⭐ **NEW v1.4.0**
+**Recipe namespacing to prevent collisions**
+- **Namespace syntax**: `namespace::path` in include statements
+- **Collision prevention**: Multiple files can have recipes with same names
+- **Organization**: Clear separation by source (docker:build, k8s:deploy, etc.)
+- **Mixed dependencies**: Recipes can depend on namespaced recipes
+
+```bash
+# Explore namespacing features
+./bin/drun -f examples/namespacing-demo.yml list-recipes
+./bin/drun -f examples/namespacing-demo.yml build        # Local recipe
+./bin/drun -f examples/namespacing-demo.yml docker:build # Namespaced recipe
+./bin/drun -f examples/namespacing-demo.yml full-build   # Mixed dependencies
+```
+
+#### [`complete-demo.yml`](complete-demo.yml) ⭐ **NEW v1.4.0**
+**Production-ready pipeline combining lifecycle + namespacing**
+- **Full CI pipeline**: Complete build, test, package, deploy workflow
+- **Mixed dependencies**: Local and namespaced recipe dependencies
+- **Pipeline reporting**: JSON reports and artifact archiving
+- **Real-world patterns**: Production-ready configuration examples
+
+```bash
+# Run complete CI pipeline
+./bin/drun -f examples/complete-demo.yml full-ci
+./bin/drun -f examples/complete-demo.yml deploy production
+./bin/drun -f examples/complete-demo.yml status
 ```
 
 #### [`snippets-showcase.yml`](snippets-showcase.yml) ⭐ **NEW**
@@ -227,13 +272,26 @@ echo "deploy-token-123" > ~/.secrets/deploy-token
 ./bin/drun -f examples/simple.yml greet Alice
 ```
 
-### 2. **Docker Integration** - Smart Detection
+### 2. **New Features (v1.4.0)** - Lifecycle & Namespacing ⭐
+```bash
+# Try lifecycle management
+./bin/drun -f examples/lifecycle-demo.yml build
+
+# Explore recipe namespacing
+./bin/drun -f examples/namespacing-demo.yml list-recipes
+./bin/drun -f examples/namespacing-demo.yml docker:build
+
+# Complete production pipeline
+./bin/drun -f examples/complete-demo.yml full-ci
+```
+
+### 3. **Docker Integration** - Smart Detection
 ```bash
 # See auto-detection in action
 ./bin/drun -f examples/docker-devops.yml build
 ```
 
-### 3. **Advanced Features** - Matrix & Secrets
+### 4. **Advanced Features** - Matrix & Secrets
 ```bash
 # Try matrix execution
 ./bin/drun -f examples/matrix-working-demo.yml test-matrix
@@ -243,13 +301,13 @@ export API_KEY="test-key"
 ./bin/drun -f examples/secrets-demo.yml secure-deploy
 ```
 
-### 4. **Remote Includes** - Collaboration
+### 5. **Remote Includes** - Collaboration
 ```bash
 # Explore remote recipe sharing
 ./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
 ```
 
-### 5. **Complete Tour** - Everything Together
+### 6. **Complete Tour** - Everything Together
 ```bash
 # See all features working together
 ./bin/drun -f examples/feature-showcase.yml showcase-all

@@ -1,4 +1,4 @@
-# drun configuration showcasing snippets and prerun capabilities
+# drun configuration showcasing snippets, recipe-prerun and recipe-postrun capabilities
 # Learn more: https://github.com/phillarmonic/drun
 
 version: 0.1
@@ -186,8 +186,8 @@ snippets:
       log_warning "No coverage data found"
     fi
 
-# Prerun snippets demonstrating different patterns
-prerun:
+# Recipe-Prerun snippets demonstrating different patterns
+recipe-prerun:
   # Essential setup that every recipe needs
   - '{{ snippet "colors" }}'
   - '{{ snippet "logging_functions" }}'
@@ -199,8 +199,21 @@ prerun:
   # Project branding
   - '{{ snippet "project_banner" }}'
 
+# Recipe-Postrun snippets for cleanup and reporting
+recipe-postrun:
+  - |
+    # Log recipe completion with timing
+    if [ $? -eq 0 ]; then
+      log_success "Recipe completed successfully at $(date)"
+    else
+      log_error "Recipe failed at $(date) with exit code $?"
+    fi
+  - |
+    # Optional per-recipe cleanup
+    {{ snippet "cleanup_temp" }}
+
 recipes:
-  # Basic recipe showing prerun in action
+  # Basic recipe showing recipe-prerun and recipe-postrun in action
   hello:
     help: "Simple hello world with enhanced logging"
     run: |
@@ -411,7 +424,7 @@ recipes:
     run: |
       log_step "Demonstrating snippet capabilities"
       
-      echo -e "${BOLD}1. Basic snippets (colors, logging) - already loaded in prerun${NC}"
+      echo -e "${BOLD}1. Basic snippets (colors, logging) - already loaded in recipe-prerun${NC}"
       
       echo -e "${BOLD}2. Environment detection:${NC}"
       {{ snippet "detect_os" }}

@@ -7,15 +7,15 @@ import (
 	"github.com/phillarmonic/drun/internal/model"
 )
 
-func TestEngine_RenderStep_WithPrerun(t *testing.T) {
-	prerun := []string{
+func TestEngine_RenderStep_WithRecipePrerun(t *testing.T) {
+	recipePrerun := []string{
 		"# Setup colors",
 		"RED='\\033[0;31m'",
 		"GREEN='\\033[0;32m'",
 		"NC='\\033[0m'",
 	}
 
-	engine := NewEngine(nil, prerun)
+	engine := NewEngine(nil, recipePrerun, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -36,14 +36,14 @@ func TestEngine_RenderStep_WithPrerun(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	// Check that prerun snippets are prepended
+	// Check that recipe-prerun snippets are prepended
 	if len(result.Lines) < 6 {
-		t.Fatalf("Expected at least 6 lines (4 prerun + 2 original), got %d", len(result.Lines))
+		t.Fatalf("Expected at least 6 lines (4 recipe-prerun + 2 original), got %d", len(result.Lines))
 	}
 
-	// Verify prerun content is at the beginning
+	// Verify recipe-prerun content is at the beginning
 	if !strings.Contains(result.Lines[0], "Setup colors") {
-		t.Errorf("Expected first line to contain prerun comment, got: %s", result.Lines[0])
+		t.Errorf("Expected first line to contain recipe-prerun comment, got: %s", result.Lines[0])
 	}
 
 	// Verify original content is preserved
@@ -59,13 +59,13 @@ func TestEngine_RenderStep_WithPrerun(t *testing.T) {
 	}
 }
 
-func TestEngine_RenderStep_WithPrerunTemplating(t *testing.T) {
-	prerun := []string{
+func TestEngine_RenderStep_WithRecipePrerunTemplating(t *testing.T) {
+	recipePrerun := []string{
 		"# Project: {{ .project_name }}",
 		"echo Starting {{ .project_name }}",
 	}
 
-	engine := NewEngine(nil, prerun)
+	engine := NewEngine(nil, recipePrerun, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -94,10 +94,10 @@ func TestEngine_RenderStep_WithPrerunTemplating(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("Expected prerun template to be rendered with project name")
+		t.Error("Expected recipe-prerun template to be rendered with project name")
 	}
 
-	// Check that templating worked in prerun echo
+	// Check that templating worked in recipe-prerun echo
 	found = false
 	for _, line := range result.Lines {
 		if strings.Contains(line, "Starting myapp") {
@@ -106,12 +106,12 @@ func TestEngine_RenderStep_WithPrerunTemplating(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("Expected prerun echo to be rendered with project name")
+		t.Error("Expected recipe-prerun echo to be rendered with project name")
 	}
 }
 
-func TestEngine_RenderStep_EmptyPrerun(t *testing.T) {
-	engine := NewEngine(nil, []string{})
+func TestEngine_RenderStep_EmptyRecipePrerun(t *testing.T) {
+	engine := NewEngine(nil, []string{}, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -136,8 +136,8 @@ func TestEngine_RenderStep_EmptyPrerun(t *testing.T) {
 	}
 }
 
-func TestEngine_RenderStep_NilPrerun(t *testing.T) {
-	engine := NewEngine(nil, nil)
+func TestEngine_RenderStep_NilRecipePrerun(t *testing.T) {
+	engine := NewEngine(nil, nil, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -163,7 +163,7 @@ func TestEngine_RenderStep_NilPrerun(t *testing.T) {
 }
 
 func TestEngine_RenderStep_WithFlags(t *testing.T) {
-	engine := NewEngine(nil, nil)
+	engine := NewEngine(nil, nil, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -197,5 +197,58 @@ func TestEngine_RenderStep_WithFlags(t *testing.T) {
 
 	if result.Lines[1] != "echo Coverage enabled" {
 		t.Errorf("Expected 'echo Coverage enabled', got %s", result.Lines[1])
+	}
+}
+
+func TestEngine_RenderStep_WithRecipePostrun(t *testing.T) {
+	recipePostrun := []string{
+		"echo Recipe completed",
+		"echo Cleanup finished",
+	}
+
+	engine := NewEngine(nil, nil, recipePostrun)
+
+	step := model.Step{
+		Lines: []string{
+			"echo Main task",
+		},
+	}
+
+	ctx := &model.ExecutionContext{
+		Vars: map[string]any{},
+		Env:  map[string]string{},
+	}
+
+	result, err := engine.RenderStep(step, ctx)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Should have original + postrun lines
+	if len(result.Lines) < 3 {
+		t.Fatalf("Expected at least 3 lines, got %d", len(result.Lines))
+	}
+
+	// Verify original content comes first
+	if !strings.Contains(result.Lines[0], "Main task") {
+		t.Errorf("Expected first line to contain original content, got: %s", result.Lines[0])
+	}
+
+	// Verify recipe-postrun content is at the end
+	foundCompleted := false
+	foundCleanup := false
+	for _, line := range result.Lines {
+		if strings.Contains(line, "Recipe completed") {
+			foundCompleted = true
+		}
+		if strings.Contains(line, "Cleanup finished") {
+			foundCleanup = true
+		}
+	}
+	if !foundCompleted {
+		t.Error("Expected to find 'Recipe completed' in recipe-postrun")
+	}
+	if !foundCleanup {
+		t.Error("Expected to find 'Cleanup finished' in recipe-postrun")
 	}
 }

@@ -19,17 +19,19 @@ import (
 // Engine handles template rendering with custom functions
 type Engine struct {
 	snippets      map[string]string
-	prerun        []string                // Prerun snippets that execute before every recipe
+	recipePrerun  []string                // Recipe-prerun snippets that execute before every recipe
+	recipePostrun []string                // Recipe-postrun snippets that execute after every recipe
 	templateCache sync.Map                // Cache compiled templates by hash
 	funcMap       template.FuncMap        // Pre-computed function map
 	currentCtx    *model.ExecutionContext // Current execution context for functions
 }
 
 // NewEngine creates a new template engine
-func NewEngine(snippets map[string]string, prerun []string) *Engine {
+func NewEngine(snippets map[string]string, recipePrerun []string, recipePostrun []string) *Engine {
 	e := &Engine{
-		snippets: snippets,
-		prerun:   prerun,
+		snippets:      snippets,
+		recipePrerun:  recipePrerun,
+		recipePostrun: recipePostrun,
 	}
 	// Pre-compute function map for better performance
 	e.funcMap = e.getFuncMap()
@@ -84,15 +86,16 @@ func (e *Engine) getOrCompileTemplate(templateStr string) (*template.Template, e
 
 // RenderStep renders a step with the given context
 func (e *Engine) RenderStep(step model.Step, ctx *model.ExecutionContext) (model.Step, error) {
-	// Prepend prerun snippets to the step
-	allLines := make([]string, 0, len(e.prerun)+len(step.Lines))
+	// Calculate total capacity for all lines
+	totalCapacity := len(e.recipePrerun) + len(step.Lines) + len(e.recipePostrun)
+	allLines := make([]string, 0, totalCapacity)
 
-	// Add prerun snippets first
-	for _, prerunSnippet := range e.prerun {
-		// Render each prerun snippet as a template to support variables
+	// Add recipe-prerun snippets first
+	for _, prerunSnippet := range e.recipePrerun {
+		// Render each recipe-prerun snippet as a template to support variables
 		rendered, err := e.Render(prerunSnippet, ctx)
 		if err != nil {
-			return model.Step{}, fmt.Errorf("failed to render prerun snippet: %w", err)
+			return model.Step{}, fmt.Errorf("failed to render recipe-prerun snippet: %w", err)
 		}
 		// Split rendered snippet into lines and add them
 		snippetLines := strings.Split(rendered, "\n")
@@ -105,6 +108,22 @@ func (e *Engine) RenderStep(step model.Step, ctx *model.ExecutionContext) (model
 
 	// Add the original step lines
 	allLines = append(allLines, step.Lines...)
+
+	// Add recipe-postrun snippets last
+	for _, postrunSnippet := range e.recipePostrun {
+		// Render each recipe-postrun snippet as a template to support variables
+		rendered, err := e.Render(postrunSnippet, ctx)
+		if err != nil {
+			return model.Step{}, fmt.Errorf("failed to render recipe-postrun snippet: %w", err)
+		}
+		// Split rendered snippet into lines and add them
+		snippetLines := strings.Split(rendered, "\n")
+		for _, line := range snippetLines {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				allLines = append(allLines, trimmed)
+			}
+		}
+	}
 
 	// Join all lines into a single script for template rendering
 	script := strings.Join(allLines, "\n")

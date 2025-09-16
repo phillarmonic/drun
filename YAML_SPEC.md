@@ -86,8 +86,8 @@ snippets:
     export PROJECT_ROOT="$(pwd)"
     export PROJECT_VERSION="{{ .version }}"
 
-# Optional: Snippets that run before EVERY recipe (NEW FEATURE!)
-prerun:
+# Optional: Snippets that run before EVERY recipe (RENAMED for clarity!)
+recipe-prerun:
   # Can call existing snippets with full template support
   - '{{ snippet "setup_colors" }}'
   - '{{ snippet "setup_env" }}'
@@ -110,6 +110,45 @@ prerun:
       echo -e "${RED}❌ $1${NC}"
     }
 
+# Optional: Snippets that run after EVERY recipe (NEW FEATURE!)
+recipe-postrun:
+  # Cleanup or logging that happens after each recipe
+  - |
+    # Log recipe completion
+    if [ $? -eq 0 ]; then
+      log_success "Recipe completed successfully"
+    else
+      log_error "Recipe failed with exit code $?"
+    fi
+  - |
+    # Optional cleanup after each recipe
+    # Clean up temporary files, reset state, etc.
+    echo "Recipe execution finished at $(date)"
+
+# Optional: Lifecycle blocks that run ONCE before any recipe execution (NEW FEATURE!)
+before:
+  - |
+    # Setup that runs once before any recipe
+    echo "🚀 Starting drun execution..."
+    export DRUN_START_TIME=$(date +%s)
+  - |
+    # Initialize shared resources
+    mkdir -p .drun/tmp
+    echo "Initialized temporary directory"
+
+# Optional: Lifecycle blocks that run ONCE after all recipe execution (NEW FEATURE!)
+after:
+  - |
+    # Cleanup that runs once after all recipes
+    echo "🧹 Cleaning up temporary files..."
+    rm -rf .drun/tmp
+  - |
+    # Show execution summary
+    if [ -n "${DRUN_START_TIME:-}" ]; then
+      DURATION=$(($(date +%s) - DRUN_START_TIME))
+      echo "✅ Execution completed in ${DURATION}s"
+    fi
+
 # Optional: Include other configuration files
 include:
   # Local files (supports globs)
@@ -122,6 +161,11 @@ include:
   # Git repositories
   - "git+https://github.com/company/recipes.git@main:docker/common.yml"
   - "git+https://github.com/company/recipes.git@v1.0.0"  # Uses drun.yml
+  
+  # Namespaced includes (NEW FEATURE!) - prevents recipe name collisions
+  - "docker::shared/docker-tasks.yml"           # Recipes prefixed with "docker:"
+  - "k8s::git+https://github.com/company/k8s-recipes.git@main"  # Recipes prefixed with "k8s:"
+  - "common::https://example.com/common-tasks.yml"  # Recipes prefixed with "common:"
 
 # Optional: Secrets management
 secrets:
@@ -287,8 +331,11 @@ cache:
 | `vars` | object | ❌ | Template variables |
 | `defaults` | object | ❌ | Global defaults for all recipes |
 | `snippets` | object | ❌ | Reusable code snippets |
-| `prerun` | array | ❌ | Snippets that run before every recipe |
-| `include` | array | ❌ | Include other configuration files |
+| `recipe-prerun` | array | ❌ | **RENAMED:** Snippets that run before every recipe |
+| `recipe-postrun` | array | ❌ | **NEW:** Snippets that run after every recipe |
+| `before` | array | ❌ | **NEW:** Lifecycle blocks that run once before any recipe execution |
+| `after` | array | ❌ | **NEW:** Lifecycle blocks that run once after all recipe execution |
+| `include` | array | ❌ | Include other configuration files (supports namespacing with `namespace::path`) |
 | `secrets` | object | ❌ | Secret definitions |
 | `recipes` | object | ✅ | Recipe definitions |
 | `cache` | object | ❌ | Caching configuration |
@@ -340,27 +387,52 @@ cache:
 | `required` | bool | ❌ | Whether secret is required |
 | `description` | string | ❌ | Human-readable description |
 
-## Prerun Snippets (New Feature)
+## Execution Lifecycle (New Feature)
 
-The `prerun` section allows you to define snippets that automatically execute before every recipe. This is perfect for:
+drun now supports different execution phases with dedicated lifecycle blocks:
 
-- **Color definitions**: Set up ANSI color codes once, use everywhere
-- **Common functions**: Define helper functions available to all recipes  
-- **Shell settings**: Apply consistent shell options (`set -euo pipefail`)
-- **Environment setup**: Initialize common variables or paths
+### Execution Phases
 
-### Benefits
+1. **Startup**: Import and parse all configuration files
+2. **Before**: Run `before` blocks once before any recipe execution
+3. **Recipes**: Execute the requested recipes and their dependencies
+4. **After**: Run `after` blocks once after all recipe execution (even on failure)
 
-- **DRY Principle**: No need to repeat common setup code
-- **Automatic**: Prerun snippets are automatically prepended to every recipe
-- **Templated**: Full template support with variables and functions
-- **Snippet Calls**: Can call existing snippets with `{{ snippet "name" }}`
-- **Flexible**: Multiple snippets for different types of setup
+### Lifecycle Blocks
 
-### Example
+#### Before Blocks
+The `before` section contains blocks that run **once** before any recipe execution:
 
 ```yaml
-prerun:
+before:
+  - |
+    echo "🚀 Starting drun execution..."
+    export DRUN_START_TIME=$(date +%s)
+  - |
+    mkdir -p .drun/tmp
+    echo "Initialized shared resources"
+```
+
+#### After Blocks
+The `after` section contains blocks that run **once** after all recipe execution:
+
+```yaml
+after:
+  - |
+    echo "🧹 Cleaning up..."
+    rm -rf .drun/tmp
+  - |
+    if [ -n "${DRUN_START_TIME:-}" ]; then
+      DURATION=$(($(date +%s) - DRUN_START_TIME))
+      echo "✅ Completed in ${DURATION}s"
+    fi
+```
+
+#### Recipe-Prerun Snippets
+The `recipe-prerun` section contains snippets that run before **every** recipe:
+
+```yaml
+recipe-prerun:
   - |
     # Colors available in all recipes
     RED='\033[0;31m'
@@ -371,14 +443,93 @@ prerun:
     success() {
       echo -e "${GREEN}✅ $1${NC}"
     }
+```
+
+#### Recipe-Postrun Snippets
+The `recipe-postrun` section contains snippets that run after **every** recipe:
+
+```yaml
+recipe-postrun:
+  - |
+    # Log completion status
+    if [ $? -eq 0 ]; then
+      echo -e "${GREEN}✅ Recipe completed successfully${NC}"
+    else
+      echo -e "${RED}❌ Recipe failed${NC}"
+    fi
+  - |
+    # Cleanup after each recipe
+    echo "Recipe finished at $(date)"
+```
+
+### Use Cases
+
+- **Before**: Database setup, resource initialization, environment validation
+- **After**: Cleanup, reporting, resource teardown, notifications
+- **Recipe-Prerun**: Color definitions, helper functions, common shell settings
+- **Recipe-Postrun**: Status logging, per-recipe cleanup, metrics collection
+
+## Recipe Namespacing (New Feature)
+
+Prevent recipe name collisions when including multiple configuration files by using namespaces.
+
+### Namespace Syntax
+
+Use the `namespace::path` syntax in include statements:
+
+```yaml
+include:
+  - "docker::shared/docker-tasks.yml"     # Recipes become "docker:build", "docker:push", etc.
+  - "k8s::tasks/kubernetes.yml"           # Recipes become "k8s:deploy", "k8s:rollback", etc.
+  - "common::https://example.com/common.yml"  # Remote includes also support namespacing
+```
+
+### Using Namespaced Recipes
+
+Execute namespaced recipes using the full name:
+
+```bash
+# Execute a namespaced recipe
+drun docker:build
+
+# List all recipes (shows both local and namespaced)
+drun --list
+```
+
+### Benefits
+
+- **Collision Prevention**: Multiple files can have recipes with the same name
+- **Organization**: Clear separation of recipe sources
+- **Flexibility**: Mix local and remote includes without conflicts
+- **Clarity**: Easy to see which file a recipe comes from
+
+### Example
+
+```yaml
+# main drun.yml
+include:
+  - "docker::shared/docker.yml"
+  - "k8s::shared/kubernetes.yml"
 
 recipes:
+  # Local recipe
   build:
-    run: |
-      # Colors and functions automatically available!
-      echo -e "${GREEN}Building...${NC}"
-      success "Build completed!"
+    run: echo "Local build"
+
+# shared/docker.yml contains:
+# recipes:
+#   build:  # Becomes "docker:build"
+#     run: docker build .
+#   push:   # Becomes "docker:push" 
+#     run: docker push
+
+# shared/kubernetes.yml contains:
+# recipes:
+#   deploy: # Becomes "k8s:deploy"
+#     run: kubectl apply -f k8s/
 ```
+
+Result: You can run `drun build`, `drun docker:build`, or `drun k8s:deploy` without conflicts.
 
 ## Template Functions
 
@@ -453,7 +604,7 @@ Plus all [Sprig functions](https://masterminds.github.io/sprig/) (150+ additiona
 See the `examples/` directory for comprehensive configuration examples:
 
 - `examples/simple.yml` - Basic recipes
-- `examples/prerun-demo.yml` - Prerun snippets showcase
+- `examples/prerun-demo.yml` - Recipe-prerun and recipe-postrun snippets showcase
 - `examples/feature-showcase.yml` - Advanced features
 - `examples/matrix-demo.yml` - Matrix execution
 - `examples/remote-includes-demo.yml` - Remote includes
@@ -464,6 +615,6 @@ See the `examples/` directory for comprehensive configuration examples:
 ### From v0.0.x to v0.1
 
 - Add `version: 0.1` to your configuration
-- `prerun` field is new and optional
+- `recipe-prerun` and `recipe-postrun` fields are new and optional
 - **Enhanced flag access**: Both `{{ .flagname }}` and `{{ .flags.flagname }}` syntaxes now work
 - All existing configurations remain compatible

@@ -1,37 +1,169 @@
-# Shared Docker recipes
+# Shared Docker Tasks
+# This file demonstrates recipes that will be namespaced when included
+
 version: 0.1
 
-env:
-  DOCKER_COMPOSE_CMD: "{{ dockerCompose }}"
-  DOCKER_BUILDX_CMD: "{{ dockerBuildx }}"
+# Variables specific to Docker operations
+vars:
+  docker_registry: "ghcr.io"
+  docker_org: "myorg"
+  image_name: "{{ .project_name }}"
+  image_tag: "{{ .version }}"
 
+# Docker-specific environment
+env:
+  DOCKER_BUILDKIT: "1"
+  DOCKER_CLI_EXPERIMENTAL: "enabled"
+
+# Docker-specific snippets
 snippets:
-  docker_check: |
+  docker_login: |
     if ! docker info >/dev/null 2>&1; then
-      {{ error "Docker daemon not running" }}
+      echo "❌ Docker is not running"
       exit 1
     fi
+    echo "🐳 Docker is available"
 
+  check_dockerfile: |
+    if [ ! -f Dockerfile ]; then
+      echo "❌ Dockerfile not found"
+      exit 1
+    fi
+    echo "📄 Dockerfile found"
+
+# Recipes that will be namespaced as docker:* when included
 recipes:
-  docker-info:
-    help: "Show Docker system information"
+  # This becomes docker:build when included with docker:: namespace
+  build:
+    help: "Build Docker image"
     run: |
-      {{ step "Gathering Docker information" }}
-      {{ snippet "docker_check" }}
+      log_info "Building Docker image..."
+      {{ snippet "docker_login" }}
+      {{ snippet "check_dockerfile" }}
       
-      echo "Docker Version: $(docker --version)"
-      echo "Compose Command: $DOCKER_COMPOSE_CMD"
-      echo "Buildx Command: $DOCKER_BUILDX_CMD"
+      IMAGE_FULL_NAME="{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:{{ .image_tag }}"
       
-      {{ success "Docker info gathered successfully" }}
+      echo "🏗️  Building image: $IMAGE_FULL_NAME"
+      docker build -t "$IMAGE_FULL_NAME" .
+      
+      # Also tag as latest
+      docker tag "$IMAGE_FULL_NAME" "{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:latest"
+      
+      log_success "Docker image built successfully"
+      echo "   Image: $IMAGE_FULL_NAME"
+      echo "   Also tagged as: {{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:latest"
 
-  docker-cleanup:
-    help: "Clean up Docker resources"
+  # This becomes docker:push when included with docker:: namespace
+  push:
+    help: "Push Docker image to registry"
+    deps: ["build"]  # Note: This will become docker:build when namespaced
     run: |
-      {{ step "Cleaning Docker resources" }}
-      {{ snippet "docker_check" }}
+      log_info "Pushing Docker image to registry..."
+      {{ snippet "docker_login" }}
       
-      docker system prune -f
+      IMAGE_FULL_NAME="{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:{{ .image_tag }}"
+      
+      echo "📤 Pushing image: $IMAGE_FULL_NAME"
+      docker push "$IMAGE_FULL_NAME"
+      
+      echo "📤 Pushing latest tag..."
+      docker push "{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:latest"
+      
+      log_success "Docker image pushed successfully"
+
+  # This becomes docker:clean when included with docker:: namespace
+  clean:
+    help: "Clean up Docker images and containers"
+    run: |
+      log_info "Cleaning up Docker resources..."
+      {{ snippet "docker_login" }}
+      
+      IMAGE_FULL_NAME="{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:{{ .image_tag }}"
+      
+      # Remove containers
+      echo "🧹 Removing stopped containers..."
+      docker container prune -f
+      
+      # Remove images
+      echo "🧹 Removing project images..."
+      docker rmi "$IMAGE_FULL_NAME" 2>/dev/null || true
+      docker rmi "{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:latest" 2>/dev/null || true
+      
+      # Remove dangling images
+      echo "🧹 Removing dangling images..."
       docker image prune -f
       
-      {{ success "Docker cleanup completed" }}
+      log_success "Docker cleanup completed"
+
+  # This becomes docker:run when included with docker:: namespace
+  run:
+    help: "Run the Docker container"
+    deps: ["build"]
+    positionals:
+      - name: port
+        default: "8080"
+    flags:
+      detach:
+        type: bool
+        default: false
+        help: "Run container in detached mode"
+    run: |
+      log_info "Running Docker container..."
+      {{ snippet "docker_login" }}
+      
+      IMAGE_FULL_NAME="{{ .docker_registry }}/{{ .docker_org }}/{{ .image_name }}:{{ .image_tag }}"
+      CONTAINER_NAME="{{ .image_name }}-{{ .version }}"
+      
+      # Stop existing container if running
+      docker stop "$CONTAINER_NAME" 2>/dev/null || true
+      docker rm "$CONTAINER_NAME" 2>/dev/null || true
+      
+      RUN_ARGS=""
+      {{ if .flags.detach }}
+      RUN_ARGS="$RUN_ARGS -d"
+      echo "🚀 Starting container in detached mode..."
+      {{ else }}
+      RUN_ARGS="$RUN_ARGS -it --rm"
+      echo "🚀 Starting container in interactive mode..."
+      {{ end }}
+      
+      echo "   Container: $CONTAINER_NAME"
+      echo "   Port: {{ .port }}"
+      echo "   Image: $IMAGE_FULL_NAME"
+      
+      docker run $RUN_ARGS \
+        --name "$CONTAINER_NAME" \
+        -p "{{ .port }}:8080" \
+        "$IMAGE_FULL_NAME"
+      
+      {{ if .flags.detach }}
+      log_success "Container started in background"
+      echo "   Access at: http://localhost:{{ .port }}"
+      echo "   Stop with: docker stop $CONTAINER_NAME"
+      {{ end }}
+
+  # This becomes docker:logs when included with docker:: namespace
+  logs:
+    help: "Show container logs"
+    positionals:
+      - name: lines
+        default: "50"
+    flags:
+      follow:
+        type: bool
+        default: false
+        help: "Follow log output"
+    run: |
+      log_info "Showing Docker container logs..."
+      
+      CONTAINER_NAME="{{ .image_name }}-{{ .version }}"
+      
+      LOGS_ARGS="-n {{ .lines }}"
+      {{ if .flags.follow }}
+      LOGS_ARGS="$LOGS_ARGS -f"
+      echo "📋 Following logs for container: $CONTAINER_NAME"
+      {{ else }}
+      echo "📋 Showing last {{ .lines }} lines for container: $CONTAINER_NAME"
+      {{ end }}
+      
+      docker logs $LOGS_ARGS "$CONTAINER_NAME"
