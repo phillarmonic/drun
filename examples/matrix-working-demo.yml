@@ -1,6 +1,6 @@
 # Matrix Working Demo
 # Shows matrix execution with proper variable usage
-version: 0.1
+version: 1.0
 
 env:
   PROJECT: "matrix-test"

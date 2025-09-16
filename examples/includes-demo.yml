@@ -1,6 +1,6 @@
 # Includes Demo
 # Demonstrates local file includes (remote includes would be added later)
-version: 0.1
+version: 1.0
 
 # Include shared recipes
 include:

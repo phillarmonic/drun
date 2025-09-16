@@ -1,6 +1,6 @@
 # Complete Remote Includes Example
 # Demonstrates all remote include capabilities
-version: 0.1
+version: 1.0
 
 # Mix of local and remote includes
 include:

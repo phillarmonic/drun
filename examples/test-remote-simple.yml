@@ -1,5 +1,5 @@
 # Test Remote Includes - Simple
-version: 0.1
+version: 1.0
 
 # Test with local includes first, then show remote syntax
 include:

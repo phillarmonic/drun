@@ -1,12 +1,12 @@
 # Lifecycle Management Demo
 # This example demonstrates the new before/after blocks and execution phases
 
-version: 0.1
+version: 1.0
 
 # Global variables
 vars:
   project_name: "lifecycle-demo"
-  version: "1.0.0"
+  version: 1.0.0
 
 # Environment variables
 env:

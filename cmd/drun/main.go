@@ -1101,7 +1101,7 @@ func generateStarterConfig() string {
 	return `# drun configuration file
 # Learn more: https://github.com/phillarmonic/drun
 
-version: 0.1
+version: 1.0
 
 # Shell configuration per OS (optional - these are the defaults)
 shell:
@@ -1117,7 +1117,7 @@ env:
 # Variables for templating
 vars:
   app_name: "myapp"
-  version: "1.0.0"
+  version: 1.0.0
 
 # Global defaults (optional)
 defaults:

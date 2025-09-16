@@ -1,12 +1,12 @@
 # Namespacing Demo
 # This example demonstrates recipe namespacing to prevent collisions
 
-version: 0.1
+version: 1.0
 
 # Global variables
 vars:
   project_name: "namespacing-demo"
-  version: "1.0.0"
+  version: 1.0.0
 
 # Include files with namespacing to prevent recipe name collisions
 include:

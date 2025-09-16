@@ -1,12 +1,12 @@
 # Complete Demo: Lifecycle + Namespacing
 # This example demonstrates both lifecycle management and recipe namespacing
 
-version: 0.1
+version: 1.0
 
 # Project configuration
 vars:
   project_name: "complete-demo"
-  version: "1.2.0"
+  version: 1.2.0
   environment: "development"
 
 env:

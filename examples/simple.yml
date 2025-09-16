@@ -2,7 +2,7 @@
 # Perfect for getting started with drun
 # Usage: drun -f examples/simple.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 recipes:
   # Basic hello world

@@ -14,7 +14,7 @@ func BenchmarkLoader_Load(b *testing.B) {
 
 	// Create a realistic spec file
 	specContent := `
-version: 0.1
+version: 1.0
 
 env:
   NODE_ENV: development
@@ -135,7 +135,7 @@ recipes:
 	// Main spec file
 	specFile := filepath.Join(tempDir, "drun.yml")
 	specContent := `
-version: 0.1
+version: 1.0
 
 include:
   - "shared/*.yml"
@@ -169,7 +169,7 @@ func BenchmarkLoader_Load_LargeSpec(b *testing.B) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	// Generate a large spec with many recipes
-	specContent := `version: 0.1
+	specContent := `version: 1.0
 
 env:
   NODE_ENV: development

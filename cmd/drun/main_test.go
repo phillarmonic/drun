@@ -578,7 +578,7 @@ func TestCompleteRecipes(t *testing.T) {
 	}
 
 	// Create test drun.yml
-	testConfig := `version: 0.1
+	testConfig := `version: 1.0
 recipes:
   build:
     help: "Build the project"
@@ -762,7 +762,7 @@ func TestCompleteRecipes_OnlyRecipes(t *testing.T) {
 	}
 
 	// Create test drun.yml
-	testConfig := `version: 0.1
+	testConfig := `version: 1.0
 recipes:
   start:
     help: "Start the service"
@@ -860,7 +860,7 @@ func TestCompleteRecipesWithNamespacing(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "drun.yml")
 
 	configContent := `
-version: 0.1
+version: 1.0
 recipes:
   build:
     help: "Local build"

@@ -14,7 +14,7 @@ func TestLoader_Load_ValidSpec(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 
 env:
   TEST_VAR: "test_value"
@@ -40,8 +40,8 @@ recipes:
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if spec.Version != "0.1" {
-		t.Errorf("Expected version '0.1', got %q", spec.Version)
+	if spec.Version != 1.0 {
+		t.Errorf("Expected version 1.0, got %v", spec.Version)
 	}
 
 	if spec.Env["TEST_VAR"] != "test_value" {
@@ -67,7 +67,7 @@ func TestLoader_Load_InvalidYAML(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	invalidYAML := `
-version: 0.1
+version: 1.0
 recipes:
   test:
     help: "Test recipe"
@@ -94,7 +94,7 @@ func TestLoader_Load_MissingRecipes(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 env:
   TEST_VAR: "test_value"
 # Missing recipes section
@@ -118,7 +118,7 @@ func TestLoader_Load_RecipeWithoutRunOrDeps(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 recipes:
   invalid:
     help: "Recipe without run or deps"
@@ -143,7 +143,7 @@ func TestLoader_Load_RecipeWithDepsOnly(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 recipes:
   base:
     help: "Base recipe"
@@ -177,7 +177,7 @@ func TestLoader_Load_WithIncludes(t *testing.T) {
 	// Create included file
 	includedFile := filepath.Join(tempDir, "included.yml")
 	includedContent := `
-version: 0.1
+version: 1.0
 env:
   INCLUDED_VAR: "included_value"
 
@@ -195,7 +195,7 @@ recipes:
 	// Create main file with include
 	mainFile := filepath.Join(tempDir, "drun.yml")
 	mainContent := `
-version: 0.1
+version: 1.0
 include:
   - "included.yml"
 
@@ -260,7 +260,7 @@ func TestLoader_Load_DefaultFilenames(t *testing.T) {
 
 			specFile := filepath.Join(tempDir, filename)
 			specContent := `
-version: 0.1
+version: 1.0
 recipes:
   test:
     help: "Test recipe"
@@ -279,8 +279,8 @@ recipes:
 				t.Fatalf("Expected no error for %s, got %v", filename, err)
 			}
 
-			if spec.Version != "0.1" {
-				t.Errorf("Expected version '0.1', got %q", spec.Version)
+			if spec.Version != 1.0 {
+				t.Errorf("Expected version 1.0, got %v", spec.Version)
 			}
 
 			// Clean up for next test
@@ -334,7 +334,7 @@ func TestLoader_Load_WithAllLifecycleBlocks(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 
 recipe-prerun:
   - echo "recipe-prerun block 1"
@@ -463,7 +463,7 @@ func TestLoader_ProcessIncludePattern_WithNamespace(t *testing.T) {
 	// Create main spec file
 	mainFile := filepath.Join(tempDir, "drun.yml")
 	mainContent := `
-version: 0.1
+version: 1.0
 include:
   - "docker::shared/docker.yml"
 recipes:
@@ -481,7 +481,7 @@ recipes:
 
 	dockerFile := filepath.Join(sharedDir, "docker.yml")
 	dockerContent := `
-version: 0.1
+version: 1.0
 recipes:
   build:
     help: "Docker build"

@@ -227,7 +227,7 @@ recipes:
 
 	// Create a base spec
 	spec := &model.Spec{
-		Version: "0.1",
+		Version: 1.0,
 		Env:     make(map[string]string),
 		Recipes: make(map[string]model.Recipe),
 	}

@@ -1,7 +1,7 @@
 # Monorepo/Multi-Service Example
 # Usage: drun -f examples/monorepo.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 vars:
   services: ["api", "web", "worker", "admin"]

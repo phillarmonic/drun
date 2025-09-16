@@ -6,7 +6,7 @@ import (
 
 // Spec represents the complete drun configuration
 type Spec struct {
-	Version       string                  `yaml:"version"`
+	Version       float64                 `yaml:"version"`
 	Shell         map[string]ShellConfig  `yaml:"shell,omitempty"`
 	Env           map[string]string       `yaml:"env,omitempty"`
 	Vars          map[string]any          `yaml:"vars,omitempty"`

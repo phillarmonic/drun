@@ -1,6 +1,6 @@
 # File Watching Demo
 # Shows auto-execution on file changes
-version: 0.1
+version: 1.0
 
 env:
   PROJECT_NAME: "watching-demo"

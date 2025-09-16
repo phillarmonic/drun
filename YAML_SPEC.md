@@ -18,7 +18,7 @@ drun automatically looks for configuration files in this order:
 
 ```yaml
 # Required: Configuration format version
-version: 0.1
+version: 1.0
 
 # Optional: Shell configuration per OS
 shell:
@@ -45,7 +45,7 @@ env:
 # Optional: Template variables
 vars:
   app_name: "myapp"
-  version: "1.0.0"
+  version: 1.0.0
   # Can reference env and other vars
   image_tag: "{{ .version }}-{{ env \"BUILD_ENV\" }}"
 
@@ -325,7 +325,7 @@ cache:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `version` | string | ✅ | Configuration format version (currently `0.1`) |
+| `version` | number | ✅ | Configuration format version (currently `1.0`) |
 | `shell` | object | ❌ | Shell configuration per OS |
 | `env` | object | ❌ | Global environment variables |
 | `vars` | object | ❌ | Template variables |
@@ -614,7 +614,7 @@ See the `examples/` directory for comprehensive configuration examples:
 
 ### From v0.0.x to v0.1
 
-- Add `version: 0.1` to your configuration
+- Add `version: 1.0` to your configuration
 - `recipe-prerun` and `recipe-postrun` fields are new and optional
 - **Enhanced flag access**: Both `{{ .flagname }}` and `{{ .flags.flagname }}` syntaxes now work
 - All existing configurations remain compatible

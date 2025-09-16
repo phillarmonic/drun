@@ -20,7 +20,7 @@ drun provides powerful HTTP client capabilities that can be used directly in you
 Add HTTP endpoint definitions to your `drun.yml`:
 
 ```yaml
-version: "1.4"
+version: 1.0
 
 http:
   api:

@@ -127,8 +127,8 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 
 // setDefaults sets reasonable defaults for the spec
 func (l *Loader) setDefaults(spec *model.Spec) {
-	if spec.Version == "" {
-		spec.Version = "0.1"
+	if spec.Version == 0 {
+		spec.Version = 1.0
 	}
 
 	// Set default shell configurations

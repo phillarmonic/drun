@@ -1,6 +1,6 @@
 # Matrix Execution Demo
 # Shows how matrix builds work across multiple configurations
-version: 0.1
+version: 1.0
 
 env:
   PROJECT_NAME: "matrix-demo"

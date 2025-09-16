@@ -127,7 +127,7 @@ Use `drun --init` to create a starter configuration, or see the included example
 ### Basic Recipe
 
 ```yaml
-version: 0.1
+version: 1.0
 
 recipes:
   hello:
@@ -229,7 +229,7 @@ recipes:
 Define snippets that automatically run before every recipe - perfect for colors, helper functions, and common setup:
 
 ```yaml
-version: 0.1
+version: 1.0
 
 # Snippets that run before EVERY recipe
 recipe-prerun:
@@ -283,7 +283,7 @@ recipes:
 Share and reuse recipes across projects and teams:
 
 ```yaml
-version: 0.1
+version: 1.0
 
 # Include recipes from various sources
 include:
@@ -320,7 +320,7 @@ recipes:
 Integrate with APIs, send notifications, and fetch data directly from your recipes:
 
 ```yaml
-version: "1.4"
+version: 1.0
 
 # Define HTTP endpoints with authentication and caching
 http:

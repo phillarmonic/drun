@@ -1,6 +1,6 @@
 # drun Feature Showcase
 # Comprehensive demonstration of all implemented features
-version: 0.1
+version: 1.0
 
 # Include shared recipes
 include:

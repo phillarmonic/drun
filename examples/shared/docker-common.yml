@@ -1,7 +1,7 @@
 # Shared Docker Tasks
 # This file demonstrates recipes that will be namespaced when included
 
-version: 0.1
+version: 1.0
 
 # Variables specific to Docker operations
 vars:

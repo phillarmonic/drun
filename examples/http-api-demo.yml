@@ -1,4 +1,4 @@
-version: "1.4"
+version: 1.0
 
 # HTTP API Demo
 # Demonstrates drun's HTTP client capabilities using reliable public APIs

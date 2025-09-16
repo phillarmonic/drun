@@ -1,7 +1,7 @@
 # drun configuration showcasing snippets, recipe-prerun and recipe-postrun capabilities
 # Learn more: https://github.com/phillarmonic/drun
 
-version: 0.1
+version: 1.0
 
 # Environment variables
 env:
@@ -11,7 +11,7 @@ env:
 # Variables for templating
 vars:
   app_name: "snippet-app"
-  version: "2.1.0"
+  version: 2.1.0
   docker_registry: "ghcr.io/myorg"
 
 # Comprehensive snippet library demonstrating various patterns
