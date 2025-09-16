@@ -145,7 +145,7 @@ Named arguments can be specified as:
 // Completion command for generating shell completion scripts
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "Generate completion script",
+	Short: "[Drun CLI cmd] Generate completion script",
 	Long: `To load completions:
 
 Bash:
@@ -206,7 +206,7 @@ PowerShell:
 // Cleanup backups command
 var cleanupBackupsCmd = &cobra.Command{
 	Use:   "cleanup-backups",
-	Short: "Clean up old drun backup files",
+	Short: "[Drun CLI cmd] Clean up old drun backup files",
 	Long: `Remove old backup files created during drun updates.
 
 This command will:
@@ -253,9 +253,19 @@ func init() {
 	// Add backup cleanup command
 	rootCmd.AddCommand(cleanupBackupsCmd)
 
+	// Custom help command
+	helpCmd := &cobra.Command{
+		Use:   "help",
+		Short: "[Drun CLI cmd] Help about any command",
+		Run: func(cmd *cobra.Command, args []string) {
+			rootCmd.HelpFunc()(cmd, args)
+		},
+	}
+	rootCmd.SetHelpCommand(helpCmd)
+
 	// Set up completion for shell type flag
 	_ = rootCmd.RegisterFlagCompletionFunc("shell", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"linux", "darwin", "windows"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"linux", "darwin", "windows"}, cobra.ShellCompDirectiveDefault
 	})
 
 	// Set up dynamic completion for recipes
@@ -1911,9 +1921,6 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 
 		// Add local recipes first, then namespaced
 		completions = append(completions, localRecipes...)
-		if len(localRecipes) > 0 && len(namespacedRecipes) > 0 {
-			completions = append(completions, "---\t")
-		}
 		completions = append(completions, namespacedRecipes...)
 
 		// Add separator if we have both recipes and subcommands
@@ -1927,10 +1934,6 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 				}
 				drunCommands = append(drunCommands, subCmd.Name()+"\t"+help+" (drun CLI command)")
 			}
-		}
-
-		if len(completions) > 0 && len(drunCommands) > 0 {
-			completions = append(completions, "---\t")
 		}
 
 		// Add drun commands with explicit labeling

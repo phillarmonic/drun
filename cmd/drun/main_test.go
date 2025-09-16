@@ -603,17 +603,17 @@ recipes:
 
 	completionCmd := &cobra.Command{
 		Use:   "completion",
-		Short: "Generate completion script",
+		Short: "[Drun CLI cmd] Generate completion script",
 	}
 
 	cleanupBackupsCmd := &cobra.Command{
 		Use:   "cleanup-backups",
-		Short: "Clean up old drun backup files",
+		Short: "[Drun CLI cmd] Clean up old drun backup files",
 	}
 
 	helpCmd := &cobra.Command{
 		Use:   "help",
-		Short: "Help about any command",
+		Short: "[Drun CLI cmd] Help about any command",
 	}
 
 	rootCmd.AddCommand(completionCmd)
@@ -641,15 +641,10 @@ recipes:
 
 		// Check that we have recipes first
 		foundRecipes := 0
-		foundSeparator := false
 		foundDrunCommands := 0
-		separatorIndex := -1
 
-		for i, comp := range completions {
-			if comp == "---\t" {
-				foundSeparator = true
-				separatorIndex = i
-			} else if strings.Contains(comp, "(drun CLI command)") {
+		for _, comp := range completions {
+			if strings.Contains(comp, "(drun CLI command)") {
 				foundDrunCommands++
 			} else if comp != "---\t" {
 				foundRecipes++
@@ -661,31 +656,8 @@ recipes:
 			t.Errorf("Expected 3 recipes, found %d", foundRecipes)
 		}
 
-		if !foundSeparator {
-			t.Error("Expected separator, not found")
-		}
-
 		if foundDrunCommands != 3 {
 			t.Errorf("Expected 3 drun commands, found %d", foundDrunCommands)
-		}
-
-		// Verify separator is in the middle
-		if separatorIndex <= 0 || separatorIndex >= len(completions)-1 {
-			t.Errorf("Separator should be in the middle, found at index %d", separatorIndex)
-		}
-
-		// Verify recipes come before separator
-		for i := 0; i < separatorIndex; i++ {
-			if strings.Contains(completions[i], "(drun CLI command)") {
-				t.Errorf("Found drun command before separator at index %d: %s", i, completions[i])
-			}
-		}
-
-		// Verify drun commands come after separator
-		for i := separatorIndex + 1; i < len(completions); i++ {
-			if !strings.Contains(completions[i], "(drun CLI command)") {
-				t.Errorf("Expected drun command after separator at index %d: %s", i, completions[i])
-			}
 		}
 	})
 
@@ -730,15 +702,10 @@ recipes:
 
 		// Check that we have the proper structure: recipes, separator, drun commands
 		foundRecipes := 0
-		foundSeparator := false
 		foundDrunCommands := 0
-		separatorIndex := -1
 
-		for i, comp := range completions {
-			if comp == "---\t" {
-				foundSeparator = true
-				separatorIndex = i
-			} else if strings.Contains(comp, "(drun CLI command)") {
+		for _, comp := range completions {
+			if strings.Contains(comp, "(drun CLI command)") {
 				foundDrunCommands++
 			} else if comp != "---\t" {
 				foundRecipes++
@@ -750,31 +717,8 @@ recipes:
 			t.Errorf("Expected 3 recipes, found %d", foundRecipes)
 		}
 
-		if !foundSeparator {
-			t.Error("Expected separator, not found - this indicates the regression is present")
-		}
-
 		if foundDrunCommands != 3 {
 			t.Errorf("Expected 3 drun commands, found %d", foundDrunCommands)
-		}
-
-		// Verify separator is in the middle
-		if separatorIndex <= 0 || separatorIndex >= len(completions)-1 {
-			t.Errorf("Separator should be in the middle, found at index %d", separatorIndex)
-		}
-
-		// Verify recipes come before separator
-		for i := 0; i < separatorIndex; i++ {
-			if strings.Contains(completions[i], "(drun CLI command)") {
-				t.Errorf("Found drun command before separator at index %d: %s", i, completions[i])
-			}
-		}
-
-		// Verify drun commands come after separator
-		for i := separatorIndex + 1; i < len(completions); i++ {
-			if !strings.Contains(completions[i], "(drun CLI command)") {
-				t.Errorf("Expected drun command after separator at index %d: %s", i, completions[i])
-			}
 		}
 	})
 
@@ -987,7 +931,6 @@ recipes:
 	// Should have local recipes first, then namespaced
 	expectedCompletions := []string{
 		"build\tLocal build",
-		"---\t",
 		"docker:build\tDocker build",
 		"docker:push\tDocker push",
 	}
