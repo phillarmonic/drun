@@ -1886,7 +1886,7 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 	}
 
 	// If no recipe specified yet, complete recipe names
-	if len(args) == 0 {
+	if len(args) == 0 || (len(args) == 1 && args[0] == "") {
 		var completions []string
 
 		// Add workspace recipes first, separating local and namespaced

@@ -689,6 +689,95 @@ recipes:
 		}
 	})
 
+	// Test completion with empty string in args (regression test)
+	// This tests the specific case that caused the completion regression
+	t.Run("completion with empty string in args", func(t *testing.T) {
+		// Set configFile to our test config
+		originalConfigFile := configFile
+		configFile = "drun.yml"
+		defer func() { configFile = originalConfigFile }()
+
+		// This is the case that was broken: args contains one empty string
+		completions, directive := completeRecipes(rootCmd, []string{""}, "")
+
+		// The key test: empty string in args should behave exactly like empty args
+		// This is a regression test for the case where args=[""] was being treated
+		// as a recipe name instead of no recipe specified
+
+		// Get completions for empty args for comparison
+		emptyArgsCompletions, emptyArgsDirective := completeRecipes(rootCmd, []string{}, "")
+
+		// Verify both cases return the same results
+		if len(completions) != len(emptyArgsCompletions) {
+			t.Errorf("Empty string in args should behave like empty args. Got %d completions vs %d for empty args",
+				len(completions), len(emptyArgsCompletions))
+		}
+
+		if directive != emptyArgsDirective {
+			t.Errorf("Empty string in args should have same directive as empty args. Got %v vs %v",
+				directive, emptyArgsDirective)
+		}
+
+		// Verify we got the expected completions (recipes + separator + drun commands)
+		if len(completions) == 0 {
+			t.Fatal("Expected completions, got none")
+		}
+
+		// Verify directive
+		if directive != cobra.ShellCompDirectiveNoFileComp {
+			t.Errorf("Expected ShellCompDirectiveNoFileComp, got %v", directive)
+		}
+
+		// Check that we have the proper structure: recipes, separator, drun commands
+		foundRecipes := 0
+		foundSeparator := false
+		foundDrunCommands := 0
+		separatorIndex := -1
+
+		for i, comp := range completions {
+			if comp == "---\t" {
+				foundSeparator = true
+				separatorIndex = i
+			} else if strings.Contains(comp, "(drun CLI command)") {
+				foundDrunCommands++
+			} else if comp != "---\t" {
+				foundRecipes++
+			}
+		}
+
+		// Verify we found expected elements
+		if foundRecipes != 3 {
+			t.Errorf("Expected 3 recipes, found %d", foundRecipes)
+		}
+
+		if !foundSeparator {
+			t.Error("Expected separator, not found - this indicates the regression is present")
+		}
+
+		if foundDrunCommands != 3 {
+			t.Errorf("Expected 3 drun commands, found %d", foundDrunCommands)
+		}
+
+		// Verify separator is in the middle
+		if separatorIndex <= 0 || separatorIndex >= len(completions)-1 {
+			t.Errorf("Separator should be in the middle, found at index %d", separatorIndex)
+		}
+
+		// Verify recipes come before separator
+		for i := 0; i < separatorIndex; i++ {
+			if strings.Contains(completions[i], "(drun CLI command)") {
+				t.Errorf("Found drun command before separator at index %d: %s", i, completions[i])
+			}
+		}
+
+		// Verify drun commands come after separator
+		for i := separatorIndex + 1; i < len(completions); i++ {
+			if !strings.Contains(completions[i], "(drun CLI command)") {
+				t.Errorf("Expected drun command after separator at index %d: %s", i, completions[i])
+			}
+		}
+	})
+
 	// Test completion with recipe specified (should delegate to recipe argument completion)
 	t.Run("completion with recipe specified", func(t *testing.T) {
 		originalConfigFile := configFile
