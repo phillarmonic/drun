@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -1319,16 +1320,8 @@ func downloadAndReplace(asset *GitHubAsset, execPath string) error {
 	}
 
 	// Replace current binary with new one
-	if err := os.Rename(tempPath, execPath); err != nil {
-		// Try to restore backup on failure
-		if restoreErr := copyFile(backupPath, execPath); restoreErr != nil {
-			fmt.Printf("⚠️  Failed to restore backup: %v\n", restoreErr)
-			fmt.Printf("💾 Backup is available at: %s\n", backupPath)
-		} else {
-			fmt.Println("🔄 Restored backup successfully")
-		}
-		_ = os.Remove(tempPath)
-		return fmt.Errorf("failed to replace binary: %w", err)
+	if err := replaceBinaryWithElevation(tempPath, execPath, backupPath); err != nil {
+		return err
 	}
 
 	// Keep backup file for safety - don't auto-delete it
@@ -1396,6 +1389,104 @@ func copyFile(src, dst string) error {
 	}
 
 	return os.Chmod(dst, sourceInfo.Mode())
+}
+
+// replaceBinaryWithElevation attempts to replace the binary, using elevated permissions if needed
+func replaceBinaryWithElevation(tempPath, execPath, backupPath string) error {
+	// First, try a simple rename (works if we have write permissions)
+	if err := os.Rename(tempPath, execPath); err == nil {
+		return nil
+	}
+
+	// If that failed, we likely need elevated permissions
+	fmt.Printf("🔐 Elevated permissions required to update binary at: %s\n", execPath)
+
+	switch runtime.GOOS {
+	case "windows":
+		fmt.Println("💡 A UAC prompt will appear to grant administrator privileges")
+		return replaceBinaryWindows(tempPath, execPath, backupPath)
+	default:
+		// Unix-like systems (Linux, macOS, etc.)
+		fmt.Println("💡 You may be prompted for your password to use sudo")
+		if err := replaceBinaryUnix(tempPath, execPath, backupPath); err != nil {
+			// Provide fallback instructions
+			fmt.Printf("\n❌ Automatic update failed. Manual update options:\n")
+			fmt.Printf("   1. Run: sudo mv %s %s\n", tempPath, execPath)
+			fmt.Printf("   2. Or install to a user-writable location like ~/bin/drun\n")
+			fmt.Printf("   3. Backup is available at: %s\n", backupPath)
+			return err
+		}
+		return nil
+	}
+}
+
+// replaceBinaryUnix handles binary replacement on Unix-like systems using sudo
+func replaceBinaryUnix(tempPath, execPath, backupPath string) error {
+	// Check if sudo is available
+	if _, err := exec.LookPath("sudo"); err != nil {
+		return fmt.Errorf("sudo is required but not available: %w", err)
+	}
+
+	fmt.Println("🔑 Using sudo to replace binary...")
+
+	// Use sudo to move the file
+	cmd := exec.Command("sudo", "mv", tempPath, execPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	if err := cmd.Run(); err != nil {
+		// Try to restore backup on failure
+		if restoreErr := copyFile(backupPath, execPath); restoreErr != nil {
+			fmt.Printf("⚠️  Failed to restore backup: %v\n", restoreErr)
+			fmt.Printf("💾 Backup is available at: %s\n", backupPath)
+		} else {
+			fmt.Println("🔄 Restored backup successfully")
+		}
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to replace binary with sudo: %w", err)
+	}
+
+	return nil
+}
+
+// replaceBinaryWindows handles binary replacement on Windows using UAC elevation
+func replaceBinaryWindows(tempPath, execPath, backupPath string) error {
+	// On Windows, we need to use a different approach for UAC elevation
+	// We'll use PowerShell with Start-Process -Verb RunAs
+
+	// Escape paths for PowerShell
+	escapedTempPath := strings.ReplaceAll(tempPath, `\`, `\\`)
+	escapedExecPath := strings.ReplaceAll(execPath, `\`, `\\`)
+
+	// Create a PowerShell command to move the file with elevation
+	psCommand := fmt.Sprintf("Move-Item -Path '%s' -Destination '%s' -Force", escapedTempPath, escapedExecPath)
+
+	// Execute PowerShell with elevation
+	cmd := exec.Command("powershell", "-Command",
+		fmt.Sprintf("Start-Process powershell -ArgumentList '-Command \"%s\"' -Verb RunAs -Wait",
+			strings.ReplaceAll(psCommand, `"`, `\"`)))
+
+	if err := cmd.Run(); err != nil {
+		// Try to restore backup on failure
+		if restoreErr := copyFile(backupPath, execPath); restoreErr != nil {
+			fmt.Printf("⚠️  Failed to restore backup: %v\n", restoreErr)
+			fmt.Printf("💾 Backup is available at: %s\n", backupPath)
+		} else {
+			fmt.Println("🔄 Restored backup successfully")
+		}
+		_ = os.Remove(tempPath)
+
+		// Provide fallback instructions for Windows
+		fmt.Printf("\n❌ Automatic update failed. Manual update options:\n")
+		fmt.Printf("   1. Run PowerShell as Administrator and execute: Move-Item '%s' '%s' -Force\n", tempPath, execPath)
+		fmt.Printf("   2. Or install to a user-writable location\n")
+		fmt.Printf("   3. Backup is available at: %s\n", backupPath)
+
+		return fmt.Errorf("failed to replace binary with UAC elevation: %w", err)
+	}
+
+	return nil
 }
 
 // createBackupPath creates a backup path in a user-writable location
