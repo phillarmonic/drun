@@ -14,7 +14,7 @@ func TestLoader_Load_ValidSpec(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 
 env:
   TEST_VAR: "test_value"
@@ -40,8 +40,8 @@ recipes:
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	if spec.Version != "0.1" {
-		t.Errorf("Expected version '0.1', got %q", spec.Version)
+	if spec.Version != 1.0 {
+		t.Errorf("Expected version 1.0, got %v", spec.Version)
 	}
 
 	if spec.Env["TEST_VAR"] != "test_value" {
@@ -67,7 +67,7 @@ func TestLoader_Load_InvalidYAML(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	invalidYAML := `
-version: 0.1
+version: 1.0
 recipes:
   test:
     help: "Test recipe"
@@ -94,7 +94,7 @@ func TestLoader_Load_MissingRecipes(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 env:
   TEST_VAR: "test_value"
 # Missing recipes section
@@ -118,7 +118,7 @@ func TestLoader_Load_RecipeWithoutRunOrDeps(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 recipes:
   invalid:
     help: "Recipe without run or deps"
@@ -143,7 +143,7 @@ func TestLoader_Load_RecipeWithDepsOnly(t *testing.T) {
 	specFile := filepath.Join(tempDir, "drun.yml")
 
 	specContent := `
-version: 0.1
+version: 1.0
 recipes:
   base:
     help: "Base recipe"
@@ -177,7 +177,7 @@ func TestLoader_Load_WithIncludes(t *testing.T) {
 	// Create included file
 	includedFile := filepath.Join(tempDir, "included.yml")
 	includedContent := `
-version: 0.1
+version: 1.0
 env:
   INCLUDED_VAR: "included_value"
 
@@ -195,7 +195,7 @@ recipes:
 	// Create main file with include
 	mainFile := filepath.Join(tempDir, "drun.yml")
 	mainContent := `
-version: 0.1
+version: 1.0
 include:
   - "included.yml"
 
@@ -260,7 +260,7 @@ func TestLoader_Load_DefaultFilenames(t *testing.T) {
 
 			specFile := filepath.Join(tempDir, filename)
 			specContent := `
-version: 0.1
+version: 1.0
 recipes:
   test:
     help: "Test recipe"
@@ -279,8 +279,8 @@ recipes:
 				t.Fatalf("Expected no error for %s, got %v", filename, err)
 			}
 
-			if spec.Version != "0.1" {
-				t.Errorf("Expected version '0.1', got %q", spec.Version)
+			if spec.Version != 1.0 {
+				t.Errorf("Expected version 1.0, got %v", spec.Version)
 			}
 
 			// Clean up for next test
@@ -324,5 +324,295 @@ func TestLoader_setDefaults(t *testing.T) {
 
 	if !spec.Defaults.InheritEnv {
 		t.Error("Expected inherit_env=true")
+	}
+}
+
+// Tests for new lifecycle and namespacing features
+
+func TestLoader_Load_WithAllLifecycleBlocks(t *testing.T) {
+	tempDir := t.TempDir()
+	specFile := filepath.Join(tempDir, "drun.yml")
+
+	specContent := `
+version: 1.0
+
+recipe-prerun:
+  - echo "recipe-prerun block 1"
+  - echo "recipe-prerun block 2"
+
+recipe-postrun:
+  - echo "recipe-postrun block 1"
+
+before:
+  - echo "before block 1"
+  - echo "before block 2"
+
+after:
+  - echo "after block 1"
+  - echo "after block 2"
+
+recipes:
+  test:
+    help: "Test recipe"
+    run: echo "test"
+`
+
+	err := os.WriteFile(specFile, []byte(specContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	loader := NewLoader(tempDir)
+	spec, err := loader.Load(specFile)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Check recipe-prerun blocks
+	if len(spec.RecipePrerun) != 2 {
+		t.Errorf("Expected 2 recipe-prerun blocks, got %d", len(spec.RecipePrerun))
+	}
+	if spec.RecipePrerun[0] != "echo \"recipe-prerun block 1\"" {
+		t.Errorf("Expected first recipe-prerun block to be 'echo \"recipe-prerun block 1\"', got %q", spec.RecipePrerun[0])
+	}
+
+	// Check recipe-postrun blocks
+	if len(spec.RecipePostrun) != 1 {
+		t.Errorf("Expected 1 recipe-postrun block, got %d", len(spec.RecipePostrun))
+	}
+	if spec.RecipePostrun[0] != "echo \"recipe-postrun block 1\"" {
+		t.Errorf("Expected first recipe-postrun block to be 'echo \"recipe-postrun block 1\"', got %q", spec.RecipePostrun[0])
+	}
+
+	// Check before blocks
+	if len(spec.Before) != 2 {
+		t.Errorf("Expected 2 before blocks, got %d", len(spec.Before))
+	}
+	if spec.Before[0] != "echo \"before block 1\"" {
+		t.Errorf("Expected first before block to be 'echo \"before block 1\"', got %q", spec.Before[0])
+	}
+
+	// Check after blocks
+	if len(spec.After) != 2 {
+		t.Errorf("Expected 2 after blocks, got %d", len(spec.After))
+	}
+	if spec.After[0] != "echo \"after block 1\"" {
+		t.Errorf("Expected first after block to be 'echo \"after block 1\"', got %q", spec.After[0])
+	}
+}
+
+func TestLoader_MergeSpecsWithNamespace(t *testing.T) {
+	loader := NewLoader(".")
+
+	// Base spec
+	base := &model.Spec{
+		Recipes: map[string]model.Recipe{
+			"build": {
+				Help: "Local build",
+				Run:  model.Step{Lines: []string{"echo local build"}},
+			},
+		},
+	}
+
+	// Included spec that will be namespaced
+	included := &model.Spec{
+		Recipes: map[string]model.Recipe{
+			"build": {
+				Help: "Docker build",
+				Run:  model.Step{Lines: []string{"docker build ."}},
+			},
+			"push": {
+				Help: "Docker push",
+				Run:  model.Step{Lines: []string{"docker push"}},
+			},
+		},
+	}
+
+	// Merge with namespace
+	loader.mergeSpecsWithNamespace(base, included, "docker")
+
+	// Check that recipes are properly namespaced
+	if len(base.Recipes) != 3 {
+		t.Errorf("Expected 3 recipes after merge, got %d", len(base.Recipes))
+	}
+
+	// Original recipe should still exist
+	if _, exists := base.Recipes["build"]; !exists {
+		t.Error("Original 'build' recipe should still exist")
+	}
+
+	// Namespaced recipes should exist
+	if _, exists := base.Recipes["docker:build"]; !exists {
+		t.Error("Namespaced 'docker:build' recipe should exist")
+	}
+	if _, exists := base.Recipes["docker:push"]; !exists {
+		t.Error("Namespaced 'docker:push' recipe should exist")
+	}
+
+	// Check that the namespaced recipe has the correct content
+	dockerBuild := base.Recipes["docker:build"]
+	if dockerBuild.Help != "Docker build" {
+		t.Errorf("Expected docker:build help to be 'Docker build', got %q", dockerBuild.Help)
+	}
+}
+
+func TestLoader_ProcessIncludePattern_WithNamespace(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create main spec file
+	mainFile := filepath.Join(tempDir, "drun.yml")
+	mainContent := `
+version: 1.0
+include:
+  - "docker::shared/docker.yml"
+recipes:
+  build:
+    help: "Local build"
+    run: echo "local build"
+`
+
+	// Create shared directory and docker file
+	sharedDir := filepath.Join(tempDir, "shared")
+	err := os.MkdirAll(sharedDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create shared directory: %v", err)
+	}
+
+	dockerFile := filepath.Join(sharedDir, "docker.yml")
+	dockerContent := `
+version: 1.0
+recipes:
+  build:
+    help: "Docker build"
+    run: docker build .
+  push:
+    help: "Docker push"
+    run: docker push
+`
+
+	err = os.WriteFile(mainFile, []byte(mainContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write main file: %v", err)
+	}
+
+	err = os.WriteFile(dockerFile, []byte(dockerContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write docker file: %v", err)
+	}
+
+	loader := NewLoader(tempDir)
+	spec, err := loader.Load(mainFile)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Should have 3 recipes: build, docker:build, docker:push
+	if len(spec.Recipes) != 3 {
+		t.Errorf("Expected 3 recipes, got %d", len(spec.Recipes))
+	}
+
+	// Check that both local and namespaced recipes exist
+	if _, exists := spec.Recipes["build"]; !exists {
+		t.Error("Local 'build' recipe should exist")
+	}
+	if _, exists := spec.Recipes["docker:build"]; !exists {
+		t.Error("Namespaced 'docker:build' recipe should exist")
+	}
+	if _, exists := spec.Recipes["docker:push"]; !exists {
+		t.Error("Namespaced 'docker:push' recipe should exist")
+	}
+
+	// Check that the recipes have the correct content
+	localBuild := spec.Recipes["build"]
+	if localBuild.Help != "Local build" {
+		t.Errorf("Expected local build help to be 'Local build', got %q", localBuild.Help)
+	}
+
+	dockerBuild := spec.Recipes["docker:build"]
+	if dockerBuild.Help != "Docker build" {
+		t.Errorf("Expected docker:build help to be 'Docker build', got %q", dockerBuild.Help)
+	}
+}
+
+func TestLoader_MergeAllLifecycleBlocks(t *testing.T) {
+	loader := NewLoader(".")
+
+	// Base spec with some lifecycle blocks
+	base := &model.Spec{
+		RecipePrerun:  []string{"echo base recipe-prerun"},
+		RecipePostrun: []string{"echo base recipe-postrun"},
+		Before:        []string{"echo base before"},
+		After:         []string{"echo base after"},
+	}
+
+	// Included spec with additional lifecycle blocks
+	included := &model.Spec{
+		RecipePrerun:  []string{"echo included recipe-prerun 1", "echo included recipe-prerun 2"},
+		RecipePostrun: []string{"echo included recipe-postrun"},
+		Before:        []string{"echo included before 1", "echo included before 2"},
+		After:         []string{"echo included after"},
+	}
+
+	// Merge specs
+	loader.mergeSpecsWithNamespace(base, included, "")
+
+	// Check that recipe-prerun blocks are merged (appended)
+	expectedRecipePrerun := []string{
+		"echo base recipe-prerun",
+		"echo included recipe-prerun 1",
+		"echo included recipe-prerun 2",
+	}
+	if len(base.RecipePrerun) != len(expectedRecipePrerun) {
+		t.Errorf("Expected %d recipe-prerun blocks, got %d", len(expectedRecipePrerun), len(base.RecipePrerun))
+	}
+	for i, expected := range expectedRecipePrerun {
+		if i < len(base.RecipePrerun) && base.RecipePrerun[i] != expected {
+			t.Errorf("Expected recipe-prerun block %d to be %q, got %q", i, expected, base.RecipePrerun[i])
+		}
+	}
+
+	// Check that recipe-postrun blocks are merged (appended)
+	expectedRecipePostrun := []string{
+		"echo base recipe-postrun",
+		"echo included recipe-postrun",
+	}
+	if len(base.RecipePostrun) != len(expectedRecipePostrun) {
+		t.Errorf("Expected %d recipe-postrun blocks, got %d", len(expectedRecipePostrun), len(base.RecipePostrun))
+	}
+	for i, expected := range expectedRecipePostrun {
+		if i < len(base.RecipePostrun) && base.RecipePostrun[i] != expected {
+			t.Errorf("Expected recipe-postrun block %d to be %q, got %q", i, expected, base.RecipePostrun[i])
+		}
+	}
+
+	// Check that before blocks are merged (appended)
+	expectedBefore := []string{
+		"echo base before",
+		"echo included before 1",
+		"echo included before 2",
+	}
+	if len(base.Before) != len(expectedBefore) {
+		t.Errorf("Expected %d before blocks, got %d", len(expectedBefore), len(base.Before))
+	}
+	for i, expected := range expectedBefore {
+		if i < len(base.Before) && base.Before[i] != expected {
+			t.Errorf("Expected before block %d to be %q, got %q", i, expected, base.Before[i])
+		}
+	}
+
+	// Check that after blocks are merged (appended)
+	expectedAfter := []string{
+		"echo base after",
+		"echo included after",
+	}
+	if len(base.After) != len(expectedAfter) {
+		t.Errorf("Expected %d after blocks, got %d", len(expectedAfter), len(base.After))
+	}
+	for i, expected := range expectedAfter {
+		if i < len(base.After) && base.After[i] != expected {
+			t.Errorf("Expected after block %d to be %q, got %q", i, expected, base.After[i])
+		}
 	}
 }

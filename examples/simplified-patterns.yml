@@ -1,6 +1,6 @@
 # Simplified Patterns Example
 # Demonstrates new template functions that make drun definitions cleaner
-version: 0.1
+version: 1.0
 
 env:
   # Auto-detect project details

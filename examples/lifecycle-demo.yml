@@ -1,0 +1,309 @@
+# Lifecycle Management Demo
+# This example demonstrates the new before/after blocks and execution phases
+
+version: 1.0
+
+# Global variables
+vars:
+  project_name: "lifecycle-demo"
+  version: 1.0.0
+
+# Environment variables
+env:
+  PROJECT_ROOT: "."
+  BUILD_ENV: "development"
+
+# Snippets for reusable code
+snippets:
+  setup_colors: |
+    # ANSI color codes
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    PURPLE='\033[0;35m'
+    CYAN='\033[0;36m'
+    NC='\033[0m' # No Color
+
+  log_functions: |
+    # Logging functions
+    log_info() {
+      echo -e "${BLUE}ℹ️  $1${NC}"
+    }
+    log_success() {
+      echo -e "${GREEN}✅ $1${NC}"
+    }
+    log_warning() {
+      echo -e "${YELLOW}⚠️  $1${NC}"
+    }
+    log_error() {
+      echo -e "${RED}❌ $1${NC}"
+    }
+    log_step() {
+      echo -e "${PURPLE}🔄 $1${NC}"
+    }
+
+# Recipe-Prerun: Executes before EVERY recipe
+recipe-prerun:
+  - '{{ snippet "setup_colors" }}'
+  - '{{ snippet "log_functions" }}'
+  - |
+    # Common shell settings
+    set -euo pipefail
+    log_info "Recipe-prerun setup completed for recipe execution"
+
+# Recipe-Postrun: Executes after EVERY recipe
+recipe-postrun:
+  - |
+    # Log recipe completion status
+    if [ $? -eq 0 ]; then
+      log_success "Recipe completed successfully"
+    else
+      log_error "Recipe failed with exit code $?"
+    fi
+  - |
+    # Per-recipe cleanup and metrics
+    echo "Recipe execution finished at $(date)"
+    echo "Working directory: $(pwd)"
+
+# Before: Executes ONCE before any recipe execution
+before:
+  - |
+    echo ""
+    echo -e "${CYAN}🚀 === DRUN LIFECYCLE DEMO STARTING ===${NC}"
+    echo -e "${BLUE}Project: {{ .project_name }} v{{ .version }}${NC}"
+    echo -e "${BLUE}Environment: {{ .BUILD_ENV }}${NC}"
+    echo -e "${BLUE}Working Directory: {{ .PROJECT_ROOT }}${NC}"
+    echo ""
+    
+    # Record start time
+    export DRUN_START_TIME=$(date +%s)
+    export DRUN_START_DATE=$(date)
+    log_info "Execution started at: $DRUN_START_DATE"
+    
+  - |
+    # Initialize shared resources
+    log_step "Initializing shared resources..."
+    mkdir -p .drun/tmp
+    mkdir -p .drun/logs
+    
+    # Create a shared state file
+    echo "execution_id=$(date +%s)" > .drun/tmp/state.env
+    echo "project={{ .project_name }}" >> .drun/tmp/state.env
+    echo "version={{ .version }}" >> .drun/tmp/state.env
+    
+    log_success "Shared resources initialized"
+    
+  - |
+    # Environment validation
+    log_step "Validating environment..."
+    
+    # Check required tools
+    MISSING_TOOLS=""
+    for tool in git date mkdir rm; do
+      if ! command -v $tool >/dev/null 2>&1; then
+        MISSING_TOOLS="$MISSING_TOOLS $tool"
+      fi
+    done
+    
+    if [ -n "$MISSING_TOOLS" ]; then
+      log_error "Missing required tools:$MISSING_TOOLS"
+      exit 1
+    fi
+    
+    log_success "Environment validation passed"
+
+# After: Executes ONCE after all recipe execution (even on failure)
+after:
+  - |
+    echo ""
+    log_step "Starting cleanup phase..."
+    
+    # Load shared state
+    if [ -f .drun/tmp/state.env ]; then
+      source .drun/tmp/state.env
+      log_info "Loaded execution state (ID: $execution_id)"
+    fi
+    
+  - |
+    # Generate execution report
+    log_step "Generating execution report..."
+    
+    REPORT_FILE=".drun/logs/execution-$(date +%Y%m%d-%H%M%S).log"
+    {
+      echo "=== DRUN EXECUTION REPORT ==="
+      echo "Project: {{ .project_name }} v{{ .version }}"
+      echo "Environment: {{ .BUILD_ENV }}"
+      echo "Start Time: ${DRUN_START_DATE:-unknown}"
+      echo "End Time: $(date)"
+      if [ -n "${DRUN_START_TIME:-}" ]; then
+        DURATION=$(($(date +%s) - DRUN_START_TIME))
+        echo "Duration: ${DURATION}s"
+      fi
+      echo "Working Directory: {{ .PROJECT_ROOT }}"
+      echo "Generated: $(date)"
+    } > "$REPORT_FILE"
+    
+    log_success "Report saved to: $REPORT_FILE"
+    
+  - |
+    # Cleanup temporary files
+    log_step "Cleaning up temporary files..."
+    
+    if [ -d .drun/tmp ]; then
+      rm -rf .drun/tmp
+      log_success "Temporary files cleaned up"
+    fi
+    
+  - |
+    # Final summary
+    echo ""
+    echo -e "${CYAN}🏁 === DRUN LIFECYCLE DEMO COMPLETED ===${NC}"
+    
+    if [ -n "${DRUN_START_TIME:-}" ]; then
+      DURATION=$(($(date +%s) - DRUN_START_TIME))
+      MINUTES=$((DURATION / 60))
+      SECONDS=$((DURATION % 60))
+      
+      if [ $MINUTES -gt 0 ]; then
+        log_success "Total execution time: ${MINUTES}m ${SECONDS}s"
+      else
+        log_success "Total execution time: ${SECONDS}s"
+      fi
+    fi
+    
+    echo -e "${GREEN}✨ All phases completed successfully!${NC}"
+    echo ""
+
+# Recipe definitions
+recipes:
+  # Default recipe
+  default:
+    help: "Show available commands and demonstrate lifecycle"
+    run: |
+      log_info "This is the default recipe"
+      log_info "Available recipes:"
+      echo "  setup    - Initialize project"
+      echo "  build    - Build the project"
+      echo "  test     - Run tests"
+      echo "  deploy   - Deploy the project"
+      echo "  cleanup  - Manual cleanup"
+      echo ""
+      log_info "Try: drun build"
+
+  # Setup recipe
+  setup:
+    help: "Initialize project setup"
+    run: |
+      log_step "Setting up project {{ .project_name }}..."
+      
+      # Simulate setup work
+      sleep 1
+      
+      # Create project structure
+      mkdir -p src tests docs
+      echo "# {{ .project_name }}" > README.md
+      echo "version = '{{ .version }}'" > src/version.txt
+      
+      log_success "Project setup completed"
+
+  # Build recipe with dependency
+  build:
+    help: "Build the project"
+    deps: [setup]
+    run: |
+      log_step "Building {{ .project_name }} v{{ .version }}..."
+      
+      # Load shared state to demonstrate persistence
+      if [ -f .drun/tmp/state.env ]; then
+        source .drun/tmp/state.env
+        log_info "Using execution ID: $execution_id"
+      fi
+      
+      # Simulate build work
+      log_info "Compiling source files..."
+      sleep 2
+      
+      log_info "Generating build artifacts..."
+      mkdir -p build
+      echo "Built at $(date)" > build/build-info.txt
+      echo "Version: {{ .version }}" >> build/build-info.txt
+      
+      log_success "Build completed successfully"
+
+  # Test recipe
+  test:
+    help: "Run project tests"
+    deps: [build]
+    run: |
+      log_step "Running tests for {{ .project_name }}..."
+      
+      # Simulate test execution
+      log_info "Running unit tests..."
+      sleep 1
+      
+      log_info "Running integration tests..."
+      sleep 1
+      
+      # Create test results
+      mkdir -p test-results
+      echo "All tests passed at $(date)" > test-results/results.txt
+      
+      log_success "All tests passed!"
+
+  # Deploy recipe
+  deploy:
+    help: "Deploy the project"
+    deps: [test]
+    positionals:
+      - name: environment
+        default: "staging"
+        one_of: ["staging", "production"]
+    run: |
+      log_step "Deploying {{ .project_name }} to {{ .environment }}..."
+      
+      {{ if eq .environment "production" }}
+      log_warning "PRODUCTION DEPLOYMENT - Please confirm!"
+      echo -n "Continue? (y/N): "
+      read -r confirm
+      if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        log_error "Deployment cancelled"
+        exit 1
+      fi
+      {{ end }}
+      
+      # Simulate deployment
+      log_info "Uploading artifacts..."
+      sleep 2
+      
+      log_info "Updating {{ .environment }} environment..."
+      sleep 1
+      
+      log_success "Deployment to {{ .environment }} completed!"
+
+  # Manual cleanup recipe (demonstrates that after blocks still run)
+  cleanup:
+    help: "Manual cleanup (after blocks will still run)"
+    run: |
+      log_step "Running manual cleanup..."
+      
+      # This cleanup runs in addition to the after blocks
+      if [ -d build ]; then
+        rm -rf build
+        log_info "Removed build directory"
+      fi
+      
+      if [ -d test-results ]; then
+        rm -rf test-results
+        log_info "Removed test results"
+      fi
+      
+      log_success "Manual cleanup completed"
+
+  # Recipe that demonstrates failure handling
+  fail:
+    help: "Demonstrate failure handling (after blocks still run)"
+    run: |
+      log_step "This recipe will fail intentionally..."
+      log_error "Simulating failure!"
+      exit 1

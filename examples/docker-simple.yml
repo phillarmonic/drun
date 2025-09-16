@@ -2,7 +2,7 @@
 # Uses built-in template functions for automatic Docker command detection
 # Usage: drun -f examples/docker-simple.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 shell:
   linux: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }

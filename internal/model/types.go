@@ -6,16 +6,21 @@ import (
 
 // Spec represents the complete drun configuration
 type Spec struct {
-	Version  string                 `yaml:"version"`
-	Shell    map[string]ShellConfig `yaml:"shell,omitempty"`
-	Env      map[string]string      `yaml:"env,omitempty"`
-	Vars     map[string]any         `yaml:"vars,omitempty"`
-	Defaults Defaults               `yaml:"defaults,omitempty"`
-	Snippets map[string]string      `yaml:"snippets,omitempty"`
-	Include  []string               `yaml:"include,omitempty"`
-	Secrets  map[string]Secret      `yaml:"secrets,omitempty"`
-	Recipes  map[string]Recipe      `yaml:"recipes"`
-	Cache    CacheConfig            `yaml:"cache,omitempty"`
+	Version       float64                 `yaml:"version"`
+	Shell         map[string]ShellConfig  `yaml:"shell,omitempty"`
+	Env           map[string]string       `yaml:"env,omitempty"`
+	Vars          map[string]any          `yaml:"vars,omitempty"`
+	Defaults      Defaults                `yaml:"defaults,omitempty"`
+	Snippets      map[string]string       `yaml:"snippets,omitempty"`
+	RecipePrerun  []string                `yaml:"recipe-prerun,omitempty"`  // Runs before every recipe
+	RecipePostrun []string                `yaml:"recipe-postrun,omitempty"` // Runs after every recipe
+	Before        []string                `yaml:"before,omitempty"`         // Runs once before any recipe execution
+	After         []string                `yaml:"after,omitempty"`          // Runs once after all recipe execution
+	Include       []string                `yaml:"include,omitempty"`
+	Secrets       map[string]Secret       `yaml:"secrets,omitempty"`
+	HTTP          map[string]HTTPEndpoint `yaml:"http,omitempty"` // HTTP endpoint definitions
+	Recipes       map[string]Recipe       `yaml:"recipes"`
+	Cache         CacheConfig             `yaml:"cache,omitempty"`
 }
 
 // ShellConfig defines shell configuration per OS
@@ -87,6 +92,42 @@ type Secret struct {
 	Description string `yaml:"description,omitempty"` // Human-readable description
 }
 
+// HTTPEndpoint defines an HTTP endpoint configuration
+type HTTPEndpoint struct {
+	URL         string            `yaml:"url"`                   // Base URL for the endpoint
+	Method      string            `yaml:"method,omitempty"`      // HTTP method (defaults to GET)
+	Headers     map[string]string `yaml:"headers,omitempty"`     // Default headers
+	Auth        HTTPAuth          `yaml:"auth,omitempty"`        // Authentication configuration
+	Timeout     time.Duration     `yaml:"timeout,omitempty"`     // Request timeout
+	Retry       HTTPRetry         `yaml:"retry,omitempty"`       // Retry configuration
+	Cache       HTTPCache         `yaml:"cache,omitempty"`       // Cache configuration
+	Description string            `yaml:"description,omitempty"` // Human-readable description
+}
+
+// HTTPAuth defines authentication for HTTP endpoints
+type HTTPAuth struct {
+	Type   string `yaml:"type"`             // basic, bearer, api-key, oauth2
+	User   string `yaml:"user,omitempty"`   // Username for basic auth
+	Pass   string `yaml:"pass,omitempty"`   // Password for basic auth (can be secret reference)
+	Token  string `yaml:"token,omitempty"`  // Token for bearer/oauth2 (can be secret reference)
+	Header string `yaml:"header,omitempty"` // Header name for api-key auth
+	Query  string `yaml:"query,omitempty"`  // Query param name for api-key auth
+}
+
+// HTTPRetry defines retry configuration for HTTP endpoints
+type HTTPRetry struct {
+	MaxAttempts int           `yaml:"max_attempts,omitempty"` // Maximum retry attempts
+	Backoff     string        `yaml:"backoff,omitempty"`      // Backoff strategy: exponential, linear, fixed
+	BaseDelay   time.Duration `yaml:"base_delay,omitempty"`   // Base delay for backoff
+	MaxDelay    time.Duration `yaml:"max_delay,omitempty"`    // Maximum delay
+}
+
+// HTTPCache defines cache configuration for HTTP endpoints
+type HTTPCache struct {
+	TTL time.Duration `yaml:"ttl,omitempty"` // Cache time-to-live
+	Key string        `yaml:"key,omitempty"` // Custom cache key template
+}
+
 // ExecutionContext contains the runtime context for template rendering
 type ExecutionContext struct {
 	Vars        map[string]any
@@ -97,6 +138,7 @@ type ExecutionContext struct {
 	OS          string
 	Arch        string
 	Hostname    string
+	Namespace   string // NEW: Namespace for imported recipes
 }
 
 // PlanNode represents a single execution unit in the DAG
@@ -113,4 +155,22 @@ type ExecutionPlan struct {
 	Nodes  []PlanNode
 	Edges  [][2]int // [from_index, to_index]
 	Levels [][]int  // Groups of node indices that can run in parallel
+}
+
+// LifecyclePhase represents different execution phases
+type LifecyclePhase int
+
+const (
+	PhaseStartup LifecyclePhase = iota // Import and parse files
+	PhaseBefore                        // Run before blocks
+	PhaseRecipes                       // Run recipes
+	PhaseAfter                         // Run after blocks
+)
+
+// LifecycleState tracks the current execution state
+type LifecycleState struct {
+	Phase      LifecyclePhase
+	BeforeRun  bool
+	AfterRun   bool
+	Namespaces map[string]*Spec // Imported specs by namespace
 }

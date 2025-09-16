@@ -9,6 +9,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 - **YAML Configuration**: Define tasks in a simple, readable YAML format
 - **Positional Arguments**: First-class support for positional arguments with validation
 - **Named Arguments**: Pass positional arguments by name for clarity (`--name=value` or `name=value`)
+- **Prerun Snippets**: Common setup code that runs before every recipe (colors, functions, etc.)
 - **Templating**: Powerful Go template engine with custom functions and caching
 - **Dependencies**: Automatic dependency resolution and parallel execution
 - **High Performance**: Microsecond-level operations with intelligent caching
@@ -19,6 +20,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 ### 🌟 **Advanced Features**
 
 - **🔗 Remote Includes**: Include recipes from HTTP/HTTPS URLs and Git repositories
+- **🌐 HTTP Integration**: Built-in HTTP client with authentication, retries, caching, and JSON support
 - **🔄 Matrix Execution**: Run recipes across multiple configurations (OS, versions, architectures)
 - **🔐 Secrets Management**: Secure handling of sensitive data with multiple sources
 - **📊 Advanced Logging**: Structured logging with emoji status messages and metrics
@@ -27,7 +29,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 
 ### 🛠️ **Developer Experience**
 
-- **15+ Template Functions**: Docker detection, Git integration, status messages, and more
+- **20+ Template Functions**: Docker detection, Git integration, HTTP calls, status messages, and more
 - **Intelligent Caching**: HTTP and Git includes cached for performance
 - **Rich Error Messages**: Helpful suggestions and context for debugging
 - **Shell Completion**: Intelligent completion for bash, zsh, fish, and PowerShell
@@ -109,21 +111,45 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 drun automatically looks for configuration files in this order:
 
-- `drun.yml`
-- `drun.yaml` 
-- `.drun.yml`
-- `.drun.yaml`
-- `.drun/drun.yml`
-- `.drun/drun.yaml`
-- `ops.drun.yml`
-- `ops.drun.yaml`
+1. **Workspace default** (if configured in `.drun/workspace.yml`)
+2. **Standard locations**:
+   - `drun.yml`
+   - `drun.yaml` 
+   - `.drun.yml`
+   - `.drun.yaml`
+   - `.drun/drun.yml`
+   - `.drun/drun.yaml`
+   - `ops.drun.yml`
+   - `ops.drun.yaml`
 
-Use `drun --init` to create a starter configuration, or see the included examples for comprehensive configurations.
+### Getting Started
+
+Use `drun --init` to create a starter configuration:
+
+```bash
+# Create config in current directory
+drun --init
+
+# Create config in custom location (will prompt to create directory)
+drun --init --file=.drun/drun.yml
+drun --init --file=config/my-project.yml
+
+# Save custom location as workspace default
+# (drun will prompt when using non-standard filenames)
+```
+
+When you specify a custom config file path:
+- **Directory creation**: drun will ask if you want to create missing directories
+- **Workspace default**: drun will ask if you want to save custom paths as the default for this workspace
+
+See the included examples for comprehensive configurations.
+
+📖 **For complete YAML specification**: See [YAML_SPEC.md](YAML_SPEC.md) for detailed field reference and examples.
 
 ### Basic Recipe
 
 ```yaml
-version: 0.1
+version: 1.0
 
 recipes:
   hello:
@@ -220,6 +246,58 @@ recipes:
       go build ./...
 ```
 
+### Prerun Snippets - DRY Common Setup
+
+Define snippets that automatically run before every recipe - perfect for colors, helper functions, and common setup:
+
+```yaml
+version: 1.0
+
+# Snippets that run before EVERY recipe
+recipe-prerun:
+  - |
+    # ANSI color codes - available in all recipes
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+  - |
+    # Helper functions available everywhere
+    log_info() {
+      echo -e "${BLUE}ℹ️  $1${NC}"
+    }
+    log_success() {
+      echo -e "${GREEN}✅ $1${NC}"
+    }
+    log_error() {
+      echo -e "${RED}❌ $1${NC}"
+    }
+
+recipes:
+  setup:
+    help: "Set up the project"
+    run: |
+      # Colors and functions automatically available!
+      log_info "Setting up project..."
+      echo -e "${GREEN}🚀 Initializing...${NC}"
+      log_success "Setup completed!"
+
+  test:
+    help: "Run tests"  
+    run: |
+      # Same colors and functions available here too!
+      log_info "Running test suite..."
+      echo -e "${YELLOW}🧪 Testing...${NC}"
+      log_success "All tests passed!"
+```
+
+**Benefits:**
+- **DRY**: Define once, use everywhere
+- **Automatic**: No need to manually include in each recipe
+- **Templated**: Full template support with variables
+- **Snippet Calls**: Can call existing snippets with `{{ snippet "name" }}`
+
 ## 🌟 Advanced Features Examples
 
 ### 🔗 Remote Includes
@@ -227,7 +305,7 @@ recipes:
 Share and reuse recipes across projects and teams:
 
 ```yaml
-version: 0.1
+version: 1.0
 
 # Include recipes from various sources
 include:
@@ -258,6 +336,66 @@ recipes:
 - 🌐 **Community**: Share recipes across open source projects  
 - 🔄 **Versioning**: Pin to specific tags/commits for stability
 - ⚡ **Performance**: Intelligent caching for fast execution
+
+### 🌐 HTTP Integration
+
+Integrate with APIs, send notifications, and fetch data directly from your recipes:
+
+```yaml
+version: 1.0
+
+# Define HTTP endpoints with authentication and caching
+http:
+  github:
+    url: "https://api.github.com"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      Authorization: "token {{ secret \"github_token\" }}"
+    timeout: 30s
+    cache:
+      ttl: 5m
+
+  slack:
+    url: "{{ env \"SLACK_WEBHOOK_URL\" }}"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+
+secrets:
+  github_token:
+    source: "env://GITHUB_TOKEN"
+    required: true
+
+recipes:
+  deploy-notify:
+    help: "Deploy with GitHub integration and Slack notifications"
+    run: |
+      {{ step "Starting deployment with API integration" }}
+      
+      # Get current user from GitHub API
+      {{ $user := httpCallJSON "github" (dict "url" "/user") }}
+      {{ info (printf "Deploying as: %s" $user.login) }}
+      
+      # Perform deployment
+      echo "Building and deploying application..."
+      
+      # Send success notification to Slack
+      {{ $message := dict 
+           "text" (printf "✅ Deployment completed by %s" $user.login)
+           "username" "drun-bot"
+      }}
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $message }}
+      
+      {{ success "Deployment completed with notifications" }}
+```
+
+**Features:**
+
+- 🔐 **Authentication**: Bearer, Basic, API Key, OAuth2 support
+- 🔄 **Retries**: Configurable retry strategies with exponential backoff
+- 💾 **Caching**: Response caching for improved performance
+- 📊 **JSON Support**: Automatic JSON parsing and generation
+- ⚡ **Direct Calls**: Use predefined endpoints or direct HTTP calls
 
 ### 🔄 Matrix Execution
 
@@ -669,7 +807,7 @@ The cleanup command provides:
 
 ## Template Functions
 
-drun includes 15+ powerful built-in template functions plus all [Sprig](https://masterminds.github.io/sprig/) functions:
+drun includes 20+ powerful built-in template functions plus all [Sprig](https://masterminds.github.io/sprig/) functions:
 
 ### 🐳 **Docker Integration**
 
@@ -683,6 +821,15 @@ drun includes 15+ powerful built-in template functions plus all [Sprig](https://
 - `{{ gitCommit }}`: Full commit hash (40 chars)
 - `{{ gitShortCommit }}`: Short commit hash (7 chars)
 - `{{ isDirty }}`: True if working directory has uncommitted changes
+
+### 🌐 **HTTP Integration**
+
+- `{{ httpCall "endpoint" }}`: Call predefined HTTP endpoint
+- `{{ httpCallJSON "endpoint" }}`: Call endpoint and parse JSON response
+- `{{ httpGet "url" }}`: Direct GET request to any URL
+- `{{ httpPost "url" data }}`: Direct POST request with data
+- `{{ httpPut "url" data }}`: Direct PUT request with data
+- `{{ httpDelete "url" }}`: Direct DELETE request
 
 ### 📦 **Project Detection**
 
@@ -796,7 +943,7 @@ cd drun
 go build -o bin/drun ./cmd/drun
 
 # Or use the build script for all platforms
-./build.sh
+./scripts/build.sh
 ```
 
 ### Testing
@@ -805,16 +952,16 @@ Run the comprehensive test suite (includes mandatory golangci-lint):
 
 ```bash
 # Basic tests (includes linting, unit tests, build verification)
-./test.sh
+./scripts/test.sh
 
 # With coverage report
-./test.sh -c
+./scripts/test.sh -c
 
 # Verbose with race detection
-./test.sh -v -r
+./scripts/test.sh -v -r
 
 # All options
-./test.sh -v -c -r -b
+./scripts/test.sh -v -c -r -b
 ```
 
 Or run components manually:
@@ -830,7 +977,7 @@ go test ./internal/...
 go test -cover ./internal/...
 
 # CI-optimized test suite
-./test-ci.sh
+./scripts/test-ci.sh
 ```
 
 ### Performance Benchmarks
@@ -883,5 +1030,12 @@ Our performance optimizations deliver significant improvements:
 Run benchmarks yourself:
 
 ```bash
-./test.sh -b  # Includes comprehensive performance benchmarks
+./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```
+
+## 📚 Documentation
+
+- **[Template Functions Reference](TEMPLATE_FUNCTIONS.md)** - Complete guide to all built-in template functions
+- **[HTTP Integration Guide](HTTP_INTEGRATION.md)** - Comprehensive HTTP client documentation with examples
+- **[YAML Specification](YAML_SPEC.md)** - Complete YAML configuration reference
+- **[Examples Directory](examples/)** - Real-world usage examples and patterns

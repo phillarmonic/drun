@@ -1,7 +1,7 @@
 # Docker/DevOps Operations Example
 # Usage: drun -f examples/docker-devops.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 shell:
   linux: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }

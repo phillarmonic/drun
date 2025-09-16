@@ -78,7 +78,7 @@ jobs:
 
     - name: Run tests (Unix)
       if: runner.os != 'Windows'
-      run: ./test-ci.sh
+      run: ./scripts/test-ci.sh
 
     - name: Run tests (Windows)
       if: runner.os == 'Windows'

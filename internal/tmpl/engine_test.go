@@ -11,7 +11,7 @@ func TestNewEngine(t *testing.T) {
 		"test": "echo test",
 	}
 
-	engine := NewEngine(snippets)
+	engine := NewEngine(snippets, nil, nil)
 
 	if engine == nil {
 		t.Fatal("Expected engine to be created, got nil")
@@ -19,7 +19,7 @@ func TestNewEngine(t *testing.T) {
 }
 
 func TestEngine_Render_SimpleTemplate(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{
 		Vars: map[string]any{
@@ -39,7 +39,7 @@ func TestEngine_Render_SimpleTemplate(t *testing.T) {
 }
 
 func TestEngine_Render_WithEnvironment(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{
 		Env: map[string]string{
@@ -59,7 +59,7 @@ func TestEngine_Render_WithEnvironment(t *testing.T) {
 }
 
 func TestEngine_Render_WithFlags(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{
 		Flags: map[string]any{
@@ -80,7 +80,7 @@ func TestEngine_Render_WithFlags(t *testing.T) {
 }
 
 func TestEngine_Render_WithPositionals(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{
 		Positionals: map[string]any{
@@ -101,7 +101,7 @@ func TestEngine_Render_WithPositionals(t *testing.T) {
 }
 
 func TestEngine_Render_WithSprigFunctions(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{
 		Vars: map[string]any{
@@ -125,7 +125,7 @@ func TestEngine_Render_WithSnippet(t *testing.T) {
 		"greeting": "Hello World!",
 	}
 
-	engine := NewEngine(snippets)
+	engine := NewEngine(snippets, nil, nil)
 
 	ctx := &model.ExecutionContext{}
 
@@ -141,7 +141,7 @@ func TestEngine_Render_WithSnippet(t *testing.T) {
 }
 
 func TestEngine_Render_InvalidTemplate(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	ctx := &model.ExecutionContext{}
 
@@ -153,7 +153,7 @@ func TestEngine_Render_InvalidTemplate(t *testing.T) {
 }
 
 func TestEngine_RenderStep(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -193,7 +193,7 @@ func TestEngine_RenderStep(t *testing.T) {
 }
 
 func TestEngine_RenderStep_WithConditionals(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -237,7 +237,7 @@ func TestEngine_RenderStep_WithConditionals(t *testing.T) {
 }
 
 func TestEngine_VariablePrecedence(t *testing.T) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil, nil)
 
 	// Test that positionals override other variables
 	ctx := &model.ExecutionContext{

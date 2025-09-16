@@ -1,6 +1,6 @@
 # Command Substitution Test
 # Tests both template functions and shell command substitution
-version: 0.1
+version: 1.0
 
 env:
   # Using template functions (preferred)

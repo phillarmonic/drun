@@ -1,7 +1,7 @@
 # Node.js/JavaScript Project Example
 # Usage: drun -f examples/nodejs-project.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 vars:
   node_version: "18"

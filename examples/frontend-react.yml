@@ -1,7 +1,7 @@
 # Frontend/React Project Example
 # Usage: drun -f examples/frontend-react.yml <recipe>
 
-version: 0.1
+version: 1.0
 
 vars:
   app_name: "my-react-app"

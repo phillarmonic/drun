@@ -22,6 +22,7 @@ import (
 	"github.com/phillarmonic/drun/internal/spec"
 	"github.com/phillarmonic/drun/internal/tmpl"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -44,6 +45,79 @@ var (
 	commit  = "unknown"
 	date    = "unknown"
 )
+
+// WorkspaceConfig represents workspace-specific configuration
+type WorkspaceConfig struct {
+	DefaultConfigFile string `yaml:"default_config_file,omitempty"`
+}
+
+// getWorkspaceConfigPath returns the path to the workspace configuration file
+func getWorkspaceConfigPath() string {
+	return filepath.Join(".drun", "workspace.yml")
+}
+
+// loadWorkspaceConfig loads the workspace configuration
+func loadWorkspaceConfig() (*WorkspaceConfig, error) {
+	configPath := getWorkspaceConfigPath()
+
+	// If config doesn't exist, return empty config
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &WorkspaceConfig{}, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	return &config, nil
+}
+
+// saveWorkspaceConfig saves the workspace configuration
+func saveWorkspaceConfig(config *WorkspaceConfig) error {
+	configPath := getWorkspaceConfigPath()
+	configDir := filepath.Dir(configPath)
+
+	// Create .drun directory if it doesn't exist
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal workspace config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write workspace config: %w", err)
+	}
+
+	return nil
+}
+
+// promptUser prompts the user for a yes/no response
+func promptUser(message string) (bool, error) {
+	fmt.Printf("%s (y/N): ", message)
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			// Handle EOF (e.g., when input is piped or no input available)
+			fmt.Println()     // Add newline for better formatting
+			return false, nil // Default to "no" on EOF
+		}
+		return false, fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes", nil
+}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -168,7 +242,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&jobs, "jobs", "j", 1, "Number of parallel jobs")
 	rootCmd.Flags().StringVar(&shellType, "shell", "", "Override shell type (linux/darwin/windows)")
 	rootCmd.Flags().StringArrayVar(&setVars, "set", []string{}, "Set variables (KEY=VALUE)")
-	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new drun.yml configuration file")
+	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new configuration file (creates directories and workspace defaults as needed)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 	rootCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching and force execution")
 	rootCmd.Flags().BoolVar(&updateSelf, "update", false, "Update drun to the latest version")
@@ -337,7 +411,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Create components
 	shellSelector := shell.NewSelector(specData.Shell)
-	templateEngine := tmpl.NewEngine(specData.Snippets)
+	templateEngine := tmpl.NewEngineWithHTTPAndVersion(specData.Snippets, specData.RecipePrerun, specData.RecipePostrun, specData.HTTP, ctx.Secrets, version)
 
 	// Set up caching
 	cacheDir := ".drun/cache"
@@ -362,29 +436,137 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to render environment variables: %w", err)
 	}
 
-	// Build execution plan
+	// Execute with lifecycle management
+	return executeWithLifecycle(specData, target, ctx, dagBuilder, taskRunner, jobs)
+}
+
+// executeWithLifecycle manages the complete execution lifecycle with before/after blocks
+func executeWithLifecycle(specData *model.Spec, target string, ctx *model.ExecutionContext, dagBuilder *dag.Builder, taskRunner *runner.Runner, jobs int) error {
+	// Phase 1: Startup (already completed - files imported and parsed)
+
+	// Phase 2: Execute before blocks (once before any recipe execution)
+	if len(specData.Before) > 0 {
+		if err := executeLifecycleBlocks(specData.Before, "before", ctx, taskRunner); err != nil {
+			return fmt.Errorf("failed to execute before blocks: %w", err)
+		}
+	}
+
+	// Phase 3: Build and execute recipe plan
 	plan, err := dagBuilder.Build(target, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to build execution plan: %w", err)
 	}
 
-	// Execute plan
-	return taskRunner.Execute(plan, jobs)
+	if err := taskRunner.Execute(plan, jobs); err != nil {
+		// Even if recipe execution fails, we should still try to run after blocks
+		afterErr := executeAfterBlocks(specData, ctx, taskRunner)
+		if afterErr != nil {
+			return fmt.Errorf("recipe execution failed: %w, and after blocks failed: %w", err, afterErr)
+		}
+		return fmt.Errorf("recipe execution failed: %w", err)
+	}
+
+	// Phase 4: Execute after blocks (once after all recipe execution)
+	return executeAfterBlocks(specData, ctx, taskRunner)
+}
+
+// executeAfterBlocks executes after blocks if they exist
+func executeAfterBlocks(specData *model.Spec, ctx *model.ExecutionContext, taskRunner *runner.Runner) error {
+	if len(specData.After) > 0 {
+		if err := executeLifecycleBlocks(specData.After, "after", ctx, taskRunner); err != nil {
+			return fmt.Errorf("failed to execute after blocks: %w", err)
+		}
+	}
+	return nil
+}
+
+// executeLifecycleBlocks executes a set of lifecycle blocks (before or after)
+func executeLifecycleBlocks(blocks []string, phase string, ctx *model.ExecutionContext, taskRunner *runner.Runner) error {
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	// Create a synthetic recipe for the lifecycle blocks
+	lifecycleRecipe := &model.Recipe{
+		Help: fmt.Sprintf("Lifecycle %s blocks", phase),
+		Run:  model.Step{Lines: blocks},
+	}
+
+	// Create a plan node for the lifecycle blocks
+	planNode := model.PlanNode{
+		ID:      fmt.Sprintf("lifecycle-%s", phase),
+		Recipe:  lifecycleRecipe,
+		Context: ctx,
+		Step:    lifecycleRecipe.Run,
+	}
+
+	// Create a simple plan with just this node
+	plan := &model.ExecutionPlan{
+		Nodes:  []model.PlanNode{planNode},
+		Edges:  [][2]int{},
+		Levels: [][]int{{0}}, // Single level with one node
+	}
+
+	// Execute the lifecycle blocks
+	return taskRunner.Execute(plan, 1) // Always run lifecycle blocks sequentially
 }
 
 func listAllRecipes(specData *model.Spec) error {
 	fmt.Println("Available recipes:")
 
-	for name, recipe := range specData.Recipes {
-		help := recipe.Help
-		if help == "" {
-			help = "No description"
-		}
-		fmt.Printf("  %-20s %s\n", name, help)
+	// Separate local and namespaced recipes
+	localRecipes := make(map[string]model.Recipe)
+	namespacedRecipes := make(map[string]map[string]model.Recipe)
 
-		// Show aliases if any
-		if len(recipe.Aliases) > 0 {
-			fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+	for name, recipe := range specData.Recipes {
+		if strings.Contains(name, ":") {
+			// Namespaced recipe
+			parts := strings.SplitN(name, ":", 2)
+			namespace := parts[0]
+			recipeName := parts[1]
+
+			if namespacedRecipes[namespace] == nil {
+				namespacedRecipes[namespace] = make(map[string]model.Recipe)
+			}
+			namespacedRecipes[namespace][recipeName] = recipe
+		} else {
+			// Local recipe
+			localRecipes[name] = recipe
+		}
+	}
+
+	// Display local recipes first
+	if len(localRecipes) > 0 {
+		fmt.Println("\nLocal recipes:")
+		for name, recipe := range localRecipes {
+			help := recipe.Help
+			if help == "" {
+				help = "No description"
+			}
+			fmt.Printf("  %-20s %s\n", name, help)
+
+			// Show aliases if any
+			if len(recipe.Aliases) > 0 {
+				fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+			}
+		}
+	}
+
+	// Display namespaced recipes by namespace
+	for namespace, recipes := range namespacedRecipes {
+		fmt.Printf("\nNamespace '%s':\n", namespace)
+		for name, recipe := range recipes {
+			help := recipe.Help
+			if help == "" {
+				help = "No description"
+			}
+			fullName := namespace + ":" + name
+			fmt.Printf("  %-20s %s\n", fullName, help)
+
+			// Show aliases if any
+			if len(recipe.Aliases) > 0 {
+				fmt.Printf("  %-20s (aliases: %s)\n", "", strings.Join(recipe.Aliases, ", "))
+			}
 		}
 	}
 
@@ -976,6 +1158,53 @@ func initializeConfig(filename string) error {
 		return fmt.Errorf("configuration file '%s' already exists", targetFile)
 	}
 
+	// Check if the directory needs to be created
+	targetDir := filepath.Dir(targetFile)
+	if targetDir != "." && targetDir != "" {
+		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+			// Directory doesn't exist, ask user if they want to create it
+			shouldCreate, err := promptUser(fmt.Sprintf("Directory '%s' doesn't exist. Create it?", targetDir))
+			if err != nil {
+				return fmt.Errorf("failed to get user input: %w", err)
+			}
+
+			if !shouldCreate {
+				return fmt.Errorf("directory creation cancelled")
+			}
+
+			// Create the directory
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				return fmt.Errorf("failed to create directory '%s': %w", targetDir, err)
+			}
+
+			fmt.Printf("📁 Created directory: %s\n", targetDir)
+		}
+	}
+
+	// Check if this is a custom filename (not default) and save it as workspace default
+	isCustomName := filename != "" && filename != "drun.yml" && filename != "drun.yaml"
+	if isCustomName {
+		// Load existing workspace config
+		workspaceConfig, err := loadWorkspaceConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load workspace config: %w", err)
+		}
+
+		// Ask user if they want to save this as the default for this workspace
+		shouldSaveDefault, err := promptUser(fmt.Sprintf("Save '%s' as the default config file for this workspace?", filename))
+		if err != nil {
+			return fmt.Errorf("failed to get user input: %w", err)
+		}
+
+		if shouldSaveDefault {
+			workspaceConfig.DefaultConfigFile = filename
+			if err := saveWorkspaceConfig(workspaceConfig); err != nil {
+				return fmt.Errorf("failed to save workspace config: %w", err)
+			}
+			fmt.Printf("💾 Saved '%s' as default config file for this workspace\n", filename)
+		}
+	}
+
 	// Generate starter configuration
 	config := generateStarterConfig()
 
@@ -993,7 +1222,7 @@ func generateStarterConfig() string {
 	return `# drun configuration file
 # Learn more: https://github.com/phillarmonic/drun
 
-version: 0.1
+version: 1.0
 
 # Shell configuration per OS (optional - these are the defaults)
 shell:
@@ -1009,7 +1238,7 @@ env:
 # Variables for templating
 vars:
   app_name: "myapp"
-  version: "1.0.0"
+  version: 1.0.0
 
 # Global defaults (optional)
 defaults:
@@ -1658,15 +1887,56 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 
 	// If no recipe specified yet, complete recipe names
 	if len(args) == 0 {
-		var recipes []string
+		var completions []string
+
+		// Add workspace recipes first, separating local and namespaced
+		localRecipes := make([]string, 0)
+		namespacedRecipes := make([]string, 0)
+
 		for name, recipe := range specData.Recipes {
 			help := recipe.Help
 			if help == "" {
 				help = "No description"
 			}
-			recipes = append(recipes, name+"\t"+help)
+
+			completion := name + "\t" + help
+			if strings.Contains(name, ":") {
+				// Namespaced recipe
+				namespacedRecipes = append(namespacedRecipes, completion)
+			} else {
+				// Local recipe
+				localRecipes = append(localRecipes, completion)
+			}
 		}
-		return recipes, cobra.ShellCompDirectiveNoFileComp
+
+		// Add local recipes first, then namespaced
+		completions = append(completions, localRecipes...)
+		if len(localRecipes) > 0 && len(namespacedRecipes) > 0 {
+			completions = append(completions, "---\t")
+		}
+		completions = append(completions, namespacedRecipes...)
+
+		// Add separator if we have both recipes and subcommands
+		var drunCommands []string
+		for _, subCmd := range cmd.Commands() {
+			// Include all non-hidden subcommands
+			if !subCmd.Hidden {
+				help := subCmd.Short
+				if help == "" {
+					help = "No description"
+				}
+				drunCommands = append(drunCommands, subCmd.Name()+"\t"+help+" (drun CLI command)")
+			}
+		}
+
+		if len(completions) > 0 && len(drunCommands) > 0 {
+			completions = append(completions, "---\t")
+		}
+
+		// Add drun commands with explicit labeling
+		completions = append(completions, drunCommands...)
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	// If recipe is specified, complete its arguments

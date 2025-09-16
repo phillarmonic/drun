@@ -1,0 +1,446 @@
+# drun configuration showcasing snippets, recipe-prerun and recipe-postrun capabilities
+# Learn more: https://github.com/phillarmonic/drun
+
+version: 1.0
+
+# Environment variables
+env:
+  PROJECT_NAME: "snippets-demo"
+  BUILD_DATE: '{{ now "2006-01-02T15:04:05Z" }}'
+
+# Variables for templating
+vars:
+  app_name: "snippet-app"
+  version: 2.1.0
+  docker_registry: "ghcr.io/myorg"
+
+# Comprehensive snippet library demonstrating various patterns
+snippets:
+  # Basic utility snippets
+  colors: |
+    # ANSI color codes for beautiful output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    PURPLE='\033[0;35m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    NC='\033[0m' # No Color
+
+  logging_functions: |
+    # Standardized logging functions
+    log_debug() {
+      echo -e "${BLUE}🐛 DEBUG: $1${NC}"
+    }
+    log_info() {
+      echo -e "${CYAN}ℹ️  INFO: $1${NC}"
+    }
+    log_success() {
+      echo -e "${GREEN}✅ SUCCESS: $1${NC}"
+    }
+    log_warning() {
+      echo -e "${YELLOW}⚠️  WARNING: $1${NC}"
+    }
+    log_error() {
+      echo -e "${RED}❌ ERROR: $1${NC}"
+    }
+    log_step() {
+      echo -e "${PURPLE}🚀 STEP: $1${NC}"
+    }
+
+  shell_safety: |
+    # Strict shell settings for reliability
+    set -euo pipefail  # Exit on error, undefined vars, pipe failures
+    IFS=$'\n\t'        # Secure Internal Field Separator
+
+  # Environment detection snippets
+  detect_os: |
+    # Detect operating system
+    case "$(uname -s)" in
+      Linux*)     OS_TYPE="Linux";;
+      Darwin*)    OS_TYPE="macOS";;
+      CYGWIN*)    OS_TYPE="Windows";;
+      MINGW*)     OS_TYPE="Windows";;
+      *)          OS_TYPE="Unknown";;
+    esac
+    log_info "Detected OS: $OS_TYPE"
+
+  detect_tools: |
+    # Check for required development tools
+    log_step "Checking development tools"
+    
+    # Docker
+    if command -v docker >/dev/null 2>&1; then
+      DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | tr -d ',')
+      log_success "Docker found: $DOCKER_VERSION"
+    else
+      log_warning "Docker not found"
+    fi
+    
+    # Git
+    if command -v git >/dev/null 2>&1; then
+      GIT_VERSION=$(git --version | cut -d' ' -f3)
+      log_success "Git found: $GIT_VERSION"
+    else
+      log_error "Git not found - required for development"
+      exit 1
+    fi
+    
+    # Node.js (if applicable)
+    if command -v node >/dev/null 2>&1; then
+      NODE_VERSION=$(node --version)
+      log_success "Node.js found: $NODE_VERSION"
+    fi
+
+  # Project-specific snippets with templating
+  project_banner: |
+    echo -e "${BOLD}${CYAN}"
+    echo "╔══════════════════════════════════════╗"
+    echo "║          {{ .app_name | upper }}          ║"
+    echo "║         Version {{ .version }}         ║"
+    echo "╚══════════════════════════════════════╝"
+    echo -e "${NC}"
+
+  docker_login: |
+    # Docker registry authentication
+    log_step "Authenticating with Docker registry"
+    if echo "$DOCKER_PASSWORD" | docker login {{ .docker_registry }} --username "$DOCKER_USERNAME" --password-stdin; then
+      log_success "Docker login successful"
+    else
+      log_error "Docker login failed"
+      exit 1
+    fi
+
+  cleanup_temp: |
+    # Clean up temporary files and directories
+    log_step "Cleaning up temporary files"
+    rm -rf .tmp/ tmp/ *.tmp
+    rm -rf node_modules/.cache/ || true
+    rm -rf __pycache__/ *.pyc || true
+    log_success "Temporary files cleaned"
+
+  # Advanced snippets with conditional logic
+  setup_node_env: |
+    # Node.js environment setup with version checking
+    if command -v node >/dev/null 2>&1; then
+      NODE_MAJOR=$(node --version | cut -d'.' -f1 | tr -d 'v')
+      if [ "$NODE_MAJOR" -ge 18 ]; then
+        log_success "Node.js version is compatible (v$NODE_MAJOR)"
+        npm config set fund false --location=user
+        npm config set audit-level moderate --location=user
+      else
+        log_error "Node.js version $NODE_MAJOR is too old (requires v18+)"
+        exit 1
+      fi
+    else
+      log_error "Node.js not found"
+      exit 1
+    fi
+
+  docker_build_args: |
+    # Common Docker build arguments
+    BUILD_ARGS="--build-arg VERSION={{ .version }}"
+    BUILD_ARGS="$BUILD_ARGS --build-arg BUILD_DATE={{ .BUILD_DATE }}"
+    BUILD_ARGS="$BUILD_ARGS --build-arg GIT_COMMIT={{ gitShortCommit }}"
+    BUILD_ARGS="$BUILD_ARGS --build-arg PROJECT_NAME={{ .PROJECT_NAME }}"
+    
+    # Add platform-specific args
+    if [ "{{ os }}" = "darwin" ]; then
+      BUILD_ARGS="$BUILD_ARGS --platform linux/amd64,linux/arm64"
+    fi
+
+  # Testing utilities
+  test_setup: |
+    # Test environment preparation
+    log_step "Setting up test environment"
+    export NODE_ENV=test
+    export CI=true
+    export FORCE_COLOR=1
+    
+    # Create test directories
+    mkdir -p coverage/ test-results/
+    
+    # Clean previous test artifacts
+    rm -rf coverage/* test-results/*
+    
+    log_success "Test environment ready"
+
+  coverage_report: |
+    # Generate and display coverage report
+    log_step "Generating coverage report"
+    
+    if [ -f "coverage/lcov.info" ]; then
+      COVERAGE=$(grep -o 'LF:[0-9]*' coverage/lcov.info | head -1 | cut -d: -f2)
+      COVERED=$(grep -o 'LH:[0-9]*' coverage/lcov.info | head -1 | cut -d: -f2)
+      
+      if [ "$COVERAGE" -gt 0 ]; then
+        PERCENTAGE=$((COVERED * 100 / COVERAGE))
+        if [ "$PERCENTAGE" -ge 80 ]; then
+          log_success "Coverage: ${PERCENTAGE}% (${COVERED}/${COVERAGE} lines)"
+        else
+          log_warning "Coverage: ${PERCENTAGE}% (${COVERED}/${COVERAGE} lines) - Below 80% threshold"
+        fi
+      fi
+    else
+      log_warning "No coverage data found"
+    fi
+
+# Recipe-Prerun snippets demonstrating different patterns
+recipe-prerun:
+  # Essential setup that every recipe needs
+  - '{{ snippet "colors" }}'
+  - '{{ snippet "logging_functions" }}'
+  - '{{ snippet "shell_safety" }}'
+  
+  # Environment detection
+  - '{{ snippet "detect_os" }}'
+  
+  # Project branding
+  - '{{ snippet "project_banner" }}'
+
+# Recipe-Postrun snippets for cleanup and reporting
+recipe-postrun:
+  - |
+    # Log recipe completion with timing
+    if [ $? -eq 0 ]; then
+      log_success "Recipe completed successfully at $(date)"
+    else
+      log_error "Recipe failed at $(date) with exit code $?"
+    fi
+  - |
+    # Optional per-recipe cleanup
+    {{ snippet "cleanup_temp" }}
+
+recipes:
+  # Basic recipe showing recipe-prerun and recipe-postrun in action
+  hello:
+    help: "Simple hello world with enhanced logging"
+    run: |
+      log_info "Starting hello world demo"
+      log_step "Executing main task"
+      echo -e "${GREEN}Hello from {{ .app_name }}!${NC}"
+      log_success "Hello world completed"
+
+  # Development environment setup
+  setup:
+    help: "Set up development environment"
+    flags:
+      tools:
+        type: bool
+        default: true
+        help: "Check for development tools"
+      node:
+        type: bool
+        default: false
+        help: "Set up Node.js environment"
+    run: |
+      log_step "Setting up development environment"
+      
+      {{ if .flags.tools }}
+      {{ snippet "detect_tools" }}
+      {{ end }}
+      
+      {{ if .flags.node }}
+      {{ snippet "setup_node_env" }}
+      {{ end }}
+      
+      log_success "Development environment ready"
+
+  # Build process with Docker
+  build:
+    help: "Build the application"
+    flags:
+      docker:
+        type: bool
+        default: true
+        help: "Build Docker image"
+      push:
+        type: bool
+        default: false
+        help: "Push to registry after build"
+      clean:
+        type: bool
+        default: false
+        help: "Clean before build"
+    run: |
+      log_step "Starting build process"
+      
+      {{ if .flags.clean }}
+      {{ snippet "cleanup_temp" }}
+      {{ end }}
+      
+      {{ if .flags.docker }}
+      log_step "Building Docker image"
+      {{ snippet "docker_build_args" }}
+      
+      docker build $BUILD_ARGS \
+        -t {{ .docker_registry }}/{{ .app_name }}:{{ .version }} \
+        -t {{ .docker_registry }}/{{ .app_name }}:latest \
+        .
+      
+      log_success "Docker image built successfully"
+      
+      {{ if .flags.push }}
+      {{ snippet "docker_login" }}
+      
+      log_step "Pushing Docker images"
+      docker push {{ .docker_registry }}/{{ .app_name }}:{{ .version }}
+      docker push {{ .docker_registry }}/{{ .app_name }}:latest
+      log_success "Docker images pushed successfully"
+      {{ end }}
+      {{ else }}
+      log_step "Building application (non-Docker)"
+      # Add your build commands here
+      log_success "Application built successfully"
+      {{ end }}
+
+  # Comprehensive testing
+  test:
+    help: "Run comprehensive test suite"
+    flags:
+      unit:
+        type: bool
+        default: true
+        help: "Run unit tests"
+      integration:
+        type: bool
+        default: false
+        help: "Run integration tests"
+      coverage:
+        type: bool
+        default: false
+        help: "Generate coverage report"
+      watch:
+        type: bool
+        default: false
+        help: "Run tests in watch mode"
+    run: |
+      {{ snippet "test_setup" }}
+      
+      {{ if .flags.unit }}
+      log_step "Running unit tests"
+      # npm test or go test or pytest, etc.
+      echo "Running unit tests..."
+      sleep 1
+      log_success "Unit tests passed"
+      {{ end }}
+      
+      {{ if .flags.integration }}
+      log_step "Running integration tests"
+      echo "Running integration tests..."
+      sleep 2
+      log_success "Integration tests passed"
+      {{ end }}
+      
+      {{ if .flags.coverage }}
+      {{ snippet "coverage_report" }}
+      {{ end }}
+      
+      {{ if .flags.watch }}
+      log_info "Starting test watcher (Ctrl+C to stop)"
+      # Add watch command here
+      {{ else }}
+      log_success "All tests completed successfully"
+      {{ end }}
+
+  # Deployment with multiple environments
+  deploy:
+    help: "Deploy application"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "prod"]
+    flags:
+      dry_run:
+        type: bool
+        default: false
+        help: "Show what would be deployed"
+      skip_tests:
+        type: bool
+        default: false
+        help: "Skip running tests before deploy"
+    deps: ["build"]
+    run: |
+      {{ if not .flags.skip_tests }}
+      log_step "Running tests before deployment"
+      # Run a quick test suite
+      echo "Running pre-deployment tests..."
+      sleep 1
+      log_success "Pre-deployment tests passed"
+      {{ end }}
+      
+      log_step "Deploying to {{ .environment }} environment"
+      
+      {{ if .flags.dry_run }}
+      log_warning "DRY RUN MODE - No actual deployment"
+      echo "Would deploy {{ .app_name }}:{{ .version }} to {{ .environment }}"
+      {{ else }}
+      # Actual deployment commands would go here
+      echo "Deploying {{ .app_name }}:{{ .version }} to {{ .environment }}..."
+      sleep 2
+      log_success "Deployment to {{ .environment }} completed"
+      {{ end }}
+
+  # Maintenance and cleanup
+  clean:
+    help: "Clean up project artifacts"
+    flags:
+      all:
+        type: bool
+        default: false
+        help: "Deep clean including dependencies"
+      docker:
+        type: bool
+        default: false
+        help: "Clean Docker images and containers"
+    run: |
+      log_step "Cleaning project artifacts"
+      
+      {{ snippet "cleanup_temp" }}
+      
+      # Clean build artifacts
+      rm -rf build/ dist/ target/ out/
+      log_info "Build artifacts cleaned"
+      
+      {{ if .flags.docker }}
+      log_step "Cleaning Docker resources"
+      docker system prune -f
+      docker image prune -f
+      log_success "Docker resources cleaned"
+      {{ end }}
+      
+      {{ if .flags.all }}
+      log_warning "Performing deep clean"
+      rm -rf node_modules/ vendor/ .venv/ __pycache__/
+      log_success "Dependencies cleaned"
+      {{ end }}
+      
+      log_success "Cleanup completed"
+
+  # Snippet demonstration recipe
+  demo-snippets:
+    help: "Demonstrate various snippet capabilities"
+    run: |
+      log_step "Demonstrating snippet capabilities"
+      
+      echo -e "${BOLD}1. Basic snippets (colors, logging) - already loaded in recipe-prerun${NC}"
+      
+      echo -e "${BOLD}2. Environment detection:${NC}"
+      {{ snippet "detect_os" }}
+      
+      echo -e "${BOLD}3. Tool detection:${NC}"
+      {{ snippet "detect_tools" }}
+      
+      echo -e "${BOLD}4. Templated snippets:${NC}"
+      echo "App name from template: {{ .app_name }}"
+      echo "Version from template: {{ .version }}"
+      
+      echo -e "${BOLD}5. Conditional snippets in action:${NC}"
+      {{ if eq .app_name "snippet-app" }}
+      log_success "Conditional snippet executed successfully"
+      {{ else }}
+      log_warning "Conditional snippet not matched"
+      {{ end }}
+      
+      log_success "Snippet demonstration completed"

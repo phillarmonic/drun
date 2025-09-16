@@ -1,6 +1,6 @@
 # Remote Includes Demo
 # Shows how to include recipes from remote sources
-version: 0.1
+version: 1.0
 
 # Include recipes from various remote sources
 include:

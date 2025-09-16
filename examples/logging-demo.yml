@@ -1,6 +1,6 @@
 # Advanced Logging Demo
 # Shows structured logging, metrics, and output formatting
-version: 0.1
+version: 1.0
 
 env:
   APP_NAME: "logging-demo"

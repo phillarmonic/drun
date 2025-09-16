@@ -1,11 +1,14 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/phillarmonic/drun/internal/model"
+	"github.com/spf13/cobra"
 )
 
 func TestIsPositionalArgName(t *testing.T) {
@@ -553,3 +556,385 @@ func TestParseRecipeArgs_ComplexScenario(t *testing.T) {
 		})
 	}
 }
+
+// Test completion functionality
+func TestCompleteRecipes(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "drun_completion_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	// Save current directory and change to temp dir
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(originalDir) }()
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp dir: %v", err)
+	}
+
+	// Create test drun.yml
+	testConfig := `version: 1.0
+recipes:
+  build:
+    help: "Build the project"
+    run: echo "building"
+  test:
+    help: "Run tests"
+    run: echo "testing"
+  deploy:
+    help: "Deploy the application"
+    run: echo "deploying"
+`
+	configPath := filepath.Join(tempDir, "drun.yml")
+	if err := os.WriteFile(configPath, []byte(testConfig), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Create mock root command with subcommands
+	rootCmd := &cobra.Command{
+		Use:   "drun",
+		Short: "A YAML-based task runner",
+	}
+
+	completionCmd := &cobra.Command{
+		Use:   "completion",
+		Short: "Generate completion script",
+	}
+
+	cleanupBackupsCmd := &cobra.Command{
+		Use:   "cleanup-backups",
+		Short: "Clean up old drun backup files",
+	}
+
+	helpCmd := &cobra.Command{
+		Use:   "help",
+		Short: "Help about any command",
+	}
+
+	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(cleanupBackupsCmd)
+	rootCmd.AddCommand(helpCmd)
+
+	// Test completion with no args (should return recipes first, then drun commands)
+	t.Run("completion with no args", func(t *testing.T) {
+		// Set configFile to our test config
+		originalConfigFile := configFile
+		configFile = "drun.yml"
+		defer func() { configFile = originalConfigFile }()
+
+		completions, directive := completeRecipes(rootCmd, []string{}, "")
+
+		// Verify we got completions
+		if len(completions) == 0 {
+			t.Fatal("Expected completions, got none")
+		}
+
+		// Verify directive
+		if directive != cobra.ShellCompDirectiveNoFileComp {
+			t.Errorf("Expected ShellCompDirectiveNoFileComp, got %v", directive)
+		}
+
+		// Check that we have recipes first
+		foundRecipes := 0
+		foundSeparator := false
+		foundDrunCommands := 0
+		separatorIndex := -1
+
+		for i, comp := range completions {
+			if comp == "---\t" {
+				foundSeparator = true
+				separatorIndex = i
+			} else if strings.Contains(comp, "(drun CLI command)") {
+				foundDrunCommands++
+			} else if comp != "---\t" {
+				foundRecipes++
+			}
+		}
+
+		// Verify we found expected elements
+		if foundRecipes != 3 {
+			t.Errorf("Expected 3 recipes, found %d", foundRecipes)
+		}
+
+		if !foundSeparator {
+			t.Error("Expected separator, not found")
+		}
+
+		if foundDrunCommands != 3 {
+			t.Errorf("Expected 3 drun commands, found %d", foundDrunCommands)
+		}
+
+		// Verify separator is in the middle
+		if separatorIndex <= 0 || separatorIndex >= len(completions)-1 {
+			t.Errorf("Separator should be in the middle, found at index %d", separatorIndex)
+		}
+
+		// Verify recipes come before separator
+		for i := 0; i < separatorIndex; i++ {
+			if strings.Contains(completions[i], "(drun CLI command)") {
+				t.Errorf("Found drun command before separator at index %d: %s", i, completions[i])
+			}
+		}
+
+		// Verify drun commands come after separator
+		for i := separatorIndex + 1; i < len(completions); i++ {
+			if !strings.Contains(completions[i], "(drun CLI command)") {
+				t.Errorf("Expected drun command after separator at index %d: %s", i, completions[i])
+			}
+		}
+	})
+
+	// Test completion with recipe specified (should delegate to recipe argument completion)
+	t.Run("completion with recipe specified", func(t *testing.T) {
+		originalConfigFile := configFile
+		configFile = "drun.yml"
+		defer func() { configFile = originalConfigFile }()
+
+		_, directive := completeRecipes(rootCmd, []string{"build"}, "")
+
+		// Should return empty for now since build recipe has no positionals/flags in test
+		if directive != cobra.ShellCompDirectiveNoFileComp {
+			t.Errorf("Expected ShellCompDirectiveNoFileComp, got %v", directive)
+		}
+
+		// The function should delegate to completeRecipeArguments, which returns empty for our simple test recipe
+		// This is expected behavior
+	})
+
+	// Test completion with non-existent recipe
+	t.Run("completion with non-existent recipe", func(t *testing.T) {
+		originalConfigFile := configFile
+		configFile = "drun.yml"
+		defer func() { configFile = originalConfigFile }()
+
+		completions, directive := completeRecipes(rootCmd, []string{"nonexistent"}, "")
+
+		// Should return nil for non-existent recipe
+		if completions != nil {
+			t.Errorf("Expected nil completions for non-existent recipe, got %v", completions)
+		}
+
+		if directive != cobra.ShellCompDirectiveNoFileComp {
+			t.Errorf("Expected ShellCompDirectiveNoFileComp, got %v", directive)
+		}
+	})
+
+	// Test completion with invalid config file
+	t.Run("completion with invalid config", func(t *testing.T) {
+		originalConfigFile := configFile
+		configFile = "nonexistent.yml"
+		defer func() { configFile = originalConfigFile }()
+
+		completions, directive := completeRecipes(rootCmd, []string{}, "")
+
+		// Should return nil when config can't be loaded
+		if completions != nil {
+			t.Errorf("Expected nil completions for invalid config, got %v", completions)
+		}
+
+		if directive != cobra.ShellCompDirectiveNoFileComp {
+			t.Errorf("Expected ShellCompDirectiveNoFileComp, got %v", directive)
+		}
+	})
+}
+
+func TestCompleteRecipes_OnlyRecipes(t *testing.T) {
+	// Test case where we have recipes but no subcommands
+	tempDir, err := os.MkdirTemp("", "drun_completion_test_recipes_only")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current dir: %v", err)
+	}
+	defer func() { _ = os.Chdir(originalDir) }()
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp dir: %v", err)
+	}
+
+	// Create test drun.yml
+	testConfig := `version: 1.0
+recipes:
+  start:
+    help: "Start the service"
+    run: echo "starting"
+`
+	configPath := filepath.Join(tempDir, "drun.yml")
+	if err := os.WriteFile(configPath, []byte(testConfig), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Create root command with no subcommands
+	rootCmd := &cobra.Command{
+		Use:   "drun",
+		Short: "A YAML-based task runner",
+	}
+
+	originalConfigFile := configFile
+	configFile = "drun.yml"
+	defer func() { configFile = originalConfigFile }()
+
+	completions, _ := completeRecipes(rootCmd, []string{}, "")
+
+	// Should only have the recipe, no separator
+	if len(completions) != 1 {
+		t.Errorf("Expected 1 completion, got %d: %v", len(completions), completions)
+	}
+
+	if completions[0] != "start\tStart the service" {
+		t.Errorf("Expected 'start\\tStart the service', got %s", completions[0])
+	}
+}
+
+// Tests for new lifecycle features
+
+func TestExecuteLifecycleBlocks_CreatesCorrectPlan(t *testing.T) {
+	// Test that executeLifecycleBlocks creates the correct plan structure
+	// This is a unit test that doesn't require actual execution
+
+	blocks := []string{
+		"echo 'before block 1'",
+		"echo 'before block 2'",
+	}
+
+	// Test that we can create a lifecycle recipe from blocks
+	lifecycleRecipe := &model.Recipe{
+		Help: "Lifecycle before blocks",
+		Run:  model.Step{Lines: blocks},
+	}
+
+	if lifecycleRecipe.Help != "Lifecycle before blocks" {
+		t.Errorf("Expected help to be 'Lifecycle before blocks', got %q", lifecycleRecipe.Help)
+	}
+
+	if len(lifecycleRecipe.Run.Lines) != 2 {
+		t.Errorf("Expected 2 lines in run block, got %d", len(lifecycleRecipe.Run.Lines))
+	}
+
+	if lifecycleRecipe.Run.Lines[0] != "echo 'before block 1'" {
+		t.Errorf("Expected first line to be 'echo 'before block 1'', got %q", lifecycleRecipe.Run.Lines[0])
+	}
+}
+
+func TestListAllRecipesWithNamespacing(t *testing.T) {
+	specData := &model.Spec{
+		Recipes: map[string]model.Recipe{
+			"build": {
+				Help: "Local build recipe",
+			},
+			"docker:build": {
+				Help: "Docker build recipe",
+			},
+			"docker:push": {
+				Help: "Docker push recipe",
+			},
+			"k8s:deploy": {
+				Help: "Kubernetes deploy recipe",
+			},
+			"test": {
+				Help: "Local test recipe",
+			},
+		},
+	}
+
+	// This test mainly verifies that the function doesn't panic
+	// and handles namespaced recipes correctly
+	err := listAllRecipes(specData)
+	if err != nil {
+		t.Errorf("listAllRecipes failed: %v", err)
+	}
+}
+
+func TestCompleteRecipesWithNamespacing(t *testing.T) {
+	// Create a temporary config file with namespaced recipes
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "drun.yml")
+
+	configContent := `
+version: 1.0
+recipes:
+  build:
+    help: "Local build"
+    run: echo "local build"
+  "docker:build":
+    help: "Docker build"
+    run: echo "docker build"
+  "docker:push":
+    help: "Docker push"
+    run: echo "docker push"
+`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	// Change to temp directory
+	oldDir, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(oldDir)
+	}()
+	err = os.Chdir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+
+	// Test recipe completion
+	completions, directive := completeRecipes(rootCmd, []string{}, "")
+
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("Expected NoFileComp directive, got %v", directive)
+	}
+
+	// Should have local recipes first, then namespaced
+	expectedCompletions := []string{
+		"build\tLocal build",
+		"---\t",
+		"docker:build\tDocker build",
+		"docker:push\tDocker push",
+	}
+
+	// Check that we have the expected number of completions (plus drun commands)
+	if len(completions) < len(expectedCompletions) {
+		t.Errorf("Expected at least %d completions, got %d: %v", len(expectedCompletions), len(completions), completions)
+	}
+
+	// Check that local recipes come before namespaced ones
+	foundBuild := false
+	foundDockerBuild := false
+	buildIndex := -1
+	dockerBuildIndex := -1
+
+	for i, completion := range completions {
+		if strings.HasPrefix(completion, "build\t") {
+			foundBuild = true
+			buildIndex = i
+		}
+		if strings.HasPrefix(completion, "docker:build\t") {
+			foundDockerBuild = true
+			dockerBuildIndex = i
+		}
+	}
+
+	if !foundBuild {
+		t.Error("Local 'build' recipe not found in completions")
+	}
+	if !foundDockerBuild {
+		t.Error("Namespaced 'docker:build' recipe not found in completions")
+	}
+	if foundBuild && foundDockerBuild && buildIndex > dockerBuildIndex {
+		t.Error("Local recipes should come before namespaced recipes")
+	}
+}
+
+// Note: TestCompleteRecipes_OnlySubcommands was removed because drun requires
+// at least one recipe to be defined - a config with no recipes fails validation

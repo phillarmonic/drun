@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/phillarmonic/drun/internal/http"
 	"github.com/phillarmonic/drun/internal/model"
 	"github.com/phillarmonic/drun/internal/pool"
 )
@@ -19,15 +20,38 @@ import (
 // Engine handles template rendering with custom functions
 type Engine struct {
 	snippets      map[string]string
-	templateCache sync.Map                // Cache compiled templates by hash
-	funcMap       template.FuncMap        // Pre-computed function map
-	currentCtx    *model.ExecutionContext // Current execution context for functions
+	recipePrerun  []string                 // Recipe-prerun snippets that execute before every recipe
+	recipePostrun []string                 // Recipe-postrun snippets that execute after every recipe
+	templateCache sync.Map                 // Cache compiled templates by hash
+	funcMap       template.FuncMap         // Pre-computed function map
+	currentCtx    *model.ExecutionContext  // Current execution context for functions
+	httpClient    *http.TemplateHTTPClient // HTTP client for template functions
 }
 
 // NewEngine creates a new template engine
-func NewEngine(snippets map[string]string) *Engine {
+func NewEngine(snippets map[string]string, recipePrerun []string, recipePostrun []string) *Engine {
 	e := &Engine{
-		snippets: snippets,
+		snippets:      snippets,
+		recipePrerun:  recipePrerun,
+		recipePostrun: recipePostrun,
+	}
+	// Pre-compute function map for better performance
+	e.funcMap = e.getFuncMap()
+	return e
+}
+
+// NewEngineWithHTTP creates a new template engine with HTTP support
+func NewEngineWithHTTP(snippets map[string]string, recipePrerun []string, recipePostrun []string, httpEndpoints map[string]model.HTTPEndpoint, secrets map[string]string) *Engine {
+	return NewEngineWithHTTPAndVersion(snippets, recipePrerun, recipePostrun, httpEndpoints, secrets, "dev")
+}
+
+// NewEngineWithHTTPAndVersion creates a new template engine with HTTP support and version
+func NewEngineWithHTTPAndVersion(snippets map[string]string, recipePrerun []string, recipePostrun []string, httpEndpoints map[string]model.HTTPEndpoint, secrets map[string]string, version string) *Engine {
+	e := &Engine{
+		snippets:      snippets,
+		recipePrerun:  recipePrerun,
+		recipePostrun: recipePostrun,
+		httpClient:    http.NewTemplateHTTPClientWithVersion(httpEndpoints, secrets, version),
 	}
 	// Pre-compute function map for better performance
 	e.funcMap = e.getFuncMap()
@@ -82,8 +106,47 @@ func (e *Engine) getOrCompileTemplate(templateStr string) (*template.Template, e
 
 // RenderStep renders a step with the given context
 func (e *Engine) RenderStep(step model.Step, ctx *model.ExecutionContext) (model.Step, error) {
+	// Calculate total capacity for all lines
+	totalCapacity := len(e.recipePrerun) + len(step.Lines) + len(e.recipePostrun)
+	allLines := make([]string, 0, totalCapacity)
+
+	// Add recipe-prerun snippets first
+	for _, prerunSnippet := range e.recipePrerun {
+		// Render each recipe-prerun snippet as a template to support variables
+		rendered, err := e.Render(prerunSnippet, ctx)
+		if err != nil {
+			return model.Step{}, fmt.Errorf("failed to render recipe-prerun snippet: %w", err)
+		}
+		// Split rendered snippet into lines and add them
+		snippetLines := strings.Split(rendered, "\n")
+		for _, line := range snippetLines {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				allLines = append(allLines, trimmed)
+			}
+		}
+	}
+
+	// Add the original step lines
+	allLines = append(allLines, step.Lines...)
+
+	// Add recipe-postrun snippets last
+	for _, postrunSnippet := range e.recipePostrun {
+		// Render each recipe-postrun snippet as a template to support variables
+		rendered, err := e.Render(postrunSnippet, ctx)
+		if err != nil {
+			return model.Step{}, fmt.Errorf("failed to render recipe-postrun snippet: %w", err)
+		}
+		// Split rendered snippet into lines and add them
+		snippetLines := strings.Split(rendered, "\n")
+		for _, line := range snippetLines {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				allLines = append(allLines, trimmed)
+			}
+		}
+	}
+
 	// Join all lines into a single script for template rendering
-	script := step.String()
+	script := strings.Join(allLines, "\n")
 
 	// Render the entire script as one template
 	rendered, err := e.Render(script, ctx)
@@ -133,9 +196,14 @@ func (e *Engine) buildTemplateData(ctx *model.ExecutionContext) map[string]any {
 	for k, v := range ctx.Secrets {
 		result[k] = v
 	}
+	// Add flags under both direct access and .flags namespace for flexibility
 	for k, v := range ctx.Flags {
 		result[k] = v
 	}
+	if len(ctx.Flags) > 0 {
+		result["flags"] = ctx.Flags
+	}
+
 	for k, v := range ctx.Positionals {
 		result[k] = v
 	}
@@ -189,6 +257,17 @@ func (e *Engine) getFuncMap() template.FuncMap {
 	// Secret functions
 	funcMap["secret"] = e.secretFunc
 	funcMap["hasSecret"] = e.hasSecretFunc
+
+	// String manipulation functions
+	funcMap["truncate"] = truncateFunc
+
+	// HTTP functions (if HTTP client is available)
+	if e.httpClient != nil {
+		httpFuncs := e.httpClient.GetTemplateFunctions()
+		for name, fn := range httpFuncs {
+			funcMap[name] = fn
+		}
+	}
 
 	return funcMap
 }
@@ -308,6 +387,21 @@ func successFunc(message string) string {
 
 func stepFunc(message string) string {
 	return fmt.Sprintf("echo \"🚀 %s\"", message)
+}
+
+// String manipulation functions
+func truncateFunc(length int, text string) string {
+	if length <= 0 {
+		return ""
+	}
+
+	// Convert to runes to handle Unicode properly
+	runes := []rune(text)
+	if len(runes) <= length {
+		return text
+	}
+
+	return string(runes[:length])
 }
 
 // Git functions

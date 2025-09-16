@@ -29,6 +29,33 @@ var DefaultFilenames = []string{
 	"ops.drun.yaml",
 }
 
+// WorkspaceConfig represents workspace-specific configuration
+type WorkspaceConfig struct {
+	DefaultConfigFile string `yaml:"default_config_file,omitempty"`
+}
+
+// loadWorkspaceConfig loads the workspace configuration from the base directory
+func (l *Loader) loadWorkspaceConfig() (*WorkspaceConfig, error) {
+	configPath := filepath.Join(l.baseDir, ".drun", "workspace.yml")
+
+	// If config doesn't exist, return empty config
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return &WorkspaceConfig{}, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	return &config, nil
+}
+
 // CacheEntry represents a cached spec with metadata
 type CacheEntry struct {
 	Spec     *model.Spec
@@ -62,18 +89,46 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 	var filePath string
 
 	if filename == "" {
-		// Try default filenames
-		found := false
-		for _, defaultName := range DefaultFilenames {
-			candidate := filepath.Join(l.baseDir, defaultName)
+		// First, check if there's a workspace-specific default config file
+		workspaceConfig, err := l.loadWorkspaceConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load workspace config: %w", err)
+		}
+
+		// If workspace has a default config file, try it first
+		if workspaceConfig.DefaultConfigFile != "" {
+			candidate := filepath.Join(l.baseDir, workspaceConfig.DefaultConfigFile)
 			if _, err := os.Stat(candidate); err == nil {
 				filePath = candidate
-				found = true
-				break
+			} else {
+				// Workspace default doesn't exist, fall back to standard defaults
+				found := false
+				for _, defaultName := range DefaultFilenames {
+					candidate := filepath.Join(l.baseDir, defaultName)
+					if _, err := os.Stat(candidate); err == nil {
+						filePath = candidate
+						found = true
+						break
+					}
+				}
+				if !found {
+					return nil, fmt.Errorf("no drun configuration file found (tried workspace default '%s' and standard defaults: %s)", workspaceConfig.DefaultConfigFile, strings.Join(DefaultFilenames, ", "))
+				}
 			}
-		}
-		if !found {
-			return nil, fmt.Errorf("no drun configuration file found (tried: %s)", strings.Join(DefaultFilenames, ", "))
+		} else {
+			// No workspace default, try standard default filenames
+			found := false
+			for _, defaultName := range DefaultFilenames {
+				candidate := filepath.Join(l.baseDir, defaultName)
+				if _, err := os.Stat(candidate); err == nil {
+					filePath = candidate
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("no drun configuration file found (tried: %s)", strings.Join(DefaultFilenames, ", "))
+			}
 		}
 	} else {
 		if filepath.IsAbs(filename) {
@@ -127,8 +182,8 @@ func (l *Loader) Load(filename string) (*model.Spec, error) {
 
 // setDefaults sets reasonable defaults for the spec
 func (l *Loader) setDefaults(spec *model.Spec) {
-	if spec.Version == "" {
-		spec.Version = "0.1"
+	if spec.Version == 0 {
+		spec.Version = 1.0
 	}
 
 	// Set default shell configurations
@@ -256,9 +311,17 @@ func (l *Loader) processIncludes(spec *model.Spec, baseDir string) error {
 }
 
 func (l *Loader) processIncludePattern(spec *model.Spec, baseDir, pattern string) error {
+	// Check for namespace syntax: namespace::pattern
+	var namespace string
+	if strings.Contains(pattern, "::") {
+		parts := strings.SplitN(pattern, "::", 2)
+		namespace = parts[0]
+		pattern = parts[1]
+	}
+
 	// Check if this is a remote URL
 	if l.isRemoteURL(pattern) {
-		return l.processRemoteInclude(spec, pattern)
+		return l.processRemoteIncludeWithNamespace(spec, pattern, namespace)
 	}
 
 	// Handle local files
@@ -275,7 +338,7 @@ func (l *Loader) processIncludePattern(spec *model.Spec, baseDir, pattern string
 
 	// Process each matched file
 	for _, matchedFile := range matches {
-		if err := l.mergeIncludedFile(spec, matchedFile); err != nil {
+		if err := l.mergeIncludedFileWithNamespace(spec, matchedFile, namespace); err != nil {
 			return fmt.Errorf("failed to merge file '%s': %w", matchedFile, err)
 		}
 	}
@@ -283,7 +346,7 @@ func (l *Loader) processIncludePattern(spec *model.Spec, baseDir, pattern string
 	return nil
 }
 
-func (l *Loader) mergeIncludedFile(spec *model.Spec, filename string) error {
+func (l *Loader) mergeIncludedFileWithNamespace(spec *model.Spec, filename string, namespace string) error {
 	// Read the included file
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -296,13 +359,17 @@ func (l *Loader) mergeIncludedFile(spec *model.Spec, filename string) error {
 		return fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	// Merge the specs (later values override earlier ones)
-	l.mergeSpecs(spec, &includedSpec)
+	// Merge the specs with namespace support
+	l.mergeSpecsWithNamespace(spec, &includedSpec, namespace)
 
 	return nil
 }
 
 func (l *Loader) mergeSpecs(base *model.Spec, included *model.Spec) {
+	l.mergeSpecsWithNamespace(base, included, "")
+}
+
+func (l *Loader) mergeSpecsWithNamespace(base *model.Spec, included *model.Spec, namespace string) {
 	// Merge environment variables
 	if base.Env == nil {
 		base.Env = make(map[string]string)
@@ -327,12 +394,16 @@ func (l *Loader) mergeSpecs(base *model.Spec, included *model.Spec) {
 		base.Snippets[k] = v
 	}
 
-	// Merge recipes
+	// Merge recipes with namespacing
 	if base.Recipes == nil {
 		base.Recipes = make(map[string]model.Recipe)
 	}
 	for k, v := range included.Recipes {
-		base.Recipes[k] = v
+		recipeName := k
+		if namespace != "" {
+			recipeName = namespace + ":" + k
+		}
+		base.Recipes[recipeName] = v
 	}
 
 	// Merge shell configurations
@@ -379,6 +450,18 @@ func (l *Loader) mergeSpecs(base *model.Spec, included *model.Spec) {
 	for k, v := range included.Secrets {
 		base.Secrets[k] = v
 	}
+
+	// Merge recipe-prerun blocks (append to existing)
+	base.RecipePrerun = append(base.RecipePrerun, included.RecipePrerun...)
+
+	// Merge recipe-postrun blocks (append to existing)
+	base.RecipePostrun = append(base.RecipePostrun, included.RecipePostrun...)
+
+	// Merge before blocks (append to existing)
+	base.Before = append(base.Before, included.Before...)
+
+	// Merge after blocks (append to existing)
+	base.After = append(base.After, included.After...)
 }
 
 // getCachedSpec retrieves a cached spec if it's still valid
@@ -543,6 +626,11 @@ func (l *Loader) isRemoteURL(pattern string) bool {
 
 // processRemoteInclude processes a remote include URL
 func (l *Loader) processRemoteInclude(spec *model.Spec, includeURL string) error {
+	return l.processRemoteIncludeWithNamespace(spec, includeURL, "")
+}
+
+// processRemoteIncludeWithNamespace processes a remote include URL with namespace support
+func (l *Loader) processRemoteIncludeWithNamespace(spec *model.Spec, includeURL string, namespace string) error {
 	// Parse the URL to determine the type and parameters
 	parsedURL, err := l.parseRemoteInclude(includeURL)
 	if err != nil {
@@ -561,8 +649,8 @@ func (l *Loader) processRemoteInclude(spec *model.Spec, includeURL string) error
 		return fmt.Errorf("failed to parse remote YAML: %w", err)
 	}
 
-	// Merge the specs
-	l.mergeSpecs(spec, &includedSpec)
+	// Merge the specs with namespace support
+	l.mergeSpecsWithNamespace(spec, &includedSpec, namespace)
 
 	return nil
 }

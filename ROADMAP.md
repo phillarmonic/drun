@@ -13,6 +13,8 @@ drun is already a powerful task runner with:
 - ✅ Package manager detection
 - ✅ Smart status messaging
 - ✅ High performance (microsecond operations)
+- ✅ Smart init with directory creation & workspace defaults
+- ✅ Workspace-specific configuration management
 
 ## Next-Level Enhancements 🌟
 

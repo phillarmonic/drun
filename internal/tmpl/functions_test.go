@@ -304,7 +304,7 @@ func TestIsCIFunc(t *testing.T) {
 }
 
 func TestEngine_SecretFunctions(t *testing.T) {
-	engine := NewEngine(map[string]string{})
+	engine := NewEngine(map[string]string{}, nil, nil)
 
 	// Create test context with secrets
 	ctx := &model.ExecutionContext{
@@ -352,7 +352,7 @@ func TestEngine_SecretFunctions(t *testing.T) {
 }
 
 func TestEngine_SecretFunctions_NoContext(t *testing.T) {
-	engine := NewEngine(map[string]string{})
+	engine := NewEngine(map[string]string{}, nil, nil)
 
 	// Test without setting context
 	value := engine.secretFunc("any_secret")
