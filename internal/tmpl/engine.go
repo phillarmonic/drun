@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/phillarmonic/drun/internal/http"
 	"github.com/phillarmonic/drun/internal/model"
 	"github.com/phillarmonic/drun/internal/pool"
 )
@@ -19,11 +20,12 @@ import (
 // Engine handles template rendering with custom functions
 type Engine struct {
 	snippets      map[string]string
-	recipePrerun  []string                // Recipe-prerun snippets that execute before every recipe
-	recipePostrun []string                // Recipe-postrun snippets that execute after every recipe
-	templateCache sync.Map                // Cache compiled templates by hash
-	funcMap       template.FuncMap        // Pre-computed function map
-	currentCtx    *model.ExecutionContext // Current execution context for functions
+	recipePrerun  []string                 // Recipe-prerun snippets that execute before every recipe
+	recipePostrun []string                 // Recipe-postrun snippets that execute after every recipe
+	templateCache sync.Map                 // Cache compiled templates by hash
+	funcMap       template.FuncMap         // Pre-computed function map
+	currentCtx    *model.ExecutionContext  // Current execution context for functions
+	httpClient    *http.TemplateHTTPClient // HTTP client for template functions
 }
 
 // NewEngine creates a new template engine
@@ -32,6 +34,19 @@ func NewEngine(snippets map[string]string, recipePrerun []string, recipePostrun 
 		snippets:      snippets,
 		recipePrerun:  recipePrerun,
 		recipePostrun: recipePostrun,
+	}
+	// Pre-compute function map for better performance
+	e.funcMap = e.getFuncMap()
+	return e
+}
+
+// NewEngineWithHTTP creates a new template engine with HTTP support
+func NewEngineWithHTTP(snippets map[string]string, recipePrerun []string, recipePostrun []string, httpEndpoints map[string]model.HTTPEndpoint, secrets map[string]string) *Engine {
+	e := &Engine{
+		snippets:      snippets,
+		recipePrerun:  recipePrerun,
+		recipePostrun: recipePostrun,
+		httpClient:    http.NewTemplateHTTPClient(httpEndpoints, secrets),
 	}
 	// Pre-compute function map for better performance
 	e.funcMap = e.getFuncMap()
@@ -237,6 +252,14 @@ func (e *Engine) getFuncMap() template.FuncMap {
 	// Secret functions
 	funcMap["secret"] = e.secretFunc
 	funcMap["hasSecret"] = e.hasSecretFunc
+
+	// HTTP functions (if HTTP client is available)
+	if e.httpClient != nil {
+		httpFuncs := e.httpClient.GetTemplateFunctions()
+		for name, fn := range httpFuncs {
+			funcMap[name] = fn
+		}
+	}
 
 	return funcMap
 }

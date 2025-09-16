@@ -1,0 +1,141 @@
+version: 0.1
+
+# Simple HTTP endpoint definitions
+http:
+  # Public API - no auth required
+  jsonplaceholder:
+    url: "https://jsonplaceholder.typicode.com"
+    headers:
+      Content-Type: "application/json"
+    timeout: 10s
+    description: "JSONPlaceholder API for testing"
+
+  # Slack notifications
+  slack:
+    url: "{{ env \"SLACK_WEBHOOK_URL\" }}"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+    timeout: 5s
+    description: "Slack webhook"
+
+# Environment setup
+env:
+  PROJECT_NAME: "my-project"
+
+recipes:
+  # Simple GET request
+  get-post:
+    help: "Get a post from JSONPlaceholder API"
+    positionals:
+      - name: id
+        required: true
+        pattern: "^[0-9]+$"
+    run: |
+      {{ step "Fetching post {{ .id }}" }}
+      
+      # Simple HTTP GET call
+      {{ $post := httpCallJSON "jsonplaceholder" (dict "url" (printf "/posts/%s" .id)) }}
+      
+      echo "Title: {{ $post.title }}"
+      echo "Body: {{ $post.body }}"
+      echo "User ID: {{ $post.userId }}"
+      
+      {{ success "Post retrieved successfully" }}
+
+  # Simple POST request
+  create-post:
+    help: "Create a new post"
+    positionals:
+      - name: title
+        required: true
+      - name: body
+        required: true
+    run: |
+      {{ step "Creating new post" }}
+      
+      # Prepare post data
+      {{ $postData := dict "title" .title "body" .body "userId" 1 }}
+      
+      # Make POST request
+      {{ $result := httpPost "https://jsonplaceholder.typicode.com/posts" $postData }}
+      
+      echo "Created post with response:"
+      echo "{{ $result }}"
+      
+      {{ success "Post created successfully" }}
+
+  # Send notification
+  notify:
+    help: "Send a Slack notification"
+    positionals:
+      - name: message
+        required: true
+    run: |
+      {{ step "Sending notification" }}
+      
+      # Simple Slack message
+      {{ $payload := dict "text" (printf "🔔 %s: %s" (env "PROJECT_NAME") .message) }}
+      
+      # Send notification
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $payload }}
+      
+      {{ success "Notification sent" }}
+
+  # Health check
+  check-api:
+    help: "Check if API is responding"
+    run: |
+      {{ step "Checking API health" }}
+      
+      # Simple GET request to check if API responds
+      {{ $response := httpGet "https://jsonplaceholder.typicode.com/posts/1" }}
+      
+      {{ if $response }}
+      {{ success "API is responding" }}
+      {{ else }}
+      {{ error "API is not responding" }}
+      exit 1
+      {{ end }}
+
+  # Fetch and process data
+  process-users:
+    help: "Fetch and process user data"
+    run: |
+      {{ step "Processing user data" }}
+      
+      # Get all users
+      {{ $users := httpCallJSON "jsonplaceholder" (dict "url" "/users") }}
+      
+      {{ info (printf "Found %d users" (len $users)) }}
+      
+      # Process each user
+      {{ range $user := $users }}
+      echo "Processing user: {{ $user.name }} ({{ $user.email }})"
+      {{ end }}
+      
+      {{ success "User processing completed" }}
+
+  # Simple workflow with notifications
+  deploy-notify:
+    help: "Deploy with notifications"
+    run: |
+      {{ step "Starting deployment" }}
+      
+      # Start notification
+      {{ $startMsg := dict "text" (printf "🚀 Starting deployment of %s" (env "PROJECT_NAME")) }}
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $startMsg }}
+      
+      # Simulate deployment
+      echo "Building application..."
+      sleep 1
+      echo "Running tests..."
+      sleep 1
+      echo "Deploying to production..."
+      sleep 1
+      
+      # Success notification
+      {{ $successMsg := dict "text" (printf "✅ Successfully deployed %s" (env "PROJECT_NAME")) }}
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $successMsg }}
+      
+      {{ success "Deployment completed with notifications" }}

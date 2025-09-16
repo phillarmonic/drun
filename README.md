@@ -20,6 +20,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 ### 🌟 **Advanced Features**
 
 - **🔗 Remote Includes**: Include recipes from HTTP/HTTPS URLs and Git repositories
+- **🌐 HTTP Integration**: Built-in HTTP client with authentication, retries, caching, and JSON support
 - **🔄 Matrix Execution**: Run recipes across multiple configurations (OS, versions, architectures)
 - **🔐 Secrets Management**: Secure handling of sensitive data with multiple sources
 - **📊 Advanced Logging**: Structured logging with emoji status messages and metrics
@@ -28,7 +29,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 
 ### 🛠️ **Developer Experience**
 
-- **15+ Template Functions**: Docker detection, Git integration, status messages, and more
+- **20+ Template Functions**: Docker detection, Git integration, HTTP calls, status messages, and more
 - **Intelligent Caching**: HTTP and Git includes cached for performance
 - **Rich Error Messages**: Helpful suggestions and context for debugging
 - **Shell Completion**: Intelligent completion for bash, zsh, fish, and PowerShell
@@ -313,6 +314,66 @@ recipes:
 - 🌐 **Community**: Share recipes across open source projects  
 - 🔄 **Versioning**: Pin to specific tags/commits for stability
 - ⚡ **Performance**: Intelligent caching for fast execution
+
+### 🌐 HTTP Integration
+
+Integrate with APIs, send notifications, and fetch data directly from your recipes:
+
+```yaml
+version: "1.4"
+
+# Define HTTP endpoints with authentication and caching
+http:
+  github:
+    url: "https://api.github.com"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      Authorization: "token {{ secret \"github_token\" }}"
+    timeout: 30s
+    cache:
+      ttl: 5m
+
+  slack:
+    url: "{{ env \"SLACK_WEBHOOK_URL\" }}"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+
+secrets:
+  github_token:
+    source: "env://GITHUB_TOKEN"
+    required: true
+
+recipes:
+  deploy-notify:
+    help: "Deploy with GitHub integration and Slack notifications"
+    run: |
+      {{ step "Starting deployment with API integration" }}
+      
+      # Get current user from GitHub API
+      {{ $user := httpCallJSON "github" (dict "url" "/user") }}
+      {{ info (printf "Deploying as: %s" $user.login) }}
+      
+      # Perform deployment
+      echo "Building and deploying application..."
+      
+      # Send success notification to Slack
+      {{ $message := dict 
+           "text" (printf "✅ Deployment completed by %s" $user.login)
+           "username" "drun-bot"
+      }}
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $message }}
+      
+      {{ success "Deployment completed with notifications" }}
+```
+
+**Features:**
+
+- 🔐 **Authentication**: Bearer, Basic, API Key, OAuth2 support
+- 🔄 **Retries**: Configurable retry strategies with exponential backoff
+- 💾 **Caching**: Response caching for improved performance
+- 📊 **JSON Support**: Automatic JSON parsing and generation
+- ⚡ **Direct Calls**: Use predefined endpoints or direct HTTP calls
 
 ### 🔄 Matrix Execution
 
@@ -724,7 +785,7 @@ The cleanup command provides:
 
 ## Template Functions
 
-drun includes 15+ powerful built-in template functions plus all [Sprig](https://masterminds.github.io/sprig/) functions:
+drun includes 20+ powerful built-in template functions plus all [Sprig](https://masterminds.github.io/sprig/) functions:
 
 ### 🐳 **Docker Integration**
 
@@ -738,6 +799,15 @@ drun includes 15+ powerful built-in template functions plus all [Sprig](https://
 - `{{ gitCommit }}`: Full commit hash (40 chars)
 - `{{ gitShortCommit }}`: Short commit hash (7 chars)
 - `{{ isDirty }}`: True if working directory has uncommitted changes
+
+### 🌐 **HTTP Integration**
+
+- `{{ httpCall "endpoint" }}`: Call predefined HTTP endpoint
+- `{{ httpCallJSON "endpoint" }}`: Call endpoint and parse JSON response
+- `{{ httpGet "url" }}`: Direct GET request to any URL
+- `{{ httpPost "url" data }}`: Direct POST request with data
+- `{{ httpPut "url" data }}`: Direct PUT request with data
+- `{{ httpDelete "url" }}`: Direct DELETE request
 
 ### 📦 **Project Detection**
 
@@ -940,3 +1010,10 @@ Run benchmarks yourself:
 ```bash
 ./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```
+
+## 📚 Documentation
+
+- **[Template Functions Reference](TEMPLATE_FUNCTIONS.md)** - Complete guide to all built-in template functions
+- **[HTTP Integration Guide](HTTP_INTEGRATION.md)** - Comprehensive HTTP client documentation with examples
+- **[YAML Specification](YAML_SPEC.md)** - Complete YAML configuration reference
+- **[Examples Directory](examples/)** - Real-world usage examples and patterns

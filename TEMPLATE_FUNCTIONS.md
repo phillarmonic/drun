@@ -46,6 +46,27 @@ Quick reference for all built-in template functions in drun.
 | `{{ secret "name" }}` | Access secret value | `TOKEN={{ secret "api_key" }}` | `TOKEN=actual_secret_value` |
 | `{{ hasSecret "name" }}` | Check secret availability | `{{ if hasSecret "token" }}...{{ end }}` | `true` or `false` |
 
+## 🌐 HTTP Functions
+
+| Function | Description | Example | Output |
+|----------|-------------|---------|---------|
+| `{{ httpCall "endpoint" }}` | Call predefined HTTP endpoint | `{{ httpCall "api" }}` | Raw response string |
+| `{{ httpCallJSON "endpoint" }}` | Call endpoint and parse JSON | `{{ $data := httpCallJSON "api" }}` | Parsed JSON object |
+| `{{ httpGet "url" }}` | Direct GET request | `{{ httpGet "https://api.example.com/status" }}` | Response body |
+| `{{ httpPost "url" data }}` | Direct POST request | `{{ httpPost "https://api.example.com/users" (dict "name" "John") }}` | Response body |
+| `{{ httpPut "url" data }}` | Direct PUT request | `{{ httpPut "https://api.example.com/users/1" (dict "name" "Jane") }}` | Response body |
+| `{{ httpDelete "url" }}` | Direct DELETE request | `{{ httpDelete "https://api.example.com/users/1" }}` | Response body |
+
+**HTTP Options**: All HTTP functions accept optional parameters:
+```yaml
+{{ $options := dict 
+     "headers" (dict "Authorization" "Bearer token")
+     "query" (dict "limit" "10")
+     "timeout" "30s"
+}}
+{{ httpGet "https://api.example.com/data" $options }}
+```
+
 ## 🛠️ Standard Functions
 
 | Function | Description | Example | Output |
@@ -177,6 +198,70 @@ recipes:
       {{ success "Test completed for {{ .matrix_os }}/{{ .matrix_version }}" }}
 ```
 
+### HTTP API Integration
+```yaml
+# Define HTTP endpoints
+http:
+  github:
+    url: "https://api.github.com"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      Authorization: "token {{ secret \"github_token\" }}"
+    timeout: 30s
+    cache:
+      ttl: 5m
+
+  slack:
+    url: "{{ env \"SLACK_WEBHOOK_URL\" }}"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+
+secrets:
+  github_token:
+    source: "env://GITHUB_TOKEN"
+    required: true
+
+recipes:
+  github-status:
+    run: |
+      {{ step "Checking GitHub API status" }}
+      
+      # Get user info using predefined endpoint
+      {{ $user := httpCallJSON "github" (dict "url" "/user") }}
+      {{ info (printf "Authenticated as: %s" $user.login) }}
+      
+      # Get repository info
+      {{ $repo := httpCallJSON "github" (dict "url" "/repos/owner/repo") }}
+      {{ info (printf "Repository: %s (%d stars)" $repo.name $repo.stargazers_count) }}
+      
+      # Send notification to Slack
+      {{ $message := dict "text" (printf "✅ GitHub check completed for %s" $user.login) }}
+      {{ httpPost (env "SLACK_WEBHOOK_URL") $message }}
+      
+      {{ success "GitHub integration completed" }}
+
+  api-workflow:
+    run: |
+      {{ step "API workflow with error handling" }}
+      
+      # Direct HTTP calls with options
+      {{ $options := dict 
+           "headers" (dict "User-Agent" "drun/1.4")
+           "query" (dict "per_page" "5")
+           "timeout" "10s"
+      }}
+      
+      {{ $repos := httpCallJSON "github" (merge $options (dict "url" "/user/repos")) }}
+      
+      {{ info (printf "Found %d repositories" (len $repos)) }}
+      {{ range $repo := $repos }}
+      echo "- {{ $repo.name }}: {{ $repo.description }}"
+      {{ end }}
+      
+      {{ success "API workflow completed" }}
+```
+
 ## 🔗 Sprig Functions
 
 drun includes all [Sprig](https://masterminds.github.io/sprig/) functions (150+ additional functions):
@@ -216,10 +301,15 @@ drun includes all [Sprig](https://masterminds.github.io/sprig/) functions (150+ 
 4. **Status Updates**: Provide clear feedback with status functions
 5. **Security**: Never log secrets in plain text - use `{{ secret }}` function
 6. **Performance**: Functions are cached - use liberally without performance concerns
+7. **HTTP Integration**: Define endpoints in YAML, use `{{ httpCallJSON }}` for APIs
+8. **API Error Handling**: Check response status and provide meaningful error messages
+9. **HTTP Caching**: Use endpoint-level caching for frequently accessed APIs
+10. **Authentication**: Store API tokens as secrets, reference with `{{ secret "name" }}`
 
 ## 📚 More Information
 
 - **Main Documentation**: [README.md](README.md)
+- **HTTP Integration**: [HTTP_INTEGRATION.md](HTTP_INTEGRATION.md)
 - **Examples**: [examples/](examples/) directory
 - **Sprig Documentation**: https://masterminds.github.io/sprig/
 - **Go Templates**: https://pkg.go.dev/text/template
