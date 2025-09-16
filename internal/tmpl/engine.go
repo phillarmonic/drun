@@ -19,8 +19,9 @@ import (
 // Engine handles template rendering with custom functions
 type Engine struct {
 	snippets      map[string]string
-	templateCache sync.Map         // Cache compiled templates by hash
-	funcMap       template.FuncMap // Pre-computed function map
+	templateCache sync.Map                // Cache compiled templates by hash
+	funcMap       template.FuncMap        // Pre-computed function map
+	currentCtx    *model.ExecutionContext // Current execution context for functions
 }
 
 // NewEngine creates a new template engine
@@ -35,6 +36,10 @@ func NewEngine(snippets map[string]string) *Engine {
 
 // Render renders a template string with the given context
 func (e *Engine) Render(templateStr string, ctx *model.ExecutionContext) (string, error) {
+	// Set current context for template functions
+	e.currentCtx = ctx
+	defer func() { e.currentCtx = nil }()
+
 	// Use template caching for better performance
 	tmpl, err := e.getOrCompileTemplate(templateStr)
 	if err != nil {
@@ -125,6 +130,9 @@ func (e *Engine) buildTemplateData(ctx *model.ExecutionContext) map[string]any {
 	for k, v := range ctx.Env {
 		result[k] = v
 	}
+	for k, v := range ctx.Secrets {
+		result[k] = v
+	}
 	for k, v := range ctx.Flags {
 		result[k] = v
 	}
@@ -177,6 +185,10 @@ func (e *Engine) getFuncMap() template.FuncMap {
 
 	// Environment detection
 	funcMap["isCI"] = isCIFunc
+
+	// Secret functions
+	funcMap["secret"] = e.secretFunc
+	funcMap["hasSecret"] = e.hasSecretFunc
 
 	return funcMap
 }
@@ -374,6 +386,24 @@ func isCIFunc() bool {
 		if os.Getenv(envVar) != "" {
 			return true
 		}
+	}
+	return false
+}
+
+// Secret functions - these need to be methods to access engine context
+func (e *Engine) secretFunc(name string) string {
+	if e.currentCtx != nil && e.currentCtx.Secrets != nil {
+		if value, exists := e.currentCtx.Secrets[name]; exists {
+			return value
+		}
+	}
+	return ""
+}
+
+func (e *Engine) hasSecretFunc(name string) bool {
+	if e.currentCtx != nil && e.currentCtx.Secrets != nil {
+		_, exists := e.currentCtx.Secrets[name]
+		return exists
 	}
 	return false
 }

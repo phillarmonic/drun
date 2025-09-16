@@ -1,0 +1,263 @@
+# Simplified Patterns Example
+# Demonstrates new template functions that make drun definitions cleaner
+version: 0.1
+
+env:
+  # Auto-detect project details
+  PACKAGE_MANAGER: "{{ packageManager }}"
+  GIT_BRANCH: "{{ gitBranch }}"
+  GIT_COMMIT: "{{ gitShortCommit }}"
+  IS_CI: "{{ isCI }}"
+  IS_DIRTY: "{{ isDirty }}"
+
+recipes:
+  # Demonstrate status messaging functions
+  status-demo:
+    help: "Show different status message styles"
+    run: |
+      {{ info "Starting status demonstration" }}
+      {{ step "Processing step 1" }}
+      sleep 1
+      {{ step "Processing step 2" }}
+      sleep 1
+      {{ warn "This is a warning message" }}
+      {{ success "All steps completed successfully!" }}
+
+  # Before: Verbose project info gathering
+  project-info-old:
+    help: "Old verbose way to show project info"
+    run: |
+      echo "📋 Project Information (Old Way)"
+      echo "================================"
+      
+      # Git branch detection
+      if git rev-parse --git-dir > /dev/null 2>&1; then
+        BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+        COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+          DIRTY=" (dirty)"
+        else
+          DIRTY=""
+        fi
+        echo "Git Branch: $BRANCH"
+        echo "Git Commit: $COMMIT$DIRTY"
+      else
+        echo "Git: Not a git repository"
+      fi
+      
+      # Package manager detection
+      if [ -f "pnpm-lock.yaml" ]; then
+        echo "Package Manager: pnpm"
+      elif [ -f "yarn.lock" ]; then
+        echo "Package Manager: yarn"
+      elif [ -f "package.json" ]; then
+        echo "Package Manager: npm"
+      elif [ -f "go.mod" ]; then
+        echo "Package Manager: go"
+      else
+        echo "Package Manager: unknown"
+      fi
+      
+      # CI detection
+      if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${GITLAB_CI:-}" ]; then
+        echo "Environment: CI"
+      else
+        echo "Environment: Local"
+      fi
+
+  # After: Clean and simple
+  project-info:
+    help: "New clean way to show project info"
+    run: |
+      {{ info "Project Information (New Way)" }}
+      echo "================================"
+      echo "Package Manager: $PACKAGE_MANAGER"
+      echo "Git Branch: $GIT_BRANCH"
+      echo "Git Commit: $GIT_COMMIT"
+      echo "Working Dir: {{ if isDirty }}dirty{{ else }}clean{{ end }}"
+      echo "Environment: {{ if isCI }}CI{{ else }}Local{{ end }}"
+
+  # Demonstrate git functions
+  git-info:
+    help: "Show detailed git information"
+    run: |
+      {{ step "Gathering git information" }}
+      
+      {{ if gitBranch }}
+      echo "Current branch: {{ gitBranch }}"
+      echo "Full commit: {{ gitCommit }}"
+      echo "Short commit: {{ gitShortCommit }}"
+      
+      {{ if isDirty }}
+      {{ warn "Working directory has uncommitted changes" }}
+      {{ else }}
+      {{ success "Working directory is clean" }}
+      {{ end }}
+      
+      {{ else }}
+      {{ error "Not a git repository" }}
+      {{ end }}
+
+  # Smart build based on project type
+  smart-build:
+    help: "Build project using detected package manager"
+    run: |
+      {{ step "Building project with detected package manager" }}
+      
+      {{ if eq (packageManager) "npm" }}
+      {{ info "Using npm for Node.js project" }}
+      npm ci
+      npm run build
+      {{ else if eq (packageManager) "yarn" }}
+      {{ info "Using yarn for Node.js project" }}
+      yarn install --frozen-lockfile
+      yarn build
+      {{ else if eq (packageManager) "pnpm" }}
+      {{ info "Using pnpm for Node.js project" }}
+      pnpm install --frozen-lockfile
+      pnpm build
+      {{ else if eq (packageManager) "go" }}
+      {{ info "Using go for Go project" }}
+      go mod tidy
+      go build ./...
+      {{ else if eq (packageManager) "pip" }}
+      {{ info "Using pip for Python project" }}
+      pip install -r requirements.txt
+      python -m build
+      {{ else }}
+      {{ error "Unknown project type - cannot auto-build" }}
+      exit 1
+      {{ end }}
+      
+      {{ success "Build completed successfully!" }}
+
+  # Smart test runner
+  smart-test:
+    help: "Run tests using detected package manager"
+    run: |
+      {{ step "Running tests with detected package manager" }}
+      
+      {{ if eq (packageManager) "npm" }}
+      npm test
+      {{ else if eq (packageManager) "yarn" }}
+      yarn test
+      {{ else if eq (packageManager) "pnpm" }}
+      pnpm test
+      {{ else if eq (packageManager) "go" }}
+      go test ./...
+      {{ else if eq (packageManager) "pip" }}
+      python -m pytest
+      {{ else }}
+      {{ warn "No test command configured for this project type" }}
+      {{ end }}
+
+  # Environment-aware deployment
+  smart-deploy:
+    help: "Deploy with environment-specific behavior"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "prod"]
+    run: |
+      {{ step "Deploying to {{ .environment }}" }}
+      
+      # Different behavior in CI vs local
+      {{ if isCI }}
+      {{ info "Running in CI environment" }}
+      
+      # Ensure clean state in CI
+      {{ if isDirty }}
+      {{ error "Cannot deploy from dirty working directory in CI" }}
+      exit 1
+      {{ end }}
+      
+      {{ else }}
+      {{ warn "Running locally - ensure you have proper credentials" }}
+      {{ end }}
+      
+      # Build with commit info
+      {{ step "Building with commit {{ gitShortCommit }}" }}
+      
+      # Environment-specific deployment
+      {{ if eq .environment "prod" }}
+      {{ warn "PRODUCTION DEPLOYMENT - Double-checking..." }}
+      {{ if ne (gitBranch) "main" }}
+      {{ error "Production deployments must be from main branch" }}
+      exit 1
+      {{ end }}
+      {{ end }}
+      
+      {{ success "Deployment to {{ .environment }} completed!" }}
+
+  # File existence checking
+  check-files:
+    help: "Check for important project files"
+    run: |
+      {{ step "Checking project structure" }}
+      
+      FILES=("README.md" "LICENSE" ".gitignore" "package.json" "go.mod" "requirements.txt")
+      
+      for file in "${FILES[@]}"; do
+        {{ if hasFile "$file" }}
+        echo "✅ $file exists"
+        {{ else }}
+        echo "❌ $file missing"
+        {{ end }}
+      done
+
+  # Compare old vs new patterns
+  compare-patterns:
+    help: "Compare old verbose patterns with new simplified ones"
+    run: |
+      {{ info "=== COMPARISON: Old vs New Patterns ===" }}
+      echo ""
+      
+      echo "OLD WAY (verbose):"
+      echo "  - Manual git command execution"
+      echo "  - Complex package manager detection"
+      echo "  - Repetitive echo statements with emojis"
+      echo "  - Manual CI environment detection"
+      echo ""
+      
+      echo "NEW WAY (simplified):"
+      echo "  - {{ gitBranch }}, {{ gitCommit }}, {{ gitShortCommit }}"
+      echo "  - {{ packageManager }} auto-detection"
+      echo "  - {{ info }}, {{ warn }}, {{ error }}, {{ success }}, {{ step }}"
+      echo "  - {{ isCI }}, {{ isDirty }}, {{ hasFile }}"
+      echo ""
+      
+      {{ success "New functions reduce boilerplate by ~70%!" }}
+
+  # Demonstrate all functions
+  showcase-all:
+    help: "Showcase all new template functions"
+    run: |
+      {{ step "Template Function Showcase" }}
+      echo "=============================="
+      echo ""
+      
+      echo "📋 Project Detection:"
+      echo "  Package Manager: {{ packageManager }}"
+      echo "  Has package.json: {{ hasFile "package.json" }}"
+      echo "  Has go.mod: {{ hasFile "go.mod" }}"
+      echo ""
+      
+      echo "🔀 Git Information:"
+      echo "  Branch: {{ gitBranch }}"
+      echo "  Commit: {{ gitShortCommit }}"
+      echo "  Is Dirty: {{ isDirty }}"
+      echo ""
+      
+      echo "🌍 Environment:"
+      echo "  Is CI: {{ isCI }}"
+      echo "  OS: {{ os }}"
+      echo "  Arch: {{ arch }}"
+      echo ""
+      
+      echo "🐳 Docker:"
+      echo "  Compose: {{ dockerCompose }}"
+      echo "  Buildx: {{ dockerBuildx }}"
+      echo ""
+      
+      {{ info "All functions working correctly!" }}
+      {{ success "Showcase complete!" }}

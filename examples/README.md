@@ -1,228 +1,353 @@
-# drun Examples
+# 📚 drun Examples
 
-This directory contains comprehensive examples of `drun` configurations for different types of projects and use cases.
+This directory contains comprehensive examples showcasing all of drun's powerful features. Each example is designed to be educational and demonstrates real-world usage patterns.
 
-## 📁 Available Examples
+## 🎯 Quick Start
 
-### 🚀 **[simple.yml](simple.yml)**
-Perfect for getting started with drun. Shows basic concepts like:
-- Simple recipes
+```bash
+# Try the comprehensive feature showcase
+./bin/drun -f examples/feature-showcase.yml showcase-all
+
+# Test matrix execution across multiple configurations
+./bin/drun -f examples/matrix-working-demo.yml test-matrix
+
+# Explore remote includes and caching
+./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
+
+# See smart template functions in action
+./bin/drun -f examples/next-level-features.yml smart-detection
+```
+
+## 📖 Example Files
+
+### 🚀 **Core Features**
+
+#### [`simple.yml`](simple.yml)
+**Basic recipes and fundamental patterns**
+- Simple recipe definitions
 - Positional arguments
-- Dependencies
+- Basic templating
 - Environment variables
-- Conditional templating
 
 ```bash
-drun -f examples/simple.yml hello
-drun -f examples/simple.yml greet Alice
-drun -f examples/simple.yml work
+# Run basic examples
+./bin/drun -f examples/simple.yml hello
+./bin/drun -f examples/simple.yml greet Alice
 ```
 
-### 🐹 **[go-project.yml](go-project.yml)**
-Complete Go project workflow including:
-- Building and testing
-- Code formatting and vetting
-- Cross-compilation
-- Dependency management
+#### [`docker-devops.yml`](docker-devops.yml)
+**Docker workflows with intelligent auto-detection**
+- Auto-detect Docker Compose vs docker-compose
+- Auto-detect Docker Buildx vs docker build
+- Multi-stage builds and deployments
+- Environment-specific configurations
 
 ```bash
-drun -f examples/go-project.yml build
-drun -f examples/go-project.yml test
-drun -f examples/go-project.yml build-all
+# Smart Docker operations
+./bin/drun -f examples/docker-devops.yml build
+./bin/drun -f examples/docker-devops.yml deploy production
 ```
 
-### 📦 **[nodejs-project.yml](nodejs-project.yml)**
-Node.js/JavaScript project with:
-- Development server
-- Testing with different modes
-- Linting and formatting
-- Docker operations
-- Deployment workflows
+**Features demonstrated:**
+- `{{ dockerCompose }}` and `{{ dockerBuildx }}` functions
+- Conditional Docker command usage
+- Multi-environment deployments
+
+### 🌟 **Advanced Features**
+
+#### [`matrix-working-demo.yml`](matrix-working-demo.yml)
+**Matrix execution across multiple configurations**
+- Multi-dimensional matrix builds
+- OS, version, and architecture combinations
+- Matrix variable access in templates
+- Conditional logic based on matrix values
 
 ```bash
-drun -f examples/nodejs-project.yml dev
-drun -f examples/nodejs-project.yml test --set coverage=true
-drun -f examples/nodejs-project.yml deploy staging
+# Run matrix tests (generates multiple jobs)
+./bin/drun -f examples/matrix-working-demo.yml test-matrix
+
+# Matrix with dependencies
+./bin/drun -f examples/matrix-working-demo.yml build-matrix
 ```
 
-### ⚛️ **[frontend-react.yml](frontend-react.yml)**
-Frontend/React project featuring:
-- Development and build processes
-- Testing (unit, E2E, visual)
-- Code quality tools
-- Performance auditing
-- Deployment strategies
+**Matrix expansion:**
+- `test-matrix` → 18 jobs (3 OS × 3 versions × 2 arch)
+- `build-matrix` → 4 jobs (2 arch × 2 variants)
+
+#### [`secrets-demo.yml`](secrets-demo.yml)
+**Secure secrets management**
+- Environment variable secrets (`env://`)
+- File-based secrets (`file://`)
+- Required vs optional secrets
+- Secure usage patterns
 
 ```bash
-drun -f examples/frontend-react.yml dev
-drun -f examples/frontend-react.yml test-e2e chromium
-drun -f examples/frontend-react.yml lighthouse
+# Set up secrets
+export API_KEY="your-api-key"
+echo "deploy-token-123" > ~/.secrets/deploy-token
+
+# Run with secrets
+./bin/drun -f examples/secrets-demo.yml secure-deploy
 ```
 
-### 🐳 **[docker-devops.yml](docker-devops.yml)**
-Docker and DevOps operations:
-- Multi-arch image building
-- Container testing and security scanning
-- Registry operations
-- Kubernetes deployment
-- CI/CD pipelines
+**Security features:**
+- Secrets not logged in plain text
+- Multiple source types
+- Validation and error handling
+
+#### [`includes-demo.yml`](includes-demo.yml)
+**Local and remote recipe includes**
+- Local file includes with glob patterns
+- Shared recipe libraries
+- Modular configuration management
 
 ```bash
-drun -f examples/docker-devops.yml build latest
-drun -f examples/docker-devops.yml deploy production latest
-drun -f examples/docker-devops.yml ci
+# Demonstrate local includes
+./bin/drun -f examples/includes-demo.yml deploy-with-shared
 ```
 
-### 🐍 **[python-project.yml](python-project.yml)**
-Python development workflow:
-- Virtual environment management
-- Testing with pytest
-- Code quality (linting, formatting, type checking)
-- Documentation building
-- Package building and deployment
+#### [`remote-includes-showcase.yml`](remote-includes-showcase.yml)
+**Remote includes deep dive**
+- HTTP/HTTPS includes with caching
+- Git repository includes with branch/tag references
+- Performance optimization through intelligent caching
+- Enterprise-grade recipe sharing
 
 ```bash
-drun -f examples/python-project.yml setup
-drun -f examples/python-project.yml test --set coverage=true
-drun -f examples/python-project.yml check
+# Explore remote capabilities
+./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
+
+# Test HTTP includes
+./bin/drun -f examples/remote-includes-showcase.yml test-http-includes
+
+# Test Git includes with versioning
+./bin/drun -f examples/remote-includes-showcase.yml test-git-includes
 ```
 
-### 🗄️ **[database-ops.yml](database-ops.yml)**
-Database operations and maintenance:
-- Backup and restore
-- Migrations
-- Data seeding
-- Performance monitoring
-- Maintenance tasks
+**Remote sources:**
+- Raw GitHub URLs
+- Git repositories with refs
+- Intelligent caching system
+
+### 📊 **Developer Experience**
+
+#### [`logging-demo.yml`](logging-demo.yml)
+**Advanced logging and metrics**
+- Structured status messages with emojis
+- Performance tracking and metrics
+- Progress indicators
+- Error handling patterns
 
 ```bash
-drun -f examples/database-ops.yml backup
-drun -f examples/database-ops.yml migrate up
-drun -f examples/database-ops.yml seed development
+# See beautiful logging in action
+./bin/drun -f examples/logging-demo.yml performance-test
+./bin/drun -f examples/logging-demo.yml status-showcase
 ```
 
-### 🏢 **[monorepo.yml](monorepo.yml)**
-Monorepo/multi-service management:
-- Service-specific operations
-- Cross-service coordination
-- Docker Compose orchestration
-- Deployment coordination
-- Health monitoring
+**Logging features:**
+- 🚀 Step indicators
+- ℹ️ Info messages
+- ⚠️ Warnings
+- ❌ Errors
+- ✅ Success messages
+
+#### [`next-level-features.yml`](next-level-features.yml)
+**Smart detection and automation**
+- Auto-detect project types (npm, go, python, etc.)
+- Git integration (branch, commit, dirty status)
+- CI environment detection
+- Intelligent command selection
 
 ```bash
-drun -f examples/monorepo.yml build-service api
-drun -f examples/monorepo.yml test
-drun -f examples/monorepo.yml deploy staging latest
+# Smart project detection
+./bin/drun -f examples/next-level-features.yml smart-detection
+
+# Git integration
+./bin/drun -f examples/next-level-features.yml git-info
+
+# CI detection
+./bin/drun -f examples/next-level-features.yml ci-check
 ```
 
-## 🎯 Key Concepts Demonstrated
+#### [`feature-showcase.yml`](feature-showcase.yml)
+**Comprehensive feature demonstration**
+- All features in one place
+- Real-world usage patterns
+- Best practices examples
+- Performance demonstrations
 
-### **Positional Arguments**
+```bash
+# Complete feature tour
+./bin/drun -f examples/feature-showcase.yml showcase-all
+
+# Individual feature demos
+./bin/drun -f examples/feature-showcase.yml smart-build
+./bin/drun -f examples/feature-showcase.yml comprehensive-workflow
+```
+
+## 🎓 Learning Path
+
+### 1. **Start Here** - Basic Concepts
+```bash
+# Learn the fundamentals
+./bin/drun -f examples/simple.yml hello
+./bin/drun -f examples/simple.yml greet Alice
+```
+
+### 2. **Docker Integration** - Smart Detection
+```bash
+# See auto-detection in action
+./bin/drun -f examples/docker-devops.yml build
+```
+
+### 3. **Advanced Features** - Matrix & Secrets
+```bash
+# Try matrix execution
+./bin/drun -f examples/matrix-working-demo.yml test-matrix
+
+# Set up and use secrets
+export API_KEY="test-key"
+./bin/drun -f examples/secrets-demo.yml secure-deploy
+```
+
+### 4. **Remote Includes** - Collaboration
+```bash
+# Explore remote recipe sharing
+./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
+```
+
+### 5. **Complete Tour** - Everything Together
+```bash
+# See all features working together
+./bin/drun -f examples/feature-showcase.yml showcase-all
+```
+
+## 🛠️ Template Functions Reference
+
+All examples demonstrate these powerful template functions:
+
+### 🐳 **Docker Integration**
+- `{{ dockerCompose }}` - Auto-detect Docker Compose command
+- `{{ dockerBuildx }}` - Auto-detect Docker Buildx command
+- `{{ hasCommand "kubectl" }}` - Check command availability
+
+### 🔗 **Git Integration**
+- `{{ gitBranch }}` - Current branch name
+- `{{ gitCommit }}` - Full commit hash
+- `{{ gitShortCommit }}` - Short commit hash (7 chars)
+- `{{ isDirty }}` - Working directory status
+
+### 📦 **Project Detection**
+- `{{ packageManager }}` - Auto-detect npm, yarn, go, pip, etc.
+- `{{ hasFile "go.mod" }}` - File existence check
+- `{{ isCI }}` - CI environment detection
+
+### 📊 **Status Messages**
+- `{{ step "message" }}` - 🚀 Step indicator
+- `{{ info "message" }}` - ℹ️ Information
+- `{{ warn "message" }}` - ⚠️ Warning
+- `{{ error "message" }}` - ❌ Error (non-fatal)
+- `{{ success "message" }}` - ✅ Success
+
+### 🔐 **Secrets Management**
+- `{{ secret "name" }}` - Access secret securely
+- `{{ hasSecret "name" }}` - Check secret availability
+
+## 🏗️ Real-World Patterns
+
+### **Enterprise Workflow**
 ```yaml
-positionals:
-  - name: version
+# Complete CI/CD pipeline
+matrix:
+  environment: ["dev", "staging", "prod"]
+  arch: ["amd64", "arm64"]
+
+secrets:
+  deploy_token:
+    source: "env://DEPLOY_TOKEN"
     required: true
-  - name: arch
-    one_of: ["amd64", "arm64", "both"]
-  - name: files
-    variadic: true
-```
 
-### **Templating**
-```yaml
-run: |
-  echo "Building {{ .app_name }} version {{ .version }}"
-  {{ if eq .environment "production" }}
-  echo "Production build with optimizations"
-  {{ else }}
-  echo "Development build"
-  {{ end }}
-```
-
-### **Dependencies**
-```yaml
-deploy:
-  deps: [test, build, security-scan]
-  parallel_deps: true
-  run: |
-    echo "All checks passed, deploying..."
-```
-
-### **Environment Variables**
-```yaml
-env:
-  NODE_ENV: production
-  BUILD_DATE: "{{ now \"2006-01-02T15:04:05Z\" }}"
-  VERSION: "{{ .version }}"
-```
-
-### **Snippets**
-```yaml
-snippets:
-  docker_login: |
-    echo "$REGISTRY_TOKEN" | docker login {{ .registry }} --username "$REGISTRY_USER" --password-stdin
+include:
+  - "git+https://company.com/drun-recipes.git@v1.0.0:ci/common.yml"
 
 recipes:
   deploy:
+    deps: [test, build]
     run: |
-      {{ snippet "docker_login" }}
-      docker push {{ .image }}
+      {{ step "Deploying to {{ .matrix_environment }}/{{ .matrix_arch }}" }}
+      {{ if eq .matrix_environment "prod" }}
+      {{ warn "Production deployment - extra validation" }}
+      {{ end }}
+      # Deploy using shared recipes and secrets
 ```
 
-## 🚀 Getting Started
+### **Multi-Project Monorepo**
+```yaml
+# Smart project detection
+recipes:
+  build-all:
+    run: |
+      for dir in */; do
+        cd "$dir"
+        {{ step "Building $dir ({{ packageManager }})" }}
+        
+        {{ if eq (packageManager) "npm" }}
+        npm ci && npm run build
+        {{ else if eq (packageManager) "go" }}
+        go build ./...
+        {{ else if eq (packageManager) "python" }}
+        pip install -r requirements.txt
+        {{ end }}
+        
+        cd ..
+      done
+```
 
-1. **Try the simple example first:**
-   ```bash
-   drun -f examples/simple.yml --list
-   drun -f examples/simple.yml hello
-   ```
+### **Docker Multi-Architecture**
+```yaml
+# Cross-platform builds
+matrix:
+  arch: ["amd64", "arm64"]
+  variant: ["alpine", "debian"]
 
-2. **Explore project-specific examples:**
-   ```bash
-   # For Go projects
-   drun -f examples/go-project.yml --list
-   
-   # For Node.js projects  
-   drun -f examples/nodejs-project.yml --list
-   ```
+recipes:
+  docker-build:
+    run: |
+      {{ step "Building for {{ .matrix_arch }}/{{ .matrix_variant }}" }}
+      
+      {{ dockerBuildx }} build \
+        --platform linux/{{ .matrix_arch }} \
+        -f Dockerfile.{{ .matrix_variant }} \
+        -t myapp:{{ gitShortCommit }}-{{ .matrix_arch }}-{{ .matrix_variant }} \
+        .
+```
 
-3. **Use dry-run to understand what commands would execute:**
-   ```bash
-   drun -f examples/docker-devops.yml build --dry-run
-   ```
+## 🚀 Performance Tips
 
-4. **Copy and adapt examples for your projects:**
-   ```bash
-   cp examples/go-project.yml ./drun.yml
-   # Edit drun.yml to match your project structure
-   ```
-
-## 💡 Tips for Creating Your Own Configurations
-
-1. **Start Simple**: Begin with basic recipes and add complexity gradually
-2. **Use Descriptive Names**: Make recipe names and help text clear
-3. **Leverage Dependencies**: Break complex workflows into smaller, reusable pieces
-4. **Template Everything**: Use variables and templates for flexibility
-5. **Add Validation**: Use `one_of` and `required` for positional arguments
-6. **Document Well**: Good help text makes recipes self-documenting
-7. **Test Thoroughly**: Use `--dry-run` and `--explain` during development
-
-## 🔗 Related Resources
-
-- [Main README](../README.md) - Getting started with drun
-- [Specification](../spec.md) - Complete feature specification
-- [Template Functions](../README.md#template-functions) - Available template functions
+1. **Use Matrix Execution** for parallel builds across configurations
+2. **Leverage Remote Includes** for shared recipes (cached automatically)
+3. **Smart Detection Functions** reduce conditional complexity
+4. **Secrets Management** keeps sensitive data secure
+5. **Status Messages** provide clear feedback and debugging
 
 ## 🤝 Contributing Examples
 
-Have a great example for a specific use case? We'd love to include it! Consider contributing examples for:
+Have a great drun pattern? Add it to the examples!
 
-- Rust projects
-- Mobile development (React Native, Flutter)
-- Infrastructure as Code (Terraform, Pulumi)
-- Machine Learning workflows
-- Game development
-- Embedded systems
-- And more!
+1. Create a new `.yml` file with clear naming
+2. Add comprehensive comments explaining the pattern
+3. Include usage examples in comments
+4. Update this README with your example
+5. Test thoroughly with `./bin/drun -f your-example.yml recipe-name`
 
-Each example should be self-contained, well-documented, and demonstrate best practices for that domain.
+## 📚 Additional Resources
+
+- **Main README**: [`../README.md`](../README.md) - Complete drun documentation
+- **Specification**: [`../spec.md`](../spec.md) - Detailed YAML format reference
+- **Roadmap**: [`../ROADMAP.md`](../ROADMAP.md) - Future features and enhancements
+
+---
+
+**Happy automating with drun!** 🎉
+
+These examples demonstrate that drun isn't just a task runner—it's a **comprehensive automation platform** that scales from simple scripts to enterprise-grade CI/CD pipelines.

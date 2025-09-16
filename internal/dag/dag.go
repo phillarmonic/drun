@@ -110,6 +110,7 @@ func (b *Builder) buildGraph(
 	recipeCtx := &model.ExecutionContext{
 		Vars:        make(map[string]any, varsSize),
 		Env:         make(map[string]string, envSize),
+		Secrets:     ctx.Secrets,     // Share reference (read-only)
 		Flags:       ctx.Flags,       // Share reference (read-only)
 		Positionals: ctx.Positionals, // Share reference (read-only)
 		OS:          ctx.OS,
@@ -130,26 +131,89 @@ func (b *Builder) buildGraph(
 		recipeCtx.Env[k] = v
 	}
 
-	// Add current recipe as a node
-	node := model.PlanNode{
-		ID:        recipeName,
-		Recipe:    &recipe,
-		Context:   recipeCtx,
-		Step:      recipe.Run,
-		DependsOn: recipe.Deps,
-	}
+	// Handle matrix expansion
+	if len(recipe.Matrix) > 0 {
+		// Expand matrix into multiple nodes
+		matrixCombinations := b.generateMatrixCombinations(recipe.Matrix)
 
-	*nodes = append(*nodes, node)
-	currentIndex := len(*nodes) - 1
-	nodeIndex[recipeName] = currentIndex
+		for i, combination := range matrixCombinations {
+			// Create matrix-specific context
+			matrixCtx := &model.ExecutionContext{
+				Vars:        make(map[string]any, len(recipeCtx.Vars)+len(combination)),
+				Env:         make(map[string]string, len(recipeCtx.Env)),
+				Secrets:     recipeCtx.Secrets, // Share secrets across matrix
+				Flags:       recipeCtx.Flags,
+				Positionals: recipeCtx.Positionals,
+				OS:          recipeCtx.OS,
+				Arch:        recipeCtx.Arch,
+				Hostname:    recipeCtx.Hostname,
+			}
 
-	// Add edges from dependencies to current recipe
-	for _, dep := range recipe.Deps {
-		depIndex, depExists := nodeIndex[dep]
-		if !depExists {
-			return fmt.Errorf("dependency '%s' not found in node index", dep)
+			// Copy base context
+			for k, v := range recipeCtx.Vars {
+				matrixCtx.Vars[k] = v
+			}
+			for k, v := range recipeCtx.Env {
+				matrixCtx.Env[k] = v
+			}
+
+			// Add matrix variables with matrix_ prefix
+			for k, v := range combination {
+				matrixCtx.Vars["matrix_"+k] = v
+			}
+
+			// Create unique node ID for this matrix combination
+			nodeID := fmt.Sprintf("%s[%d]", recipeName, i)
+
+			node := model.PlanNode{
+				ID:        nodeID,
+				Recipe:    &recipe,
+				Context:   matrixCtx,
+				Step:      recipe.Run,
+				DependsOn: recipe.Deps,
+			}
+
+			*nodes = append(*nodes, node)
+			currentIndex := len(*nodes) - 1
+
+			// Map both the matrix node ID and the base recipe name to this index
+			nodeIndex[nodeID] = currentIndex
+			if i == 0 {
+				// First matrix node also represents the base recipe
+				nodeIndex[recipeName] = currentIndex
+			}
+
+			// Add edges from dependencies to this matrix node
+			for _, dep := range recipe.Deps {
+				depIndex, depExists := nodeIndex[dep]
+				if !depExists {
+					return fmt.Errorf("dependency '%s' not found for matrix recipe '%s'", dep, recipeName)
+				}
+				*edges = append(*edges, [2]int{depIndex, currentIndex})
+			}
 		}
-		*edges = append(*edges, [2]int{depIndex, currentIndex})
+	} else {
+		// Regular single node
+		node := model.PlanNode{
+			ID:        recipeName,
+			Recipe:    &recipe,
+			Context:   recipeCtx,
+			Step:      recipe.Run,
+			DependsOn: recipe.Deps,
+		}
+
+		*nodes = append(*nodes, node)
+		currentIndex := len(*nodes) - 1
+		nodeIndex[recipeName] = currentIndex
+
+		// Add edges from dependencies to current recipe
+		for _, dep := range recipe.Deps {
+			depIndex, depExists := nodeIndex[dep]
+			if !depExists {
+				return fmt.Errorf("dependency '%s' not found", dep)
+			}
+			*edges = append(*edges, [2]int{depIndex, currentIndex})
+		}
 	}
 
 	visiting[recipeName] = false
@@ -349,4 +413,52 @@ func (b *Builder) computeExecutionLevels(nodes []model.PlanNode, edges [][2]int)
 	}
 
 	return levels
+}
+
+// generateMatrixCombinations generates all combinations of matrix variables
+func (b *Builder) generateMatrixCombinations(matrix map[string][]any) []map[string]any {
+	if len(matrix) == 0 {
+		return []map[string]any{}
+	}
+
+	// Get keys and values
+	keys := make([]string, 0, len(matrix))
+	values := make([][]any, 0, len(matrix))
+
+	for k, v := range matrix {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	// Calculate total combinations
+	totalCombinations := 1
+	for _, vals := range values {
+		totalCombinations *= len(vals)
+	}
+
+	// Generate all combinations
+	combinations := make([]map[string]any, 0, totalCombinations)
+
+	// Use recursive approach to generate combinations
+	var generate func(int, map[string]any)
+	generate = func(keyIndex int, current map[string]any) {
+		if keyIndex == len(keys) {
+			// Make a copy of the current combination
+			combination := make(map[string]any, len(current))
+			for k, v := range current {
+				combination[k] = v
+			}
+			combinations = append(combinations, combination)
+			return
+		}
+
+		key := keys[keyIndex]
+		for _, value := range values[keyIndex] {
+			current[key] = value
+			generate(keyIndex+1, current)
+		}
+	}
+
+	generate(0, make(map[string]any))
+	return combinations
 }

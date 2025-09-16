@@ -1,0 +1,223 @@
+# Advanced Logging Demo
+# Shows structured logging, metrics, and output formatting
+version: 0.1
+
+env:
+  APP_NAME: "logging-demo"
+  VERSION: "{{ gitShortCommit }}"
+
+recipes:
+  # Basic logging example
+  basic-logging:
+    help: "Demonstrate basic logging features"
+    run: |
+      {{ step "Starting basic logging demo" }}
+      
+      # Different log levels
+      {{ info "This is an info message" }}
+      {{ warn "This is a warning message" }}
+      {{ error "This is an error message (non-fatal)" }}
+      {{ success "This is a success message" }}
+      
+      echo "Regular shell output"
+      echo "Multiple lines of output"
+      echo "Can be mixed with structured messages"
+      
+      {{ step "Processing data" }}
+      for i in {1..3}; do
+        {{ info "Processing item $i" }}
+        sleep 0.5
+      done
+      
+      {{ success "Basic logging demo completed" }}
+
+  # Structured logging example
+  structured-logging:
+    help: "Demonstrate structured logging (future feature)"
+    run: |
+      {{ step "Structured logging demo" }}
+      
+      {{ warn "Structured logging not yet fully implemented" }}
+      {{ info "Current implementation uses emoji-based status messages" }}
+      
+      echo "Future structured logging would output JSON:"
+      echo '{"level":"info","msg":"Processing started","app":"'$APP_NAME'","version":"'$VERSION'","timestamp":"'$(date -Iseconds)'"}'
+      echo '{"level":"debug","msg":"Debug information","component":"processor","items":3}'
+      echo '{"level":"warn","msg":"Resource usage high","cpu":85,"memory":78}'
+      echo '{"level":"error","msg":"Temporary failure","error":"connection timeout","retry":true}'
+      echo '{"level":"info","msg":"Processing completed","duration":"2.3s","items_processed":150}'
+      
+      {{ success "Structured logging demo completed" }}
+
+  # Metrics and timing example
+  metrics-demo:
+    help: "Demonstrate metrics collection"
+    run: |
+      {{ step "Starting metrics collection demo" }}
+      
+      START_TIME=$(date +%s)
+      
+      {{ info "Simulating work with metrics" }}
+      
+      # Simulate different operations with timing
+      echo "Operation 1: Database query"
+      sleep 1
+      echo "  Duration: 1.2s"
+      echo "  Rows: 1,234"
+      
+      echo "Operation 2: API calls"
+      sleep 0.5
+      echo "  Duration: 0.8s"
+      echo "  Requests: 15"
+      echo "  Success rate: 100%"
+      
+      echo "Operation 3: File processing"
+      sleep 0.3
+      echo "  Duration: 0.5s"
+      echo "  Files: 42"
+      echo "  Size: 15.6MB"
+      
+      END_TIME=$(date +%s)
+      TOTAL_DURATION=$((END_TIME - START_TIME))
+      
+      {{ success "Metrics demo completed in ${TOTAL_DURATION}s" }}
+      
+      echo ""
+      echo "📊 Summary Metrics:"
+      echo "  Total Duration: ${TOTAL_DURATION}s"
+      echo "  Operations: 3"
+      echo "  Success Rate: 100%"
+      echo "  Throughput: $(echo "scale=2; 3 / $TOTAL_DURATION" | bc 2>/dev/null || echo "N/A") ops/sec"
+
+  # Error handling and logging
+  error-handling:
+    help: "Demonstrate error handling with logging"
+    run: |
+      {{ step "Error handling demo" }}
+      
+      {{ info "Testing different error scenarios" }}
+      
+      # Simulate recoverable error
+      {{ warn "Simulating recoverable error" }}
+      if ! ping -c 1 nonexistent.example.com >/dev/null 2>&1; then
+        {{ warn "Network connectivity issue detected" }}
+        {{ info "Falling back to cached data" }}
+      fi
+      
+      # Simulate validation error
+      {{ info "Validating configuration" }}
+      if [ ! -f "nonexistent-config.yml" ]; then
+        {{ warn "Configuration file not found, using defaults" }}
+      fi
+      
+      # Simulate successful recovery
+      {{ info "All errors handled successfully" }}
+      {{ success "Error handling demo completed" }}
+
+  # Log aggregation simulation
+  log-aggregation:
+    help: "Simulate log aggregation and analysis"
+    run: |
+      {{ step "Log aggregation simulation" }}
+      
+      {{ info "Generating sample log entries" }}
+      
+      # Generate various log entries
+      for i in {1..10}; do
+        case $((i % 4)) in
+          0) {{ info "Request processed successfully (ID: $i)" }} ;;
+          1) {{ warn "High memory usage detected (ID: $i)" }} ;;
+          2) {{ info "Cache hit for request (ID: $i)" }} ;;
+          3) {{ error "Temporary service unavailable (ID: $i)" }} ;;
+        esac
+        sleep 0.1
+      done
+      
+      {{ step "Analyzing logs" }}
+      echo "📈 Log Analysis (simulated):"
+      echo "  Total entries: 10"
+      echo "  Info: 6 (60%)"
+      echo "  Warnings: 3 (30%)"
+      echo "  Errors: 1 (10%)"
+      echo "  Success rate: 90%"
+      
+      {{ success "Log aggregation demo completed" }}
+
+  # Future logging features
+  logging-roadmap:
+    help: "Show logging implementation roadmap"
+    run: |
+      {{ step "Logging Implementation Roadmap" }}
+      echo "======================================="
+      echo ""
+      
+      echo "✅ CURRENT FEATURES:"
+      echo "  - Emoji-based status messages"
+      echo "  - Template functions: step, info, warn, error, success"
+      echo "  - Mixed structured and unstructured output"
+      echo "  - Basic timing and metrics"
+      echo ""
+      
+      echo "🚧 IN PROGRESS:"
+      echo "  - JSON structured logging"
+      echo "  - Log levels and filtering"
+      echo "  - Metrics collection"
+      echo ""
+      
+      echo "🔮 PLANNED FEATURES:"
+      echo "  - Multiple output formats (JSON, logfmt, plain)"
+      echo "  - Log aggregation and shipping"
+      echo "  - Integration with logging systems:"
+      echo "    * ELK Stack (Elasticsearch, Logstash, Kibana)"
+      echo "    * Prometheus + Grafana"
+      echo "    * DataDog, New Relic"
+      echo "    * AWS CloudWatch, GCP Logging"
+      echo "  - Real-time log streaming"
+      echo "  - Log retention and rotation"
+      echo "  - Performance profiling"
+      echo "  - Distributed tracing"
+      echo "  - Custom log formatters"
+      echo "  - Log sampling and rate limiting"
+      echo ""
+      
+      echo "🎯 ADVANCED FEATURES:"
+      echo "  - Machine learning for anomaly detection"
+      echo "  - Automated alerting and escalation"
+      echo "  - Log correlation across services"
+      echo "  - Cost optimization for log storage"
+      echo "  - Compliance and audit logging"
+      echo ""
+      
+      {{ success "Logging roadmap displayed" }}
+
+  # Performance logging
+  perf-logging:
+    help: "Demonstrate performance logging"
+    run: |
+      {{ step "Performance logging demo" }}
+      
+      # CPU and memory simulation
+      {{ info "Monitoring system resources" }}
+      
+      echo "🔧 System Metrics:"
+      echo "  CPU Usage: $(top -l 1 -n 0 | grep "CPU usage" | awk '{print $3}' | sed 's/%//' || echo "N/A")%"
+      echo "  Memory: $(vm_stat | grep "Pages free" | awk '{print $3}' | sed 's/\.//' || echo "N/A") pages free"
+      echo "  Load Average: $(uptime | awk -F'load averages:' '{print $2}' | xargs || echo "N/A")"
+      
+      {{ info "Simulating CPU-intensive task" }}
+      START=$(date +%s%N)
+      
+      # Simulate work
+      for i in {1..1000}; do
+        echo -n "" > /dev/null
+      done
+      
+      END=$(date +%s%N)
+      DURATION=$(( (END - START) / 1000000 )) # Convert to milliseconds
+      
+      echo "⚡ Performance Metrics:"
+      echo "  Task Duration: ${DURATION}ms"
+      echo "  Operations: 1,000"
+      echo "  Throughput: $(echo "scale=2; 1000 * 1000 / $DURATION" | bc 2>/dev/null || echo "N/A") ops/sec"
+      
+      {{ success "Performance logging completed" }}

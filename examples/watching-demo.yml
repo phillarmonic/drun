@@ -1,0 +1,246 @@
+# File Watching Demo
+# Shows auto-execution on file changes
+version: 0.1
+
+env:
+  PROJECT_NAME: "watching-demo"
+
+recipes:
+  # Basic file watching (conceptual - not yet implemented)
+  watch-basic:
+    help: "Basic file watching example (future feature)"
+    # watch: ["src/**/*.go", "*.yml"]  # Future syntax
+    # debounce: "500ms"                # Future syntax
+    run: |
+      {{ warn "File watching not yet implemented" }}
+      {{ info "Future syntax would be:" }}
+      echo "watch: [\"src/**/*.go\", \"*.yml\"]"
+      echo "debounce: \"500ms\""
+      echo ""
+      
+      {{ step "Simulating file watching behavior" }}
+      
+      # Simulate what file watching would do
+      {{ info "Would monitor files matching patterns:" }}
+      echo "  - src/**/*.go"
+      echo "  - *.yml"
+      echo ""
+      
+      {{ info "On file change, would:" }}
+      echo "  1. Wait 500ms for more changes (debounce)"
+      echo "  2. Execute this recipe"
+      echo "  3. Show results"
+      echo "  4. Continue watching"
+      
+      {{ success "File watching simulation completed" }}
+
+  # Development workflow with watching
+  dev-watch:
+    help: "Development workflow with file watching (future)"
+    # watch: ["src/**/*", "tests/**/*"]
+    # exclude: ["**/*.tmp", "**/node_modules/**"]
+    # debounce: "1s"
+    run: |
+      {{ step "Development workflow simulation" }}
+      
+      {{ warn "This would be triggered automatically on file changes" }}
+      
+      # Typical development workflow
+      {{ info "Running development checks" }}
+      
+      echo "1. Linting code..."
+      sleep 0.5
+      {{ success "Linting passed" }}
+      
+      echo "2. Running tests..."
+      sleep 1
+      {{ success "Tests passed" }}
+      
+      echo "3. Building application..."
+      sleep 0.8
+      {{ success "Build completed" }}
+      
+      echo "4. Restarting dev server..."
+      {{ success "Dev server restarted" }}
+      
+      {{ success "Development workflow completed - watching for more changes..." }}
+
+  # Advanced watching with conditions
+  conditional-watch:
+    help: "Conditional watching based on file types (future)"
+    run: |
+      {{ step "Conditional watching simulation" }}
+      
+      {{ info "Future implementation would support:" }}
+      echo ""
+      echo "Go files changed:"
+      echo "  - Run: go fmt, go vet, go test"
+      echo "  - If tests pass: go build"
+      echo ""
+      echo "YAML files changed:"
+      echo "  - Validate YAML syntax"
+      echo "  - Reload configuration"
+      echo ""
+      echo "Dockerfile changed:"
+      echo "  - Rebuild Docker image"
+      echo "  - Restart containers"
+      echo ""
+      echo "Documentation changed:"
+      echo "  - Generate docs"
+      echo "  - Update README"
+      
+      {{ success "Conditional watching simulation completed" }}
+
+  # Manual file watching simulation
+  manual-watch:
+    help: "Manual file watching using external tools"
+    run: |
+      {{ step "Manual file watching with external tools" }}
+      
+      # Check if fswatch is available
+      {{ if hasCommand "fswatch" }}
+      {{ info "fswatch detected - can implement basic file watching" }}
+      
+      echo "Starting file watcher (press Ctrl+C to stop)..."
+      echo "Watching current directory for changes..."
+      
+      # This would run indefinitely in practice
+      timeout 5s fswatch -o . | while read f; do
+        {{ info "Files changed - would trigger rebuild" }}
+        echo "Changed files: $f"
+        
+        # Simulate quick rebuild
+        {{ step "Rebuilding..." }}
+        sleep 0.5
+        {{ success "Rebuild completed" }}
+      done || true
+      
+      {{ info "File watching stopped" }}
+      
+      {{ else if hasCommand "inotifywait" }}
+      {{ info "inotifywait detected - can implement Linux file watching" }}
+      
+      echo "Would use: inotifywait -m -r -e modify,create,delete ."
+      
+      {{ else }}
+      {{ warn "No file watching tools detected" }}
+      {{ info "Install fswatch (macOS/Linux) or inotifywait (Linux) for file watching" }}
+      {{ info "macOS: brew install fswatch" }}
+      {{ info "Linux: apt-get install inotify-tools" }}
+      {{ end }}
+      
+      {{ success "Manual watching demo completed" }}
+
+  # Performance considerations
+  watch-performance:
+    help: "File watching performance considerations"
+    run: |
+      {{ step "File watching performance analysis" }}
+      
+      echo "📊 Performance Considerations:"
+      echo ""
+      echo "✅ EFFICIENT PATTERNS:"
+      echo "  - Specific file extensions: *.go, *.js"
+      echo "  - Limited directory depth: src/**/*.go"
+      echo "  - Exclude patterns: **/node_modules/**, **/.git/**"
+      echo "  - Debouncing: 500ms-2s depending on use case"
+      echo ""
+      echo "⚠️  PERFORMANCE ISSUES:"
+      echo "  - Watching entire filesystem: /**/*"
+      echo "  - No exclusions in large projects"
+      echo "  - Very short debounce times: <100ms"
+      echo "  - Watching binary/generated files"
+      echo ""
+      echo "🎯 OPTIMIZATION STRATEGIES:"
+      echo "  - Use .gitignore patterns for exclusions"
+      echo "  - Implement smart debouncing (longer for large changes)"
+      echo "  - Batch multiple file changes"
+      echo "  - Use efficient file system APIs"
+      echo "  - Cache file metadata to detect real changes"
+      
+      {{ success "Performance analysis completed" }}
+
+  # Integration examples
+  watch-integrations:
+    help: "File watching integration examples"
+    run: |
+      {{ step "File watching integrations" }}
+      
+      echo "🔧 DEVELOPMENT INTEGRATIONS:"
+      echo ""
+      echo "Frontend Development:"
+      echo "  watch: [\"src/**/*.js\", \"src/**/*.css\", \"public/**/*\"]"
+      echo "  run: npm run build && npm run test"
+      echo ""
+      echo "Backend Development:"
+      echo "  watch: [\"**/*.go\", \"go.mod\", \"go.sum\"]"
+      echo "  run: go test ./... && go build"
+      echo ""
+      echo "Docker Development:"
+      echo "  watch: [\"Dockerfile\", \"docker-compose.yml\", \"src/**/*\"]"
+      echo "  run: docker-compose build && docker-compose up -d"
+      echo ""
+      echo "Documentation:"
+      echo "  watch: [\"docs/**/*.md\", \"README.md\"]"
+      echo "  run: generate-docs && deploy-docs"
+      echo ""
+      
+      echo "🚀 CI/CD INTEGRATIONS:"
+      echo ""
+      echo "Continuous Testing:"
+      echo "  watch: [\"**/*.go\", \"**/*_test.go\"]"
+      echo "  run: go test -race -cover ./..."
+      echo ""
+      echo "Continuous Deployment:"
+      echo "  watch: [\"main\", \"production\"] # Git branches"
+      echo "  run: deploy-to-production"
+      echo ""
+      echo "Security Scanning:"
+      echo "  watch: [\"go.mod\", \"package.json\", \"requirements.txt\"]"
+      echo "  run: security-scan && vulnerability-check"
+      
+      {{ success "Integration examples completed" }}
+
+  # Future roadmap
+  watching-roadmap:
+    help: "File watching implementation roadmap"
+    run: |
+      {{ step "File Watching Roadmap" }}
+      echo "================================"
+      echo ""
+      
+      echo "🚧 PHASE 1: Basic Implementation"
+      echo "  - fsnotify integration for cross-platform watching"
+      echo "  - Basic glob pattern matching"
+      echo "  - Simple debouncing (fixed time)"
+      echo "  - Recipe re-execution on changes"
+      echo ""
+      
+      echo "🔄 PHASE 2: Advanced Features"
+      echo "  - Smart debouncing (adaptive timing)"
+      echo "  - Exclude patterns and .gitignore support"
+      echo "  - File type-specific handling"
+      echo "  - Batch change processing"
+      echo ""
+      
+      echo "⚡ PHASE 3: Performance & Scale"
+      echo "  - Efficient large project handling"
+      echo "  - Memory usage optimization"
+      echo "  - CPU usage monitoring"
+      echo "  - Configurable resource limits"
+      echo ""
+      
+      echo "🎯 PHASE 4: Advanced Integrations"
+      echo "  - Git hook integration"
+      echo "  - IDE/editor integration"
+      echo "  - Remote file watching (network shares)"
+      echo "  - Cloud storage watching (S3, GCS)"
+      echo ""
+      
+      echo "🔮 FUTURE POSSIBILITIES"
+      echo "  - Machine learning for change prediction"
+      echo "  - Intelligent test selection based on changes"
+      echo "  - Distributed watching across multiple machines"
+      echo "  - Integration with container orchestration"
+      
+      {{ success "Roadmap displayed - file watching will be amazing!" }}

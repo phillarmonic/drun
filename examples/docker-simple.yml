@@ -1,0 +1,266 @@
+# Simple Docker Command Detection
+# Uses built-in template functions for automatic Docker command detection
+# Usage: drun -f examples/docker-simple.yml <recipe>
+
+version: 0.1
+
+shell:
+  linux: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }
+  darwin: { cmd: "/bin/bash", args: ["-euo", "pipefail", "-c"] }
+  windows: { cmd: "pwsh", args: ["-NoLogo", "-Command"] }
+
+# Environment variables using new template functions - much cleaner!
+env:
+  DOCKER_COMPOSE_CMD: "{{ dockerCompose }}"
+  DOCKER_BUILDX_CMD: "{{ dockerBuildx }}"
+  REGISTRY: "ghcr.io"
+  ORG: "mycompany"
+  APP_NAME: "myapp"
+  IMAGE_NAME: "{{ .REGISTRY }}/{{ .ORG }}/{{ .APP_NAME }}"
+  BUILD_DATE: "{{ now \"2006-01-02T15:04:05Z07:00\" }}"
+  GIT_COMMIT: "{{ env \"GITHUB_SHA\" | default \"local\" }}"
+
+recipes:
+  # Show detected commands
+  show:
+    help: "Show detected Docker commands"
+    run: |
+      echo "🔍 Detected Docker Commands:"
+      echo "  Compose: $DOCKER_COMPOSE_CMD"
+      echo "  Buildx: $DOCKER_BUILDX_CMD"
+      echo ""
+      echo "Image: $IMAGE_NAME"
+      echo "Build Date: $BUILD_DATE"
+      echo "Git Commit: $GIT_COMMIT"
+
+  # Test commands work
+  test:
+    help: "Test that detected Docker commands work"
+    run: |
+      if [ -z "$DOCKER_COMPOSE_CMD" ]; then
+        echo "❌ Docker Compose not found"
+        exit 1
+      fi
+      if [ -z "$DOCKER_BUILDX_CMD" ]; then
+        echo "❌ Docker Buildx not found"
+        exit 1
+      fi
+      
+      echo "🧪 Testing Docker commands..."
+      echo "Compose version:"
+      $DOCKER_COMPOSE_CMD version
+      echo ""
+      echo "Buildx version:"
+      $DOCKER_BUILDX_CMD version
+      echo ""
+      echo "✅ All commands work!"
+
+  # Build image
+  build:
+    help: "Build Docker image"
+    positionals:
+      - name: tag
+        default: "{{ .GIT_COMMIT | trunc 8 }}"
+    run: |
+      if [ -z "$DOCKER_BUILDX_CMD" ]; then
+        echo "❌ Docker Buildx not available"
+        exit 1
+      fi
+      
+      echo "🏗️  Building $IMAGE_NAME:{{ .tag }}"
+      $DOCKER_BUILDX_CMD build \
+        --build-arg BUILD_DATE="$BUILD_DATE" \
+        --build-arg GIT_COMMIT="$GIT_COMMIT" \
+        --tag "$IMAGE_NAME:{{ .tag }}" \
+        --tag "$IMAGE_NAME:latest" \
+        --load \
+        .
+      echo "✅ Build complete"
+
+  # Multi-arch build
+  build-multi:
+    help: "Build multi-architecture image"
+    positionals:
+      - name: tag
+        required: true
+      - name: platforms
+        default: "linux/amd64,linux/arm64"
+    flags:
+      push:
+        type: bool
+        default: false
+    run: |
+      if [ -z "$DOCKER_BUILDX_CMD" ]; then
+        echo "❌ Docker Buildx not available"
+        exit 1
+      fi
+      
+      echo "🏗️  Multi-arch build: $IMAGE_NAME:{{ .tag }}"
+      echo "Platforms: {{ .platforms }}"
+      
+      $DOCKER_BUILDX_CMD create --use --name multi 2>/dev/null || true
+      
+      {{ if .push }}
+      $DOCKER_BUILDX_CMD build \
+        --platform {{ .platforms }} \
+        --build-arg BUILD_DATE="$BUILD_DATE" \
+        --build-arg GIT_COMMIT="$GIT_COMMIT" \
+        --tag "$IMAGE_NAME:{{ .tag }}" \
+        --push \
+        .
+      {{ else }}
+      $DOCKER_BUILDX_CMD build \
+        --platform {{ .platforms }} \
+        --build-arg BUILD_DATE="$BUILD_DATE" \
+        --build-arg GIT_COMMIT="$GIT_COMMIT" \
+        --tag "$IMAGE_NAME:{{ .tag }}" \
+        --load \
+        .
+      {{ end }}
+      echo "✅ Multi-arch build complete"
+
+  # Compose operations
+  up:
+    help: "Start services with compose"
+    positionals:
+      - name: service
+        default: ""
+      - name: file
+        default: "docker-compose.yml"
+    flags:
+      build:
+        type: bool
+        default: false
+      detach:
+        type: bool
+        default: true
+    run: |
+      if [ -z "$DOCKER_COMPOSE_CMD" ]; then
+        echo "❌ Docker Compose not available"
+        exit 1
+      fi
+      
+      if [ ! -f "{{ .file }}" ]; then
+        echo "❌ Compose file not found: {{ .file }}"
+        exit 1
+      fi
+      
+      echo "🚀 Starting services with $DOCKER_COMPOSE_CMD"
+      
+      ARGS="-f {{ .file }}"
+      {{ if .build }}
+      echo "Building first..."
+      $DOCKER_COMPOSE_CMD $ARGS build {{ .service }}
+      {{ end }}
+      
+      {{ if .detach }}
+      $DOCKER_COMPOSE_CMD $ARGS up -d {{ .service }}
+      echo "✅ Services started"
+      $DOCKER_COMPOSE_CMD $ARGS ps
+      {{ else }}
+      $DOCKER_COMPOSE_CMD $ARGS up {{ .service }}
+      {{ end }}
+
+  down:
+    help: "Stop services with compose"
+    positionals:
+      - name: file
+        default: "docker-compose.yml"
+    flags:
+      volumes:
+        type: bool
+        default: false
+    run: |
+      if [ -z "$DOCKER_COMPOSE_CMD" ]; then
+        echo "❌ Docker Compose not available"
+        exit 1
+      fi
+      
+      echo "🛑 Stopping services with $DOCKER_COMPOSE_CMD"
+      
+      ARGS="-f {{ .file }} down"
+      {{ if .volumes }}
+      ARGS="$ARGS --volumes"
+      {{ end }}
+      
+      $DOCKER_COMPOSE_CMD $ARGS
+      echo "✅ Services stopped"
+
+  # Development workflow
+  dev:
+    help: "Start development environment"
+    run: |
+      if [ -z "$DOCKER_COMPOSE_CMD" ]; then
+        echo "❌ Docker Compose not available"
+        exit 1
+      fi
+      
+      # Create dev compose file if needed
+      if [ ! -f "docker-compose.dev.yml" ]; then
+        echo "Creating docker-compose.dev.yml..."
+        echo 'version: "3.8"' > docker-compose.dev.yml
+        echo 'services:' >> docker-compose.dev.yml
+        echo '  app:' >> docker-compose.dev.yml
+        echo '    build: .' >> docker-compose.dev.yml
+        echo '    ports:' >> docker-compose.dev.yml
+        echo '      - "3000:3000"' >> docker-compose.dev.yml
+        echo '    volumes:' >> docker-compose.dev.yml
+        echo '      - .:/app' >> docker-compose.dev.yml
+        echo '    environment:' >> docker-compose.dev.yml
+        echo '      - NODE_ENV=development' >> docker-compose.dev.yml
+        echo '  db:' >> docker-compose.dev.yml
+        echo '    image: postgres:15' >> docker-compose.dev.yml
+        echo '    environment:' >> docker-compose.dev.yml
+        echo '      - POSTGRES_DB=myapp' >> docker-compose.dev.yml
+        echo '      - POSTGRES_USER=dev' >> docker-compose.dev.yml
+        echo '      - POSTGRES_PASSWORD=dev' >> docker-compose.dev.yml
+        echo '    ports:' >> docker-compose.dev.yml
+        echo '      - "5432:5432"' >> docker-compose.dev.yml
+        echo "✅ Created docker-compose.dev.yml"
+      fi
+      
+      echo "🚀 Starting development environment..."
+      $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml up -d
+      echo "✅ Development ready!"
+      $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml ps
+
+  # Check what commands are available
+  check:
+    help: "Check available Docker commands"
+    run: |
+      echo "🔍 Docker Command Availability:"
+      echo ""
+      
+      {{ if hasCommand "docker" }}
+      echo "✅ docker: $(docker --version)"
+      {{ else }}
+      echo "❌ docker: Not found"
+      {{ end }}
+      
+      {{ if dockerCompose }}
+      echo "✅ compose: {{ dockerCompose }}"
+      {{ else }}
+      echo "❌ compose: Not found"
+      {{ end }}
+      
+      {{ if dockerBuildx }}
+      echo "✅ buildx: {{ dockerBuildx }}"
+      {{ else }}
+      echo "❌ buildx: Not found"
+      {{ end }}
+      
+      {{ if hasCommand "docker-compose" }}
+      echo "✅ docker-compose: Available as standalone"
+      {{ else }}
+      echo "ℹ️  docker-compose: Not found (using CLI plugin)"
+      {{ end }}
+
+  # Export for shell
+  export:
+    help: "Export Docker commands for shell use"
+    run: |
+      echo "# Docker environment variables"
+      echo "# Run: eval \"\$(drun export)\""
+      echo "export DOCKER_COMPOSE_CMD=\"$DOCKER_COMPOSE_CMD\""
+      echo "export DOCKER_BUILDX_CMD=\"$DOCKER_BUILDX_CMD\""
+      echo "export IMAGE_NAME=\"$IMAGE_NAME\""

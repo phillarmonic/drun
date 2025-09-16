@@ -13,6 +13,7 @@ type Spec struct {
 	Defaults Defaults               `yaml:"defaults,omitempty"`
 	Snippets map[string]string      `yaml:"snippets,omitempty"`
 	Include  []string               `yaml:"include,omitempty"`
+	Secrets  map[string]Secret      `yaml:"secrets,omitempty"`
 	Recipes  map[string]Recipe      `yaml:"recipes"`
 	Cache    CacheConfig            `yaml:"cache,omitempty"`
 }
@@ -79,10 +80,18 @@ type CacheConfig struct {
 	Keys []string `yaml:"keys,omitempty"`
 }
 
+// Secret defines a secret source
+type Secret struct {
+	Source      string `yaml:"source"`                // env://VAR, file://path, vault://path
+	Required    bool   `yaml:"required,omitempty"`    // Whether secret is required
+	Description string `yaml:"description,omitempty"` // Human-readable description
+}
+
 // ExecutionContext contains the runtime context for template rendering
 type ExecutionContext struct {
 	Vars        map[string]any
 	Env         map[string]string
+	Secrets     map[string]string // Resolved secrets
 	Flags       map[string]any
 	Positionals map[string]any
 	OS          string

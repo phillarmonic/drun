@@ -320,6 +320,15 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Build execution context
 	ctx := buildExecutionContext(specData, positionals, flags, setVarsMap)
 
+	// Resolve secrets
+	if len(specData.Secrets) > 0 {
+		resolvedSecrets, err := loader.ResolveSecrets(specData.Secrets)
+		if err != nil {
+			return fmt.Errorf("failed to resolve secrets: %w", err)
+		}
+		ctx.Secrets = resolvedSecrets
+	}
+
 	// Override OS if shell type is specified
 	if shellType != "" {
 		ctx.OS = shellType
@@ -760,6 +769,7 @@ func buildExecutionContext(specData *model.Spec, positionals, flags, setVars map
 	ctx := &model.ExecutionContext{
 		Vars:        make(map[string]any),
 		Env:         make(map[string]string),
+		Secrets:     make(map[string]string),
 		Flags:       flags,
 		Positionals: positionals,
 		OS:          runtime.GOOS,
