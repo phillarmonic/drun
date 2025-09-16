@@ -76,6 +76,7 @@ Quick reference for all built-in template functions in drun.
 | `{{ .version }}` | Positional arguments | `Version: {{ .version }}` | `Version: v1.0.0` |
 | `{{ snippet "name" }}` | Include reusable snippets | `{{ snippet "docker-login" }}` | Snippet content |
 | `{{ shellquote .arg }}` | Shell-safe quoting | `echo {{ shellquote .message }}` | `echo "safe message"` |
+| `{{ truncate 50 .text }}` | Truncate text to length | `{{ truncate 20 "This is a long message" }}` | `This is a long messa` |
 
 ## 🎯 Usage Examples
 

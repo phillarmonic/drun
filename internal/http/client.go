@@ -79,11 +79,20 @@ type Response struct {
 
 // NewClient creates a new HTTP client with default configuration
 func NewClient() *Client {
+	return NewClientWithVersion("dev")
+}
+
+// NewClientWithVersion creates a new HTTP client with default configuration and version
+func NewClientWithVersion(version string) *Client {
+	headers := make(map[string]string)
+	headers["Accept"] = "application/json"
+	headers["User-Agent"] = fmt.Sprintf("drun/%s", version)
+
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		headers:     make(map[string]string),
+		headers:     headers,
 		queryParams: make(map[string]string),
 		timeout:     30 * time.Second,
 		retryConfig: &RetryConfig{

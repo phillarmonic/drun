@@ -42,11 +42,16 @@ func NewEngine(snippets map[string]string, recipePrerun []string, recipePostrun 
 
 // NewEngineWithHTTP creates a new template engine with HTTP support
 func NewEngineWithHTTP(snippets map[string]string, recipePrerun []string, recipePostrun []string, httpEndpoints map[string]model.HTTPEndpoint, secrets map[string]string) *Engine {
+	return NewEngineWithHTTPAndVersion(snippets, recipePrerun, recipePostrun, httpEndpoints, secrets, "dev")
+}
+
+// NewEngineWithHTTPAndVersion creates a new template engine with HTTP support and version
+func NewEngineWithHTTPAndVersion(snippets map[string]string, recipePrerun []string, recipePostrun []string, httpEndpoints map[string]model.HTTPEndpoint, secrets map[string]string, version string) *Engine {
 	e := &Engine{
 		snippets:      snippets,
 		recipePrerun:  recipePrerun,
 		recipePostrun: recipePostrun,
-		httpClient:    http.NewTemplateHTTPClient(httpEndpoints, secrets),
+		httpClient:    http.NewTemplateHTTPClientWithVersion(httpEndpoints, secrets, version),
 	}
 	// Pre-compute function map for better performance
 	e.funcMap = e.getFuncMap()
@@ -253,6 +258,9 @@ func (e *Engine) getFuncMap() template.FuncMap {
 	funcMap["secret"] = e.secretFunc
 	funcMap["hasSecret"] = e.hasSecretFunc
 
+	// String manipulation functions
+	funcMap["truncate"] = truncateFunc
+
 	// HTTP functions (if HTTP client is available)
 	if e.httpClient != nil {
 		httpFuncs := e.httpClient.GetTemplateFunctions()
@@ -379,6 +387,21 @@ func successFunc(message string) string {
 
 func stepFunc(message string) string {
 	return fmt.Sprintf("echo \"🚀 %s\"", message)
+}
+
+// String manipulation functions
+func truncateFunc(length int, text string) string {
+	if length <= 0 {
+		return ""
+	}
+
+	// Convert to runes to handle Unicode properly
+	runes := []rune(text)
+	if len(runes) <= length {
+		return text
+	}
+
+	return string(runes[:length])
 }
 
 // Git functions

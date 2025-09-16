@@ -18,8 +18,13 @@ type TemplateHTTPClient struct {
 
 // NewTemplateHTTPClient creates a new template HTTP client
 func NewTemplateHTTPClient(endpoints map[string]model.HTTPEndpoint, secrets map[string]string) *TemplateHTTPClient {
+	return NewTemplateHTTPClientWithVersion(endpoints, secrets, "dev")
+}
+
+// NewTemplateHTTPClientWithVersion creates a new template HTTP client with version
+func NewTemplateHTTPClientWithVersion(endpoints map[string]model.HTTPEndpoint, secrets map[string]string, version string) *TemplateHTTPClient {
 	return &TemplateHTTPClient{
-		client:    NewClient().Cache(NewMemoryCache()),
+		client:    NewClientWithVersion(version).Cache(NewMemoryCache()),
 		endpoints: endpoints,
 		secrets:   secrets,
 	}
@@ -194,23 +199,37 @@ func (t *TemplateHTTPClient) buildRequest(endpoint model.HTTPEndpoint, opts map[
 		method = "GET"
 	}
 
+	// Build the full URL
+	fullURL := endpoint.URL
+	if urlPath, exists := opts["url"]; exists {
+		if pathStr, ok := urlPath.(string); ok {
+			// Ensure base URL doesn't end with / and path starts with /
+			baseURL := strings.TrimSuffix(endpoint.URL, "/")
+			path := pathStr
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+			fullURL = baseURL + path
+		}
+	}
+
 	// Create request
 	var req *Request
 	switch method {
 	case "GET":
-		req = t.client.GET(endpoint.URL)
+		req = t.client.GET(fullURL)
 	case "POST":
-		req = t.client.POST(endpoint.URL)
+		req = t.client.POST(fullURL)
 	case "PUT":
-		req = t.client.PUT(endpoint.URL)
+		req = t.client.PUT(fullURL)
 	case "PATCH":
-		req = t.client.PATCH(endpoint.URL)
+		req = t.client.PATCH(fullURL)
 	case "DELETE":
-		req = t.client.DELETE(endpoint.URL)
+		req = t.client.DELETE(fullURL)
 	case "HEAD":
-		req = t.client.HEAD(endpoint.URL)
+		req = t.client.HEAD(fullURL)
 	case "OPTIONS":
-		req = t.client.OPTIONS(endpoint.URL)
+		req = t.client.OPTIONS(fullURL)
 	default:
 		return nil, fmt.Errorf("unsupported HTTP method: %s", method)
 	}
