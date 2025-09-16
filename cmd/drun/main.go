@@ -60,11 +60,11 @@ It supports positional arguments (both positional and named), dependencies, temp
 Named arguments can be specified as:
   --name=value  or  name=value`,
 	RunE: runDrun,
-	// Disable unknown command errors
+	// Disable unknown command errors so recipes can be treated as arguments
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	// Allow any arguments to be passed through
-	DisableFlagParsing: false,
+	// Don't treat unknown arguments as errors
+	Args: cobra.ArbitraryArgs,
 }
 
 // Completion command for generating shell completion scripts
@@ -192,7 +192,6 @@ func init() {
 	// rootCmd.AddCommand(cacheCmd)
 
 	// Set up unknown command handling
-	rootCmd.SetArgs(os.Args[1:])
 	rootCmd.FParseErrWhitelist.UnknownFlags = true
 }
 

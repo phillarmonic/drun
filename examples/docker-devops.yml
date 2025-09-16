@@ -18,6 +18,9 @@ env:
   IMAGE_NAME: "{{ .registry }}/{{ .org }}/{{ .app_name }}"
   BUILD_DATE: "{{ now \"2006-01-02T15:04:05Z07:00\" }}"
   GIT_COMMIT: "{{ env \"GITHUB_SHA\" | default \"local\" }}"
+  # Auto-detect Docker commands
+  DOCKER_COMPOSE_CMD: "{{ dockerCompose }}"
+  DOCKER_BUILDX_CMD: "{{ dockerBuildx }}"
 
 snippets:
   docker_login: |
@@ -61,8 +64,8 @@ recipes:
         default: "linux/amd64,linux/arm64"
     run: |
       echo "🏗️  Building multi-arch {{ .IMAGE_NAME }}:{{ .tag }} for {{ .platforms }}..."
-      docker buildx create --use --name multiarch || true
-      docker buildx build \
+      $DOCKER_BUILDX_CMD create --use --name multiarch || true
+      $DOCKER_BUILDX_CMD build \
         --platform {{ .platforms }} \
         --build-arg BUILD_DATE="{{ .BUILD_DATE }}" \
         --build-arg GIT_COMMIT="{{ .GIT_COMMIT }}" \

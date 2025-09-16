@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -152,6 +153,31 @@ func (e *Engine) getFuncMap() template.FuncMap {
 	funcMap["arch"] = archFunc
 	funcMap["hostname"] = hostnameFunc
 
+	// Command detection functions
+	funcMap["dockerCompose"] = dockerComposeFunc
+	funcMap["dockerBuildx"] = dockerBuildxFunc
+	funcMap["hasCommand"] = hasCommandFunc
+
+	// Status and messaging functions
+	funcMap["info"] = infoFunc
+	funcMap["warn"] = warnFunc
+	funcMap["error"] = errorFunc
+	funcMap["success"] = successFunc
+	funcMap["step"] = stepFunc
+
+	// Git functions
+	funcMap["gitBranch"] = gitBranchFunc
+	funcMap["gitCommit"] = gitCommitFunc
+	funcMap["gitShortCommit"] = gitShortCommitFunc
+	funcMap["isDirty"] = isDirtyFunc
+
+	// Package manager detection
+	funcMap["packageManager"] = packageManagerFunc
+	funcMap["hasFile"] = hasFileFunc
+
+	// Environment detection
+	funcMap["isCI"] = isCIFunc
+
 	return funcMap
 }
 
@@ -200,4 +226,154 @@ func archFunc() string {
 func hostnameFunc() string {
 	hostname, _ := os.Hostname()
 	return hostname
+}
+
+// dockerComposeFunc detects the available Docker Compose command
+func dockerComposeFunc() string {
+	// Check for docker compose (CLI plugin) first
+	if hasDockerAndSubcommand("compose") {
+		return "docker compose"
+	}
+
+	// Fall back to docker-compose (standalone)
+	if hasCommandFunc("docker-compose") {
+		return "docker-compose"
+	}
+
+	return ""
+}
+
+// dockerBuildxFunc detects the available Docker Buildx command
+func dockerBuildxFunc() string {
+	// Check for docker buildx (CLI plugin) first
+	if hasDockerAndSubcommand("buildx") {
+		return "docker buildx"
+	}
+
+	// Fall back to docker-buildx (standalone)
+	if hasCommandFunc("docker-buildx") {
+		return "docker-buildx"
+	}
+
+	return ""
+}
+
+// hasCommandFunc checks if a command is available in PATH
+func hasCommandFunc(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
+}
+
+// hasDockerAndSubcommand checks if docker command exists and supports a subcommand
+func hasDockerAndSubcommand(subcommand string) bool {
+	// First check if docker command exists
+	if !hasCommandFunc("docker") {
+		return false
+	}
+
+	// Then check if the subcommand is available by running docker <subcommand> --help
+	cmd := exec.Command("docker", subcommand, "--help")
+	err := cmd.Run()
+	return err == nil
+}
+
+// Status and messaging functions
+func infoFunc(message string) string {
+	return fmt.Sprintf("echo \"ℹ️  %s\"", message)
+}
+
+func warnFunc(message string) string {
+	return fmt.Sprintf("echo \"⚠️  %s\"", message)
+}
+
+func errorFunc(message string) string {
+	return fmt.Sprintf("echo \"❌ %s\"", message)
+}
+
+func successFunc(message string) string {
+	return fmt.Sprintf("echo \"✅ %s\"", message)
+}
+
+func stepFunc(message string) string {
+	return fmt.Sprintf("echo \"🚀 %s\"", message)
+}
+
+// Git functions
+func gitBranchFunc() string {
+	cmd := exec.Command("git", "branch", "--show-current")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func gitCommitFunc() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func gitShortCommitFunc() string {
+	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func isDirtyFunc() bool {
+	cmd := exec.Command("git", "diff-index", "--quiet", "HEAD", "--")
+	err := cmd.Run()
+	return err != nil // If command fails, working directory is dirty
+}
+
+// Package manager detection
+func packageManagerFunc() string {
+	// Check for lock files to determine package manager
+	if hasFileFunc("pnpm-lock.yaml") {
+		return "pnpm"
+	}
+	if hasFileFunc("yarn.lock") {
+		return "yarn"
+	}
+	if hasFileFunc("bun.lockb") {
+		return "bun"
+	}
+	if hasFileFunc("package.json") {
+		return "npm"
+	}
+
+	// Check for Python
+	if hasFileFunc("pyproject.toml") || hasFileFunc("requirements.txt") {
+		return "pip"
+	}
+
+	// Check for Go
+	if hasFileFunc("go.mod") {
+		return "go"
+	}
+
+	return ""
+}
+
+func hasFileFunc(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil
+}
+
+// Environment detection
+func isCIFunc() bool {
+	// Check common CI environment variables
+	ciVars := []string{"CI", "CONTINUOUS_INTEGRATION", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "TRAVIS", "CIRCLECI"}
+	for _, envVar := range ciVars {
+		if os.Getenv(envVar) != "" {
+			return true
+		}
+	}
+	return false
 }
