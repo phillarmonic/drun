@@ -2,6 +2,8 @@
 
 Quick reference for all built-in template functions in drun.
 
+💡 **Pro Tip**: Use [prerun snippets](YAML_SPEC.md#prerun-snippets-new-feature) to define common functions and colors that are automatically available in all recipes!
+
 ## 🐳 Docker Integration
 
 | Function | Description | Example | Output |

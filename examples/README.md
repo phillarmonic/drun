@@ -35,6 +35,39 @@ This directory contains comprehensive examples showcasing all of drun's powerful
 ./bin/drun -f examples/simple.yml greet Alice
 ```
 
+#### [`prerun-demo.yml`](prerun-demo.yml) ⭐ **NEW**
+**Prerun snippets for DRY common setup**
+- Universal ANSI color codes for any project type
+- Generic helper functions (log_info, log_success, etc.)
+- Common shell settings and error handling
+- Language-agnostic project workflow examples
+
+```bash
+# See prerun snippets in action
+./bin/drun -f examples/prerun-demo.yml setup --dry-run
+./bin/drun -f examples/prerun-demo.yml build --target=production
+./bin/drun -f examples/prerun-demo.yml test --coverage
+./bin/drun -f examples/prerun-demo.yml deploy --environment=staging --dry-run
+```
+
+#### [`snippets-showcase.yml`](snippets-showcase.yml) ⭐ **NEW**
+**Comprehensive snippet library and patterns**
+- Advanced snippet patterns and best practices
+- Prerun snippet calls with `{{ snippet "name" }}`
+- Conditional snippet usage with flags
+- Environment detection and tool checking
+- Professional logging and error handling
+- Real-world development workflow examples
+
+```bash
+# Explore snippet capabilities
+./bin/drun -f examples/snippets-showcase.yml demo-snippets --dry-run
+./bin/drun -f examples/snippets-showcase.yml hello
+./bin/drun -f examples/snippets-showcase.yml setup --tools --node
+./bin/drun -f examples/snippets-showcase.yml test --unit --coverage
+./bin/drun -f examples/snippets-showcase.yml build --docker --push
+```
+
 #### [`docker-devops.yml`](docker-devops.yml)
 **Docker workflows with intelligent auto-detection**
 - Auto-detect Docker Compose vs docker-compose

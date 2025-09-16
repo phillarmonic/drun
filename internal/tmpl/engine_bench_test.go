@@ -8,7 +8,7 @@ import (
 
 // BenchmarkEngine_Render benchmarks template rendering performance
 func BenchmarkEngine_Render(b *testing.B) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil)
 
 	template := `
 Hello {{ .name }}!
@@ -48,7 +48,7 @@ func BenchmarkEngine_RenderStep(b *testing.B) {
 	engine := NewEngine(map[string]string{
 		"setup":   "echo 'Setting up environment'",
 		"cleanup": "echo 'Cleaning up'",
-	})
+	}, nil)
 
 	step := model.Step{
 		Lines: []string{
@@ -96,7 +96,7 @@ docker build \
 		"docker_push": `
 docker push {{ .registry }}/{{ .org }}/{{ .app_name }}:{{ .version }}
 `,
-	})
+	}, nil)
 
 	template := `
 #!/bin/bash
@@ -158,7 +158,7 @@ echo "Build completed successfully!"
 
 // BenchmarkEngine_Render_WithSprig benchmarks Sprig function usage
 func BenchmarkEngine_Render_WithSprig(b *testing.B) {
-	engine := NewEngine(nil)
+	engine := NewEngine(nil, nil)
 
 	template := `
 {{ $data := dict "users" (list "alice" "bob" "charlie") "config" (dict "debug" true "port" 8080) }}

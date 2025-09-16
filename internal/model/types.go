@@ -12,6 +12,7 @@ type Spec struct {
 	Vars     map[string]any         `yaml:"vars,omitempty"`
 	Defaults Defaults               `yaml:"defaults,omitempty"`
 	Snippets map[string]string      `yaml:"snippets,omitempty"`
+	Prerun   []string               `yaml:"prerun,omitempty"`
 	Include  []string               `yaml:"include,omitempty"`
 	Secrets  map[string]Secret      `yaml:"secrets,omitempty"`
 	Recipes  map[string]Recipe      `yaml:"recipes"`

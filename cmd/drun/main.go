@@ -337,7 +337,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Create components
 	shellSelector := shell.NewSelector(specData.Shell)
-	templateEngine := tmpl.NewEngine(specData.Snippets)
+	templateEngine := tmpl.NewEngine(specData.Snippets, specData.Prerun)
 
 	// Set up caching
 	cacheDir := ".drun/cache"

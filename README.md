@@ -9,6 +9,7 @@ A **high-performance** YAML-based task runner with first-class arguments, powerf
 - **YAML Configuration**: Define tasks in a simple, readable YAML format
 - **Positional Arguments**: First-class support for positional arguments with validation
 - **Named Arguments**: Pass positional arguments by name for clarity (`--name=value` or `name=value`)
+- **Prerun Snippets**: Common setup code that runs before every recipe (colors, functions, etc.)
 - **Templating**: Powerful Go template engine with custom functions and caching
 - **Dependencies**: Automatic dependency resolution and parallel execution
 - **High Performance**: Microsecond-level operations with intelligent caching
@@ -120,6 +121,8 @@ drun automatically looks for configuration files in this order:
 
 Use `drun --init` to create a starter configuration, or see the included examples for comprehensive configurations.
 
+📖 **For complete YAML specification**: See [YAML_SPEC.md](YAML_SPEC.md) for detailed field reference and examples.
+
 ### Basic Recipe
 
 ```yaml
@@ -219,6 +222,58 @@ recipes:
     run: |
       go build ./...
 ```
+
+### Prerun Snippets - DRY Common Setup
+
+Define snippets that automatically run before every recipe - perfect for colors, helper functions, and common setup:
+
+```yaml
+version: 0.1
+
+# Snippets that run before EVERY recipe
+prerun:
+  - |
+    # ANSI color codes - available in all recipes
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+  - |
+    # Helper functions available everywhere
+    log_info() {
+      echo -e "${BLUE}ℹ️  $1${NC}"
+    }
+    log_success() {
+      echo -e "${GREEN}✅ $1${NC}"
+    }
+    log_error() {
+      echo -e "${RED}❌ $1${NC}"
+    }
+
+recipes:
+  setup:
+    help: "Set up the project"
+    run: |
+      # Colors and functions automatically available!
+      log_info "Setting up project..."
+      echo -e "${GREEN}🚀 Initializing...${NC}"
+      log_success "Setup completed!"
+
+  test:
+    help: "Run tests"  
+    run: |
+      # Same colors and functions available here too!
+      log_info "Running test suite..."
+      echo -e "${YELLOW}🧪 Testing...${NC}"
+      log_success "All tests passed!"
+```
+
+**Benefits:**
+- **DRY**: Define once, use everywhere
+- **Automatic**: No need to manually include in each recipe
+- **Templated**: Full template support with variables
+- **Snippet Calls**: Can call existing snippets with `{{ snippet "name" }}`
 
 ## 🌟 Advanced Features Examples
 

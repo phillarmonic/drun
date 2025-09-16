@@ -19,15 +19,17 @@ import (
 // Engine handles template rendering with custom functions
 type Engine struct {
 	snippets      map[string]string
+	prerun        []string                // Prerun snippets that execute before every recipe
 	templateCache sync.Map                // Cache compiled templates by hash
 	funcMap       template.FuncMap        // Pre-computed function map
 	currentCtx    *model.ExecutionContext // Current execution context for functions
 }
 
 // NewEngine creates a new template engine
-func NewEngine(snippets map[string]string) *Engine {
+func NewEngine(snippets map[string]string, prerun []string) *Engine {
 	e := &Engine{
 		snippets: snippets,
+		prerun:   prerun,
 	}
 	// Pre-compute function map for better performance
 	e.funcMap = e.getFuncMap()
@@ -82,8 +84,30 @@ func (e *Engine) getOrCompileTemplate(templateStr string) (*template.Template, e
 
 // RenderStep renders a step with the given context
 func (e *Engine) RenderStep(step model.Step, ctx *model.ExecutionContext) (model.Step, error) {
+	// Prepend prerun snippets to the step
+	allLines := make([]string, 0, len(e.prerun)+len(step.Lines))
+
+	// Add prerun snippets first
+	for _, prerunSnippet := range e.prerun {
+		// Render each prerun snippet as a template to support variables
+		rendered, err := e.Render(prerunSnippet, ctx)
+		if err != nil {
+			return model.Step{}, fmt.Errorf("failed to render prerun snippet: %w", err)
+		}
+		// Split rendered snippet into lines and add them
+		snippetLines := strings.Split(rendered, "\n")
+		for _, line := range snippetLines {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				allLines = append(allLines, trimmed)
+			}
+		}
+	}
+
+	// Add the original step lines
+	allLines = append(allLines, step.Lines...)
+
 	// Join all lines into a single script for template rendering
-	script := step.String()
+	script := strings.Join(allLines, "\n")
 
 	// Render the entire script as one template
 	rendered, err := e.Render(script, ctx)
@@ -133,9 +157,14 @@ func (e *Engine) buildTemplateData(ctx *model.ExecutionContext) map[string]any {
 	for k, v := range ctx.Secrets {
 		result[k] = v
 	}
+	// Add flags under both direct access and .flags namespace for flexibility
 	for k, v := range ctx.Flags {
 		result[k] = v
 	}
+	if len(ctx.Flags) > 0 {
+		result["flags"] = ctx.Flags
+	}
+
 	for k, v := range ctx.Positionals {
 		result[k] = v
 	}

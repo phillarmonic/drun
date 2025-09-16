@@ -12,7 +12,7 @@ import (
 
 func TestNewManager(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 
 	manager := NewManager(tempDir, engine, false)
 
@@ -31,7 +31,7 @@ func TestNewManager(t *testing.T) {
 
 func TestNewManager_Disabled(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 
 	manager := NewManager(tempDir, engine, true)
 
@@ -42,7 +42,7 @@ func TestNewManager_Disabled(t *testing.T) {
 
 func TestManager_IsValid_NoCacheKey(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	recipe := &model.Recipe{
@@ -66,7 +66,7 @@ func TestManager_IsValid_NoCacheKey(t *testing.T) {
 
 func TestManager_IsValid_Disabled(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, true) // disabled
 
 	recipe := &model.Recipe{
@@ -90,7 +90,7 @@ func TestManager_IsValid_Disabled(t *testing.T) {
 
 func TestManager_IsValid_NoCache(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	recipe := &model.Recipe{
@@ -118,7 +118,7 @@ func TestManager_IsValid_NoCache(t *testing.T) {
 
 func TestManager_MarkComplete_AndIsValid(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	recipe := &model.Recipe{
@@ -160,7 +160,7 @@ func TestManager_MarkComplete_AndIsValid(t *testing.T) {
 
 func TestManager_MarkComplete_Disabled(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, true) // disabled
 
 	recipe := &model.Recipe{
@@ -186,7 +186,7 @@ func TestManager_MarkComplete_Disabled(t *testing.T) {
 
 func TestManager_MarkComplete_NoCacheKey(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	recipe := &model.Recipe{
@@ -212,7 +212,7 @@ func TestManager_MarkComplete_NoCacheKey(t *testing.T) {
 
 func TestManager_Clear(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	// Create some cache files
@@ -252,7 +252,7 @@ func TestManager_Clear(t *testing.T) {
 
 func TestManager_Clear_Disabled(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, true) // disabled
 
 	err := manager.Clear()
@@ -264,7 +264,7 @@ func TestManager_Clear_Disabled(t *testing.T) {
 
 func TestManager_GetStats(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	// Initially should have no entries
@@ -323,7 +323,7 @@ func TestManager_GetStats(t *testing.T) {
 
 func TestManager_GetStats_Disabled(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, true) // disabled
 
 	stats, err := manager.GetStats()
@@ -339,7 +339,7 @@ func TestManager_GetStats_Disabled(t *testing.T) {
 
 func TestManager_IsValid_ExpiredCache(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	recipe := &model.Recipe{
@@ -377,7 +377,7 @@ func TestManager_IsValid_ExpiredCache(t *testing.T) {
 
 func TestManager_getCacheFilePath(t *testing.T) {
 	tempDir := t.TempDir()
-	engine := tmpl.NewEngine(nil)
+	engine := tmpl.NewEngine(nil, nil)
 	manager := NewManager(tempDir, engine, false)
 
 	cacheKey := "test-cache-key"
