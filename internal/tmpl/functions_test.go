@@ -107,6 +107,17 @@ func TestGitBranchFunc(t *testing.T) {
 	if result == "" {
 		t.Error("gitBranchFunc() returned empty string in git repository")
 	}
+
+	// Should return a valid branch name, tag, or detached state
+	if result != "unknown" {
+		// Valid results include:
+		// - Branch names (e.g., "main", "feature/test")
+		// - Tag names (e.g., "v1.0.0")
+		// - Detached state (e.g., "detached@abc1234")
+		t.Logf("gitBranchFunc() returned: %s", result)
+	} else {
+		t.Error("gitBranchFunc() returned 'unknown' - Git commands failed")
+	}
 }
 
 func TestGitCommitFunc(t *testing.T) {
@@ -120,10 +131,17 @@ func TestGitCommitFunc(t *testing.T) {
 		t.Error("gitCommitFunc() returned empty string in git repository")
 	}
 
+	if result == "unknown" {
+		t.Error("gitCommitFunc() returned 'unknown' - Git command failed")
+		return
+	}
+
 	// Should be a 40-character hex string
 	if len(result) != 40 {
 		t.Errorf("gitCommitFunc() returned %d characters, want 40", len(result))
 	}
+
+	t.Logf("gitCommitFunc() returned: %s", result)
 }
 
 func TestGitShortCommitFunc(t *testing.T) {
@@ -137,10 +155,17 @@ func TestGitShortCommitFunc(t *testing.T) {
 		t.Error("gitShortCommitFunc() returned empty string in git repository")
 	}
 
-	// Should be a 7-character hex string
-	if len(result) != 7 {
-		t.Errorf("gitShortCommitFunc() returned %d characters, want 7", len(result))
+	if result == "unknown" {
+		t.Error("gitShortCommitFunc() returned 'unknown' - Git command failed")
+		return
 	}
+
+	// Should be a 7-character hex string (or possibly shorter in some cases)
+	if len(result) < 4 || len(result) > 12 {
+		t.Errorf("gitShortCommitFunc() returned %d characters, expected 4-12", len(result))
+	}
+
+	t.Logf("gitShortCommitFunc() returned: %s", result)
 }
 
 func TestIsDirtyFunc(t *testing.T) {

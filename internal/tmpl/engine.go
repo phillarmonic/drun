@@ -312,30 +312,73 @@ func stepFunc(message string) string {
 
 // Git functions
 func gitBranchFunc() string {
+	// Try modern git command first (Git 2.22+)
 	cmd := exec.Command("git", "branch", "--show-current")
 	output, err := cmd.Output()
-	if err != nil {
-		return ""
+	if err == nil {
+		branch := strings.TrimSpace(string(output))
+		if branch != "" {
+			return branch
+		}
 	}
-	return strings.TrimSpace(string(output))
+
+	// Fallback for older git versions or detached HEAD
+	cmd = exec.Command("git", "symbolic-ref", "--short", "HEAD")
+	output, err = cmd.Output()
+	if err == nil {
+		branch := strings.TrimSpace(string(output))
+		if branch != "" {
+			return branch
+		}
+	}
+
+	// If we're in detached HEAD, try to get a descriptive name
+	cmd = exec.Command("git", "describe", "--tags", "--exact-match")
+	output, err = cmd.Output()
+	if err == nil {
+		tag := strings.TrimSpace(string(output))
+		if tag != "" {
+			return tag
+		}
+	}
+
+	// Last resort: return short commit hash with "detached" prefix
+	cmd = exec.Command("git", "rev-parse", "--short", "HEAD")
+	output, err = cmd.Output()
+	if err == nil {
+		commit := strings.TrimSpace(string(output))
+		if commit != "" {
+			return "detached@" + commit
+		}
+	}
+
+	return "unknown"
 }
 
 func gitCommitFunc() string {
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
-		return ""
+		return "unknown"
 	}
-	return strings.TrimSpace(string(output))
+	commit := strings.TrimSpace(string(output))
+	if commit == "" {
+		return "unknown"
+	}
+	return commit
 }
 
 func gitShortCommitFunc() string {
 	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
-		return ""
+		return "unknown"
 	}
-	return strings.TrimSpace(string(output))
+	commit := strings.TrimSpace(string(output))
+	if commit == "" {
+		return "unknown"
+	}
+	return commit
 }
 
 func isDirtyFunc() bool {
