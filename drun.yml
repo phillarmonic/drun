@@ -1,203 +1,269 @@
 version: 0.1
 
-# Default shell and options per OS
-shell:
-  linux: { cmd: "/bin/sh", args: ["-ceu"] }
-  darwin: { cmd: "/bin/zsh", args: ["-ceu"] }
-  windows: { cmd: "pwsh", args: ["-NoLogo", "-Command"] }
-
+# Environment variables available to all recipes
 env:
-  # Static env
-  REGISTRY: ghcr.io
-  ORG: phillarmonic
-  # Computed env (evaluated at runtime)
-  DATE: "{{ now \"2006-01-02\" }}"
+  PROJECT_NAME: "drun"
+  GO_VERSION: "1.21"
 
+# Variables for templating
 vars:
-  go_version: "1.25"
-  app_name: "drun"
-  # Can reference env and other vars
-  image_tag: "{{ .go_version }}-{{ .DATE }}"
+  project_root: "."
+  cmd_path: "./cmd/drun"
+  coverage_file: "coverage.out"
 
-# Global options applied to all recipes (can be overridden)
-defaults:
-  working_dir: "."
-  shell: auto
-  export_env: true
-  timeout: "2h"
-
-# Reusable snippets
+# Reusable code snippets
 snippets:
-  ensure_deps: |
-    echo "Ensuring dependencies are up to date..."
-    go mod tidy
-    go mod download
+  check_go: |
+    if ! command -v go &> /dev/null; then
+        echo "❌ Go is not installed"
+        exit 1
+    fi
+    echo "✅ Go $(go version | cut -d' ' -f3) found"
+
+  check_golangci_lint: |
+    if ! command -v golangci-lint &> /dev/null; then
+        echo "⚠️  golangci-lint not found, installing..."
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    fi
+    echo "✅ golangci-lint found"
 
 recipes:
-  # Default recipe - shows help
-  default:
-    help: "Show available recipes"
-    run: |
-      echo "Available drun recipes:"
-      echo "  build    - Build the application"
-      echo "  test     - Run tests"
-      echo "  clean    - Clean build artifacts"
-      echo "  release  - Build and release (usage: release <version> <arch>)"
-
-  # Simple build recipe
-  build:
-    help: "Build the drun application"
-    deps: [deps]
-    cache_key: "build-{{ sha256 \"go.mod go.sum\" }}-{{ now \"2006-01-02\" }}"
-    run: |
-      {{ snippet "ensure_deps" }}
-      echo "Building {{ .app_name }}..."
-      go build -o bin/{{ .app_name }} ./cmd/{{ .app_name }}
-      echo "Build complete: bin/{{ .app_name }}"
-
-  # Test recipe with optional filter
+  # Development workflow recipes
   test:
-    help: "Run tests (usage: test [--unit=pattern])"
-    flags:
-      unit: 
-        type: string
-        default: ""
-        help: "Run specific unit tests matching pattern"
-    deps: [deps]
+    help: "Run all tests with coverage"
     run: |
-      {{ snippet "ensure_deps" }}
-      {{ if .unit }}
-      echo "Running tests matching: {{ .unit }}"
-      go test -v -run "{{ .unit }}" ./...
-      {{ else }}
-      echo "Running all tests..."
-      go test -v ./...
-      {{ end }}
+      {{ snippet "check_go" }}
+      {{ step "Running tests with coverage..." }}
+      
+      go test -v -race -coverprofile={{ .coverage_file }} ./...
+      
+      if [ $? -eq 0 ]; then
+          {{ success "All tests passed!" }}
+          
+          # Show coverage summary
+          {{ info "Coverage Summary:" }}
+          go tool cover -func={{ .coverage_file }} | tail -1
+      else
+          {{ error "Tests failed!" }}
+          exit 1
+      fi
 
-  # Clean build artifacts
-  clean:
-    help: "Clean build artifacts"
+  test-unit:
+    help: "Run unit tests only (fast)"
     run: |
-      echo "Cleaning build artifacts..."
-      rm -rf bin/
-      go clean -cache
-      echo "Clean complete"
+      {{ snippet "check_go" }}
+      {{ step "Running unit tests..." }}
+      
+      go test -v -short ./...
 
-  # Release with positionals
-  release:
-    help: "Build & optionally push release. Usage: release <version> <arch> [--push]"
-    positionals:
-      - name: version
-        required: true
-      - name: arch
-        required: true
-        one_of: ["amd64", "arm64", "both"]
-    flags:
-      push:
-        type: bool
-        default: false
-        help: "Push the release to registry"
-      platform:
-        type: string
-        default: "{{ if eq .arch \"both\" }}linux/amd64,linux/arm64{{ else }}linux/{{ .arch }}{{ end }}"
-    env:
-      VERSION: "{{ .version }}"
-      GOOS: linux
-      GOARCH: "{{ if eq .arch \"both\" }}amd64{{ else }}{{ .arch }}{{ end }}"
-    deps: [clean, deps]
+  test-coverage:
+    help: "Generate and view test coverage report"
+    deps: ["test"]
     run: |
-      echo "Building release {{ .version }} for {{ .arch }}"
-      {{ if eq .arch "both" }}
-      echo "Building for multiple architectures..."
-      GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-amd64 ./cmd/{{ .app_name }}
-      GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-arm64 ./cmd/{{ .app_name }}
-      {{ else }}
-      echo "Building for {{ .arch }}..."
-      go build -ldflags "-X main.version={{ .version }}" -o bin/{{ .app_name }}-linux-{{ .arch }} ./cmd/{{ .app_name }}
-      {{ end }}
-      {{ if .push }}
-      echo "Would push to registry (not implemented in example)"
-      {{ else }}
-      echo "Built locally (use --push to upload)"
-      {{ end }}
+      {{ step "Generating coverage report..." }}
+      
+      go tool cover -html={{ .coverage_file }} -o coverage.html
+      {{ success "Coverage report generated: coverage.html" }}
+      
+      # Try to open in browser (works on macOS and Linux)
+      if command -v open &> /dev/null; then
+          open coverage.html
+      elif command -v xdg-open &> /dev/null; then
+          xdg-open coverage.html
+      else
+          {{ info "Open coverage.html in your browser to view the report" }}
+      fi
 
-  # Dependency management
-  deps:
-    help: "Ensure dependencies are up to date"
-    run: |
-      {{ snippet "ensure_deps" }}
-
-  # Lint code
   lint:
-    help: "Run linting"
-    deps: [deps]
+    help: "Run golangci-lint checks"
     run: |
-      echo "Running linters..."
+      {{ snippet "check_golangci_lint" }}
+      {{ step "Running linter..." }}
+      
+      golangci-lint run
+      
+      if [ $? -eq 0 ]; then
+          {{ success "No linting issues found!" }}
+      else
+          {{ error "Linting issues found!" }}
+          exit 1
+      fi
+
+  fmt:
+    help: "Format Go code"
+    run: |
+      {{ snippet "check_go" }}
+      {{ step "Formatting Go code..." }}
+      
       go fmt ./...
+      {{ success "Code formatted!" }}
+
+  vet:
+    help: "Run go vet"
+    run: |
+      {{ snippet "check_go" }}
+      {{ step "Running go vet..." }}
+      
       go vet ./...
-      echo "Linting complete"
+      
+      if [ $? -eq 0 ]; then
+          {{ success "No vet issues found!" }}
+      else
+          {{ error "Vet issues found!" }}
+          exit 1
+      fi
 
-  # Run all checks in parallel
-  all:
-    help: "Run all checks (parallel)"
-    deps:
-      - lint
-      - test
-      - build
-    parallel_deps: true
+  # Build recipes
+  build:
+    help: "Build the drun binary"
     run: |
-      echo "All checks completed successfully!"
+      {{ snippet "check_go" }}
+      {{ step "Building drun..." }}
+      
+      go build -o bin/drun {{ .cmd_path }}
+      
+      if [ $? -eq 0 ]; then
+          {{ success "Build successful! Binary: bin/drun" }}
+          {{ info "Binary info:" }}
+          ls -lh bin/drun
+          {{ info "Version:" }}
+          ./bin/drun --version || echo "Version command not available"
+      else
+          {{ error "Build failed!" }}
+          exit 1
+      fi
 
-  # Development server (example of long-running task)
+  build-all:
+    help: "Build binaries for all platforms"
+    run: |
+      {{ snippet "check_go" }}
+      {{ step "Building for all platforms..." }}
+      
+      # Run the existing build script
+      ./build.sh
+      
+      if [ $? -eq 0 ]; then
+          {{ success "All builds successful!" }}
+          {{ info "Built binaries:" }}
+          ls -lh dist/
+      else
+          {{ error "Build failed!" }}
+          exit 1
+      fi
+
+  # Quality assurance recipes
+  check:
+    help: "Run all quality checks (fmt, vet, lint, test)"
+    deps: ["fmt", "vet", "lint", "test"]
+    run: |
+      {{ success "All quality checks passed!" }}
+      {{ info "Your code is ready for commit!" }}
+
+  ci:
+    help: "Run CI pipeline (what runs in continuous integration)"
+    run: |
+      {{ step "Running CI pipeline..." }}
+      
+      # Run existing CI script
+      ./test-ci.sh
+      
+      if [ $? -eq 0 ]; then
+          {{ success "CI pipeline passed!" }}
+      else
+          {{ error "CI pipeline failed!" }}
+          exit 1
+      fi
+
+  # Development helpers
+  clean:
+    help: "Clean build artifacts and temporary files"
+    run: |
+      {{ step "Cleaning up..." }}
+      
+      # Remove build artifacts
+      rm -rf bin/ dist/
+      rm -f {{ .coverage_file }} coverage.html
+      
+      # Clean Go module cache for this project
+      go clean -cache -testcache -modcache
+      
+      {{ success "Cleanup complete!" }}
+
+  deps:
+    help: "Download and verify dependencies"
+    run: |
+      {{ snippet "check_go" }}
+      {{ step "Managing dependencies..." }}
+      
+      {{ info "Downloading dependencies..." }}
+      go mod download
+      
+      {{ info "Verifying dependencies..." }}
+      go mod verify
+      
+      {{ info "Tidying go.mod..." }}
+      go mod tidy
+      
+      {{ success "Dependencies updated!" }}
+
+  install:
+    help: "Install drun to $GOPATH/bin"
+    deps: ["test"]
+    run: |
+      {{ snippet "check_go" }}
+      {{ step "Installing drun..." }}
+      
+      go install {{ .cmd_path }}
+      
+      if [ $? -eq 0 ]; then
+          {{ success "drun installed successfully!" }}
+          {{ info "Make sure $GOPATH/bin is in your PATH" }}
+          
+          # Show installation location
+          if command -v drun &> /dev/null; then
+              {{ info "Installed at: $(which drun)" }}
+              {{ info "Version: $(drun --version 2>/dev/null || echo 'Version command not available')" }}
+          fi
+      else
+          {{ error "Installation failed!" }}
+          exit 1
+      fi
+
+  # Completion testing
+  test-completion:
+    help: "Test tab completion functionality"
+    run: |
+      {{ step "Testing completion functionality..." }}
+      
+      # Build first to ensure we have the latest binary
+      go build -o bin/drun {{ .cmd_path }}
+      
+      {{ info "Generating completion script..." }}
+      ./bin/drun completion bash > /tmp/drun_completion_test.bash
+      
+      if [ $? -eq 0 ]; then
+          {{ success "Completion script generated successfully!" }}
+          {{ info "To test completion manually:" }}
+          echo "   source /tmp/drun_completion_test.bash"
+          echo "   drun <TAB><TAB>"
+      else
+          {{ error "Completion script generation failed!" }}
+          exit 1
+      fi
+      
+      # Clean up
+      rm -f /tmp/drun_completion_test.bash
+
+  # Development workflow
   dev:
-    help: "Start development server"
-    deps: [build]
+    help: "Quick development check (fmt + test-unit)"
+    deps: ["fmt", "test-unit"]
     run: |
-      echo "Starting development server..."
-      echo "Press Ctrl+C to stop"
-      ./bin/{{ .app_name }} --help
+      {{ success "Quick dev check complete!" }}
 
-  # Test recipe with multiple flag types
-  demo-flags:
-    help: "Demonstrate different flag types"
-    flags:
-      name:
-        type: string
-        default: "world"
-        help: "Name to greet"
-      count:
-        type: int
-        default: 1
-        help: "Number of times to greet"
-      verbose:
-        type: bool
-        default: false
-        help: "Enable verbose output"
-      tags:
-        type: "string[]"
-        help: "List of tags"
+  release-check:
+    help: "Full release readiness check"
+    deps: ["clean", "deps", "check", "build-all"]
     run: |
-      {{ if .verbose }}
-      echo "Verbose mode enabled"
-      echo "Flags received:"
-      echo "  name: {{ .name }}"
-      echo "  count: {{ .count }}"
-      echo "  verbose: {{ .verbose }}"
-      {{ if .tags }}
-      echo "  tags: {{ .tags | join ", " }}"
-      {{ end }}
-      {{ end }}
-      
-      {{ range $i := until .count }}
-      echo "Hello, {{ $.name }}! ({{ add $i 1 }}/{{ $.count }})"
-      {{ end }}
-      
-      {{ if .tags }}
-      echo "Tags: {{ .tags | join ", " }}"
-      {{ end }}
-
-# Artifact cache (optional)
-cache:
-  path: ".drun/cache"
-  keys:
-    - "go-deps-{{ sha256 \"go.mod\" }}"
+      {{ success "Release readiness check complete!" }}
+      {{ info "Ready for release!" }}

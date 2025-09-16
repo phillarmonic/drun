@@ -1658,15 +1658,38 @@ func completeRecipes(cmd *cobra.Command, args []string, toComplete string) ([]st
 
 	// If no recipe specified yet, complete recipe names
 	if len(args) == 0 {
-		var recipes []string
+		var completions []string
+
+		// Add workspace recipes first
 		for name, recipe := range specData.Recipes {
 			help := recipe.Help
 			if help == "" {
 				help = "No description"
 			}
-			recipes = append(recipes, name+"\t"+help)
+			completions = append(completions, name+"\t"+help)
 		}
-		return recipes, cobra.ShellCompDirectiveNoFileComp
+
+		// Add separator if we have both recipes and subcommands
+		var drunCommands []string
+		for _, subCmd := range cmd.Commands() {
+			// Include all non-hidden subcommands
+			if !subCmd.Hidden {
+				help := subCmd.Short
+				if help == "" {
+					help = "No description"
+				}
+				drunCommands = append(drunCommands, subCmd.Name()+"\t"+help+" (drun CLI command)")
+			}
+		}
+
+		if len(completions) > 0 && len(drunCommands) > 0 {
+			completions = append(completions, "---\t")
+		}
+
+		// Add drun commands with explicit labeling
+		completions = append(completions, drunCommands...)
+
+		return completions, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	// If recipe is specified, complete its arguments
