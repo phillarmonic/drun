@@ -851,7 +851,7 @@ cd drun
 go build -o bin/drun ./cmd/drun
 
 # Or use the build script for all platforms
-./build.sh
+./scripts/build.sh
 ```
 
 ### Testing
@@ -860,16 +860,16 @@ Run the comprehensive test suite (includes mandatory golangci-lint):
 
 ```bash
 # Basic tests (includes linting, unit tests, build verification)
-./test.sh
+./scripts/test.sh
 
 # With coverage report
-./test.sh -c
+./scripts/test.sh -c
 
 # Verbose with race detection
-./test.sh -v -r
+./scripts/test.sh -v -r
 
 # All options
-./test.sh -v -c -r -b
+./scripts/test.sh -v -c -r -b
 ```
 
 Or run components manually:
@@ -885,7 +885,7 @@ go test ./internal/...
 go test -cover ./internal/...
 
 # CI-optimized test suite
-./test-ci.sh
+./scripts/test-ci.sh
 ```
 
 ### Performance Benchmarks
@@ -938,5 +938,5 @@ Our performance optimizations deliver significant improvements:
 Run benchmarks yourself:
 
 ```bash
-./test.sh -b  # Includes comprehensive performance benchmarks
+./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```

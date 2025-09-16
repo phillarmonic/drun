@@ -3,7 +3,7 @@ version: 0.1
 # Environment variables available to all recipes
 env:
   PROJECT_NAME: "drun"
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.25"
 
 # Variables for templating
 vars:
@@ -140,7 +140,7 @@ recipes:
       {{ step "Building for all platforms..." }}
       
       # Run the existing build script
-      ./build.sh
+      ./scripts/build.sh
       
       if [ $? -eq 0 ]; then
           {{ success "All builds successful!" }}
@@ -164,8 +164,12 @@ recipes:
     run: |
       {{ step "Running CI pipeline..." }}
       
+      # Download dependencies first (like GHA)
+      {{ info "Downloading dependencies..." }}
+      go mod download
+      
       # Run existing CI script
-      ./test-ci.sh
+      ./scripts/test-ci.sh
       
       if [ $? -eq 0 ]; then
           {{ success "CI pipeline passed!" }}

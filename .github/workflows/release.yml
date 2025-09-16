@@ -65,7 +65,7 @@ jobs:
       run: go mod download
 
     - name: Run tests
-      run: ./test-ci.sh
+      run: ./scripts/test-ci.sh
 
   # Build job for cross-platform binaries
   build:
