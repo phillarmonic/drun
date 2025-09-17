@@ -1,0 +1,102 @@
+# Control Flow Examples
+# Demonstrates if/when statements, loops, and error handling
+
+task "check environment" means "Check and validate environment":
+  step "Environment validation"
+  
+  # Smart detection conditions
+  if docker is running:
+    success "Docker is available"
+  else:
+    warn "Docker is not running"
+  
+  if kubernetes is available:
+    success "Kubernetes is available"
+  else:
+    info "Kubernetes not detected"
+  
+  # File detection
+  when project type:
+    is "node": info "Node.js project detected"
+    is "go": info "Go project detected"  
+    is "python": info "Python project detected"
+    else: info "Unknown project type"
+
+task "matrix test" means "Run tests across multiple configurations":
+  step "Running matrix tests"
+  
+  for each os in ["ubuntu", "alpine", "debian"]:
+    for each version in ["16", "18", "20"]:
+      step "Testing on {os} with Node {version}"
+      info "Configuration: {os}/{version}"
+      
+      # Simulate test execution
+      if {version} == "16":
+        warn "Using legacy Node.js version"
+      else:
+        info "Using modern Node.js version"
+
+task "retry example" means "Demonstrate retry logic with error handling":
+  step "Attempting operation with retries"
+  
+  for attempt from 1 to 3:
+    try:
+      step "Attempt {attempt}/3"
+      
+      # Simulate random failure (in real scenario, this would be actual operation)
+      if {attempt} < 3:
+        error "Simulated failure on attempt {attempt}"
+        fail with "Operation failed"
+      else:
+        success "Operation succeeded on attempt {attempt}"
+        break
+        
+    catch operation_error:
+      if {attempt} == 3:
+        error "All retry attempts failed"
+        fail "Maximum retries exceeded"
+      else:
+        warn "Attempt {attempt} failed, retrying in {attempt * 2} seconds..."
+        wait {attempt * 2} seconds
+
+task "conditional deployment" means "Deploy with environment-specific logic":
+  requires target_env from ["dev", "staging", "production"]
+  
+  step "Preparing deployment to {target_env}"
+  
+  # Environment-specific configuration
+  let config be:
+    when target_env is "production": {
+      replicas: 5,
+      resources: "high",
+      monitoring: true
+    }
+    when target_env is "staging": {
+      replicas: 2, 
+      resources: "medium",
+      monitoring: true
+    }
+    else: {
+      replicas: 1,
+      resources: "low", 
+      monitoring: false
+    }
+  
+  info "Configuration: {config.replicas} replicas, {config.resources} resources"
+  
+  if {config.monitoring}:
+    info "Monitoring enabled for {target_env}"
+  else:
+    info "Monitoring disabled for {target_env}"
+  
+  # Production safety checks
+  if {target_env} == "production":
+    if git repo is dirty:
+      error "Cannot deploy dirty repository to production"
+      fail
+    
+    if not git tag exists for current commit:
+      warn "No git tag found for current commit"
+      require manual approval "Deploy untagged commit to production?"
+  
+  success "Deployment configuration validated for {target_env}"

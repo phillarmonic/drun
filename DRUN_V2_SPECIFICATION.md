@@ -27,22 +27,31 @@
 
 ## Overview
 
-drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. The language compiles to shell commands while providing high-level abstractions for common DevOps operations.
+drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. Unlike v1 which uses YAML configuration, v2 features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
 
 ### Key Features
 
 - **Natural Language Syntax**: Write automation in English-like sentences
-- **Shell Backend**: All constructs compile to shell commands
+- **Native Execution Engine**: Direct interpretation and execution of v2 syntax
+- **Shell Backend**: All constructs execute as shell commands when needed
 - **Smart Inference**: Automatic detection of tools, environments, and patterns
 - **Type Safety**: Static analysis with runtime validation
-- **Backward Compatibility**: Compiles to drun v1 YAML format
+
+### Architecture
+
+drun v2 uses a **new execution engine** with the following components:
+
+1. **Lexer**: Tokenizes the semantic language source code
+2. **Parser**: Builds an Abstract Syntax Tree (AST) from tokens
+3. **Engine**: Directly executes the AST without intermediate compilation
+4. **Runtime**: Provides built-in actions, smart detection, and shell integration
 
 ### Design Goals
 
 1. **Readability**: Non-technical stakeholders can understand automation workflows
 2. **Maintainability**: Reduce boilerplate, focus on intent
 3. **Composability**: Natural language enables intuitive composition
-4. **Performance**: Leverage existing drun infrastructure and optimizations
+4. **Performance**: Direct execution without compilation overhead
 5. **Extensibility**: Plugin system for domain-specific actions
 
 ---
@@ -1293,20 +1302,20 @@ when vite is detected:
 
 ---
 
-## Compilation Model
+## Execution Model
 
-### Compilation Pipeline
+### Execution Pipeline
 
-1. **Lexical Analysis**: Tokenize source code
-2. **Parsing**: Build Abstract Syntax Tree (AST)
-3. **Semantic Analysis**: Type checking, scope resolution
+1. **Lexical Analysis**: Tokenize source code into semantic tokens
+2. **Parsing**: Build Abstract Syntax Tree (AST) from tokens
+3. **Semantic Analysis**: Type checking, scope resolution, validation
 4. **Smart Detection**: Analyze project structure and available tools
-5. **Code Generation**: Generate drun v1 YAML and shell commands
-6. **Optimization**: Optimize generated code for performance
+5. **Direct Execution**: Execute AST nodes directly through the v2 engine
+6. **Runtime Integration**: Interface with shell, tools, and external systems
 
-### Target Generation
+### Native Execution
 
-The semantic language compiles to drun v1 YAML format:
+The semantic language executes directly without intermediate compilation:
 
 #### Source (Semantic v2):
 ```
@@ -1317,38 +1326,28 @@ task "deploy" means "Deploy to environment":
   deploy myapp:latest to kubernetes namespace {environment}
 ```
 
-#### Generated (drun v1 YAML):
-```yaml
-recipes:
-  deploy:
-    help: "Deploy to environment"
-    positionals:
-      - name: environment
-        required: true
-        one_of: ["dev", "staging", "production"]
-    deps: [build, test]
-    run: |
-      kubectl set image deployment/myapp myapp=myapp:latest --namespace={{ .environment }}
-      kubectl rollout status deployment/myapp --namespace={{ .environment }}
-```
+#### Execution Flow:
+1. **Parse**: Convert source to AST with task dependencies and actions
+2. **Validate**: Check parameter constraints and dependencies
+3. **Execute**: Run dependency tasks first, then execute deployment actions
+4. **Runtime**: Execute shell commands with parameter substitution
 
-### Smart Code Generation
+### Smart Execution
 
-#### Docker Command Generation
+#### Docker Command Execution
 
 ```
 # Source
 build docker image "myapp:{version}"
 
-# Generated (detects available Docker features)
-{{ if dockerBuildx }}
-docker buildx build -t myapp:{{ .version }} .
-{{ else }}
-docker build -t myapp:{{ .version }} .
-{{ end }}
+# Runtime Detection & Execution
+if dockerBuildx available:
+  execute: docker buildx build -t myapp:${version} .
+else:
+  execute: docker build -t myapp:${version} .
 ```
 
-#### Kubernetes Command Generation
+#### Kubernetes Command Execution
 
 ```
 # Source
@@ -1787,6 +1786,57 @@ task "custom-operation":
 ---
 
 ## Implementation Notes
+
+### Architecture Overview
+
+drun v2 uses a **completely new execution engine** separate from v1:
+
+```
+drun/
+├── internal/
+│   ├── v1/           # Legacy v1 components (YAML-based)
+│   │   ├── model/    # v1 data structures
+│   │   ├── spec/     # v1 YAML loader
+│   │   ├── runner/   # v1 task execution
+│   │   ├── cache/    # v1 caching system
+│   │   ├── dag/      # v1 dependency graph
+│   │   ├── http/     # v1 HTTP integration
+│   │   ├── pool/     # v1 worker pools
+│   │   ├── shell/    # v1 shell execution
+│   │   └── tmpl/     # v1 template engine
+│   └── v2/           # New v2 components (semantic language)
+│       ├── lexer/    # Lexical analysis domain
+│       │   ├── token.go    # Token definitions
+│       │   ├── lexer.go    # Tokenizer implementation
+│       │   └── lexer_test.go
+│       ├── parser/   # Syntax parsing domain
+│       │   ├── parser.go   # Parser implementation
+│       │   └── parser_test.go
+│       ├── ast/      # Abstract Syntax Tree domain
+│       │   └── ast.go      # AST node definitions
+│       └── engine/   # Execution engine domain
+│           ├── engine.go   # Direct execution engine
+│           └── engine_test.go
+└── cmd/drun/
+    └── main.go       # CLI integration for both v1 and v2
+```
+
+### v2 Engine Components
+
+1. **Lexer** (`internal/v2/lexer/`): Tokenizes semantic language into tokens
+2. **Parser** (`internal/v2/parser/`): Builds Abstract Syntax Tree from tokens
+3. **AST** (`internal/v2/ast/`): Defines semantic language node structures
+4. **Engine** (`internal/v2/engine/`): Directly executes AST nodes
+5. **Runtime**: Built-in actions, smart detection, shell integration
+
+### Domain Separation
+
+Each v2 component is organized into its own domain package:
+
+- **`lexer/`**: Handles tokenization of source code
+- **`parser/`**: Converts tokens into structured AST
+- **`ast/`**: Defines the semantic language's syntax tree nodes
+- **`engine/`**: Executes the parsed AST directly
 
 ### Parser Implementation
 

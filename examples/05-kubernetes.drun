@@ -1,0 +1,154 @@
+# Kubernetes Deployment Examples
+# Shows Kubernetes operations in semantic syntax
+
+project "k8s-app":
+  set namespace_prefix to "myapp"
+  set image_registry to "ghcr.io/company"
+
+task "deploy" means "Deploy application to Kubernetes":
+  requires environment from ["dev", "staging", "production"]
+  given version defaults to "latest"
+  given replicas defaults to 3
+  
+  step "Deploying to Kubernetes"
+  
+  # Calculate namespace and image
+  let namespace be "{namespace_prefix}-{environment}"
+  let image be "{image_registry}/myapp:{version}"
+  
+  info "Deploying {image} to namespace {namespace}"
+  
+  # Environment-specific replica counts
+  let final_replicas be:
+    when environment is "production": 5
+    when environment is "staging": 2
+    else: {replicas}
+  
+  # Deploy to Kubernetes
+  deploy {image} to kubernetes namespace {namespace} with {final_replicas} replicas
+  
+  # Wait for rollout to complete
+  wait for rollout of deployment "myapp" in namespace {namespace}
+  
+  success "Deployment completed in {namespace}"
+
+task "scale" means "Scale application replicas":
+  requires environment from ["dev", "staging", "production"]
+  requires replica_count as number between 1 and 20
+  
+  let namespace be "{namespace_prefix}-{environment}"
+  
+  step "Scaling application to {replica_count} replicas"
+  
+  scale deployment "myapp" to {replica_count} replicas in namespace {namespace}
+  
+  # Wait for scaling to complete
+  wait for deployment "myapp" to be ready in namespace {namespace}
+  
+  success "Scaled to {replica_count} replicas in {environment}"
+
+task "rollback" means "Rollback to previous version":
+  requires environment from ["dev", "staging", "production"]
+  
+  let namespace be "{namespace_prefix}-{environment}"
+  
+  step "Rolling back deployment"
+  
+  when environment is "production":
+    warn "Rolling back production deployment!"
+    require manual approval "Confirm production rollback?"
+  
+  rollback deployment "myapp" in namespace {namespace}
+  
+  wait for rollout of deployment "myapp" in namespace {namespace}
+  
+  success "Rollback completed in {environment}"
+
+task "status" means "Check application status":
+  requires environment from ["dev", "staging", "production"]
+  
+  let namespace be "{namespace_prefix}-{environment}"
+  
+  step "Checking application status in {environment}"
+  
+  # Get deployment status
+  capture deployment_status from kubectl get deployment myapp in namespace {namespace}
+  capture pod_status from kubectl get pods in namespace {namespace}
+  
+  info "Deployment Status:"
+  info {deployment_status}
+  info "Pod Status:"
+  info {pod_status}
+  
+  # Check if deployment is healthy
+  if deployment "myapp" is healthy in namespace {namespace}:
+    success "Application is healthy in {environment}"
+  else:
+    warn "Application may have issues in {environment}"
+
+task "logs" means "Get application logs":
+  requires environment from ["dev", "staging", "production"]
+  given lines defaults to 100
+  given follow defaults to false
+  
+  let namespace be "{namespace_prefix}-{environment}"
+  
+  step "Getting logs from {environment}"
+  
+  if {follow}:
+    info "Following logs (press Ctrl+C to stop)..."
+    follow logs from deployment "myapp" in namespace {namespace}
+  else:
+    info "Getting last {lines} lines..."
+    get {lines} lines of logs from deployment "myapp" in namespace {namespace}
+
+task "port forward" means "Forward local port to application":
+  requires environment from ["dev", "staging", "production"]
+  given local_port defaults to 8080
+  given remote_port defaults to 8080
+  
+  let namespace be "{namespace_prefix}-{environment}"
+  
+  step "Setting up port forwarding"
+  
+  info "Forwarding localhost:{local_port} -> {environment}:{remote_port}"
+  info "Press Ctrl+C to stop port forwarding"
+  
+  forward port {local_port} to deployment "myapp" port {remote_port} in namespace {namespace}
+
+task "full deployment" means "Complete deployment pipeline":
+  requires environment from ["dev", "staging", "production"]
+  given version defaults to current git commit
+  
+  step "Starting full deployment pipeline"
+  
+  # Pre-deployment checks
+  when environment is "production":
+    if git repo is dirty:
+      error "Cannot deploy dirty repository to production"
+      fail
+    
+    if not git tag exists for current commit:
+      warn "No git tag for current commit"
+      require manual approval "Deploy untagged commit?"
+  
+  # Deploy
+  deploy myapp:{version} to kubernetes namespace {namespace_prefix}-{environment}
+  
+  # Health check
+  step "Performing health check"
+  
+  for attempt from 1 to 5:
+    try:
+      check health of service "myapp" in namespace {namespace_prefix}-{environment}
+      success "Health check passed"
+      break
+    catch health_error:
+      if {attempt} == 5:
+        error "Health check failed after 5 attempts"
+        warn "Consider rolling back the deployment"
+        fail
+      warn "Health check attempt {attempt} failed, retrying..."
+      wait {attempt * 10} seconds
+  
+  success "Full deployment to {environment} completed successfully!"

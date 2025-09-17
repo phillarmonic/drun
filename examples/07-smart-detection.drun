@@ -1,0 +1,314 @@
+# Smart Detection Examples
+# Demonstrates intelligent project and environment detection
+
+task "analyze project" means "Analyze and detect project characteristics":
+  step "🔍 Analyzing project structure"
+  
+  # Framework detection
+  when symfony is detected:
+    info "🎵 Symfony framework detected"
+    capture symfony_version from symfony console version
+    info "Version: {symfony_version}"
+    
+    if {symfony_version} contains "6.":
+      success "Modern Symfony 6.x - all features available"
+    else if {symfony_version} contains "5.":
+      info "Symfony 5.x - stable version"
+    else:
+      warn "Older Symfony version detected"
+  
+  when laravel is detected:
+    info "🔺 Laravel framework detected"
+    capture laravel_version from php artisan --version
+    info "Version: {laravel_version}"
+  
+  when rails is detected:
+    info "💎 Ruby on Rails detected"
+    capture rails_version from rails --version
+    info "Version: {rails_version}"
+  
+  when django is detected:
+    info "🐍 Django framework detected"
+    capture django_version from python manage.py --version
+    info "Version: {django_version}"
+  
+  # Package manager detection
+  when package manager:
+    is "npm": 
+      info "📦 Using npm package manager"
+      capture npm_version from npm --version
+    is "yarn":
+      info "🧶 Using Yarn package manager"  
+      capture yarn_version from yarn --version
+    is "pnpm":
+      info "⚡ Using pnpm package manager"
+      capture pnpm_version from pnpm --version
+    is "go":
+      info "🐹 Go modules detected"
+      capture go_version from go version
+    is "pip":
+      info "🐍 Python pip detected"
+      capture pip_version from pip --version
+    else:
+      info "❓ Unknown or no package manager detected"
+  
+  # Container detection
+  if file "Dockerfile" exists:
+    success "🐳 Docker configuration found"
+    
+    if file "docker-compose.yml" exists:
+      info "🐙 Docker Compose configuration found"
+    
+    if file ".dockerignore" exists:
+      info "📄 Docker ignore file found"
+  
+  # CI/CD detection
+  if directory ".github/workflows" exists:
+    info "⚙️ GitHub Actions workflows detected"
+  
+  if file ".gitlab-ci.yml" exists:
+    info "🦊 GitLab CI configuration detected"
+  
+  if file "Jenkinsfile" exists:
+    info "🤖 Jenkins pipeline detected"
+  
+  # Kubernetes detection
+  if directory "k8s" exists or directory "kubernetes" exists:
+    info "☸️ Kubernetes manifests found"
+  
+  if file "helm/Chart.yaml" exists:
+    info "⎈ Helm chart detected"
+
+task "smart build" means "Build project using detected tools and frameworks":
+  step "🏗️ Starting intelligent build"
+  
+  # Pre-build setup based on detected tools
+  when package manager:
+    is "npm": 
+      info "Installing npm dependencies"
+      run "npm ci"
+    is "yarn":
+      info "Installing yarn dependencies"
+      run "yarn install --frozen-lockfile"
+    is "pnpm":
+      info "Installing pnpm dependencies"
+      run "pnpm install --frozen-lockfile"
+    is "go":
+      info "Downloading Go dependencies"
+      run "go mod download"
+    is "pip":
+      info "Installing Python dependencies"
+      if file "requirements.txt" exists:
+        run "pip install -r requirements.txt"
+      if file "pyproject.toml" exists:
+        run "pip install -e ."
+  
+  # Framework-specific build steps
+  when symfony is detected:
+    info "Building Symfony application"
+    run "composer install --no-dev --optimize-autoloader"
+    
+    if file "webpack.config.js" exists:
+      run "npm run build"
+    
+    run "php bin/console cache:clear --env=prod"
+    run "php bin/console assets:install"
+  
+  when laravel is detected:
+    info "Building Laravel application"
+    run "composer install --no-dev --optimize-autoloader"
+    run "php artisan config:cache"
+    run "php artisan route:cache"
+    run "php artisan view:cache"
+    
+    if file "package.json" exists:
+      run "npm run production"
+  
+  when node project exists:
+    info "Building Node.js application"
+    
+    # Detect build script
+    if npm script "build" exists:
+      run "npm run build"
+    else if npm script "compile" exists:
+      run "npm run compile"
+    else:
+      info "No build script detected"
+  
+  when go project exists:
+    info "Building Go application"
+    
+    if directory "cmd" exists:
+      run "go build -o bin/app ./cmd/..."
+    else:
+      run "go build -o bin/app ."
+  
+  # Container build if Dockerfile exists
+  if file "Dockerfile" exists:
+    info "Building Docker container"
+    
+    let image_name be project_name or "app"
+    let image_tag be current git commit or "latest"
+    
+    build docker image "{image_name}:{image_tag}"
+    
+    success "Container built: {image_name}:{image_tag}"
+  
+  success "Smart build completed"
+
+task "smart test" means "Run tests using detected testing frameworks":
+  step "🧪 Running intelligent test suite"
+  
+  # Framework-specific testing
+  when symfony is detected:
+    if file "phpunit.xml" exists or file "phpunit.xml.dist" exists:
+      run "php bin/phpunit"
+    
+    if directory "tests/Behat" exists:
+      run "vendor/bin/behat"
+  
+  when laravel is detected:
+    run "php artisan test"
+    
+    if file "phpunit.xml" exists:
+      run "vendor/bin/phpunit"
+  
+  when node project exists:
+    # Detect test runner
+    if npm script "test" exists:
+      run "npm test"
+    
+    if file "jest.config.js" exists:
+      run "npx jest"
+    
+    if file "vitest.config.js" exists:
+      run "npx vitest run"
+    
+    # E2E tests
+    if file "cypress.config.js" exists:
+      run "npx cypress run"
+    
+    if file "playwright.config.js" exists:
+      run "npx playwright test"
+  
+  when go project exists:
+    run "go test -v ./..."
+    
+    # Check for integration tests
+    if directory "tests" exists:
+      run "go test -v -tags=integration ./tests/..."
+  
+  when python project exists:
+    if file "pytest.ini" exists or directory "tests" exists:
+      run "pytest"
+    
+    if file "tox.ini" exists:
+      run "tox"
+  
+  success "Smart testing completed"
+
+task "smart deploy" means "Deploy using detected infrastructure":
+  requires environment from ["dev", "staging", "production"]
+  
+  step "🚀 Starting intelligent deployment"
+  
+  # Kubernetes deployment
+  if kubernetes is available:
+    info "Deploying to Kubernetes"
+    
+    let namespace be "{project_name}-{environment}"
+    let image_name be project_name
+    let image_tag be current git commit
+    
+    if directory "k8s" exists:
+      apply kubernetes manifests from "k8s/{environment}/"
+    else if directory "kubernetes" exists:
+      apply kubernetes manifests from "kubernetes/{environment}/"
+    else:
+      # Generate basic deployment
+      deploy {image_name}:{image_tag} to kubernetes namespace {namespace}
+    
+    wait for rollout to complete
+    
+  # Docker Compose deployment
+  else if file "docker-compose.yml" exists:
+    info "Deploying with Docker Compose"
+    
+    if file "docker-compose.{environment}.yml" exists:
+      start docker compose services from "docker-compose.{environment}.yml"
+    else:
+      start docker compose services
+  
+  # Heroku deployment
+  else if file "Procfile" exists:
+    info "Deploying to Heroku"
+    
+    when environment:
+      is "staging": run "git push heroku-staging main"
+      is "production": run "git push heroku main"
+  
+  # Traditional server deployment
+  else:
+    info "Deploying to traditional server"
+    
+    # Framework-specific deployment
+    when symfony is detected:
+      run "rsync -av --exclude=var/cache/ . deploy@server:/var/www/{project_name}/"
+      run "ssh deploy@server 'cd /var/www/{project_name} && php bin/console cache:clear --env=prod'"
+    
+    when laravel is detected:
+      run "rsync -av --exclude=storage/ . deploy@server:/var/www/{project_name}/"
+      run "ssh deploy@server 'cd /var/www/{project_name} && php artisan migrate --force'"
+  
+  success "Smart deployment to {environment} completed"
+
+task "environment check" means "Check environment and tool availability":
+  step "🔧 Checking environment"
+  
+  # Docker availability
+  if docker is running:
+    success "Docker is available and running"
+    capture docker_version from docker --version
+    info "Docker version: {docker_version}"
+  else:
+    warn "Docker is not running or not available"
+  
+  # Kubernetes availability  
+  if kubernetes is available:
+    success "Kubernetes is available"
+    capture k8s_version from kubectl version --client
+    info "kubectl version: {k8s_version}"
+  else:
+    info "Kubernetes is not available"
+  
+  # Git status
+  if git repo exists:
+    success "Git repository detected"
+    capture git_branch from current git branch
+    capture git_commit from current git commit
+    info "Branch: {git_branch}"
+    info "Commit: {git_commit}"
+    
+    if git repo is clean:
+      success "Working directory is clean"
+    else:
+      warn "Working directory has uncommitted changes"
+  else:
+    warn "Not a Git repository"
+  
+  # CI environment detection
+  when running in CI:
+    info "Running in CI environment"
+    
+    if running in github actions:
+      info "GitHub Actions detected"
+    else if running in gitlab ci:
+      info "GitLab CI detected"
+    else if running in jenkins:
+      info "Jenkins detected"
+    else:
+      info "Unknown CI environment"
+  else:
+    info "Running in local environment"
+  
+  success "Environment check completed"

@@ -1,0 +1,52 @@
+# Parameters and Variables
+# Shows how to use parameters, defaults, and variables in semantic syntax
+
+task "greet" means "Greet someone by name":
+  requires name
+  given title defaults to "friend"
+  
+  info "Hello, {title} {name}! Nice to meet you. 😊"
+
+task "deploy app" means "Deploy application to environment":
+  requires environment from ["dev", "staging", "production"]
+  given version defaults to current git commit
+  given replicas defaults to 3
+  
+  step "Deploying to {environment}"
+  info "Version: {version}"
+  info "Replicas: {replicas}"
+  
+  when environment is "production":
+    warn "Deploying to production - please confirm!"
+    require manual approval "Continue with production deployment?"
+  
+  success "Deployment to {environment} completed!"
+
+task "backup files" means "Backup files with timestamp":
+  requires source_path
+  given backup_name defaults to "backup-{now.format('2006-01-02-15-04-05')}"
+  
+  step "Creating backup: {backup_name}"
+  
+  if file {source_path} exists:
+    copy {source_path} to "backups/{backup_name}"
+    success "Backup created: backups/{backup_name}"
+  else:
+    error "Source path not found: {source_path}"
+    fail
+
+task "process list" means "Process a list of items":
+  accepts items as list of strings
+  given parallel defaults to false
+  
+  if {parallel}:
+    info "Processing items in parallel"
+    for each item in {items} in parallel:
+      info "Processing: {item}"
+  else:
+    info "Processing items sequentially"
+    for each item in {items}:
+      step "Processing: {item}"
+      info "Completed: {item}"
+  
+  success "All items processed!"
