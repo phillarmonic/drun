@@ -28,6 +28,27 @@ const (
 	SUCCESS // success
 	FAIL    // fail
 
+	// Parameter keywords
+	REQUIRES // requires
+	GIVEN    // given
+	ACCEPTS  // accepts
+	DEFAULTS // defaults
+	TO       // to
+	FROM     // from
+	AS       // as
+	LIST     // list
+	OF       // of
+
+	// Control flow keywords
+	WHEN     // when
+	IF       // if
+	ELSE     // else
+	FOR      // for
+	EACH     // each
+	IN       // in
+	PARALLEL // parallel
+	IS       // is
+
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
@@ -91,6 +112,40 @@ func (t TokenType) String() string {
 		return "SUCCESS"
 	case FAIL:
 		return "FAIL"
+	case REQUIRES:
+		return "REQUIRES"
+	case GIVEN:
+		return "GIVEN"
+	case ACCEPTS:
+		return "ACCEPTS"
+	case DEFAULTS:
+		return "DEFAULTS"
+	case TO:
+		return "TO"
+	case FROM:
+		return "FROM"
+	case AS:
+		return "AS"
+	case LIST:
+		return "LIST"
+	case OF:
+		return "OF"
+	case WHEN:
+		return "WHEN"
+	case IF:
+		return "IF"
+	case ELSE:
+		return "ELSE"
+	case FOR:
+		return "FOR"
+	case EACH:
+		return "EACH"
+	case IN:
+		return "IN"
+	case PARALLEL:
+		return "PARALLEL"
+	case IS:
+		return "IS"
 	case IDENT:
 		return "IDENT"
 	case ASSIGN:
@@ -132,17 +187,34 @@ func (t Token) String() string {
 
 // Keywords maps string literals to their token types
 var keywords = map[string]TokenType{
-	"version": VERSION,
-	"task":    TASK,
-	"means":   MEANS,
-	"info":    INFO,
-	"step":    STEP,
-	"warn":    WARN,
-	"error":   ERROR,
-	"success": SUCCESS,
-	"fail":    FAIL,
-	"true":    BOOLEAN,
-	"false":   BOOLEAN,
+	"version":  VERSION,
+	"task":     TASK,
+	"means":    MEANS,
+	"info":     INFO,
+	"step":     STEP,
+	"warn":     WARN,
+	"error":    ERROR,
+	"success":  SUCCESS,
+	"fail":     FAIL,
+	"requires": REQUIRES,
+	"given":    GIVEN,
+	"accepts":  ACCEPTS,
+	"defaults": DEFAULTS,
+	"to":       TO,
+	"from":     FROM,
+	"as":       AS,
+	"list":     LIST,
+	"of":       OF,
+	"when":     WHEN,
+	"if":       IF,
+	"else":     ELSE,
+	"for":      FOR,
+	"each":     EACH,
+	"in":       IN,
+	"parallel": PARALLEL,
+	"is":       IS,
+	"true":     BOOLEAN,
+	"false":    BOOLEAN,
 }
 
 // LookupIdent checks if an identifier is a keyword

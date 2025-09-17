@@ -3,6 +3,7 @@ package parser
 import (
 	"testing"
 
+	"github.com/phillarmonic/drun/internal/v2/ast"
 	"github.com/phillarmonic/drun/internal/v2/lexer"
 )
 
@@ -51,12 +52,17 @@ task "hello world":
 		t.Errorf("task1.Body wrong length. expected=1, got=%d", len(task1.Body))
 	}
 
-	if task1.Body[0].Action != "info" {
-		t.Errorf("task1.Body[0].Action wrong. expected=info, got=%s", task1.Body[0].Action)
-	}
+	action1, ok := task1.Body[0].(*ast.ActionStatement)
+	if !ok {
+		t.Errorf("task1.Body[0] is not an ActionStatement")
+	} else {
+		if action1.Action != "info" {
+			t.Errorf("task1.Body[0].Action wrong. expected=info, got=%s", action1.Action)
+		}
 
-	if task1.Body[0].Message != "Hello from drun v2! 👋" {
-		t.Errorf("task1.Body[0].Message wrong. expected='Hello from drun v2! 👋', got=%s", task1.Body[0].Message)
+		if action1.Message != "Hello from drun v2! 👋" {
+			t.Errorf("task1.Body[0].Message wrong. expected='Hello from drun v2! 👋', got=%s", action1.Message)
+		}
 	}
 
 	// Check second task
@@ -79,12 +85,18 @@ task "hello world":
 	}
 
 	for i, expected := range expectedActions {
-		if task2.Body[i].Action != expected.action {
-			t.Errorf("task2.Body[%d].Action wrong. expected=%s, got=%s", i, expected.action, task2.Body[i].Action)
+		action, ok := task2.Body[i].(*ast.ActionStatement)
+		if !ok {
+			t.Errorf("task2.Body[%d] is not an ActionStatement", i)
+			continue
 		}
 
-		if task2.Body[i].Message != expected.message {
-			t.Errorf("task2.Body[%d].Message wrong. expected=%s, got=%s", i, expected.message, task2.Body[i].Message)
+		if action.Action != expected.action {
+			t.Errorf("task2.Body[%d].Action wrong. expected=%s, got=%s", i, expected.action, action.Action)
+		}
+
+		if action.Message != expected.message {
+			t.Errorf("task2.Body[%d].Message wrong. expected=%s, got=%s", i, expected.message, action.Message)
 		}
 	}
 }

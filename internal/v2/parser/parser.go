@@ -124,7 +124,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 		return nil
 	}
 
-	// Parse task body (action statements)
+	// Parse task body (parameters and statements)
 	for {
 		// Check if we've reached the end of the task body
 		if p.peekToken.Type == lexer.DEDENT || p.peekToken.Type == lexer.EOF {
@@ -133,10 +133,15 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 
 		p.nextToken() // Move to the next token
 
-		if p.isActionToken(p.curToken.Type) {
+		if p.isParameterToken(p.curToken.Type) {
+			param := p.parseParameterStatement()
+			if param != nil {
+				stmt.Parameters = append(stmt.Parameters, *param)
+			}
+		} else if p.isActionToken(p.curToken.Type) {
 			action := p.parseActionStatement()
 			if action != nil {
-				stmt.Body = append(stmt.Body, *action)
+				stmt.Body = append(stmt.Body, action)
 			}
 		} else if p.curToken.Type == lexer.COMMENT {
 			// Skip comments in task body
@@ -170,6 +175,102 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 	stmt.Message = p.curToken.Literal
 
 	return stmt
+}
+
+// parseParameterStatement parses parameter declarations (requires, given, accepts)
+func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
+	stmt := &ast.ParameterStatement{
+		Token: p.curToken,
+		Type:  p.curToken.Literal,
+	}
+
+	// Parse parameter name
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	stmt.Name = p.curToken.Literal
+
+	// Handle different parameter types
+	switch stmt.Type {
+	case "requires":
+		stmt.Required = true
+		// Check for constraints: requires env from ["dev", "staging"]
+		if p.peekToken.Type == lexer.FROM {
+			p.nextToken() // consume FROM
+			if p.peekToken.Type == lexer.LBRACKET {
+				p.nextToken() // consume LBRACKET
+				stmt.Constraints = p.parseStringList()
+			}
+		}
+
+	case "given":
+		stmt.Required = false
+		// Expect: given name defaults to "value"
+		if !p.expectPeek(lexer.DEFAULTS) {
+			return nil
+		}
+		if !p.expectPeek(lexer.TO) {
+			return nil
+		}
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.DefaultValue = p.curToken.Literal
+
+	case "accepts":
+		stmt.Required = false
+		// Handle: accepts items as list of strings
+		if p.peekToken.Type == lexer.AS {
+			p.nextToken() // consume AS
+			if p.peekToken.Type == lexer.LIST {
+				p.nextToken() // consume LIST
+				stmt.DataType = "list"
+				if p.peekToken.Type == lexer.OF {
+					p.nextToken() // consume OF
+					if p.peekToken.Type == lexer.IDENT {
+						p.nextToken() // consume type
+						stmt.DataType = "list of " + p.curToken.Literal
+					}
+				}
+			}
+		}
+	}
+
+	return stmt
+}
+
+// parseStringList parses a list of strings like ["dev", "staging", "production"]
+func (p *Parser) parseStringList() []string {
+	var items []string
+
+	for p.peekToken.Type != lexer.RBRACKET && p.peekToken.Type != lexer.EOF {
+		if !p.expectPeek(lexer.STRING) {
+			break
+		}
+		items = append(items, p.curToken.Literal)
+
+		// Check for comma
+		if p.peekToken.Type == lexer.COMMA {
+			p.nextToken() // consume comma
+		}
+	}
+
+	// Consume RBRACKET
+	if p.peekToken.Type == lexer.RBRACKET {
+		p.nextToken()
+	}
+
+	return items
+}
+
+// isParameterToken checks if a token type represents a parameter declaration
+func (p *Parser) isParameterToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.REQUIRES, lexer.GIVEN, lexer.ACCEPTS:
+		return true
+	default:
+		return false
+	}
 }
 
 // isActionToken checks if a token type represents an action

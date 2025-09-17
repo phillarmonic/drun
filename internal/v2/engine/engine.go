@@ -62,20 +62,41 @@ func (e *Engine) executeTask(task *ast.TaskStatement) error {
 		if task.Description != "" {
 			fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
 		}
-		for _, action := range task.Body {
-			fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, action.Message)
+		for _, stmt := range task.Body {
+			if action, ok := stmt.(*ast.ActionStatement); ok {
+				fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, action.Message)
+			}
 		}
 		return nil
 	}
 
-	// Execute each action in the task body
-	for _, action := range task.Body {
-		if err := e.executeAction(&action); err != nil {
-			return fmt.Errorf("failed to execute action '%s': %v", action.Action, err)
+	// Execute each statement in the task body
+	for _, stmt := range task.Body {
+		if err := e.executeStatement(stmt); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+// executeStatement executes a single statement (action, parameter, conditional, etc.)
+func (e *Engine) executeStatement(stmt ast.Statement) error {
+	switch s := stmt.(type) {
+	case *ast.ActionStatement:
+		return e.executeAction(s)
+	case *ast.ParameterStatement:
+		// Parameters are handled during task setup, not execution
+		return nil
+	case *ast.ConditionalStatement:
+		// TODO: Implement conditional execution
+		return fmt.Errorf("conditional statements not yet implemented")
+	case *ast.LoopStatement:
+		// TODO: Implement loop execution
+		return fmt.Errorf("loop statements not yet implemented")
+	default:
+		return fmt.Errorf("unknown statement type: %T", stmt)
+	}
 }
 
 // executeAction executes a single action statement

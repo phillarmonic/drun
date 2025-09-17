@@ -1,6 +1,8 @@
 # Parameters and Variables
 # Shows how to use parameters, defaults, and variables in semantic syntax
 
+version: 2.0
+
 task "greet" means "Greet someone by name":
   requires name
   given title defaults to "friend"
