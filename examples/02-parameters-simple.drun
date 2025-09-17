@@ -1,0 +1,23 @@
+version: 2.0
+
+task "greet" means "Greet someone by name":
+  requires name
+  given title defaults to "friend"
+  
+  info "Hello there!"
+  step "Processing greeting"
+  success "Greeting completed!"
+
+task "deploy" means "Deploy to environment":
+  requires environment from ["dev", "staging", "production"]
+  
+  step "Deploying to environment"
+  info "Deployment in progress"
+  success "Deployment completed!"
+
+task "process" means "Process a list of items":
+  accepts items as list of strings
+  
+  info "Processing items"
+  step "Working on items"
+  success "All items processed!"
