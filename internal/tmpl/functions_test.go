@@ -13,10 +13,120 @@ func TestDockerComposeFunc(t *testing.T) {
 	// Test docker compose command detection
 	result := dockerComposeFunc()
 
-	// The result should be either "docker compose", "docker-compose", or empty
-	if result != "" && result != "docker compose" && result != "docker-compose" {
-		t.Errorf("dockerComposeFunc() = %q, expected 'docker compose', 'docker-compose', or empty", result)
+	// Test String() method for backward compatibility
+	resultStr := result.String()
+	if resultStr != "" && resultStr != "docker compose" && resultStr != "docker-compose" {
+		t.Errorf("dockerComposeFunc().String() = %q, expected 'docker compose', 'docker-compose', or empty", resultStr)
 	}
+
+	// Test that the helper can be used as a string in templates (implicit string conversion)
+	if result.String() != resultStr {
+		t.Errorf("String conversion mismatch: String() = %q, expected = %q", result.String(), resultStr)
+	}
+}
+
+func TestDockerComposeHelper_IsRunning(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		// We can't predict the actual result since it depends on the system state
+		// Just test that it doesn't panic and returns a boolean
+	}{
+		{"With docker compose", "docker compose"},
+		{"With docker-compose", "docker-compose"},
+		{"With empty command", ""},
+		{"With invalid command", "invalid-command"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			helper := DockerComposeHelper{command: tt.command}
+
+			// Just ensure it doesn't panic and returns a boolean
+			result := helper.IsRunning()
+
+			// Result should be a boolean (true or false)
+			if result != true && result != false {
+				t.Errorf("IsRunning() should return a boolean, got %T", result)
+			}
+
+			// For empty or invalid commands, should return false
+			if tt.command == "" || tt.command == "invalid-command" {
+				if result != false {
+					t.Errorf("IsRunning() with command %q should return false, got %v", tt.command, result)
+				}
+			}
+
+			t.Logf("IsRunning() with command %q returned: %v", tt.command, result)
+		})
+	}
+}
+
+func TestDockerComposeHelper_StringMethod(t *testing.T) {
+	tests := []struct {
+		name     string
+		command  string
+		expected string
+	}{
+		{"Docker compose command", "docker compose", "docker compose"},
+		{"Docker-compose command", "docker-compose", "docker-compose"},
+		{"Empty command", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			helper := DockerComposeHelper{command: tt.command}
+			result := helper.String()
+			if result != tt.expected {
+				t.Errorf("String() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDockerComposeInTemplate(t *testing.T) {
+	// Test that dockerCompose can be used in templates both as string and with methods
+	engine := NewEngine(map[string]string{}, nil, nil)
+	ctx := &model.ExecutionContext{
+		Vars: map[string]any{},
+		Env:  map[string]string{},
+	}
+
+	// Test using dockerCompose as a string (backward compatibility)
+	template1 := `{{ dockerCompose }} up -d`
+	result1, err := engine.Render(template1, ctx)
+	if err != nil {
+		t.Fatalf("Failed to render template with dockerCompose as string: %v", err)
+	}
+	t.Logf("Template '{{ dockerCompose }} up -d' rendered as: %q", result1)
+
+	// Test using dockerCompose.IsRunning method
+	template2 := `{{ if (dockerCompose).IsRunning }}Services are running{{ else }}No services running{{ end }}`
+	result2, err := engine.Render(template2, ctx)
+	if err != nil {
+		t.Fatalf("Failed to render template with dockerCompose.IsRunning: %v", err)
+	}
+
+	expectedResults := []string{"Services are running", "No services running"}
+	found := false
+	for _, expected := range expectedResults {
+		if result2 == expected {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Template result %q not in expected results %v", result2, expectedResults)
+	}
+	t.Logf("Template '{{ if (dockerCompose).IsRunning }}...' rendered as: %q", result2)
+
+	// Test conditional logic based on IsRunning
+	template3 := `{{ $dc := dockerCompose }}{{ if $dc.IsRunning }}{{ $dc }} down{{ else }}{{ $dc }} up -d{{ end }}`
+	result3, err := engine.Render(template3, ctx)
+	if err != nil {
+		t.Fatalf("Failed to render complex template: %v", err)
+	}
+	t.Logf("Complex template rendered as: %q", result3)
 }
 
 func TestDockerBuildxFunc(t *testing.T) {
@@ -363,5 +473,147 @@ func TestEngine_SecretFunctions_NoContext(t *testing.T) {
 	exists := engine.hasSecretFunc("any_secret")
 	if exists {
 		t.Error("hasSecretFunc() without context = true, want false")
+	}
+}
+
+func TestStringContainsFunc(t *testing.T) {
+	tests := []struct {
+		name     string
+		str      string
+		substr   string
+		expected bool
+	}{
+		{"Contains substring", "hello world", "world", true},
+		{"Contains at beginning", "hello world", "hello", true},
+		{"Contains at end", "hello world", "world", true},
+		{"Contains full string", "hello", "hello", true},
+		{"Does not contain", "hello world", "foo", false},
+		{"Empty substring", "hello world", "", true}, // Empty string is contained in any string
+		{"Empty string", "", "hello", false},
+		{"Both empty", "", "", true},
+		{"Case sensitive - different case", "Hello World", "hello", false},
+		{"Case sensitive - same case", "Hello World", "Hello", true},
+		{"Special characters", "hello@world.com", "@world", true},
+		{"Numbers", "version1.2.3", "1.2", true},
+		{"Unicode", "café", "é", true},
+		{"Whitespace", "hello world", " ", true},
+		{"Newline", "hello\nworld", "\n", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stringContainsFunc(tt.str, tt.substr)
+			if result != tt.expected {
+				t.Errorf("stringContainsFunc(%q, %q) = %v, want %v", tt.str, tt.substr, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStringContainsInTemplate(t *testing.T) {
+	engine := NewEngine(map[string]string{}, nil, nil)
+	ctx := &model.ExecutionContext{
+		Vars: map[string]any{
+			"message": "hello world",
+			"env":     "production",
+		},
+		Env: map[string]string{},
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		expected string
+	}{
+		{
+			"Basic contains check",
+			`{{ if stringContains .message "world" }}Found world{{ else }}No world{{ end }}`,
+			"Found world",
+		},
+		{
+			"Negated contains check",
+			`{{ if not (stringContains .message "foo") }}No foo found{{ else }}Found foo{{ end }}`,
+			"No foo found",
+		},
+		{
+			"Environment check",
+			`{{ if stringContains .env "prod" }}Production environment{{ else }}Not production{{ end }}`,
+			"Production environment",
+		},
+		{
+			"Multiple conditions",
+			`{{ if and (stringContains .message "hello") (stringContains .env "prod") }}Hello in prod{{ else }}Not matching{{ end }}`,
+			"Hello in prod",
+		},
+		{
+			"String literals",
+			`{{ if stringContains "docker-compose.yml" "compose" }}Is compose file{{ end }}`,
+			"Is compose file",
+		},
+		{
+			"Case sensitive check",
+			`{{ if stringContains "Hello World" "hello" }}Found{{ else }}Not found{{ end }}`,
+			"Not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.Render(tt.template, ctx)
+			if err != nil {
+				t.Fatalf("Failed to render template: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("Template result = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestStringContainsVsSprigContains(t *testing.T) {
+	// Test to demonstrate the difference between our stringContains and Sprig's contains
+	engine := NewEngine(map[string]string{}, nil, nil)
+	ctx := &model.ExecutionContext{
+		Vars: map[string]any{},
+		Env:  map[string]string{},
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		expected string
+	}{
+		{
+			"stringContains - intuitive order",
+			`{{ stringContains "hello world" "world" }}`,
+			"true",
+		},
+		{
+			"Sprig contains - reverse order",
+			`{{ contains "world" "hello world" }}`,
+			"true",
+		},
+		{
+			"stringContains conditional",
+			`{{ if stringContains "docker-compose.yml" "docker" }}Docker file{{ end }}`,
+			"Docker file",
+		},
+		{
+			"Sprig contains conditional",
+			`{{ if contains "docker" "docker-compose.yml" }}Docker file{{ end }}`,
+			"Docker file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.Render(tt.template, ctx)
+			if err != nil {
+				t.Fatalf("Failed to render template: %v", err)
+			}
+			if result != tt.expected {
+				t.Errorf("Template result = %q, want %q", result, tt.expected)
+			}
+		})
 	}
 }

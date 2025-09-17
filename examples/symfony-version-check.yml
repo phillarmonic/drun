@@ -1,0 +1,81 @@
+# do-run configuration file
+# Learn more: https://github.com/phillarmonic/drun
+
+version: 1.0
+
+# Environment variables available to all recipes
+env:
+  PROJECT_NAME: "vibrez-api"
+  BUILD_DATE: '{{ now "2006-01-02T15:04:05Z" }}'
+
+# Variables for templating
+vars:
+  app_name: "myapp"
+  version: 1.0.0
+
+# Global defaults (optional)
+defaults:
+  working_dir: "."
+  shell: auto
+  timeout: "10m"
+
+# Reusable code snippets
+snippets:
+  setup_colors: |
+    # ANSI color codes
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m' # No Color
+
+recipes:
+  # Simple build recipe with direct template checking
+  test:
+    help: "Test lifecycle"
+    prerun: |
+      # Ensure services are running and capture version
+      {{ if not dockerCompose.IsRunning }}
+          {{ info "Starting Docker Compose services..." }}
+          {{ dockerCompose }} up -d
+          sleep 5
+      {{ end }}
+      
+      # Capture Symfony version for use in templates
+      export SYMFONY_VERSION=$({{ dockerCompose }} exec -T php bash -c "frankenphp php-cli bin/console --version" 2>/dev/null || echo "unknown")
+    run: |
+        {{ step "Checking Docker Compose status" }}
+        {{ if dockerCompose.IsRunning }}
+            {{ success "Services are running" }}
+        {{ else }}
+            {{ error "Services failed to start" }}
+            exit 1
+        {{ end }}
+        
+        {{ step "Checking Symfony version" }}
+        # Use stringContains directly in template with captured version
+        {{ if stringContains (env "SYMFONY_VERSION") "Symfony" }}
+            {{ success "Symfony framework detected!" }}
+            echo "Framework version: {{ env "SYMFONY_VERSION" }}"
+            
+            # Additional version-specific logic
+            {{ if stringContains (env "SYMFONY_VERSION") "6." }}
+                {{ info "Symfony 6.x detected - using modern features" }}
+            {{ else if stringContains (env "SYMFONY_VERSION") "5." }}
+                {{ info "Symfony 5.x detected - using compatible features" }}
+            {{ else if stringContains (env "SYMFONY_VERSION") "4." }}
+                {{ warn "Symfony 4.x detected - consider upgrading" }}
+            {{ else }}
+                {{ info "Symfony version detected but specific version unknown" }}
+            {{ end }}
+            
+        {{ else if stringContains (env "SYMFONY_VERSION") "symfony" }}
+            {{ success "Symfony framework detected (lowercase)!" }}
+            echo "Framework version: {{ env "SYMFONY_VERSION" }}"
+        {{ else }}
+            {{ error "Symfony not detected!" }}
+            echo "Version output: {{ env "SYMFONY_VERSION" }}"
+            {{ if stringContains (env "SYMFONY_VERSION") "unknown" }}
+                {{ error "Failed to get version - check if PHP service is running" }}
+            {{ end }}
+            exit 1
+        {{ end }}

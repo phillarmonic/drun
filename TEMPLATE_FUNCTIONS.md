@@ -9,6 +9,7 @@ Quick reference for all built-in template functions in drun.
 | Function | Description | Example | Output |
 |----------|-------------|---------|---------|
 | `{{ dockerCompose }}` | Auto-detect Docker Compose command | `{{ dockerCompose }} up` | `docker compose up` or `docker-compose up` |
+| `{{ (dockerCompose).IsRunning }}` | Check if Docker Compose services are running | `{{ if (dockerCompose).IsRunning }}...{{ end }}` | `true` or `false` |
 | `{{ dockerBuildx }}` | Auto-detect Docker Buildx command | `{{ dockerBuildx }} build .` | `docker buildx build .` or `docker build .` |
 | `{{ hasCommand "kubectl" }}` | Check if command exists in PATH | `{{ if hasCommand "kubectl" }}...{{ end }}` | `true` or `false` |
 
@@ -77,6 +78,7 @@ Quick reference for all built-in template functions in drun.
 | `{{ snippet "name" }}` | Include reusable snippets | `{{ snippet "docker-login" }}` | Snippet content |
 | `{{ shellquote .arg }}` | Shell-safe quoting | `echo {{ shellquote .message }}` | `echo "safe message"` |
 | `{{ truncate 50 .text }}` | Truncate text to length | `{{ truncate 20 "This is a long message" }}` | `This is a long messa` |
+| `{{ stringContains .text "substring" }}` | Check if string contains substring | `{{ if stringContains .env "prod" }}...{{ end }}` | `true` or `false` |
 
 ## 🎯 Usage Examples
 
@@ -96,6 +98,32 @@ recipes:
       $DOCKER_COMPOSE up -d
       
       {{ success "Build completed!" }}
+
+  status:
+    run: |
+      {{ step "Checking Docker Compose status" }}
+      
+      {{ if dockerCompose.IsRunning }}
+      {{ success "Services are running" }}
+      {{ dockerCompose }} ps
+      {{ else }}
+      {{ warn "No services are running" }}
+      {{ info "Use '{{ dockerCompose }} up -d' to start services" }}
+      {{ end }}
+
+  restart:
+    run: |
+      {{ step "Restarting Docker Compose services" }}
+      
+      {{ if dockerCompose.IsRunning }}
+      {{ info "Stopping running services..." }}
+      {{ dockerCompose }} down
+      {{ end }}
+      
+      {{ info "Starting services..." }}
+      {{ dockerCompose }} up -d
+      
+      {{ success "Services restarted!" }}
 ```
 
 ### Git-Aware Deployment
@@ -197,6 +225,102 @@ recipes:
       {{ end }}
       
       {{ success "Test completed for {{ .matrix_os }}/{{ .matrix_version }}" }}
+```
+
+### String Matching and Conditional Logic
+```yaml
+recipes:
+  environment-check:
+    run: |
+      {{ step "Environment-based configuration" }}
+      
+      # Check environment type using stringContains
+      {{ if stringContains .env "prod" }}
+      {{ success "Production environment detected" }}
+      export NODE_ENV=production
+      export LOG_LEVEL=warn
+      {{ else if stringContains .env "dev" }}
+      {{ info "Development environment detected" }}
+      export NODE_ENV=development
+      export LOG_LEVEL=debug
+      {{ else }}
+      {{ warn "Unknown environment: {{ .env }}" }}
+      export NODE_ENV=development
+      {{ end }}
+
+  file-type-handler:
+    run: |
+      {{ step "Processing files based on type" }}
+      
+      # Handle different file types
+      {{ range $file := .files }}
+      {{ if stringContains $file ".js" }}
+      {{ info "Processing JavaScript file: {{ $file }}" }}
+      npm run lint {{ $file }}
+      {{ else if stringContains $file ".go" }}
+      {{ info "Processing Go file: {{ $file }}" }}
+      go fmt {{ $file }}
+      gofmt -s -w {{ $file }}
+      {{ else if stringContains $file ".py" }}
+      {{ info "Processing Python file: {{ $file }}" }}
+      black {{ $file }}
+      {{ else }}
+      {{ warn "Unknown file type: {{ $file }}" }}
+      {{ end }}
+      {{ end }}
+
+  smart-deployment:
+    run: |
+      {{ step "Smart deployment based on branch and environment" }}
+      
+      # Check branch and environment for deployment strategy
+      {{ $branch := gitBranch }}
+      {{ $env := .env }}
+      
+      {{ if and (stringContains $branch "main") (stringContains $env "prod") }}
+      {{ success "Production deployment on main branch" }}
+      {{ info "Using blue-green deployment strategy" }}
+      kubectl apply -f k8s/production/
+      {{ else if and (stringContains $branch "develop") (stringContains $env "staging") }}
+      {{ info "Staging deployment on develop branch" }}
+      kubectl apply -f k8s/staging/
+      {{ else if stringContains $branch "feature/" }}
+      {{ info "Feature branch deployment" }}
+      # Create temporary namespace for feature testing
+      kubectl create namespace feature-{{ $branch | replace "feature/" "" }}
+      {{ else }}
+      {{ error "Invalid deployment configuration" }}
+      {{ error "Branch: {{ $branch }}, Environment: {{ $env }}" }}
+      exit 1
+      {{ end }}
+
+  negation-examples:
+    run: |
+      {{ step "Using negation with stringContains" }}
+      
+      # Check if NOT a test file
+      {{ if not (stringContains .filename "test") }}
+      {{ info "Processing non-test file: {{ .filename }}" }}
+      npm run build {{ .filename }}
+      {{ else }}
+      {{ info "Skipping test file: {{ .filename }}" }}
+      {{ end }}
+      
+      # Check if NOT in CI environment
+      {{ if not (stringContains (env "CI") "true") }}
+      {{ warn "Not running in CI - enabling development mode" }}
+      export DEBUG=true
+      {{ else }}
+      {{ info "CI environment detected - using production settings" }}
+      {{ end }}
+      
+      # Multiple negation conditions
+      {{ $file := .filename }}
+      {{ if and (not (stringContains $file ".test.")) (not (stringContains $file ".spec.")) }}
+      {{ success "Processing production file: {{ $file }}" }}
+      {{ else }}
+      {{ info "Skipping test/spec file: {{ $file }}" }}
+      {{ end }}
 ```
 
 ### HTTP API Integration

@@ -260,6 +260,7 @@ func (e *Engine) getFuncMap() template.FuncMap {
 
 	// String manipulation functions
 	funcMap["truncate"] = truncateFunc
+	funcMap["stringContains"] = stringContainsFunc
 
 	// HTTP functions (if HTTP client is available)
 	if e.httpClient != nil {
@@ -319,19 +320,58 @@ func hostnameFunc() string {
 	return hostname
 }
 
-// dockerComposeFunc detects the available Docker Compose command
-func dockerComposeFunc() string {
+// DockerComposeHelper provides Docker Compose functionality for templates
+type DockerComposeHelper struct {
+	command string
+}
+
+// String returns the Docker Compose command (for backward compatibility)
+func (d DockerComposeHelper) String() string {
+	return d.command
+}
+
+// IsRunning checks if any Docker Compose services are currently running
+// Returns true if any services are in "running" state, false otherwise
+func (d DockerComposeHelper) IsRunning() bool {
+	if d.command == "" {
+		return false
+	}
+
+	// Use docker compose ps to check running services
+	// The command will be either "docker compose" or "docker-compose"
+	var cmd *exec.Cmd
+	if strings.Contains(d.command, " ") {
+		// "docker compose" - split into parts
+		parts := strings.Fields(d.command)
+		args := append(parts[1:], "ps", "--services", "--filter", "status=running")
+		cmd = exec.Command(parts[0], args...)
+	} else {
+		// "docker-compose" - single command
+		cmd = exec.Command(d.command, "ps", "--services", "--filter", "status=running")
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	// If there's any output, it means there are running services
+	return strings.TrimSpace(string(output)) != ""
+}
+
+// dockerComposeFunc detects the available Docker Compose command and returns a helper
+func dockerComposeFunc() DockerComposeHelper {
+	var command string
+
 	// Check for docker compose (CLI plugin) first
 	if hasDockerAndSubcommand("compose") {
-		return "docker compose"
+		command = "docker compose"
+	} else if hasCommandFunc("docker-compose") {
+		// Fall back to docker-compose (standalone)
+		command = "docker-compose"
 	}
 
-	// Fall back to docker-compose (standalone)
-	if hasCommandFunc("docker-compose") {
-		return "docker-compose"
-	}
-
-	return ""
+	return DockerComposeHelper{command: command}
 }
 
 // dockerBuildxFunc detects the available Docker Buildx command
@@ -402,6 +442,12 @@ func truncateFunc(length int, text string) string {
 	}
 
 	return string(runes[:length])
+}
+
+// stringContainsFunc checks if a string contains a substring
+// Parameters: string, substring (intuitive order, unlike Sprig's contains)
+func stringContainsFunc(str, substr string) bool {
+	return strings.Contains(str, substr)
 }
 
 // Git functions
