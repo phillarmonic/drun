@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
@@ -15,6 +16,11 @@ import (
 type Engine struct {
 	output io.Writer
 	dryRun bool
+}
+
+// ExecutionContext holds parameter values and other runtime context
+type ExecutionContext struct {
+	Parameters map[string]string // parameter name -> value
 }
 
 // NewEngine creates a new v2 execution engine
@@ -33,8 +39,13 @@ func (e *Engine) SetDryRun(dryRun bool) {
 	e.dryRun = dryRun
 }
 
-// Execute runs a v2 program
+// Execute runs a v2 program with no parameters
 func (e *Engine) Execute(program *ast.Program, taskName string) error {
+	return e.ExecuteWithParams(program, taskName, map[string]string{})
+}
+
+// ExecuteWithParams runs a v2 program with the given parameters
+func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params map[string]string) error {
 	if program == nil {
 		return fmt.Errorf("program is nil")
 	}
@@ -52,11 +63,40 @@ func (e *Engine) Execute(program *ast.Program, taskName string) error {
 		return fmt.Errorf("task '%s' not found", taskName)
 	}
 
-	return e.executeTask(targetTask)
+	// Create execution context with parameters
+	ctx := &ExecutionContext{
+		Parameters: make(map[string]string),
+	}
+
+	// Set up parameters with defaults and validation
+	for _, param := range targetTask.Parameters {
+		var value string
+		var hasValue bool
+
+		if providedValue, exists := params[param.Name]; exists {
+			value = providedValue
+			hasValue = true
+		} else if param.DefaultValue != "" {
+			value = param.DefaultValue
+			hasValue = true
+		} else if param.Required {
+			return fmt.Errorf("required parameter '%s' not provided", param.Name)
+		}
+
+		// Validate constraints if value is provided
+		if hasValue {
+			if err := e.validateParameterConstraints(param, value); err != nil {
+				return err
+			}
+			ctx.Parameters[param.Name] = value
+		}
+	}
+
+	return e.executeTask(targetTask, ctx)
 }
 
-// executeTask executes a single task
-func (e *Engine) executeTask(task *ast.TaskStatement) error {
+// executeTask executes a single task with the given context
+func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
 	if e.dryRun {
 		fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
 		if task.Description != "" {
@@ -64,7 +104,8 @@ func (e *Engine) executeTask(task *ast.TaskStatement) error {
 		}
 		for _, stmt := range task.Body {
 			if action, ok := stmt.(*ast.ActionStatement); ok {
-				fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, action.Message)
+				interpolatedMessage := e.interpolateVariables(action.Message, ctx)
+				fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
 			}
 		}
 		return nil
@@ -72,7 +113,7 @@ func (e *Engine) executeTask(task *ast.TaskStatement) error {
 
 	// Execute each statement in the task body
 	for _, stmt := range task.Body {
-		if err := e.executeStatement(stmt); err != nil {
+		if err := e.executeStatement(stmt, ctx); err != nil {
 			return err
 		}
 	}
@@ -81,10 +122,10 @@ func (e *Engine) executeTask(task *ast.TaskStatement) error {
 }
 
 // executeStatement executes a single statement (action, parameter, conditional, etc.)
-func (e *Engine) executeStatement(stmt ast.Statement) error {
+func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) error {
 	switch s := stmt.(type) {
 	case *ast.ActionStatement:
-		return e.executeAction(s)
+		return e.executeAction(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -100,22 +141,25 @@ func (e *Engine) executeStatement(stmt ast.Statement) error {
 }
 
 // executeAction executes a single action statement
-func (e *Engine) executeAction(action *ast.ActionStatement) error {
+func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in the message
+	interpolatedMessage := e.interpolateVariables(action.Message, ctx)
+
 	// Map actions to output with appropriate formatting and emojis
 	switch action.Action {
 	case "info":
-		fmt.Fprintf(e.output, "ℹ️  %s\n", action.Message)
+		fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
-		fmt.Fprintf(e.output, "🚀 %s\n", action.Message)
+		fmt.Fprintf(e.output, "🚀 %s\n", interpolatedMessage)
 	case "warn":
-		fmt.Fprintf(e.output, "⚠️  %s\n", action.Message)
+		fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
-		fmt.Fprintf(e.output, "❌ %s\n", action.Message)
+		fmt.Fprintf(e.output, "❌ %s\n", interpolatedMessage)
 	case "success":
-		fmt.Fprintf(e.output, "✅ %s\n", action.Message)
+		fmt.Fprintf(e.output, "✅ %s\n", interpolatedMessage)
 	case "fail":
-		fmt.Fprintf(e.output, "💥 %s\n", action.Message)
-		return fmt.Errorf("task failed: %s", action.Message)
+		fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
+		return fmt.Errorf("task failed: %s", interpolatedMessage)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Action)
 	}
@@ -170,4 +214,45 @@ func ParseString(input string) (*ast.Program, error) {
 	}
 
 	return program, nil
+}
+
+// interpolateVariables replaces {variable} placeholders with actual values
+func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
+	if ctx == nil || len(ctx.Parameters) == 0 {
+		return message
+	}
+
+	// Use regex to find {variable} patterns
+	re := regexp.MustCompile(`\{([^}]+)\}`)
+
+	return re.ReplaceAllStringFunc(message, func(match string) string {
+		// Extract variable name (remove { and })
+		varName := match[1 : len(match)-1]
+
+		// Look up the variable value
+		if value, exists := ctx.Parameters[varName]; exists {
+			return value
+		}
+
+		// If variable not found, return the original placeholder
+		return match
+	})
+}
+
+// validateParameterConstraints validates parameter values against their constraints
+func (e *Engine) validateParameterConstraints(param ast.ParameterStatement, value string) error {
+	// Check constraints (e.g., from ["dev", "staging", "production"])
+	if len(param.Constraints) > 0 {
+		for _, constraint := range param.Constraints {
+			if value == constraint {
+				return nil // Value is valid
+			}
+		}
+		return fmt.Errorf("parameter '%s' value '%s' is not valid. Must be one of: %v",
+			param.Name, value, param.Constraints)
+	}
+
+	// TODO: Add more validation types (data type validation, regex patterns, etc.)
+
+	return nil
 }

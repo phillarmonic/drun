@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
 	"github.com/phillarmonic/drun/internal/v2/engine"
@@ -104,8 +105,10 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return listAllTasks(eng, program)
 	}
 
-	// Determine target task
+	// Determine target task and parse parameters
 	var target string
+	var params map[string]string
+
 	if len(args) == 0 {
 		// No arguments - try to find a default task or list tasks
 		if defaultTask := findDefaultTask(program); defaultTask != "" {
@@ -113,13 +116,14 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		} else {
 			return listAllTasks(eng, program)
 		}
+		params = make(map[string]string)
 	} else {
 		target = args[0]
-		// TODO: Handle task arguments in future iterations
+		params = parseTaskParameters(args[1:])
 	}
 
-	// Execute the task
-	return eng.Execute(program, target)
+	// Execute the task with parameters
+	return eng.ExecuteWithParams(program, target, params)
 }
 
 // findConfigFile finds the drun configuration file to use
@@ -173,6 +177,23 @@ func findDefaultTask(program *ast.Program) string {
 	}
 
 	return ""
+}
+
+// parseTaskParameters parses task parameters from command line arguments
+// Supports format: param1=value1 param2=value2
+func parseTaskParameters(args []string) map[string]string {
+	params := make(map[string]string)
+
+	for _, arg := range args {
+		if strings.Contains(arg, "=") {
+			parts := strings.SplitN(arg, "=", 2)
+			if len(parts) == 2 {
+				params[parts[0]] = parts[1]
+			}
+		}
+	}
+
+	return params
 }
 
 // showVersionInfo displays version information
