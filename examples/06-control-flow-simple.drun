@@ -1,0 +1,48 @@
+version: 2.0
+
+task "deploy" means "Deploy with environment-specific logic":
+  requires environment from ["dev", "staging", "production"]
+  given skip_tests defaults to "false"
+  
+  step "Starting deployment to {environment}"
+  
+  when environment is "production":
+    warn "⚠️  Deploying to PRODUCTION - please confirm!"
+    step "Running extra production validations"
+    step "Creating production backup"
+  
+  if skip_tests is "false":
+    step "Running test suite"
+    info "✅ All tests passed"
+  else:
+    warn "⚠️  Skipping tests as requested"
+  
+  step "Deploying application"
+  success "🎉 Deployment to {environment} completed!"
+
+task "process" means "Process a list of items":
+  accepts items as list of strings
+  
+  step "Processing items"
+  
+  for each item in items:
+    step "Processing: {item}"
+    info "✅ Completed: {item}"
+  
+  success "All items processed successfully!"
+
+task "health check" means "System health check with conditions":
+  given check_database defaults to "true"
+  given check_cache defaults to "true"
+  
+  step "Starting health check"
+  
+  when check_database is "true":
+    step "Checking database connectivity"
+    info "✅ Database is healthy"
+  
+  when check_cache is "true":
+    step "Checking cache status"
+    info "✅ Cache is operational"
+  
+  success "🏥 Health check completed!"

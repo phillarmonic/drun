@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
+	"github.com/phillarmonic/drun/internal/v2/builtins"
 	"github.com/phillarmonic/drun/internal/v2/lexer"
 	"github.com/phillarmonic/drun/internal/v2/parser"
 )
@@ -98,14 +99,14 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 // executeTask executes a single task with the given context
 func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
 	if e.dryRun {
-		fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
 		if task.Description != "" {
-			fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
 		}
 		for _, stmt := range task.Body {
 			if action, ok := stmt.(*ast.ActionStatement); ok {
 				interpolatedMessage := e.interpolateVariables(action.Message, ctx)
-				fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
 			}
 		}
 		return nil
@@ -130,11 +131,9 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		// Parameters are handled during task setup, not execution
 		return nil
 	case *ast.ConditionalStatement:
-		// TODO: Implement conditional execution
-		return fmt.Errorf("conditional statements not yet implemented")
+		return e.executeConditional(s, ctx)
 	case *ast.LoopStatement:
-		// TODO: Implement loop execution
-		return fmt.Errorf("loop statements not yet implemented")
+		return e.executeLoop(s, ctx)
 	default:
 		return fmt.Errorf("unknown statement type: %T", stmt)
 	}
@@ -148,17 +147,17 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	// Map actions to output with appropriate formatting and emojis
 	switch action.Action {
 	case "info":
-		fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
-		fmt.Fprintf(e.output, "🚀 %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "🚀 %s\n", interpolatedMessage)
 	case "warn":
-		fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
-		fmt.Fprintf(e.output, "❌ %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "❌ %s\n", interpolatedMessage)
 	case "success":
-		fmt.Fprintf(e.output, "✅ %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "✅ %s\n", interpolatedMessage)
 	case "fail":
-		fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
 		return fmt.Errorf("task failed: %s", interpolatedMessage)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Action)
@@ -218,25 +217,93 @@ func ParseString(input string) (*ast.Program, error) {
 
 // interpolateVariables replaces {variable} placeholders with actual values
 func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
-	if ctx == nil || len(ctx.Parameters) == 0 {
-		return message
-	}
-
 	// Use regex to find {variable} patterns
 	re := regexp.MustCompile(`\{([^}]+)\}`)
 
 	return re.ReplaceAllStringFunc(message, func(match string) string {
-		// Extract variable name (remove { and })
-		varName := match[1 : len(match)-1]
+		// Extract content (remove { and })
+		content := match[1 : len(match)-1]
 
-		// Look up the variable value
-		if value, exists := ctx.Parameters[varName]; exists {
-			return value
+		// Try to resolve the content
+		if result := e.resolveExpression(content, ctx); result != "" {
+			return result
 		}
 
-		// If variable not found, return the original placeholder
+		// If nothing worked, return the original placeholder
 		return match
 	})
+}
+
+// resolveExpression resolves various types of expressions
+func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
+	// 1. Check if it's a simple builtin function call (no arguments)
+	if builtins.IsBuiltin(expr) {
+		if result, err := builtins.CallBuiltin(expr); err == nil {
+			return result
+		}
+	}
+
+	// 2. Check for function calls with quoted string arguments
+	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
+	quotedArgRe := regexp.MustCompile(`^([^(]+)\((.+)\)$`)
+	if matches := quotedArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+		funcName := strings.TrimSpace(matches[1])
+		argsStr := matches[2]
+
+		// Parse arguments - handle both single and multiple quoted arguments
+		args := e.parseQuotedArguments(argsStr)
+
+		if builtins.IsBuiltin(funcName) && len(args) > 0 {
+			if result, err := builtins.CallBuiltin(funcName, args...); err == nil {
+				return result
+			}
+		}
+	}
+
+	// 3. Check for function calls with parameter arguments
+	// Pattern: "function(param)" where param is a parameter name
+	paramArgRe := regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`)
+	if matches := paramArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+		funcName := strings.TrimSpace(matches[1])
+		paramName := strings.TrimSpace(matches[2])
+
+		// Resolve the parameter first
+		if ctx != nil {
+			if paramValue, exists := ctx.Parameters[paramName]; exists {
+				if builtins.IsBuiltin(funcName) {
+					if result, err := builtins.CallBuiltin(funcName, paramValue); err == nil {
+						return result
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Check for simple parameter lookup
+	if ctx != nil {
+		if value, exists := ctx.Parameters[expr]; exists {
+			return value
+		}
+	}
+
+	return ""
+}
+
+// parseQuotedArguments parses comma-separated quoted arguments
+func (e *Engine) parseQuotedArguments(argsStr string) []string {
+	var args []string
+
+	// Simple regex to match quoted strings
+	quotedRe := regexp.MustCompile(`['"]([^'"]*?)['"]`)
+	matches := quotedRe.FindAllStringSubmatch(argsStr, -1)
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			args = append(args, match[1])
+		}
+	}
+
+	return args
 }
 
 // validateParameterConstraints validates parameter values against their constraints
@@ -255,4 +322,108 @@ func (e *Engine) validateParameterConstraints(param ast.ParameterStatement, valu
 	// TODO: Add more validation types (data type validation, regex patterns, etc.)
 
 	return nil
+}
+
+// executeConditional executes conditional statements (when, if/else)
+func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
+	// Evaluate the condition
+	conditionResult := e.evaluateCondition(stmt.Condition, ctx)
+
+	if conditionResult {
+		// Execute the main body
+		for _, bodyStmt := range stmt.Body {
+			if err := e.executeStatement(bodyStmt, ctx); err != nil {
+				return err
+			}
+		}
+	} else if len(stmt.ElseBody) > 0 {
+		// Execute the else body if condition is false
+		for _, elseStmt := range stmt.ElseBody {
+			if err := e.executeStatement(elseStmt, ctx); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeLoop executes loop statements (for each)
+func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
+	// For now, we'll implement a simple mock loop
+	// In a real implementation, we'd need to:
+	// 1. Resolve the iterable (could be a parameter, file list, etc.)
+	// 2. Iterate over each item
+	// 3. Set the loop variable in a new context
+	// 4. Execute the body for each iteration
+
+	// Mock implementation: assume iterable is a parameter containing comma-separated values
+	iterableValue, exists := ctx.Parameters[stmt.Iterable]
+	if !exists {
+		return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+	}
+
+	// Split by comma to get items (simple implementation)
+	items := strings.Split(iterableValue, ",")
+
+	for _, item := range items {
+		// Create a new context with the loop variable
+		loopCtx := &ExecutionContext{
+			Parameters: make(map[string]string),
+		}
+
+		// Copy existing parameters
+		for k, v := range ctx.Parameters {
+			loopCtx.Parameters[k] = v
+		}
+
+		// Set the loop variable
+		loopCtx.Parameters[stmt.Variable] = strings.TrimSpace(item)
+
+		// Execute the loop body
+		for _, bodyStmt := range stmt.Body {
+			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// evaluateCondition evaluates condition expressions
+func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool {
+	// Simple condition evaluation
+	// For now, we'll handle basic patterns like "variable is value"
+
+	// Handle "variable is value" pattern
+	if strings.Contains(condition, " is ") {
+		parts := strings.SplitN(condition, " is ", 2)
+		if len(parts) == 2 {
+			left := strings.TrimSpace(parts[0])
+			right := strings.TrimSpace(parts[1])
+
+			// Try to get the value of the left side from parameters
+			if value, exists := ctx.Parameters[left]; exists {
+				return value == right
+			}
+
+			// If not found in parameters, compare as strings
+			return left == right
+		}
+	}
+
+	// Interpolate variables in the condition for other cases
+	interpolatedCondition := e.interpolateVariables(condition, ctx)
+
+	// Handle boolean values directly
+	switch strings.ToLower(strings.TrimSpace(interpolatedCondition)) {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+
+	// Default: treat non-empty strings as true
+	return strings.TrimSpace(interpolatedCondition) != ""
 }

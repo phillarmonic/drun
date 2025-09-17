@@ -49,6 +49,10 @@ const (
 	PARALLEL // parallel
 	IS       // is
 
+	// Built-in functions/conditions
+	FILE   // file
+	EXISTS // exists
+
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
@@ -146,6 +150,10 @@ func (t TokenType) String() string {
 		return "PARALLEL"
 	case IS:
 		return "IS"
+	case FILE:
+		return "FILE"
+	case EXISTS:
+		return "EXISTS"
 	case IDENT:
 		return "IDENT"
 	case ASSIGN:
@@ -213,6 +221,8 @@ var keywords = map[string]TokenType{
 	"in":       IN,
 	"parallel": PARALLEL,
 	"is":       IS,
+	"file":     FILE,
+	"exists":   EXISTS,
 	"true":     BOOLEAN,
 	"false":    BOOLEAN,
 }

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
 	"github.com/phillarmonic/drun/internal/v2/lexer"
@@ -57,17 +58,18 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 	// Parse task statements
 	for p.curToken.Type != lexer.EOF {
-		if p.curToken.Type == lexer.TASK {
+		switch p.curToken.Type {
+		case lexer.TASK:
 			task := p.parseTaskStatement()
 			if task != nil {
 				program.Tasks = append(program.Tasks, task)
 			}
-		} else if p.curToken.Type == lexer.COMMENT {
+		case lexer.COMMENT:
 			p.nextToken() // Skip comments
-		} else if p.curToken.Type == lexer.DEDENT {
+		case lexer.DEDENT:
 			// Skip stray lexer.DEDENT tokens (they should be consumed by task parsing)
 			p.nextToken()
-		} else {
+		default:
 			p.addError(fmt.Sprintf("unexpected token: %s", p.curToken.Type))
 			p.nextToken()
 		}
@@ -125,18 +127,18 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	}
 
 	// Parse task body (parameters and statements)
-	for {
-		// Check if we've reached the end of the task body
-		if p.peekToken.Type == lexer.DEDENT || p.peekToken.Type == lexer.EOF {
-			break
-		}
-
+	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
 		if p.isParameterToken(p.curToken.Type) {
 			param := p.parseParameterStatement()
 			if param != nil {
 				stmt.Parameters = append(stmt.Parameters, *param)
+			}
+		} else if p.isControlFlowToken(p.curToken.Type) {
+			controlFlow := p.parseControlFlowStatement()
+			if controlFlow != nil {
+				stmt.Body = append(stmt.Body, controlFlow)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			action := p.parseActionStatement()
@@ -273,6 +275,16 @@ func (p *Parser) isParameterToken(tokenType lexer.TokenType) bool {
 	}
 }
 
+// isControlFlowToken checks if a token type represents a control flow statement
+func (p *Parser) isControlFlowToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.WHEN, lexer.IF, lexer.FOR:
+		return true
+	default:
+		return false
+	}
+}
+
 // isActionToken checks if a token type represents an action
 func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
@@ -315,4 +327,177 @@ func (p *Parser) skipComments() {
 // Errors returns any parsing errors
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+// parseControlFlowStatement parses control flow statements (when, if, for)
+func (p *Parser) parseControlFlowStatement() ast.Statement {
+	switch p.curToken.Type {
+	case lexer.WHEN:
+		return p.parseWhenStatement()
+	case lexer.IF:
+		return p.parseIfStatement()
+	case lexer.FOR:
+		return p.parseForStatement()
+	default:
+		p.addError(fmt.Sprintf("unexpected control flow token: %s", p.curToken.Type))
+		return nil
+	}
+}
+
+// parseWhenStatement parses when statements: when condition:
+func (p *Parser) parseWhenStatement() *ast.ConditionalStatement {
+	stmt := &ast.ConditionalStatement{
+		Token: p.curToken,
+		Type:  "when",
+	}
+
+	// Parse condition (everything until colon)
+	condition := p.parseConditionExpression()
+	if condition == "" {
+		return nil
+	}
+	stmt.Condition = condition
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse body
+	stmt.Body = p.parseControlFlowBody()
+
+	return stmt
+}
+
+// parseIfStatement parses if/else statements
+func (p *Parser) parseIfStatement() *ast.ConditionalStatement {
+	stmt := &ast.ConditionalStatement{
+		Token: p.curToken,
+		Type:  "if",
+	}
+
+	// Parse condition
+	condition := p.parseConditionExpression()
+	if condition == "" {
+		return nil
+	}
+	stmt.Condition = condition
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse if body
+	stmt.Body = p.parseControlFlowBody()
+
+	// Check for else clause
+	if p.peekToken.Type == lexer.ELSE {
+		p.nextToken() // consume ELSE
+		if !p.expectPeek(lexer.COLON) {
+			return nil
+		}
+		stmt.ElseBody = p.parseControlFlowBody()
+	}
+
+	return stmt
+}
+
+// parseForStatement parses for each loops
+func (p *Parser) parseForStatement() *ast.LoopStatement {
+	stmt := &ast.LoopStatement{
+		Token: p.curToken,
+	}
+
+	// Expect: for each variable in iterable:
+	if !p.expectPeek(lexer.EACH) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	stmt.Variable = p.curToken.Literal
+
+	if !p.expectPeek(lexer.IN) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	stmt.Iterable = p.curToken.Literal
+
+	// Check for "in parallel"
+	if p.peekToken.Type == lexer.IN {
+		// Look ahead to see if next token is PARALLEL
+		// For now, we'll use a simplified approach
+		p.nextToken() // consume IN
+		if p.peekToken.Type == lexer.PARALLEL {
+			p.nextToken() // consume PARALLEL
+			stmt.Parallel = true
+		}
+		// Note: If not PARALLEL, we just continue without setting parallel=true
+		// TODO: Real parser would need proper backtracking to put the IN token back
+	}
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse body
+	stmt.Body = p.parseControlFlowBody()
+
+	return stmt
+}
+
+// parseConditionExpression parses condition expressions like "environment is production"
+func (p *Parser) parseConditionExpression() string {
+	var parts []string
+
+	// Read tokens until we hit a colon
+	for p.peekToken.Type != lexer.COLON && p.peekToken.Type != lexer.EOF {
+		p.nextToken()
+		parts = append(parts, p.curToken.Literal)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// parseControlFlowBody parses the body of control flow statements
+func (p *Parser) parseControlFlowBody() []ast.Statement {
+	var body []ast.Statement
+
+	// Expect INDENT
+	if !p.expectPeek(lexer.INDENT) {
+		return body
+	}
+
+	// Parse statements until DEDENT
+	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+		p.nextToken()
+
+		if p.isActionToken(p.curToken.Type) {
+			action := p.parseActionStatement()
+			if action != nil {
+				body = append(body, action)
+			}
+		} else if p.isControlFlowToken(p.curToken.Type) {
+			controlFlow := p.parseControlFlowStatement()
+			if controlFlow != nil {
+				body = append(body, controlFlow)
+			}
+		} else if p.curToken.Type == lexer.COMMENT {
+			// Skip comments
+			continue
+		} else {
+			p.addError(fmt.Sprintf("unexpected token in control flow body: %s", p.curToken.Type))
+			break
+		}
+	}
+
+	// Consume DEDENT
+	if p.peekToken.Type == lexer.DEDENT {
+		p.nextToken()
+	}
+
+	return body
 }

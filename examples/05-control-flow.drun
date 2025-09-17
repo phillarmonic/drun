@@ -1,0 +1,72 @@
+version: 2.0
+
+task "deploy" means "Deploy with environment-specific logic":
+  requires environment from ["dev", "staging", "production"]
+  given skip_tests defaults to "false"
+  
+  step "Starting deployment to {environment}"
+  
+  when environment is "production":
+    warn "⚠️  Deploying to PRODUCTION - please confirm!"
+    step "Running extra production validations"
+    step "Creating production backup"
+  
+  if skip_tests is "false":
+    step "Running test suite"
+    info "✅ All tests passed"
+  else:
+    warn "⚠️  Skipping tests as requested"
+  
+  step "Deploying application"
+  success "🎉 Deployment to {environment} completed!"
+
+task "process files" means "Process a list of files":
+  accepts file_list as list of strings
+  given parallel defaults to "false"
+  
+  step "Processing files"
+  
+  if parallel is "true":
+    info "Processing files in parallel"
+    for each file in file_list in parallel:
+      step "Processing: {file}"
+      info "✅ Completed: {file}"
+  else:
+    info "Processing files sequentially"
+    for each file in file_list:
+      step "Processing: {file}"
+      info "✅ Completed: {file}"
+  
+  success "All files processed successfully!"
+
+task "backup" means "Conditional backup with validation":
+  requires source_path
+  given destination defaults to "/backups"
+  
+  step "Checking source path: {source_path}"
+  
+  if file {source_path} exists:
+    step "Source found, creating backup"
+    info "Source: {source_path}"
+    info "Destination: {destination}"
+    step "Copying files to {destination}"
+    success "✅ Backup created successfully!"
+  else:
+    error "❌ Source path not found: {source_path}"
+    fail
+
+task "health check" means "System health check with conditions":
+  given check_database defaults to "true"
+  given check_cache defaults to "true"
+  
+  step "Starting health check"
+  
+  when check_database is "true":
+    step "Checking database connectivity"
+    info "✅ Database is healthy"
+  
+  when check_cache is "true":
+    step "Checking cache status"
+    info "✅ Cache is operational"
+  
+  success "🏥 Health check completed!"
