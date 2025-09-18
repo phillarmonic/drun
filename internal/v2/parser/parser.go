@@ -323,6 +323,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if param != nil {
 				stmt.Parameters = append(stmt.Parameters, *param)
 			}
+		} else if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
+			detection := p.parseDetectionStatement()
+			if detection != nil {
+				stmt.Body = append(stmt.Body, detection)
+			}
 		} else if p.isControlFlowToken(p.curToken.Type) {
 			controlFlow := p.parseControlFlowStatement()
 			if controlFlow != nil {
@@ -1320,6 +1325,146 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 	return stmt
 }
 
+// parseDetectionStatement parses smart detection operations
+func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
+	stmt := &ast.DetectionStatement{
+		Token: p.curToken,
+	}
+
+	switch p.curToken.Type {
+	case lexer.DETECT:
+		// detect project type
+		// detect docker
+		// detect node version
+		stmt.Type = "detect"
+
+		if p.peekToken.Type == lexer.PROJECT {
+			p.nextToken() // consume PROJECT
+			stmt.Target = "project"
+			if p.peekToken.Type == lexer.TYPE {
+				p.nextToken() // consume TYPE
+				stmt.Condition = "type"
+			}
+		} else if p.isToolToken(p.peekToken.Type) {
+			p.nextToken()
+			stmt.Target = p.curToken.Literal
+
+			if p.peekToken.Type == lexer.VERSION {
+				p.nextToken() // consume VERSION
+				stmt.Condition = "version"
+			}
+		}
+
+	case lexer.IF:
+		// if docker is available:
+		// if node version >= "16":
+		stmt.Type = "if_available"
+
+		if p.isToolToken(p.peekToken.Type) {
+			p.nextToken()
+			stmt.Target = p.curToken.Literal
+
+			if p.peekToken.Type == lexer.IS {
+				p.nextToken() // consume IS
+				if p.peekToken.Type == lexer.AVAILABLE {
+					p.nextToken() // consume AVAILABLE
+					stmt.Condition = "available"
+				}
+			} else if p.peekToken.Type == lexer.VERSION {
+				p.nextToken() // consume VERSION
+				stmt.Type = "if_version"
+
+				// Parse comparison operator
+				if p.peekToken.Type == lexer.GTE || p.peekToken.Type == lexer.GT ||
+					p.peekToken.Type == lexer.LTE || p.peekToken.Type == lexer.LT ||
+					p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE {
+					p.nextToken()
+					stmt.Condition = p.curToken.Literal
+
+					if p.peekToken.Type == lexer.STRING {
+						p.nextToken()
+						stmt.Value = p.curToken.Literal
+					}
+				}
+			}
+		}
+
+	case lexer.WHEN:
+		// when in ci environment:
+		// when in production environment:
+		stmt.Type = "when_environment"
+
+		if p.peekToken.Type == lexer.IN {
+			p.nextToken() // consume IN
+
+			if p.isEnvironmentToken(p.peekToken.Type) {
+				p.nextToken()
+				stmt.Target = p.curToken.Literal
+
+				if p.peekToken.Type == lexer.ENVIRONMENT {
+					p.nextToken() // consume ENVIRONMENT
+					stmt.Condition = "environment"
+				}
+			}
+		}
+	}
+
+	// Parse body if there's a colon
+	if p.peekToken.Type == lexer.COLON {
+		p.nextToken() // consume COLON
+		stmt.Body = p.parseControlFlowBody()
+
+		// Check for else clause (similar to parseIfStatement)
+		if p.peekToken.Type == lexer.ELSE {
+			p.nextToken() // consume ELSE
+			if !p.expectPeek(lexer.COLON) {
+				return stmt
+			}
+			stmt.ElseBody = p.parseControlFlowBody()
+		}
+	}
+
+	return stmt
+}
+
+// isToolToken checks if a token represents a tool name
+func (p *Parser) isToolToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PYTHON, lexer.PIP,
+		lexer.GO, lexer.GOLANG, lexer.JAVA, lexer.RUBY, lexer.PHP, lexer.RUST, lexer.KUBECTL, lexer.HELM,
+		lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
+		return true
+	default:
+		return false
+	}
+}
+
+// isEnvironmentToken checks if a token represents an environment name
+func (p *Parser) isEnvironmentToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.CI, lexer.LOCAL, lexer.PRODUCTION, lexer.STAGING, lexer.DEVELOPMENT:
+		return true
+	default:
+		return false
+	}
+}
+
+// isDetectionContext checks if the current context suggests a detection statement
+func (p *Parser) isDetectionContext() bool {
+	switch p.curToken.Type {
+	case lexer.DETECT:
+		return true
+	case lexer.IF:
+		// Check if this is "if <tool> is available" or "if <tool> version ..."
+		return p.isToolToken(p.peekToken.Type)
+	case lexer.WHEN:
+		// Check if this is "when in <environment> environment"
+		return p.peekToken.Type == lexer.IN
+	default:
+		return false
+	}
+}
+
 // parseStringList parses a list of strings like ["dev", "staging", "production"]
 func (p *Parser) parseStringList() []string {
 	var items []string
@@ -1363,6 +1508,16 @@ func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS:
+		return true
+	default:
+		return false
+	}
+}
+
+// isDetectionToken checks if a token type represents a detection statement
+func (p *Parser) isDetectionToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.DETECT, lexer.IF, lexer.WHEN:
 		return true
 	default:
 		return false
@@ -1631,7 +1786,12 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken()
 
-		if p.isThrowActionToken(p.curToken.Type) {
+		if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
+			detection := p.parseDetectionStatement()
+			if detection != nil {
+				body = append(body, detection)
+			}
+		} else if p.isThrowActionToken(p.curToken.Type) {
 			throw := p.parseThrowStatement()
 			if throw != nil {
 				body = append(body, throw)

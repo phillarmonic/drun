@@ -112,6 +112,46 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok.Type = RBRACKET
 		tok.Literal = string(l.ch)
+	case '>':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = GTE
+			tok.Literal = string(ch) + string(l.ch)
+		} else {
+			tok.Type = GT
+			tok.Literal = string(l.ch)
+		}
+	case '<':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = LTE
+			tok.Literal = string(ch) + string(l.ch)
+		} else {
+			tok.Type = LT
+			tok.Literal = string(l.ch)
+		}
+	case '=':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = EQ
+			tok.Literal = string(ch) + string(l.ch)
+		} else {
+			tok.Type = ILLEGAL
+			tok.Literal = string(l.ch)
+		}
+	case '!':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			tok.Type = NE
+			tok.Literal = string(ch) + string(l.ch)
+		} else {
+			tok.Type = ILLEGAL
+			tok.Literal = string(l.ch)
+		}
 	case '#':
 		tok.Type = COMMENT
 		tok.Literal = l.readComment()

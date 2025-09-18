@@ -109,6 +109,52 @@ const (
 	DOWNLOAD  // download
 	UPLOAD    // upload
 
+	// Smart Detection keywords
+	DETECT      // detect
+	AVAILABLE   // available
+	INSTALLED   // installed
+	TOOL        // tool
+	FRAMEWORK   // framework
+	ENVIRONMENT // environment
+	NODE        // node
+	NPM         // npm
+	YARN        // yarn
+	PYTHON      // python
+	PIP         // pip
+	GO          // go
+	GOLANG      // golang
+	JAVA        // java
+	RUBY        // ruby
+	PHP         // php
+	RUST        // rust
+	KUBECTL     // kubectl
+	HELM        // helm
+	TERRAFORM   // terraform
+	AWS         // aws
+	GCP         // gcp
+	AZURE       // azure
+	CI          // ci
+	LOCAL       // local
+	PRODUCTION  // production
+	STAGING     // staging
+	DEVELOPMENT // development
+	REACT       // react
+	VUE         // vue
+	ANGULAR     // angular
+	DJANGO      // django
+	RAILS       // rails
+	EXPRESS     // express
+	SPRING      // spring
+	LARAVEL     // laravel
+
+	// Comparison operators
+	GTE // >=
+	GT  // >
+	LTE // <=
+	LT  // <
+	EQ  // ==
+	NE  // !=
+
 	// Action keywords (built-in actions)
 	INFO    // info
 	STEP    // step
@@ -390,6 +436,90 @@ func (t TokenType) String() string {
 		return "DOWNLOAD"
 	case UPLOAD:
 		return "UPLOAD"
+	case DETECT:
+		return "DETECT"
+	case AVAILABLE:
+		return "AVAILABLE"
+	case INSTALLED:
+		return "INSTALLED"
+	case TOOL:
+		return "TOOL"
+	case FRAMEWORK:
+		return "FRAMEWORK"
+	case ENVIRONMENT:
+		return "ENVIRONMENT"
+	case NODE:
+		return "NODE"
+	case NPM:
+		return "NPM"
+	case YARN:
+		return "YARN"
+	case PYTHON:
+		return "PYTHON"
+	case PIP:
+		return "PIP"
+	case GO:
+		return "GO"
+	case GOLANG:
+		return "GOLANG"
+	case JAVA:
+		return "JAVA"
+	case RUBY:
+		return "RUBY"
+	case PHP:
+		return "PHP"
+	case RUST:
+		return "RUST"
+	case KUBECTL:
+		return "KUBECTL"
+	case HELM:
+		return "HELM"
+	case TERRAFORM:
+		return "TERRAFORM"
+	case AWS:
+		return "AWS"
+	case GCP:
+		return "GCP"
+	case AZURE:
+		return "AZURE"
+	case CI:
+		return "CI"
+	case LOCAL:
+		return "LOCAL"
+	case PRODUCTION:
+		return "PRODUCTION"
+	case STAGING:
+		return "STAGING"
+	case DEVELOPMENT:
+		return "DEVELOPMENT"
+	case REACT:
+		return "REACT"
+	case VUE:
+		return "VUE"
+	case ANGULAR:
+		return "ANGULAR"
+	case DJANGO:
+		return "DJANGO"
+	case RAILS:
+		return "RAILS"
+	case EXPRESS:
+		return "EXPRESS"
+	case SPRING:
+		return "SPRING"
+	case LARAVEL:
+		return "LARAVEL"
+	case GTE:
+		return "GTE"
+	case GT:
+		return "GT"
+	case LTE:
+		return "LTE"
+	case LT:
+		return "LT"
+	case EQ:
+		return "EQ"
+	case NE:
+		return "NE"
 	case INFO:
 		return "INFO"
 	case STEP:
@@ -527,141 +657,183 @@ func (t Token) String() string {
 
 // Keywords maps string literals to their token types
 var keywords = map[string]TokenType{
-	"version":    VERSION,
-	"task":       TASK,
-	"means":      MEANS,
-	"project":    PROJECT,
-	"set":        SET,
-	"include":    INCLUDE,
-	"before":     BEFORE,
-	"after":      AFTER,
-	"any":        ANY,
-	"depends":    DEPENDS,
-	"on":         ON,
-	"then":       THEN,
-	"and":        AND,
-	"docker":     DOCKER,
-	"image":      IMAGE,
-	"container":  CONTAINER,
-	"compose":    COMPOSE,
-	"build":      BUILD,
-	"push":       PUSH,
-	"pull":       PULL,
-	"tag":        TAG,
-	"remove":     REMOVE,
-	"start":      START,
-	"stop":       STOP,
-	"up":         UP,
-	"down":       DOWN,
-	"git":        GIT,
-	"clone":      CLONE,
-	"init":       INIT,
-	"branch":     BRANCH,
-	"switch":     SWITCH,
-	"merge":      MERGE,
-	"add":        ADD,
-	"commit":     COMMIT,
-	"fetch":      FETCH,
-	"status":     STATUS,
-	"log":        LOG,
-	"show":       SHOW,
-	"repository": REPOSITORY,
-	"remote":     REMOTE,
-	"changes":    CHANGES,
-	"message":    MESSAGE,
-	"files":      FILES,
-	"current":    CURRENT,
-	"all":        ALL,
-	"with":       WITH,
-	"into":       INTO,
-	"http":       HTTP,
-	"https":      HTTPS,
-	"get":        GET,
-	"post":       POST,
-	"put":        PUT,
-	"patch":      PATCH,
-	"head":       HEAD,
-	"options":    OPTIONS,
-	"request":    REQUEST,
-	"response":   RESPONSE,
-	"body":       BODY,
-	"headers":    HEADERS,
-	"header":     HEADER,
-	"url":        URL,
-	"endpoint":   ENDPOINT,
-	"api":        API,
-	"json":       JSON,
-	"xml":        XML,
-	"form":       FORM,
-	"data":       DATA,
-	"timeout":    TIMEOUT,
-	"retry":      RETRY,
-	"follow":     FOLLOW,
-	"redirects":  REDIRECTS,
-	"verify":     VERIFY,
-	"ssl":        SSL,
-	"auth":       AUTH,
-	"bearer":     BEARER,
-	"basic":      BASIC,
-	"token":      TOKEN,
-	"user":       USER,
-	"password":   PASSWORD,
-	"content":    CONTENT,
-	"type":       TYPE,
-	"accept":     ACCEPT,
-	"send":       SEND,
-	"receive":    RECEIVE,
-	"download":   DOWNLOAD,
-	"upload":     UPLOAD,
-	"info":       INFO,
-	"step":       STEP,
-	"warn":       WARN,
-	"error":      ERROR,
-	"success":    SUCCESS,
-	"fail":       FAIL,
-	"requires":   REQUIRES,
-	"given":      GIVEN,
-	"accepts":    ACCEPTS,
-	"defaults":   DEFAULTS,
-	"to":         TO,
-	"from":       FROM,
-	"as":         AS,
-	"list":       LIST,
-	"of":         OF,
-	"when":       WHEN,
-	"if":         IF,
-	"else":       ELSE,
-	"for":        FOR,
-	"each":       EACH,
-	"in":         IN,
-	"parallel":   PARALLEL,
-	"is":         IS,
-	"file":       FILE,
-	"exists":     EXISTS,
-	"run":        RUN,
-	"exec":       EXEC,
-	"shell":      SHELL,
-	"capture":    CAPTURE,
-	"output":     OUTPUT,
-	"string":     STRING_TYPE,
-	"number":     NUMBER_TYPE,
-	"boolean":    BOOLEAN_TYPE,
-	"create":     CREATE,
-	"copy":       COPY,
-	"move":       MOVE,
-	"delete":     DELETE,
-	"read":       READ,
-	"write":      WRITE,
-	"append":     APPEND,
-	"dir":        DIR,
-	"try":        TRY,
-	"catch":      CATCH,
-	"finally":    FINALLY,
-	"throw":      THROW,
-	"rethrow":    RETHROW,
-	"ignore":     IGNORE,
-	"true":       BOOLEAN,
-	"false":      BOOLEAN,
+	"version":     VERSION,
+	"task":        TASK,
+	"means":       MEANS,
+	"project":     PROJECT,
+	"set":         SET,
+	"include":     INCLUDE,
+	"before":      BEFORE,
+	"after":       AFTER,
+	"any":         ANY,
+	"depends":     DEPENDS,
+	"on":          ON,
+	"then":        THEN,
+	"and":         AND,
+	"docker":      DOCKER,
+	"image":       IMAGE,
+	"container":   CONTAINER,
+	"compose":     COMPOSE,
+	"build":       BUILD,
+	"push":        PUSH,
+	"pull":        PULL,
+	"tag":         TAG,
+	"remove":      REMOVE,
+	"start":       START,
+	"stop":        STOP,
+	"up":          UP,
+	"down":        DOWN,
+	"git":         GIT,
+	"clone":       CLONE,
+	"init":        INIT,
+	"branch":      BRANCH,
+	"switch":      SWITCH,
+	"merge":       MERGE,
+	"add":         ADD,
+	"commit":      COMMIT,
+	"fetch":       FETCH,
+	"status":      STATUS,
+	"log":         LOG,
+	"show":        SHOW,
+	"repository":  REPOSITORY,
+	"remote":      REMOTE,
+	"changes":     CHANGES,
+	"message":     MESSAGE,
+	"files":       FILES,
+	"current":     CURRENT,
+	"all":         ALL,
+	"with":        WITH,
+	"into":        INTO,
+	"http":        HTTP,
+	"https":       HTTPS,
+	"get":         GET,
+	"post":        POST,
+	"put":         PUT,
+	"patch":       PATCH,
+	"head":        HEAD,
+	"options":     OPTIONS,
+	"request":     REQUEST,
+	"response":    RESPONSE,
+	"body":        BODY,
+	"headers":     HEADERS,
+	"header":      HEADER,
+	"url":         URL,
+	"endpoint":    ENDPOINT,
+	"api":         API,
+	"json":        JSON,
+	"xml":         XML,
+	"form":        FORM,
+	"data":        DATA,
+	"timeout":     TIMEOUT,
+	"retry":       RETRY,
+	"follow":      FOLLOW,
+	"redirects":   REDIRECTS,
+	"verify":      VERIFY,
+	"ssl":         SSL,
+	"auth":        AUTH,
+	"bearer":      BEARER,
+	"basic":       BASIC,
+	"token":       TOKEN,
+	"user":        USER,
+	"password":    PASSWORD,
+	"content":     CONTENT,
+	"type":        TYPE,
+	"accept":      ACCEPT,
+	"send":        SEND,
+	"receive":     RECEIVE,
+	"download":    DOWNLOAD,
+	"upload":      UPLOAD,
+	"detect":      DETECT,
+	"available":   AVAILABLE,
+	"installed":   INSTALLED,
+	"tool":        TOOL,
+	"framework":   FRAMEWORK,
+	"environment": ENVIRONMENT,
+	"node":        NODE,
+	"npm":         NPM,
+	"yarn":        YARN,
+	"python":      PYTHON,
+	"pip":         PIP,
+	"go":          GO,
+	"golang":      GOLANG,
+	"java":        JAVA,
+	"ruby":        RUBY,
+	"php":         PHP,
+	"rust":        RUST,
+	"kubectl":     KUBECTL,
+	"helm":        HELM,
+	"terraform":   TERRAFORM,
+	"aws":         AWS,
+	"gcp":         GCP,
+	"azure":       AZURE,
+	"ci":          CI,
+	"local":       LOCAL,
+	"production":  PRODUCTION,
+	"staging":     STAGING,
+	"development": DEVELOPMENT,
+	"react":       REACT,
+	"vue":         VUE,
+	"angular":     ANGULAR,
+	"django":      DJANGO,
+	"rails":       RAILS,
+	"express":     EXPRESS,
+	"spring":      SPRING,
+	"laravel":     LARAVEL,
+	">=":          GTE,
+	">":           GT,
+	"<=":          LTE,
+	"<":           LT,
+	"==":          EQ,
+	"!=":          NE,
+	"info":        INFO,
+	"step":        STEP,
+	"warn":        WARN,
+	"error":       ERROR,
+	"success":     SUCCESS,
+	"fail":        FAIL,
+	"requires":    REQUIRES,
+	"given":       GIVEN,
+	"accepts":     ACCEPTS,
+	"defaults":    DEFAULTS,
+	"to":          TO,
+	"from":        FROM,
+	"as":          AS,
+	"list":        LIST,
+	"of":          OF,
+	"when":        WHEN,
+	"if":          IF,
+	"else":        ELSE,
+	"for":         FOR,
+	"each":        EACH,
+	"in":          IN,
+	"parallel":    PARALLEL,
+	"is":          IS,
+	"file":        FILE,
+	"exists":      EXISTS,
+	"run":         RUN,
+	"exec":        EXEC,
+	"shell":       SHELL,
+	"capture":     CAPTURE,
+	"output":      OUTPUT,
+	"string":      STRING_TYPE,
+	"number":      NUMBER_TYPE,
+	"boolean":     BOOLEAN_TYPE,
+	"create":      CREATE,
+	"copy":        COPY,
+	"move":        MOVE,
+	"delete":      DELETE,
+	"read":        READ,
+	"write":       WRITE,
+	"append":      APPEND,
+	"dir":         DIR,
+	"try":         TRY,
+	"catch":       CATCH,
+	"finally":     FINALLY,
+	"throw":       THROW,
+	"rethrow":     RETHROW,
+	"ignore":      IGNORE,
+	"true":        BOOLEAN,
+	"false":       BOOLEAN,
 }
 
 // LookupIdent checks if an identifier is a keyword

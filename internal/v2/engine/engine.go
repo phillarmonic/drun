@@ -9,6 +9,7 @@ import (
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
 	"github.com/phillarmonic/drun/internal/v2/builtins"
+	"github.com/phillarmonic/drun/internal/v2/detection"
 	"github.com/phillarmonic/drun/internal/v2/fileops"
 	"github.com/phillarmonic/drun/internal/v2/lexer"
 	"github.com/phillarmonic/drun/internal/v2/parallel"
@@ -260,6 +261,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeGit(s, ctx)
 	case *ast.HTTPStatement:
 		return e.executeHTTP(s, ctx)
+	case *ast.DetectionStatement:
+		return e.executeDetection(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -891,6 +894,182 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 	} else {
 		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(httpCmd, " "))
 	}
+}
+
+// executeDetection executes smart detection operations
+func (e *Engine) executeDetection(detectionStmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	detector := detection.NewDetector()
+
+	switch detectionStmt.Type {
+	case "detect":
+		return e.executeDetectOperation(detector, detectionStmt, ctx)
+	case "if_available":
+		return e.executeIfAvailable(detector, detectionStmt, ctx)
+	case "if_version":
+		return e.executeIfVersion(detector, detectionStmt, ctx)
+	case "when_environment":
+		return e.executeWhenEnvironment(detector, detectionStmt, ctx)
+	default:
+		return fmt.Errorf("unknown detection type: %s", detectionStmt.Type)
+	}
+}
+
+// executeDetectOperation executes detect operations
+func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	switch stmt.Target {
+	case "project":
+		if stmt.Condition == "type" {
+			types := detector.DetectProjectType()
+			if e.dryRun {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would detect project types: %v\n", types)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "🔍 Detected project types: %v\n", types)
+			}
+		}
+	default:
+		// Detect tool
+		if stmt.Condition == "version" {
+			version := detector.GetToolVersion(stmt.Target)
+			if e.dryRun {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would detect %s version: %s\n", stmt.Target, version)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "🔍 Detected %s version: %s\n", stmt.Target, version)
+			}
+		} else {
+			available := detector.IsToolAvailable(stmt.Target)
+			if e.dryRun {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s is available: %t\n", stmt.Target, available)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "🔍 %s available: %t\n", stmt.Target, available)
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeIfAvailable executes "if tool is available" conditions
+func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	available := detector.IsToolAvailable(stmt.Target)
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s is available: %t\n", stmt.Target, available)
+		if available {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if-available body for %s\n", stmt.Target)
+			for _, bodyStmt := range stmt.Body {
+				if err := e.executeStatement(bodyStmt, ctx); err != nil {
+					return err
+				}
+			}
+		} else if len(stmt.ElseBody) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body for %s\n", stmt.Target)
+			for _, elseStmt := range stmt.ElseBody {
+				if err := e.executeStatement(elseStmt, ctx); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s is available: %t\n", stmt.Target, available)
+
+	if available {
+		for _, bodyStmt := range stmt.Body {
+			if err := e.executeStatement(bodyStmt, ctx); err != nil {
+				return err
+			}
+		}
+	} else if len(stmt.ElseBody) > 0 {
+		for _, elseStmt := range stmt.ElseBody {
+			if err := e.executeStatement(elseStmt, ctx); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeIfVersion executes "if tool version comparison" conditions
+func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	version := detector.GetToolVersion(stmt.Target)
+	targetVersion := e.interpolateVariables(stmt.Value, ctx)
+
+	matches := detector.CompareVersion(version, stmt.Condition, targetVersion)
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s version %s %s %s: %t (current: %s)\n",
+			stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+		if matches {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if-version body for %s\n", stmt.Target)
+			for _, bodyStmt := range stmt.Body {
+				if err := e.executeStatement(bodyStmt, ctx); err != nil {
+					return err
+				}
+			}
+		} else if len(stmt.ElseBody) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body for %s\n", stmt.Target)
+			for _, elseStmt := range stmt.ElseBody {
+				if err := e.executeStatement(elseStmt, ctx); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
+		stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+
+	if matches {
+		for _, bodyStmt := range stmt.Body {
+			if err := e.executeStatement(bodyStmt, ctx); err != nil {
+				return err
+			}
+		}
+	} else if len(stmt.ElseBody) > 0 {
+		for _, elseStmt := range stmt.ElseBody {
+			if err := e.executeStatement(elseStmt, ctx); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeWhenEnvironment executes "when in environment" conditions
+func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	currentEnv := detector.DetectEnvironment()
+	matches := currentEnv == stmt.Target
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if in %s environment: %t (current: %s)\n",
+			stmt.Target, matches, currentEnv)
+		if matches {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute when-environment body\n")
+			for _, bodyStmt := range stmt.Body {
+				if err := e.executeStatement(bodyStmt, ctx); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
+		stmt.Target, matches, currentEnv)
+
+	if matches {
+		for _, bodyStmt := range stmt.Body {
+			if err := e.executeStatement(bodyStmt, ctx); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // shouldHandleError determines if a catch clause should handle the given error

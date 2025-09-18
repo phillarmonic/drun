@@ -463,6 +463,57 @@ func (hs *HTTPStatement) String() string {
 	return out.String()
 }
 
+// DetectionStatement represents smart detection operations
+type DetectionStatement struct {
+	Token     lexer.Token // the DETECT token or condition token
+	Type      string      // "detect", "if_available", "when_environment", etc.
+	Target    string      // what to detect: "docker", "node", "ci", etc.
+	Condition string      // condition type: "available", "version", ">=", etc.
+	Value     string      // expected value for comparisons
+	Body      []Statement // statements to execute if condition is true
+	ElseBody  []Statement // statements to execute if condition is false (optional)
+}
+
+func (ds *DetectionStatement) statementNode() {}
+func (ds *DetectionStatement) String() string {
+	var out strings.Builder
+
+	switch ds.Type {
+	case "detect":
+		out.WriteString("detect " + ds.Target)
+		if ds.Condition != "" {
+			out.WriteString(" " + ds.Condition)
+		}
+		if ds.Value != "" {
+			out.WriteString(" " + ds.Value)
+		}
+	case "if_available":
+		out.WriteString("if " + ds.Target + " is available")
+	case "when_environment":
+		out.WriteString("when in " + ds.Target + " environment")
+	case "if_version":
+		out.WriteString("if " + ds.Target + " version " + ds.Condition + " " + ds.Value)
+	default:
+		out.WriteString(ds.Type + " " + ds.Target)
+	}
+
+	if len(ds.Body) > 0 {
+		out.WriteString(":")
+		for _, stmt := range ds.Body {
+			out.WriteString("\n  " + stmt.String())
+		}
+	}
+
+	if len(ds.ElseBody) > 0 {
+		out.WriteString("\nelse:")
+		for _, stmt := range ds.ElseBody {
+			out.WriteString("\n  " + stmt.String())
+		}
+	}
+
+	return out.String()
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)
