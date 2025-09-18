@@ -1,0 +1,16 @@
+version: 2.0
+
+task "throw test" means "Test throw statements":
+  info "Starting error handling test"
+  
+  when file exists("nonexistent.txt") is "false":
+    warn "File does not exist, throwing error"
+    throw "File not found: nonexistent.txt"
+  
+  success "This should not be reached"
+
+task "ignore test" means "Test ignore statements":
+  info "Testing ignore functionality"
+  ignore
+  success "Ignore test completed!"
+

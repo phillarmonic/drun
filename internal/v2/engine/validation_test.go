@@ -65,7 +65,7 @@ task "deploy":
 		t.Fatal("Expected error for invalid constraint value, got nil")
 	}
 
-	expectedError := "parameter 'environment' value 'testing' is not valid. Must be one of: [dev staging production]"
+	expectedError := "parameter 'environment': value 'testing' is not in allowed values: [dev staging production]"
 	if err.Error() != expectedError {
 		t.Errorf("Expected error %q, got %q", expectedError, err.Error())
 	}

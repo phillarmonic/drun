@@ -1,0 +1,7 @@
+version: 2.0
+
+task "debug":
+  info "Before shell"
+  exec "echo 'test'"
+  info "After shell"
+

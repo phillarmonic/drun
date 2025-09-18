@@ -1,0 +1,5 @@
+version: 2.0
+
+task "just ignore":
+  ignore
+

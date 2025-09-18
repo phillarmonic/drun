@@ -1,0 +1,39 @@
+version: 2.0
+
+task "sequential demo" means "Sequential processing demo":
+  accepts items as list
+  
+  info "Starting sequential processing"
+  for each item in items:
+    info "Processing: {item}"
+    step "Working on {item}"
+  
+  success "Sequential processing completed!"
+
+task "parallel demo" means "Parallel processing demo":
+  accepts items as list
+  
+  info "Starting parallel processing"
+  for each item in items in parallel:
+    info "Processing: {item}"
+    step "Working on {item}"
+  
+  success "Parallel processing completed!"
+
+task "file batch" means "Batch file operations":
+  accepts filenames as list
+  
+  info "Creating files in parallel"
+  for each name in filenames in parallel:
+    create file "{name}"
+    write "Content for {name}" to file "{name}"
+    info "Created: {name}"
+  
+  info "Reading files sequentially"
+  for each name in filenames:
+    read file "{name}" as content
+    info "File {name}: {content}"
+    delete file "{name}"
+  
+  success "Batch file operations completed!"
+

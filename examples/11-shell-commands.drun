@@ -1,0 +1,53 @@
+version: 2.0
+
+task "shell demo" means "Demonstrate shell command execution":
+  info "Starting shell command demonstration"
+  
+  run "echo 'Hello from shell command!'"
+  exec "date +%Y-%m-%d"
+  shell "pwd"
+  
+  success "Shell commands completed successfully!"
+
+task "capture demo" means "Demonstrate command output capture":
+  info "Testing command capture functionality"
+  
+  capture "echo 'This will be captured'" as message
+  capture "date +%Y" as year
+  
+  info "Captured message: {message}"
+  info "Current year: {year}"
+  
+  success "Capture demonstration completed!"
+
+task "build info" means "Generate build information using shell commands":
+  info "Gathering build information"
+  
+  capture "git rev-parse --short HEAD" as commit
+  capture "date +%Y%m%d-%H%M%S" as timestamp
+  capture "whoami" as user
+  
+  info "Build Details:"
+  info "  Commit: {commit}"
+  info "  Timestamp: {timestamp}"
+  info "  Built by: {user}"
+  info "  Host: {hostname}"
+  
+  run "echo 'Build {commit}-{timestamp} by {user}@{hostname}'"
+  
+  success "Build information generated!"
+
+task "system check" means "Perform system checks using shell commands":
+  info "Performing system checks"
+  
+  run "echo 'Checking disk space...'"
+  exec "df -h | head -2"
+  
+  run "echo 'Checking memory usage...'"
+  exec "free -h | head -2"
+  
+  run "echo 'Checking current processes...'"
+  shell "ps aux | head -5"
+  
+  success "System check completed!"
+

@@ -90,6 +90,152 @@ func (as *ActionStatement) String() string {
 	return fmt.Sprintf("%s \"%s\"", as.Action, as.Message)
 }
 
+// ShellStatement represents shell command execution
+type ShellStatement struct {
+	Token        lexer.Token // the shell token (RUN, EXEC, SHELL, CAPTURE)
+	Action       string      // "run", "exec", "shell", "capture"
+	Command      string      // the shell command to execute
+	CaptureVar   string      // variable name to capture output (for capture action)
+	StreamOutput bool        // whether to stream output in real-time
+}
+
+func (ss *ShellStatement) statementNode() {}
+func (ss *ShellStatement) String() string {
+	if ss.CaptureVar != "" {
+		return fmt.Sprintf("%s \"%s\" as %s", ss.Action, ss.Command, ss.CaptureVar)
+	}
+	return fmt.Sprintf("%s \"%s\"", ss.Action, ss.Command)
+}
+
+// FileStatement represents file system operations
+type FileStatement struct {
+	Token      lexer.Token // the file operation token (CREATE, COPY, MOVE, DELETE, READ, WRITE, APPEND)
+	Action     string      // "create", "copy", "move", "delete", "read", "write", "append"
+	Target     string      // target file/directory path
+	Source     string      // source path (for copy/move operations)
+	Content    string      // content (for write/append operations)
+	IsDir      bool        // whether the operation is on a directory
+	CaptureVar string      // variable name to capture content (for read operations)
+}
+
+func (fs *FileStatement) statementNode() {}
+func (fs *FileStatement) String() string {
+	switch fs.Action {
+	case "create":
+		if fs.IsDir {
+			return fmt.Sprintf("create dir \"%s\"", fs.Target)
+		}
+		return fmt.Sprintf("create file \"%s\"", fs.Target)
+	case "copy":
+		return fmt.Sprintf("copy \"%s\" to \"%s\"", fs.Source, fs.Target)
+	case "move":
+		return fmt.Sprintf("move \"%s\" to \"%s\"", fs.Source, fs.Target)
+	case "delete":
+		if fs.IsDir {
+			return fmt.Sprintf("delete dir \"%s\"", fs.Target)
+		}
+		return fmt.Sprintf("delete file \"%s\"", fs.Target)
+	case "read":
+		if fs.CaptureVar != "" {
+			return fmt.Sprintf("read file \"%s\" as %s", fs.Target, fs.CaptureVar)
+		}
+		return fmt.Sprintf("read file \"%s\"", fs.Target)
+	case "write":
+		return fmt.Sprintf("write \"%s\" to file \"%s\"", fs.Content, fs.Target)
+	case "append":
+		return fmt.Sprintf("append \"%s\" to file \"%s\"", fs.Content, fs.Target)
+	default:
+		return fmt.Sprintf("%s \"%s\"", fs.Action, fs.Target)
+	}
+}
+
+// TryStatement represents try/catch/finally error handling blocks
+type TryStatement struct {
+	Token        lexer.Token   // the TRY token
+	TryBody      []Statement   // statements in the try block
+	CatchClauses []CatchClause // catch clauses
+	FinallyBody  []Statement   // statements in the finally block (optional)
+}
+
+func (ts *TryStatement) statementNode() {}
+func (ts *TryStatement) String() string {
+	var out strings.Builder
+	out.WriteString("try:")
+
+	for _, stmt := range ts.TryBody {
+		out.WriteString("\n  ")
+		out.WriteString(stmt.String())
+	}
+
+	for _, catch := range ts.CatchClauses {
+		out.WriteString("\n")
+		out.WriteString(catch.String())
+	}
+
+	if len(ts.FinallyBody) > 0 {
+		out.WriteString("\nfinally:")
+		for _, stmt := range ts.FinallyBody {
+			out.WriteString("\n  ")
+			out.WriteString(stmt.String())
+		}
+	}
+
+	return out.String()
+}
+
+// CatchClause represents a catch clause within a try statement
+type CatchClause struct {
+	Token     lexer.Token // the CATCH token
+	ErrorType string      // specific error type to catch (optional)
+	ErrorVar  string      // variable to capture error (optional)
+	Body      []Statement // statements in the catch block
+}
+
+func (cc *CatchClause) String() string {
+	var out strings.Builder
+	out.WriteString("catch")
+
+	if cc.ErrorType != "" {
+		out.WriteString(" ")
+		out.WriteString(cc.ErrorType)
+	}
+
+	if cc.ErrorVar != "" {
+		out.WriteString(" as ")
+		out.WriteString(cc.ErrorVar)
+	}
+
+	out.WriteString(":")
+
+	for _, stmt := range cc.Body {
+		out.WriteString("\n  ")
+		out.WriteString(stmt.String())
+	}
+
+	return out.String()
+}
+
+// ThrowStatement represents throw and rethrow statements
+type ThrowStatement struct {
+	Token   lexer.Token // the THROW or RETHROW token
+	Action  string      // "throw", "rethrow", or "ignore"
+	Message string      // error message (for throw)
+}
+
+func (ts *ThrowStatement) statementNode() {}
+func (ts *ThrowStatement) String() string {
+	switch ts.Action {
+	case "throw":
+		return fmt.Sprintf("throw \"%s\"", ts.Message)
+	case "rethrow":
+		return "rethrow"
+	case "ignore":
+		return "ignore"
+	default:
+		return ts.Action
+	}
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)
@@ -97,7 +243,7 @@ type ParameterStatement struct {
 	Name         string      // parameter name
 	DefaultValue string      // default value (for "given")
 	Constraints  []string    // constraints like ["dev", "staging", "production"]
-	DataType     string      // "string", "list", "number", etc.
+	DataType     string      // "string", "number", "boolean", "list", etc.
 	Required     bool        // true for "requires", false for "given"/"accepts"
 }
 
@@ -164,11 +310,13 @@ func (cs *ConditionalStatement) String() string {
 
 // LoopStatement represents for each loops
 type LoopStatement struct {
-	Token    lexer.Token // the FOR token
-	Variable string      // loop variable name
-	Iterable string      // what to iterate over
-	Parallel bool        // whether to run in parallel
-	Body     []Statement // statements in the loop body
+	Token      lexer.Token // the FOR token
+	Variable   string      // loop variable name
+	Iterable   string      // what to iterate over
+	Parallel   bool        // whether to run in parallel
+	MaxWorkers int         // maximum number of parallel workers (0 = unlimited)
+	FailFast   bool        // whether to stop on first error
+	Body       []Statement // statements in the loop body
 }
 
 func (ls *LoopStatement) statementNode() {}

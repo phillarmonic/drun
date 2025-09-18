@@ -140,10 +140,37 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if controlFlow != nil {
 				stmt.Body = append(stmt.Body, controlFlow)
 			}
+		} else if p.isErrorHandlingToken(p.curToken.Type) {
+			errorHandling := p.parseErrorHandlingStatement()
+			if errorHandling != nil {
+				stmt.Body = append(stmt.Body, errorHandling)
+			}
+		} else if p.isThrowActionToken(p.curToken.Type) {
+			throw := p.parseThrowStatement()
+			if throw != nil {
+				stmt.Body = append(stmt.Body, throw)
+			}
 		} else if p.isActionToken(p.curToken.Type) {
-			action := p.parseActionStatement()
-			if action != nil {
-				stmt.Body = append(stmt.Body, action)
+			if p.isShellActionToken(p.curToken.Type) {
+				shell := p.parseShellStatement()
+				if shell != nil {
+					stmt.Body = append(stmt.Body, shell)
+				}
+			} else if p.isFileActionToken(p.curToken.Type) {
+				file := p.parseFileStatement()
+				if file != nil {
+					stmt.Body = append(stmt.Body, file)
+				}
+			} else if p.isThrowActionToken(p.curToken.Type) {
+				throw := p.parseThrowStatement()
+				if throw != nil {
+					stmt.Body = append(stmt.Body, throw)
+				}
+			} else {
+				action := p.parseActionStatement()
+				if action != nil {
+					stmt.Body = append(stmt.Body, action)
+				}
 			}
 		} else if p.curToken.Type == lexer.COMMENT {
 			// Skip comments in task body
@@ -179,11 +206,336 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 	return stmt
 }
 
+// parseShellStatement parses a shell command statement (run, exec, shell, capture)
+func (p *Parser) parseShellStatement() *ast.ShellStatement {
+	stmt := &ast.ShellStatement{
+		Token:  p.curToken,
+		Action: p.curToken.Literal,
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+
+	stmt.Command = p.curToken.Literal
+
+	// Check for capture syntax: capture "command" as variable_name
+	if stmt.Action == "capture" && p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.CaptureVar = p.curToken.Literal
+	}
+
+	// Set streaming behavior based on action type
+	switch stmt.Action {
+	case "run", "exec":
+		stmt.StreamOutput = true
+	case "shell":
+		stmt.StreamOutput = true
+	case "capture":
+		stmt.StreamOutput = false
+	}
+
+	return stmt
+}
+
+// parseFileStatement parses file operation statements (create, copy, move, delete, read, write, append)
+func (p *Parser) parseFileStatement() *ast.FileStatement {
+	stmt := &ast.FileStatement{
+		Token:  p.curToken,
+		Action: p.curToken.Literal,
+	}
+
+	switch stmt.Action {
+	case "create":
+		return p.parseCreateStatement(stmt)
+	case "copy":
+		return p.parseCopyStatement(stmt)
+	case "move":
+		return p.parseMoveStatement(stmt)
+	case "delete":
+		return p.parseDeleteStatement(stmt)
+	case "read":
+		return p.parseReadStatement(stmt)
+	case "write":
+		return p.parseWriteStatement(stmt)
+	case "append":
+		return p.parseAppendStatement(stmt)
+	default:
+		p.addError(fmt.Sprintf("unknown file operation: %s", stmt.Action))
+		return nil
+	}
+}
+
+// parseCreateStatement parses "create file/dir" statements
+func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: create file "path" or create dir "path"
+	switch p.peekToken.Type {
+	case lexer.FILE:
+		p.nextToken() // consume FILE
+		stmt.IsDir = false
+	case lexer.DIR:
+		p.nextToken() // consume DIR
+		stmt.IsDir = true
+	default:
+		p.addError("expected 'file' or 'dir' after 'create'")
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseCopyStatement parses "copy" statements
+func (p *Parser) parseCopyStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: copy "source" to "target"
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Source = p.curToken.Literal
+
+	if !p.expectPeek(lexer.TO) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseMoveStatement parses "move" statements
+func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: move "source" to "target"
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Source = p.curToken.Literal
+
+	if !p.expectPeek(lexer.TO) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseDeleteStatement parses "delete" statements
+func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: delete file "path" or delete dir "path"
+	switch p.peekToken.Type {
+	case lexer.FILE:
+		p.nextToken() // consume FILE
+		stmt.IsDir = false
+	case lexer.DIR:
+		p.nextToken() // consume DIR
+		stmt.IsDir = true
+	default:
+		p.addError("expected 'file' or 'dir' after 'delete'")
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseReadStatement parses "read" statements
+func (p *Parser) parseReadStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: read file "path" [as variable]
+	if !p.expectPeek(lexer.FILE) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	// Check for capture syntax: read file "path" as variable
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.CaptureVar = p.curToken.Literal
+	}
+
+	return stmt
+}
+
+// parseWriteStatement parses "write" statements
+func (p *Parser) parseWriteStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: write "content" to file "path"
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Content = p.curToken.Literal
+
+	if !p.expectPeek(lexer.TO) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.FILE) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseAppendStatement parses "append" statements
+func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: append "content" to file "path"
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Content = p.curToken.Literal
+
+	if !p.expectPeek(lexer.TO) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.FILE) {
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseErrorHandlingStatement parses try/catch/finally statements
+func (p *Parser) parseErrorHandlingStatement() *ast.TryStatement {
+	if p.curToken.Type != lexer.TRY {
+		p.addError("expected 'try' keyword")
+		return nil
+	}
+
+	stmt := &ast.TryStatement{
+		Token: p.curToken,
+	}
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse try body (parseControlFlowBody handles INDENT internally)
+	stmt.TryBody = p.parseControlFlowBody()
+
+	// Parse catch clauses
+	for p.peekToken.Type == lexer.CATCH {
+		p.nextToken() // consume CATCH
+		catchClause := p.parseCatchClause()
+		if catchClause != nil {
+			stmt.CatchClauses = append(stmt.CatchClauses, *catchClause)
+		}
+	}
+
+	// Parse optional finally clause
+	if p.peekToken.Type == lexer.FINALLY {
+		p.nextToken() // consume FINALLY
+		if !p.expectPeek(lexer.COLON) {
+			return nil
+		}
+		stmt.FinallyBody = p.parseControlFlowBody()
+	}
+
+	return stmt
+}
+
+// parseCatchClause parses a catch clause
+func (p *Parser) parseCatchClause() *ast.CatchClause {
+	clause := &ast.CatchClause{
+		Token: p.curToken,
+	}
+
+	// Check for specific error type or "as" clause
+	switch p.peekToken.Type {
+	case lexer.IDENT:
+		p.nextToken() // consume error type
+		clause.ErrorType = p.curToken.Literal
+
+		// Check for "as variable" clause
+		if p.peekToken.Type == lexer.AS {
+			p.nextToken() // consume AS
+			if !p.expectPeek(lexer.IDENT) {
+				return nil
+			}
+			clause.ErrorVar = p.curToken.Literal
+		}
+	case lexer.AS:
+		p.nextToken() // consume AS
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		clause.ErrorVar = p.curToken.Literal
+	}
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse catch body (parseControlFlowBody handles INDENT internally)
+	clause.Body = p.parseControlFlowBody()
+
+	return clause
+}
+
+// parseThrowStatement parses throw, rethrow, and ignore statements
+func (p *Parser) parseThrowStatement() *ast.ThrowStatement {
+	stmt := &ast.ThrowStatement{
+		Token:  p.curToken,
+		Action: p.curToken.Literal,
+	}
+
+	switch stmt.Action {
+	case "throw":
+		// Expect: throw "message"
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Message = p.curToken.Literal
+	case "rethrow":
+		// No additional parameters needed
+	case "ignore":
+		// No additional parameters needed
+	default:
+		p.addError(fmt.Sprintf("unknown throw action: %s", stmt.Action))
+		return nil
+	}
+
+	return stmt
+}
+
 // parseParameterStatement parses parameter declarations (requires, given, accepts)
 func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	stmt := &ast.ParameterStatement{
-		Token: p.curToken,
-		Type:  p.curToken.Literal,
+		Token:    p.curToken,
+		Type:     p.curToken.Literal,
+		DataType: "string", // default type
 	}
 
 	// Parse parameter name
@@ -191,6 +543,28 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		return nil
 	}
 	stmt.Name = p.curToken.Literal
+
+	// Check for type declaration: "as type"
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		if p.isTypeToken(p.peekToken.Type) {
+			p.nextToken() // consume type token
+			stmt.DataType = p.curToken.Literal
+		} else if p.peekToken.Type == lexer.LIST {
+			p.nextToken() // consume LIST
+			stmt.DataType = "list"
+			if p.peekToken.Type == lexer.OF {
+				p.nextToken() // consume OF
+				if p.isTypeToken(p.peekToken.Type) {
+					p.nextToken() // consume element type
+					stmt.DataType = "list of " + p.curToken.Literal
+				}
+			}
+		} else {
+			p.addError("expected type after 'as'")
+			return nil
+		}
+	}
 
 	// Handle different parameter types
 	switch stmt.Type {
@@ -221,19 +595,12 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 
 	case "accepts":
 		stmt.Required = false
-		// Handle: accepts items as list of strings
-		if p.peekToken.Type == lexer.AS {
-			p.nextToken() // consume AS
-			if p.peekToken.Type == lexer.LIST {
-				p.nextToken() // consume LIST
-				stmt.DataType = "list"
-				if p.peekToken.Type == lexer.OF {
-					p.nextToken() // consume OF
-					if p.peekToken.Type == lexer.IDENT {
-						p.nextToken() // consume type
-						stmt.DataType = "list of " + p.curToken.Literal
-					}
-				}
+		// accepts can have constraints too
+		if p.peekToken.Type == lexer.FROM {
+			p.nextToken() // consume FROM
+			if p.peekToken.Type == lexer.LBRACKET {
+				p.nextToken() // consume LBRACKET
+				stmt.Constraints = p.parseStringList()
 			}
 		}
 	}
@@ -288,7 +655,59 @@ func (p *Parser) isControlFlowToken(tokenType lexer.TokenType) bool {
 // isActionToken checks if a token type represents an action
 func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL:
+	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL,
+		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
+		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND:
+		return true
+	default:
+		return false
+	}
+}
+
+// isShellActionToken checks if a token type represents a shell action
+func (p *Parser) isShellActionToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE:
+		return true
+	default:
+		return false
+	}
+}
+
+// isTypeToken checks if a token type represents a data type
+func (p *Parser) isTypeToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.STRING_TYPE, lexer.NUMBER_TYPE, lexer.BOOLEAN_TYPE, lexer.LIST_TYPE:
+		return true
+	default:
+		return false
+	}
+}
+
+// isFileActionToken checks if a token type represents a file action
+func (p *Parser) isFileActionToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND:
+		return true
+	default:
+		return false
+	}
+}
+
+// isErrorHandlingToken checks if a token type represents error handling
+func (p *Parser) isErrorHandlingToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.TRY:
+		return true
+	default:
+		return false
+	}
+}
+
+// isThrowActionToken checks if a token type represents a throw action
+func (p *Parser) isThrowActionToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.THROW, lexer.RETHROW, lexer.IGNORE:
 		return true
 	default:
 		return false
@@ -475,15 +894,42 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken()
 
-		if p.isActionToken(p.curToken.Type) {
-			action := p.parseActionStatement()
-			if action != nil {
-				body = append(body, action)
+		if p.isThrowActionToken(p.curToken.Type) {
+			throw := p.parseThrowStatement()
+			if throw != nil {
+				body = append(body, throw)
+			}
+		} else if p.isActionToken(p.curToken.Type) {
+			if p.isShellActionToken(p.curToken.Type) {
+				shell := p.parseShellStatement()
+				if shell != nil {
+					body = append(body, shell)
+				}
+			} else if p.isFileActionToken(p.curToken.Type) {
+				file := p.parseFileStatement()
+				if file != nil {
+					body = append(body, file)
+				}
+			} else if p.isThrowActionToken(p.curToken.Type) {
+				throw := p.parseThrowStatement()
+				if throw != nil {
+					body = append(body, throw)
+				}
+			} else {
+				action := p.parseActionStatement()
+				if action != nil {
+					body = append(body, action)
+				}
 			}
 		} else if p.isControlFlowToken(p.curToken.Type) {
 			controlFlow := p.parseControlFlowStatement()
 			if controlFlow != nil {
 				body = append(body, controlFlow)
+			}
+		} else if p.isErrorHandlingToken(p.curToken.Type) {
+			errorHandling := p.parseErrorHandlingStatement()
+			if errorHandling != nil {
+				body = append(body, errorHandling)
 			}
 		} else if p.curToken.Type == lexer.COMMENT {
 			// Skip comments

@@ -228,7 +228,7 @@ func TestEngine_SimpleLoop(t *testing.T) {
 	input := `version: 2.0
 
 task "process":
-  accepts files as list of strings
+  accepts files as list
   
   step "Processing files"
   

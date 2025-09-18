@@ -9,8 +9,12 @@ import (
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
 	"github.com/phillarmonic/drun/internal/v2/builtins"
+	"github.com/phillarmonic/drun/internal/v2/fileops"
 	"github.com/phillarmonic/drun/internal/v2/lexer"
+	"github.com/phillarmonic/drun/internal/v2/parallel"
 	"github.com/phillarmonic/drun/internal/v2/parser"
+	"github.com/phillarmonic/drun/internal/v2/shell"
+	"github.com/phillarmonic/drun/internal/v2/types"
 )
 
 // Engine executes drun v2 programs directly
@@ -21,7 +25,8 @@ type Engine struct {
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
-	Parameters map[string]string // parameter name -> value
+	Parameters map[string]*types.Value // parameter name -> typed value
+	Variables  map[string]string       // captured variables from shell commands
 }
 
 // NewEngine creates a new v2 execution engine
@@ -66,30 +71,47 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
-		Parameters: make(map[string]string),
+		Parameters: make(map[string]*types.Value),
+		Variables:  make(map[string]string),
 	}
 
 	// Set up parameters with defaults and validation
 	for _, param := range targetTask.Parameters {
-		var value string
+		var rawValue string
 		var hasValue bool
 
 		if providedValue, exists := params[param.Name]; exists {
-			value = providedValue
+			rawValue = providedValue
 			hasValue = true
 		} else if param.DefaultValue != "" {
-			value = param.DefaultValue
+			rawValue = param.DefaultValue
 			hasValue = true
 		} else if param.Required {
 			return fmt.Errorf("required parameter '%s' not provided", param.Name)
 		}
 
-		// Validate constraints if value is provided
+		// Create typed value if we have a value
 		if hasValue {
-			if err := e.validateParameterConstraints(param, value); err != nil {
-				return err
+			// Determine parameter type
+			paramType, err := types.ParseParameterType(param.DataType)
+			if err != nil {
+				// Fall back to type inference if parsing fails
+				paramType = types.InferType(rawValue)
 			}
-			ctx.Parameters[param.Name] = value
+
+			// Create typed value
+			typedValue, err := types.NewValue(paramType, rawValue)
+			if err != nil {
+				return fmt.Errorf("parameter '%s': invalid %s value '%s': %w",
+					param.Name, paramType, rawValue, err)
+			}
+
+			// Validate constraints
+			if err := typedValue.ValidateConstraints(param.Constraints); err != nil {
+				return fmt.Errorf("parameter '%s': %w", param.Name, err)
+			}
+
+			ctx.Parameters[param.Name] = typedValue
 		}
 	}
 
@@ -103,10 +125,10 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 		if task.Description != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
 		}
+		// Process statements in dry run mode
 		for _, stmt := range task.Body {
-			if action, ok := stmt.(*ast.ActionStatement); ok {
-				interpolatedMessage := e.interpolateVariables(action.Message, ctx)
-				_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
+			if err := e.executeStatement(stmt, ctx); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -127,6 +149,14 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 	switch s := stmt.(type) {
 	case *ast.ActionStatement:
 		return e.executeAction(s, ctx)
+	case *ast.ShellStatement:
+		return e.executeShell(s, ctx)
+	case *ast.FileStatement:
+		return e.executeFile(s, ctx)
+	case *ast.TryStatement:
+		return e.executeTry(s, ctx)
+	case *ast.ThrowStatement:
+		return e.executeThrow(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -143,6 +173,11 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the message
 	interpolatedMessage := e.interpolateVariables(action.Message, ctx)
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
+		return nil
+	}
 
 	// Map actions to output with appropriate formatting and emojis
 	switch action.Action {
@@ -164,6 +199,299 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	}
 
 	return nil
+}
+
+// executeShell executes a shell command statement
+func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in the command
+	interpolatedCommand := e.interpolateVariables(shellStmt.Command, ctx)
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute shell command: %s\n", interpolatedCommand)
+		if shellStmt.CaptureVar != "" {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+		}
+		return nil
+	}
+
+	// Configure shell options based on the action type
+	opts := shell.DefaultOptions()
+	opts.CaptureOutput = true
+	opts.StreamOutput = shellStmt.StreamOutput
+	opts.Output = e.output
+
+	// Show what we're about to execute
+	switch shellStmt.Action {
+	case "run":
+		_, _ = fmt.Fprintf(e.output, "🏃 Running: %s\n", interpolatedCommand)
+	case "exec":
+		_, _ = fmt.Fprintf(e.output, "⚡ Executing: %s\n", interpolatedCommand)
+	case "shell":
+		_, _ = fmt.Fprintf(e.output, "🐚 Shell: %s\n", interpolatedCommand)
+	case "capture":
+		_, _ = fmt.Fprintf(e.output, "📥 Capturing: %s\n", interpolatedCommand)
+	}
+
+	// Execute the command
+	result, err := shell.Execute(interpolatedCommand, opts)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌ Command failed: %v\n", err)
+		return err
+	}
+
+	// Handle capture
+	if shellStmt.CaptureVar != "" && shellStmt.Action == "capture" {
+		ctx.Variables[shellStmt.CaptureVar] = result.Stdout
+		_, _ = fmt.Fprintf(e.output, "📦 Captured output in variable '%s'\n", shellStmt.CaptureVar)
+	}
+
+	// Show execution summary
+	if result.Success {
+		_, _ = fmt.Fprintf(e.output, "✅ Command completed successfully (exit code: %d, duration: %v)\n",
+			result.ExitCode, result.Duration)
+	} else {
+		_, _ = fmt.Fprintf(e.output, "⚠️  Command completed with exit code: %d (duration: %v)\n",
+			result.ExitCode, result.Duration)
+	}
+
+	return nil
+}
+
+// executeFile executes a file operation statement
+func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in paths and content
+	target := e.interpolateVariables(fileStmt.Target, ctx)
+	source := e.interpolateVariables(fileStmt.Source, ctx)
+	content := e.interpolateVariables(fileStmt.Content, ctx)
+
+	// Create file operation
+	op := &fileops.FileOperation{
+		Type:    fileStmt.Action,
+		Target:  target,
+		Source:  source,
+		Content: content,
+		IsDir:   fileStmt.IsDir,
+	}
+
+	if e.dryRun {
+		result, err := op.Execute(true) // dry run
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "❌ File operation failed: %v\n", err)
+			return err
+		}
+		_, _ = fmt.Fprintf(e.output, "📁 %s\n", result.Message)
+		if fileStmt.CaptureVar != "" {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture file content in variable '%s'\n", fileStmt.CaptureVar)
+		}
+		return nil
+	}
+
+	// Show what we're about to do
+	switch fileStmt.Action {
+	case "create":
+		if fileStmt.IsDir {
+			_, _ = fmt.Fprintf(e.output, "📁 Creating directory: %s\n", target)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "📄 Creating file: %s\n", target)
+		}
+	case "copy":
+		_, _ = fmt.Fprintf(e.output, "📋 Copying: %s → %s\n", source, target)
+	case "move":
+		_, _ = fmt.Fprintf(e.output, "🚚 Moving: %s → %s\n", source, target)
+	case "delete":
+		if fileStmt.IsDir {
+			_, _ = fmt.Fprintf(e.output, "🗑️  Deleting directory: %s\n", target)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "🗑️  Deleting file: %s\n", target)
+		}
+	case "read":
+		_, _ = fmt.Fprintf(e.output, "📖 Reading file: %s\n", target)
+	case "write":
+		_, _ = fmt.Fprintf(e.output, "✏️  Writing to file: %s\n", target)
+	case "append":
+		_, _ = fmt.Fprintf(e.output, "➕ Appending to file: %s\n", target)
+	}
+
+	// Execute the file operation
+	result, err := op.Execute(false)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌ File operation failed: %v\n", err)
+		return err
+	}
+
+	// Handle capture for read operations
+	if fileStmt.CaptureVar != "" && fileStmt.Action == "read" {
+		ctx.Variables[fileStmt.CaptureVar] = result.Content
+		_, _ = fmt.Fprintf(e.output, "📦 Captured file content in variable '%s' (%d bytes)\n",
+			fileStmt.CaptureVar, len(result.Content))
+	}
+
+	// Show success message
+	if result.Success {
+		_, _ = fmt.Fprintf(e.output, "✅ %s\n", result.Message)
+	} else {
+		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", result.Message)
+	}
+
+	return nil
+}
+
+// executeTry executes a try/catch/finally statement
+func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) error {
+	var tryError error
+	var finallyError error
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute try block\n")
+
+		// Execute try body in dry run
+		for _, stmt := range tryStmt.TryBody {
+			if err := e.executeStatement(stmt, ctx); err != nil {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would catch error: %v\n", err)
+				break
+			}
+		}
+
+		if len(tryStmt.CatchClauses) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute catch blocks if needed\n")
+		}
+
+		if len(tryStmt.FinallyBody) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute finally block\n")
+		}
+
+		return nil
+	}
+
+	// Execute try block
+	_, _ = fmt.Fprintf(e.output, "🔄 Executing try block\n")
+	for _, stmt := range tryStmt.TryBody {
+		if err := e.executeStatement(stmt, ctx); err != nil {
+			tryError = err
+			_, _ = fmt.Fprintf(e.output, "⚠️  Error in try block: %v\n", err)
+			break
+		}
+	}
+
+	// Execute catch blocks if there was an error
+	if tryError != nil {
+		handled := false
+		for _, catchClause := range tryStmt.CatchClauses {
+			if e.shouldHandleError(tryError, catchClause) {
+				_, _ = fmt.Fprintf(e.output, "🔧 Handling error with catch block\n")
+
+				// Set error variable if specified
+				if catchClause.ErrorVar != "" {
+					ctx.Variables[catchClause.ErrorVar] = tryError.Error()
+					_, _ = fmt.Fprintf(e.output, "📦 Captured error in variable '%s'\n", catchClause.ErrorVar)
+				}
+
+				// Execute catch body
+				for _, stmt := range catchClause.Body {
+					if err := e.executeStatement(stmt, ctx); err != nil {
+						// Error in catch block - this becomes the new error
+						tryError = err
+						break
+					}
+				}
+
+				handled = true
+				break
+			}
+		}
+
+		if !handled {
+			_, _ = fmt.Fprintf(e.output, "❌ Unhandled error: %v\n", tryError)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "✅ Error handled successfully\n")
+			tryError = nil // Error was handled
+		}
+	} else {
+		_, _ = fmt.Fprintf(e.output, "✅ Try block completed successfully\n")
+	}
+
+	// Always execute finally block
+	if len(tryStmt.FinallyBody) > 0 {
+		_, _ = fmt.Fprintf(e.output, "🔄 Executing finally block\n")
+		for _, stmt := range tryStmt.FinallyBody {
+			if err := e.executeStatement(stmt, ctx); err != nil {
+				finallyError = err
+				_, _ = fmt.Fprintf(e.output, "⚠️  Error in finally block: %v\n", err)
+				break
+			}
+		}
+
+		if finallyError == nil {
+			_, _ = fmt.Fprintf(e.output, "✅ Finally block completed successfully\n")
+		}
+	}
+
+	// Return the most relevant error
+	if finallyError != nil {
+		return finallyError // Finally errors take precedence
+	}
+	return tryError // Original error (if not handled)
+}
+
+// executeThrow executes throw, rethrow, and ignore statements
+func (e *Engine) executeThrow(throwStmt *ast.ThrowStatement, ctx *ExecutionContext) error {
+	if e.dryRun {
+		switch throwStmt.Action {
+		case "throw":
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would throw error: %s\n", throwStmt.Message)
+		case "rethrow":
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would rethrow current error\n")
+		case "ignore":
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would ignore current error\n")
+		}
+		return nil
+	}
+
+	switch throwStmt.Action {
+	case "throw":
+		message := e.interpolateVariables(throwStmt.Message, ctx)
+		_, _ = fmt.Fprintf(e.output, "💥 Throwing error: %s\n", message)
+		return fmt.Errorf("thrown error: %s", message)
+	case "rethrow":
+		_, _ = fmt.Fprintf(e.output, "🔄 Rethrowing current error\n")
+		// In a real implementation, we'd need to track the current error context
+		return fmt.Errorf("rethrown error")
+	case "ignore":
+		_, _ = fmt.Fprintf(e.output, "🤐 Ignoring current error\n")
+		return nil // Ignore effectively suppresses the error
+	default:
+		return fmt.Errorf("unknown throw action: %s", throwStmt.Action)
+	}
+}
+
+// shouldHandleError determines if a catch clause should handle the given error
+func (e *Engine) shouldHandleError(err error, catchClause ast.CatchClause) bool {
+	// If no specific error type is specified, catch all errors
+	if catchClause.ErrorType == "" {
+		return true
+	}
+
+	// Simple error type matching based on error message content
+	// In a more sophisticated implementation, we'd have typed errors
+	errorMsg := strings.ToLower(err.Error())
+	errorType := strings.ToLower(catchClause.ErrorType)
+
+	switch errorType {
+	case "filenotfounderror", "filenotfound":
+		return strings.Contains(errorMsg, "no such file") ||
+			strings.Contains(errorMsg, "not found") ||
+			strings.Contains(errorMsg, "does not exist")
+	case "shellerror", "commanderror":
+		return strings.Contains(errorMsg, "command") ||
+			strings.Contains(errorMsg, "shell") ||
+			strings.Contains(errorMsg, "exit")
+	case "permissionerror", "permission":
+		return strings.Contains(errorMsg, "permission") ||
+			strings.Contains(errorMsg, "access denied")
+	default:
+		// For custom error types, do a simple string match
+		return strings.Contains(errorMsg, errorType)
+	}
 }
 
 // ListTasks returns a list of available tasks in the program
@@ -271,7 +599,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		if ctx != nil {
 			if paramValue, exists := ctx.Parameters[paramName]; exists {
 				if builtins.IsBuiltin(funcName) {
-					if result, err := builtins.CallBuiltin(funcName, paramValue); err == nil {
+					if result, err := builtins.CallBuiltin(funcName, paramValue.AsString()); err == nil {
 						return result
 					}
 				}
@@ -282,6 +610,10 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 	// 4. Check for simple parameter lookup
 	if ctx != nil {
 		if value, exists := ctx.Parameters[expr]; exists {
+			return value.AsString()
+		}
+		// Also check captured variables
+		if value, exists := ctx.Variables[expr]; exists {
 			return value
 		}
 	}
@@ -304,24 +636,6 @@ func (e *Engine) parseQuotedArguments(argsStr string) []string {
 	}
 
 	return args
-}
-
-// validateParameterConstraints validates parameter values against their constraints
-func (e *Engine) validateParameterConstraints(param ast.ParameterStatement, value string) error {
-	// Check constraints (e.g., from ["dev", "staging", "production"])
-	if len(param.Constraints) > 0 {
-		for _, constraint := range param.Constraints {
-			if value == constraint {
-				return nil // Value is valid
-			}
-		}
-		return fmt.Errorf("parameter '%s' value '%s' is not valid. Must be one of: %v",
-			param.Name, value, param.Constraints)
-	}
-
-	// TODO: Add more validation types (data type validation, regex patterns, etc.)
-
-	return nil
 }
 
 // executeConditional executes conditional statements (when, if/else)
@@ -350,45 +664,152 @@ func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *Executi
 
 // executeLoop executes loop statements (for each)
 func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
-	// For now, we'll implement a simple mock loop
-	// In a real implementation, we'd need to:
-	// 1. Resolve the iterable (could be a parameter, file list, etc.)
-	// 2. Iterate over each item
-	// 3. Set the loop variable in a new context
-	// 4. Execute the body for each iteration
-
-	// Mock implementation: assume iterable is a parameter containing comma-separated values
+	// Resolve the iterable (could be a parameter, file list, etc.)
 	iterableValue, exists := ctx.Parameters[stmt.Iterable]
 	if !exists {
 		return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
 	}
 
 	// Split by comma to get items (simple implementation)
-	items := strings.Split(iterableValue, ",")
+	iterableStr := strings.TrimSpace(iterableValue.AsString())
+	if iterableStr == "" {
+		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+		return nil
+	}
 
-	for _, item := range items {
+	items := strings.Split(iterableStr, ",")
+
+	// Trim whitespace from items
+	for i, item := range items {
+		items[i] = strings.TrimSpace(item)
+	}
+
+	if len(items) == 0 {
+		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+		return nil
+	}
+
+	// Check if this should run in parallel
+	if stmt.Parallel {
+		return e.executeParallelLoop(stmt, items, ctx)
+	}
+
+	// Sequential execution
+	return e.executeSequentialLoop(stmt, items, ctx)
+}
+
+// executeSequentialLoop executes loop items sequentially
+func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
+	_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+
+	for i, item := range items {
+		_, _ = fmt.Fprintf(e.output, "📋 Processing item %d/%d: %s\n", i+1, len(items), item)
+
 		// Create a new context with the loop variable
-		loopCtx := &ExecutionContext{
-			Parameters: make(map[string]string),
-		}
-
-		// Copy existing parameters
-		for k, v := range ctx.Parameters {
-			loopCtx.Parameters[k] = v
-		}
-
-		// Set the loop variable
-		loopCtx.Parameters[stmt.Variable] = strings.TrimSpace(item)
+		loopCtx := e.createLoopContext(ctx, stmt.Variable, item)
 
 		// Execute the loop body
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
-				return err
+				return fmt.Errorf("error processing item '%s': %v", item, err)
 			}
 		}
 	}
 
+	_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
 	return nil
+}
+
+// executeParallelLoop executes loop items in parallel
+func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
+	// Determine parallel execution settings
+	maxWorkers := stmt.MaxWorkers
+	if maxWorkers <= 0 {
+		maxWorkers = 5 // reasonable default
+	}
+
+	failFast := stmt.FailFast
+
+	// Create parallel executor
+	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun)
+
+	// Define the execution function for each item
+	executeItem := func(body []ast.Statement, variables map[string]string) error {
+		// Create a new context for this parallel execution
+		loopCtx := &ExecutionContext{
+			Parameters: make(map[string]*types.Value),
+			Variables:  make(map[string]string),
+		}
+
+		// Copy existing parameters and variables
+		for k, v := range ctx.Parameters {
+			loopCtx.Parameters[k] = v
+		}
+		for k, v := range ctx.Variables {
+			loopCtx.Variables[k] = v
+		}
+
+		// Add the variables from the parallel executor
+		for k, v := range variables {
+			loopCtx.Variables[k] = v
+			// Also add as a typed parameter for compatibility
+			if itemValue, err := types.NewValue(types.StringType, v); err == nil {
+				loopCtx.Parameters[k] = itemValue
+			}
+		}
+
+		// Execute the loop body
+		for _, bodyStmt := range body {
+			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	// Execute in parallel
+	results, err := executor.ExecuteLoop(items, stmt.Variable, stmt.Body, executeItem)
+
+	// Report results
+	if err != nil {
+		// Count successful executions
+		successCount := 0
+		for _, result := range results {
+			if result.Error == nil {
+				successCount++
+			}
+		}
+
+		_, _ = fmt.Fprintf(e.output, "⚠️  Parallel loop completed with errors: %d/%d successful\n",
+			successCount, len(items))
+		return err
+	}
+
+	return nil
+}
+
+// createLoopContext creates a new execution context for a loop iteration
+func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string) *ExecutionContext {
+	loopCtx := &ExecutionContext{
+		Parameters: make(map[string]*types.Value),
+		Variables:  make(map[string]string),
+	}
+
+	// Copy existing parameters and variables
+	for k, v := range ctx.Parameters {
+		loopCtx.Parameters[k] = v
+	}
+	for k, v := range ctx.Variables {
+		loopCtx.Variables[k] = v
+	}
+
+	// Set the loop variable as a string type
+	itemValue, _ := types.NewValue(types.StringType, value)
+	loopCtx.Parameters[variable] = itemValue
+	loopCtx.Variables[variable] = value
+
+	return loopCtx
 }
 
 // evaluateCondition evaluates condition expressions
@@ -405,7 +826,7 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 			// Try to get the value of the left side from parameters
 			if value, exists := ctx.Parameters[left]; exists {
-				return value == right
+				return value.AsString() == right
 			}
 
 			// If not found in parameters, compare as strings

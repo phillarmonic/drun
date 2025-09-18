@@ -53,6 +53,37 @@ const (
 	FILE   // file
 	EXISTS // exists
 
+	// Shell operations
+	RUN     // run
+	EXEC    // exec
+	SHELL   // shell
+	CAPTURE // capture
+	OUTPUT  // output
+
+	// Type keywords
+	STRING_TYPE  // string
+	NUMBER_TYPE  // number
+	BOOLEAN_TYPE // boolean
+	LIST_TYPE    // list
+
+	// File operations
+	CREATE // create
+	COPY   // copy
+	MOVE   // move
+	DELETE // delete
+	READ   // read
+	WRITE  // write
+	APPEND // append
+	DIR    // dir
+
+	// Error handling
+	TRY     // try
+	CATCH   // catch
+	FINALLY // finally
+	THROW   // throw
+	RETHROW // rethrow
+	IGNORE  // ignore
+
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
@@ -154,6 +185,52 @@ func (t TokenType) String() string {
 		return "FILE"
 	case EXISTS:
 		return "EXISTS"
+	case RUN:
+		return "RUN"
+	case EXEC:
+		return "EXEC"
+	case SHELL:
+		return "SHELL"
+	case CAPTURE:
+		return "CAPTURE"
+	case OUTPUT:
+		return "OUTPUT"
+	case STRING_TYPE:
+		return "STRING_TYPE"
+	case NUMBER_TYPE:
+		return "NUMBER_TYPE"
+	case BOOLEAN_TYPE:
+		return "BOOLEAN_TYPE"
+	case LIST_TYPE:
+		return "LIST_TYPE"
+	case CREATE:
+		return "CREATE"
+	case COPY:
+		return "COPY"
+	case MOVE:
+		return "MOVE"
+	case DELETE:
+		return "DELETE"
+	case READ:
+		return "READ"
+	case WRITE:
+		return "WRITE"
+	case APPEND:
+		return "APPEND"
+	case DIR:
+		return "DIR"
+	case TRY:
+		return "TRY"
+	case CATCH:
+		return "CATCH"
+	case FINALLY:
+		return "FINALLY"
+	case THROW:
+		return "THROW"
+	case RETHROW:
+		return "RETHROW"
+	case IGNORE:
+		return "IGNORE"
 	case IDENT:
 		return "IDENT"
 	case ASSIGN:
@@ -223,6 +300,28 @@ var keywords = map[string]TokenType{
 	"is":       IS,
 	"file":     FILE,
 	"exists":   EXISTS,
+	"run":      RUN,
+	"exec":     EXEC,
+	"shell":    SHELL,
+	"capture":  CAPTURE,
+	"output":   OUTPUT,
+	"string":   STRING_TYPE,
+	"number":   NUMBER_TYPE,
+	"boolean":  BOOLEAN_TYPE,
+	"create":   CREATE,
+	"copy":     COPY,
+	"move":     MOVE,
+	"delete":   DELETE,
+	"read":     READ,
+	"write":    WRITE,
+	"append":   APPEND,
+	"dir":      DIR,
+	"try":      TRY,
+	"catch":    CATCH,
+	"finally":  FINALLY,
+	"throw":    THROW,
+	"rethrow":  RETHROW,
+	"ignore":   IGNORE,
 	"true":     BOOLEAN,
 	"false":    BOOLEAN,
 }

@@ -1,0 +1,10 @@
+version: 2.0
+
+task "explicit indent":
+  info "before try"
+  try:
+    info "inside try"
+  catch:
+    warn "inside catch"
+  info "after try"
+

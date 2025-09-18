@@ -1,0 +1,44 @@
+version: 2.0
+
+task "basic files" means "Basic file operations":
+  create file "test.txt"
+  write "Hello World" to file "test.txt"
+  read file "test.txt" as content
+  info "File content: {content}"
+  copy "test.txt" to "backup.txt"
+  append " - Updated" to file "test.txt"
+  create dir "testdir"
+  move "backup.txt" to "testdir/moved.txt"
+  success "Basic file operations completed!"
+
+task "file management" means "File management with parameters":
+  requires action as string from ["create", "cleanup"]
+  given filename as string defaults to "example.txt"
+  
+  when action is "create":
+    create file "{filename}"
+    write "Created by drun v2" to file "{filename}"
+    info "Created file: {filename}"
+  
+  when action is "cleanup":
+    delete file "{filename}"
+    info "Deleted file: {filename}"
+  
+  success "File management completed!"
+
+task "config setup" means "Configuration file setup":
+  given env as string defaults to "dev"
+  
+  create file "config.txt"
+  write "environment={env}" to file "config.txt"
+  
+  when env is "prod":
+    append "\ndebug=false" to file "config.txt"
+  
+  when env is "dev":
+    append "\ndebug=true" to file "config.txt"
+  
+  read file "config.txt" as config
+  info "Configuration: {config}"
+  success "Configuration setup completed!"
+

@@ -1,0 +1,67 @@
+version: 2.0
+
+task "error demo" means "Demonstrate error handling capabilities":
+  info "🚀 Starting error handling demonstration"
+  
+  when file exists("nonexistent.txt") is "false":
+    warn "⚠️  File does not exist, but continuing..."
+    info "✅ Handled missing file gracefully"
+  
+  info "🔄 Testing ignore functionality"
+  ignore
+  info "✅ Ignore executed successfully"
+  
+  success "Error handling demo completed!"
+
+task "throw demo" means "Demonstrate throw functionality":
+  requires should_fail as boolean defaults to "false"
+  
+  info "🚀 Starting throw demonstration"
+  
+  when should_fail is "true":
+    warn "⚠️  About to throw an error as requested"
+    throw "This is a custom error thrown by user request"
+  
+  when should_fail is "false":
+    info "✅ No error thrown, continuing normally"
+  
+  success "Throw demo completed successfully!"
+
+task "file error handling" means "Handle file operation errors":
+  info "🔄 Testing file operations with error handling"
+  
+  # This will succeed
+  create file "temp_test.txt"
+  write "Test content" to file "temp_test.txt"
+  info "✅ File created successfully"
+  
+  # Clean up
+  delete file "temp_test.txt"
+  info "🧹 Cleanup completed"
+  
+  success "File error handling completed!"
+
+task "conditional errors" means "Conditional error throwing":
+  requires environment as string from ["dev", "staging", "production"]
+  given strict_mode as boolean defaults to "false"
+  
+  info "🌍 Environment: {environment}"
+  info "🔒 Strict mode: {strict_mode}"
+  
+  when environment is "production":
+    when strict_mode is "true":
+      warn "⚠️  Production environment with strict mode enabled"
+      info "✅ All production checks passed"
+    
+    when strict_mode is "false":
+      warn "⚠️  Production environment without strict mode"
+      throw "Strict mode is required in production environment"
+  
+  when environment is "dev":
+    info "🔧 Development environment - all checks skipped"
+  
+  when environment is "staging":
+    info "🧪 Staging environment - running basic checks"
+  
+  success "Conditional error handling completed!"
+
