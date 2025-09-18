@@ -1,0 +1,86 @@
+version: 2.0
+
+project "microservice" version "1.0.0":
+  set registry to "ghcr.io/company"
+  set k8s_namespace to "production"
+  
+  before any task:
+    info "🚀 Starting {project} v{version} task execution"
+  
+  after any task:
+    info "✅ Task execution completed"
+
+task "install" means "Install project dependencies":
+  info "📦 Installing dependencies"
+  step "npm install"
+  success "Dependencies installed successfully!"
+
+task "lint" means "Run code linting":
+  depends on install
+  
+  info "🔍 Running ESLint"
+  step "Checking code style and quality"
+  success "Code linting passed!"
+
+task "unit_tests" means "Run unit tests":
+  depends on install
+  
+  info "🧪 Running unit tests"
+  step "Jest test suite execution"
+  success "All unit tests passed!"
+
+task "build" means "Build the application":
+  depends on lint and unit_tests
+  
+  info "🏗️  Building application"
+  step "Compiling TypeScript"
+  step "Bundling assets"
+  step "Building Docker image {registry}/{project}:{version}"
+  success "Build completed successfully!"
+
+task "integration_tests" means "Run integration tests":
+  depends on build
+  
+  info "🔗 Running integration tests"
+  step "Starting test database"
+  step "Running API tests"
+  success "Integration tests passed!"
+
+task "security_scan" means "Run security scanning":
+  depends on build
+  
+  info "🛡️  Running security scan"
+  step "Scanning Docker image for vulnerabilities"
+  step "Checking dependencies for known issues"
+  success "Security scan completed - no issues found!"
+
+task "deploy_staging" means "Deploy to staging environment":
+  depends on integration_tests, security_scan
+  
+  info "🚀 Deploying to staging environment"
+  step "Pushing image to {registry}"
+  step "Updating Kubernetes deployment in {k8s_namespace}-staging"
+  step "Running smoke tests"
+  success "Staging deployment completed!"
+
+task "deploy_production" means "Deploy to production environment":
+  depends on deploy_staging
+  
+  info "🚀 Deploying to production environment"
+  step "Pushing image to {registry}"
+  step "Updating Kubernetes deployment in {k8s_namespace}"
+  step "Running health checks"
+  success "Production deployment completed!"
+
+task "rollback" means "Rollback production deployment":
+  info "⏪ Rolling back production deployment"
+  step "Reverting Kubernetes deployment"
+  step "Verifying rollback success"
+  success "Rollback completed successfully!"
+
+task "status" means "Check deployment status":
+  info "📊 Checking deployment status"
+  step "Verifying {k8s_namespace} namespace"
+  step "Checking pod health"
+  step "Validating service endpoints"
+  success "All systems operational!"

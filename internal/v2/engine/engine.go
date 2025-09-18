@@ -66,17 +66,22 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		return fmt.Errorf("program is nil")
 	}
 
-	// Find the requested task
-	var targetTask *ast.TaskStatement
-	for _, task := range program.Tasks {
-		if task.Name == taskName {
-			targetTask = task
-			break
-		}
+	// Create dependency resolver
+	resolver := NewDependencyResolver(program.Tasks)
+
+	// Validate all dependencies first
+	if err := resolver.ValidateAllDependencies(); err != nil {
+		return fmt.Errorf("dependency validation failed: %v", err)
 	}
 
-	if targetTask == nil {
-		return fmt.Errorf("task '%s' not found", taskName)
+	// Resolve execution order
+	executionOrder, err := resolver.ResolveDependencies(taskName)
+	if err != nil {
+		return fmt.Errorf("dependency resolution failed: %v", err)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", executionOrder)
 	}
 
 	// Create execution context with parameters
@@ -86,8 +91,57 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		Project:    e.createProjectContext(program.Project),
 	}
 
+	// Execute all tasks in dependency order
+	for _, currentTaskName := range executionOrder {
+		// Find the task
+		var currentTask *ast.TaskStatement
+		for _, task := range program.Tasks {
+			if task.Name == currentTaskName {
+				currentTask = task
+				break
+			}
+		}
+
+		if currentTask == nil {
+			return fmt.Errorf("task '%s' not found during execution", currentTaskName)
+		}
+
+		// Set up parameters for this specific task
+		if err := e.setupTaskParameters(currentTask, params, ctx); err != nil {
+			return err
+		}
+
+		// Execute before hooks only for the target task
+		if currentTaskName == taskName && ctx.Project != nil {
+			for _, hook := range ctx.Project.BeforeHooks {
+				if err := e.executeStatement(hook, ctx); err != nil {
+					return fmt.Errorf("before hook failed: %v", err)
+				}
+			}
+		}
+
+		// Execute the task
+		if err := e.executeTask(currentTask, ctx); err != nil {
+			return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
+		}
+
+		// Execute after hooks only for the target task
+		if currentTaskName == taskName && ctx.Project != nil {
+			for _, hook := range ctx.Project.AfterHooks {
+				if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// setupTaskParameters sets up parameters for a specific task
+func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]string, ctx *ExecutionContext) error {
 	// Set up parameters with defaults and validation
-	for _, param := range targetTask.Parameters {
+	for _, param := range task.Parameters {
 		var rawValue string
 		var hasValue bool
 
@@ -126,28 +180,7 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		}
 	}
 
-	// Execute before hooks
-	if ctx.Project != nil {
-		for _, hook := range ctx.Project.BeforeHooks {
-			if err := e.executeStatement(hook, ctx); err != nil {
-				return fmt.Errorf("before hook failed: %v", err)
-			}
-		}
-	}
-
-	// Execute the task
-	err := e.executeTask(targetTask, ctx)
-
-	// Execute after hooks (even if task failed)
-	if ctx.Project != nil {
-		for _, hook := range ctx.Project.AfterHooks {
-			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
-				_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
-			}
-		}
-	}
-
-	return err
+	return nil
 }
 
 // createProjectContext creates a project context from the project statement
@@ -221,6 +254,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeTry(s, ctx)
 	case *ast.ThrowStatement:
 		return e.executeThrow(s, ctx)
+	case *ast.DockerStatement:
+		return e.executeDocker(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -526,6 +561,78 @@ func (e *Engine) executeThrow(throwStmt *ast.ThrowStatement, ctx *ExecutionConte
 	default:
 		return fmt.Errorf("unknown throw action: %s", throwStmt.Action)
 	}
+}
+
+// executeDocker executes Docker operations
+func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in Docker statement
+	operation := dockerStmt.Operation
+	resource := dockerStmt.Resource
+	name := e.interpolateVariables(dockerStmt.Name, ctx)
+
+	// Interpolate options
+	options := make(map[string]string)
+	for key, value := range dockerStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command: docker %s %s", operation, resource)
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, " %s", name)
+		}
+		for key, value := range options {
+			_, _ = fmt.Fprintf(e.output, " %s %s", key, value)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+		return nil
+	}
+
+	// Build Docker command
+	var dockerCmd []string
+	dockerCmd = append(dockerCmd, "docker")
+
+	// Handle Docker Compose separately
+	if operation == "compose" {
+		dockerCmd = append(dockerCmd, "compose")
+		if command, exists := options["command"]; exists {
+			dockerCmd = append(dockerCmd, command)
+		}
+	} else {
+		// Regular Docker commands
+		dockerCmd = append(dockerCmd, operation)
+		if resource != "" {
+			dockerCmd = append(dockerCmd, resource)
+		}
+		if name != "" {
+			dockerCmd = append(dockerCmd, name)
+		}
+
+		// Add options in a logical order
+		if from, exists := options["from"]; exists {
+			if operation == "build" {
+				dockerCmd = append(dockerCmd, "--file", from)
+			} else {
+				dockerCmd = append(dockerCmd, from)
+			}
+		}
+		if to, exists := options["to"]; exists {
+			dockerCmd = append(dockerCmd, to)
+		}
+		if as, exists := options["as"]; exists {
+			dockerCmd = append(dockerCmd, as)
+		}
+	}
+
+	// Execute Docker command
+	_, _ = fmt.Fprintf(e.output, "🐳 Running Docker: %s\n", strings.Join(dockerCmd, " "))
+
+	// For now, we'll simulate the command execution
+	// In a real implementation, you would use exec.Command to run the Docker command
+	// cmd := exec.Command(dockerCmd[0], dockerCmd[1:]...)
+	// return cmd.Run()
+
+	return nil
 }
 
 // shouldHandleError determines if a catch clause should handle the given error

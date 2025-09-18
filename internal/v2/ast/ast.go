@@ -134,11 +134,12 @@ func (lh *LifecycleHook) String() string {
 
 // TaskStatement represents a task definition
 type TaskStatement struct {
-	Token       lexer.Token          // the TASK token
-	Name        string               // task name
-	Description string               // optional description after "means"
-	Parameters  []ParameterStatement // parameter declarations
-	Body        []Statement          // statements in the task body (actions, conditionals, loops)
+	Token        lexer.Token          // the TASK token
+	Name         string               // task name
+	Description  string               // optional description after "means"
+	Parameters   []ParameterStatement // parameter declarations
+	Dependencies []DependencyGroup    // dependency declarations
+	Body         []Statement          // statements in the task body (actions, conditionals, loops)
 }
 
 func (ts *TaskStatement) statementNode() {}
@@ -149,6 +150,11 @@ func (ts *TaskStatement) String() string {
 		out.WriteString(fmt.Sprintf(" means \"%s\"", ts.Description))
 	}
 	out.WriteString(":\n")
+
+	// Add dependencies
+	for _, dep := range ts.Dependencies {
+		out.WriteString(fmt.Sprintf("  %s\n", dep.String()))
+	}
 
 	// Add parameters
 	for _, param := range ts.Parameters {
@@ -318,6 +324,70 @@ func (ts *ThrowStatement) String() string {
 	default:
 		return ts.Action
 	}
+}
+
+// DependencyGroup represents a group of dependencies with execution semantics
+type DependencyGroup struct {
+	Token        lexer.Token      // the DEPENDS token
+	Dependencies []DependencyItem // list of dependencies in this group
+	Sequential   bool             // true for "and" dependencies, false for "," dependencies
+}
+
+func (dg *DependencyGroup) statementNode() {}
+func (dg *DependencyGroup) String() string {
+	var out strings.Builder
+	out.WriteString("depends on ")
+
+	for i, dep := range dg.Dependencies {
+		if i > 0 {
+			if dg.Sequential {
+				out.WriteString(" and ")
+			} else {
+				out.WriteString(", ")
+			}
+		}
+		out.WriteString(dep.String())
+	}
+
+	return out.String()
+}
+
+// DependencyItem represents a single dependency
+type DependencyItem struct {
+	Name     string // task name
+	Parallel bool   // whether this dependency can run in parallel
+}
+
+func (di *DependencyItem) String() string {
+	if di.Parallel {
+		return di.Name + " in parallel"
+	}
+	return di.Name
+}
+
+// DockerStatement represents Docker operations
+type DockerStatement struct {
+	Token     lexer.Token       // the DOCKER token
+	Operation string            // "build", "push", "pull", "run", "stop", etc.
+	Resource  string            // "image", "container", "compose"
+	Name      string            // image/container name
+	Options   map[string]string // additional options (from, to, as, etc.)
+}
+
+func (ds *DockerStatement) statementNode() {}
+func (ds *DockerStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("docker %s %s", ds.Operation, ds.Resource))
+	if ds.Name != "" {
+		out.WriteString(fmt.Sprintf(" \"%s\"", ds.Name))
+	}
+
+	// Add options
+	for key, value := range ds.Options {
+		out.WriteString(fmt.Sprintf(" %s \"%s\"", key, value))
+	}
+
+	return out.String()
 }
 
 // ParameterStatement represents parameter declarations (requires, given, accepts)

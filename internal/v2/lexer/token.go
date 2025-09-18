@@ -25,6 +25,25 @@ const (
 	BEFORE  // before
 	AFTER   // after
 	ANY     // any
+	DEPENDS // depends
+	ON      // on
+	THEN    // then
+	AND     // and
+
+	// Docker keywords
+	DOCKER    // docker
+	IMAGE     // image
+	CONTAINER // container
+	COMPOSE   // compose
+	BUILD     // build
+	PUSH      // push
+	PULL      // pull
+	TAG       // tag
+	REMOVE    // remove
+	START     // start
+	STOP      // stop
+	UP        // up
+	DOWN      // down
 
 	// Action keywords (built-in actions)
 	INFO    // info
@@ -153,6 +172,40 @@ func (t TokenType) String() string {
 		return "AFTER"
 	case ANY:
 		return "ANY"
+	case DEPENDS:
+		return "DEPENDS"
+	case ON:
+		return "ON"
+	case THEN:
+		return "THEN"
+	case AND:
+		return "AND"
+	case DOCKER:
+		return "DOCKER"
+	case IMAGE:
+		return "IMAGE"
+	case CONTAINER:
+		return "CONTAINER"
+	case COMPOSE:
+		return "COMPOSE"
+	case BUILD:
+		return "BUILD"
+	case PUSH:
+		return "PUSH"
+	case PULL:
+		return "PULL"
+	case TAG:
+		return "TAG"
+	case REMOVE:
+		return "REMOVE"
+	case START:
+		return "START"
+	case STOP:
+		return "STOP"
+	case UP:
+		return "UP"
+	case DOWN:
+		return "DOWN"
 	case INFO:
 		return "INFO"
 	case STEP:
@@ -290,64 +343,81 @@ func (t Token) String() string {
 
 // Keywords maps string literals to their token types
 var keywords = map[string]TokenType{
-	"version":  VERSION,
-	"task":     TASK,
-	"means":    MEANS,
-	"project":  PROJECT,
-	"set":      SET,
-	"include":  INCLUDE,
-	"before":   BEFORE,
-	"after":    AFTER,
-	"any":      ANY,
-	"info":     INFO,
-	"step":     STEP,
-	"warn":     WARN,
-	"error":    ERROR,
-	"success":  SUCCESS,
-	"fail":     FAIL,
-	"requires": REQUIRES,
-	"given":    GIVEN,
-	"accepts":  ACCEPTS,
-	"defaults": DEFAULTS,
-	"to":       TO,
-	"from":     FROM,
-	"as":       AS,
-	"list":     LIST,
-	"of":       OF,
-	"when":     WHEN,
-	"if":       IF,
-	"else":     ELSE,
-	"for":      FOR,
-	"each":     EACH,
-	"in":       IN,
-	"parallel": PARALLEL,
-	"is":       IS,
-	"file":     FILE,
-	"exists":   EXISTS,
-	"run":      RUN,
-	"exec":     EXEC,
-	"shell":    SHELL,
-	"capture":  CAPTURE,
-	"output":   OUTPUT,
-	"string":   STRING_TYPE,
-	"number":   NUMBER_TYPE,
-	"boolean":  BOOLEAN_TYPE,
-	"create":   CREATE,
-	"copy":     COPY,
-	"move":     MOVE,
-	"delete":   DELETE,
-	"read":     READ,
-	"write":    WRITE,
-	"append":   APPEND,
-	"dir":      DIR,
-	"try":      TRY,
-	"catch":    CATCH,
-	"finally":  FINALLY,
-	"throw":    THROW,
-	"rethrow":  RETHROW,
-	"ignore":   IGNORE,
-	"true":     BOOLEAN,
-	"false":    BOOLEAN,
+	"version":   VERSION,
+	"task":      TASK,
+	"means":     MEANS,
+	"project":   PROJECT,
+	"set":       SET,
+	"include":   INCLUDE,
+	"before":    BEFORE,
+	"after":     AFTER,
+	"any":       ANY,
+	"depends":   DEPENDS,
+	"on":        ON,
+	"then":      THEN,
+	"and":       AND,
+	"docker":    DOCKER,
+	"image":     IMAGE,
+	"container": CONTAINER,
+	"compose":   COMPOSE,
+	"build":     BUILD,
+	"push":      PUSH,
+	"pull":      PULL,
+	"tag":       TAG,
+	"remove":    REMOVE,
+	"start":     START,
+	"stop":      STOP,
+	"up":        UP,
+	"down":      DOWN,
+	"info":      INFO,
+	"step":      STEP,
+	"warn":      WARN,
+	"error":     ERROR,
+	"success":   SUCCESS,
+	"fail":      FAIL,
+	"requires":  REQUIRES,
+	"given":     GIVEN,
+	"accepts":   ACCEPTS,
+	"defaults":  DEFAULTS,
+	"to":        TO,
+	"from":      FROM,
+	"as":        AS,
+	"list":      LIST,
+	"of":        OF,
+	"when":      WHEN,
+	"if":        IF,
+	"else":      ELSE,
+	"for":       FOR,
+	"each":      EACH,
+	"in":        IN,
+	"parallel":  PARALLEL,
+	"is":        IS,
+	"file":      FILE,
+	"exists":    EXISTS,
+	"run":       RUN,
+	"exec":      EXEC,
+	"shell":     SHELL,
+	"capture":   CAPTURE,
+	"output":    OUTPUT,
+	"string":    STRING_TYPE,
+	"number":    NUMBER_TYPE,
+	"boolean":   BOOLEAN_TYPE,
+	"create":    CREATE,
+	"copy":      COPY,
+	"move":      MOVE,
+	"delete":    DELETE,
+	"read":      READ,
+	"write":     WRITE,
+	"append":    APPEND,
+	"dir":       DIR,
+	"try":       TRY,
+	"catch":     CATCH,
+	"finally":   FINALLY,
+	"throw":     THROW,
+	"rethrow":   RETHROW,
+	"ignore":    IGNORE,
+	"true":      BOOLEAN,
+	"false":     BOOLEAN,
 }
 
 // LookupIdent checks if an identifier is a keyword

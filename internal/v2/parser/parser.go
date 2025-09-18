@@ -295,7 +295,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
-		if p.isParameterToken(p.curToken.Type) {
+		if p.isDependencyToken(p.curToken.Type) {
+			dep := p.parseDependencyStatement()
+			if dep != nil {
+				stmt.Dependencies = append(stmt.Dependencies, *dep)
+			}
+		} else if p.isParameterToken(p.curToken.Type) {
 			param := p.parseParameterStatement()
 			if param != nil {
 				stmt.Parameters = append(stmt.Parameters, *param)
@@ -314,6 +319,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			throw := p.parseThrowStatement()
 			if throw != nil {
 				stmt.Body = append(stmt.Body, throw)
+			}
+		} else if p.isDockerToken(p.curToken.Type) {
+			docker := p.parseDockerStatement()
+			if docker != nil {
+				stmt.Body = append(stmt.Body, docker)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
@@ -773,6 +783,134 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	return stmt
 }
 
+// parseDependencyStatement parses a dependency declaration
+func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
+	group := &ast.DependencyGroup{
+		Token:        p.curToken,
+		Dependencies: []ast.DependencyItem{},
+		Sequential:   false, // default to parallel
+	}
+
+	// Expect "on"
+	if !p.expectPeek(lexer.ON) {
+		return nil
+	}
+
+	// Parse dependency list
+	for {
+		// Expect task name (identifier or Docker keyword)
+		switch p.peekToken.Type {
+		case lexer.IDENT:
+			p.nextToken()
+		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN:
+			p.nextToken()
+		default:
+			p.addError(fmt.Sprintf("expected task name, got %s instead", p.peekToken.Type))
+			return nil
+		}
+
+		dep := ast.DependencyItem{
+			Name:     p.curToken.Literal,
+			Parallel: false, // default
+		}
+
+		// Check for "in parallel" modifier
+		if p.peekToken.Type == lexer.IN {
+			p.nextToken() // consume IN
+			if p.peekToken.Type == lexer.PARALLEL {
+				p.nextToken() // consume PARALLEL
+				dep.Parallel = true
+			} else {
+				// Put back the IN token by not advancing
+				p.addError("expected 'parallel' after 'in'")
+				return nil
+			}
+		}
+
+		group.Dependencies = append(group.Dependencies, dep)
+
+		// Check what comes next
+		switch p.peekToken.Type {
+		case lexer.AND:
+			p.nextToken() // consume AND
+			group.Sequential = true
+		case lexer.COMMA:
+			p.nextToken() // consume COMMA
+			// Keep Sequential as false (parallel)
+		case lexer.THEN:
+			// Handle "then" - this creates a new dependency group
+			// For now, we'll treat it as sequential
+			p.nextToken() // consume THEN
+			group.Sequential = true
+		default:
+			// End of dependency list
+			return group
+		}
+	}
+}
+
+// parseDockerStatement parses Docker operations
+func (p *Parser) parseDockerStatement() *ast.DockerStatement {
+	stmt := &ast.DockerStatement{
+		Token:   p.curToken,
+		Options: make(map[string]string),
+	}
+
+	// Parse operation (build, push, pull, run, etc.)
+	switch p.peekToken.Type {
+	case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN:
+		p.nextToken()
+		stmt.Operation = p.curToken.Literal
+	case lexer.COMPOSE:
+		p.nextToken()
+		stmt.Operation = "compose"
+		stmt.Resource = "compose"
+
+		// Parse compose command (up, down, build, etc.)
+		if p.peekToken.Type == lexer.UP || p.peekToken.Type == lexer.DOWN || p.peekToken.Type == lexer.BUILD {
+			p.nextToken()
+			stmt.Options["command"] = p.curToken.Literal
+		}
+		return stmt
+	case lexer.IDENT:
+		p.nextToken()
+		stmt.Operation = p.curToken.Literal
+	default:
+		return nil
+	}
+
+	// Parse resource type (image, container)
+	switch p.peekToken.Type {
+	case lexer.IMAGE, lexer.CONTAINER:
+		p.nextToken()
+		stmt.Resource = p.curToken.Literal
+	case lexer.IDENT:
+		p.nextToken()
+		stmt.Resource = p.curToken.Literal
+	default:
+		return nil
+	}
+
+	// Parse name (optional for some operations)
+	if p.peekToken.Type == lexer.STRING {
+		p.nextToken()
+		stmt.Name = p.curToken.Literal
+	}
+
+	// Parse additional options (from, to, as, etc.)
+	for p.peekToken.Type == lexer.FROM || p.peekToken.Type == lexer.TO || p.peekToken.Type == lexer.AS || p.peekToken.Type == lexer.IDENT {
+		p.nextToken()
+		optionKey := p.curToken.Literal
+
+		if p.peekToken.Type == lexer.STRING {
+			p.nextToken()
+			stmt.Options[optionKey] = p.curToken.Literal
+		}
+	}
+
+	return stmt
+}
+
 // parseStringList parses a list of strings like ["dev", "staging", "production"]
 func (p *Parser) parseStringList() []string {
 	var items []string
@@ -795,6 +933,16 @@ func (p *Parser) parseStringList() []string {
 	}
 
 	return items
+}
+
+// isDependencyToken checks if a token type represents a dependency declaration
+func (p *Parser) isDependencyToken(tokenType lexer.TokenType) bool {
+	return tokenType == lexer.DEPENDS
+}
+
+// isDockerToken checks if a token type represents a Docker statement
+func (p *Parser) isDockerToken(tokenType lexer.TokenType) bool {
+	return tokenType == lexer.DOCKER
 }
 
 // isParameterToken checks if a token type represents a parameter declaration
@@ -1063,6 +1211,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			throw := p.parseThrowStatement()
 			if throw != nil {
 				body = append(body, throw)
+			}
+		} else if p.isDockerToken(p.curToken.Type) {
+			docker := p.parseDockerStatement()
+			if docker != nil {
+				body = append(body, docker)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
