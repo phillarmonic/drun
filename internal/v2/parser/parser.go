@@ -358,6 +358,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if http != nil {
 				stmt.Body = append(stmt.Body, http)
 			}
+		} else if p.isBreakContinueToken(p.curToken.Type) {
+			breakContinue := p.parseBreakContinueStatement()
+			if breakContinue != nil {
+				stmt.Body = append(stmt.Body, breakContinue)
+			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
 				shell := p.parseShellStatement()
@@ -1712,42 +1717,107 @@ func (p *Parser) parseIfStatement() *ast.ConditionalStatement {
 	return stmt
 }
 
-// parseForStatement parses for each loops
+// parseForStatement parses for loops (each, range, line, match)
 func (p *Parser) parseForStatement() *ast.LoopStatement {
 	stmt := &ast.LoopStatement{
 		Token: p.curToken,
 	}
 
-	// Expect: for each variable in iterable:
+	// Check what type of for loop this is
+	switch p.peekToken.Type {
+	case lexer.EACH:
+		return p.parseForEachStatement(stmt)
+	case lexer.IDENT:
+		// This could be "for i in range" or "for variable in iterable"
+		return p.parseForVariableStatement(stmt)
+	default:
+		p.addError(fmt.Sprintf("unexpected token after for: %s", p.peekToken.Type))
+		return nil
+	}
+}
+
+// parseForEachStatement parses "for each" loops
+func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
+	stmt.Type = "each"
+
 	if !p.expectPeek(lexer.EACH) {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.IDENT) {
-		return nil
-	}
-	stmt.Variable = p.curToken.Literal
+	// Check for special each types: "line" or "match"
+	if p.peekToken.Type == lexer.LINE {
+		p.nextToken() // consume LINE
+		stmt.Type = "line"
 
-	if !p.expectPeek(lexer.IN) {
-		return nil
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.IN) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.FILE) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Iterable = p.curToken.Literal
+
+	} else if p.peekToken.Type == lexer.MATCH {
+		p.nextToken() // consume MATCH
+		stmt.Type = "match"
+
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.IN) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.PATTERN) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Iterable = p.curToken.Literal
+
+	} else {
+		// Regular "for each variable in iterable"
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.IN) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Iterable = p.curToken.Literal
 	}
 
-	if !p.expectPeek(lexer.IDENT) {
-		return nil
+	// Check for filter: "where variable operator value"
+	if p.peekToken.Type == lexer.WHERE {
+		stmt.Filter = p.parseFilterExpression()
 	}
-	stmt.Iterable = p.curToken.Literal
 
 	// Check for "in parallel"
-	if p.peekToken.Type == lexer.IN {
-		// Look ahead to see if next token is PARALLEL
-		// For now, we'll use a simplified approach
+	if p.peekToken.Type == lexer.IN && p.peekToken.Literal == "in" {
 		p.nextToken() // consume IN
 		if p.peekToken.Type == lexer.PARALLEL {
 			p.nextToken() // consume PARALLEL
 			stmt.Parallel = true
 		}
-		// Note: If not PARALLEL, we just continue without setting parallel=true
-		// TODO: Real parser would need proper backtracking to put the IN token back
 	}
 
 	if !p.expectPeek(lexer.COLON) {
@@ -1760,12 +1830,227 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 	return stmt
 }
 
+// parseForVariableStatement parses "for variable in range" or "for variable in iterable"
+func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	stmt.Variable = p.curToken.Literal
+
+	if !p.expectPeek(lexer.IN) {
+		return nil
+	}
+
+	// Check if this is a range loop
+	if p.peekToken.Type == lexer.RANGE {
+		p.nextToken() // consume RANGE
+		stmt.Type = "range"
+
+		// Parse range: start to end [step step_value]
+		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.RangeStart = p.curToken.Literal
+
+		if !p.expectPeek(lexer.TO) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.RangeEnd = p.curToken.Literal
+
+		// Optional step
+		if p.peekToken.Type == lexer.STEP {
+			p.nextToken() // consume STEP
+			if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+				return nil
+			}
+			stmt.RangeStep = p.curToken.Literal
+		}
+
+	} else {
+		// Regular "for variable in iterable"
+		stmt.Type = "each"
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Iterable = p.curToken.Literal
+	}
+
+	// Check for filter: "where variable operator value"
+	if p.peekToken.Type == lexer.WHERE {
+		stmt.Filter = p.parseFilterExpression()
+	}
+
+	// Check for "in parallel"
+	if p.peekToken.Type == lexer.IN && p.peekToken.Literal == "in" {
+		p.nextToken() // consume IN
+		if p.peekToken.Type == lexer.PARALLEL {
+			p.nextToken() // consume PARALLEL
+			stmt.Parallel = true
+		}
+	}
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse body
+	stmt.Body = p.parseControlFlowBody()
+
+	return stmt
+}
+
+// parseFilterExpression parses filter conditions like "where item contains 'test'"
+func (p *Parser) parseFilterExpression() *ast.FilterExpression {
+	if !p.expectPeek(lexer.WHERE) {
+		return nil
+	}
+
+	filter := &ast.FilterExpression{}
+
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	filter.Variable = p.curToken.Literal
+
+	// Parse operator
+	p.nextToken()
+
+	switch p.curToken.Type {
+	case lexer.CONTAINS:
+		filter.Operator = p.curToken.Literal
+	case lexer.STARTS:
+		filter.Operator = p.curToken.Literal
+		// Check for "starts with"
+		if p.peekToken.Type == lexer.WITH {
+			p.nextToken() // consume WITH
+			filter.Operator = "starts with"
+		}
+	case lexer.ENDS:
+		filter.Operator = p.curToken.Literal
+		// Check for "ends with"
+		if p.peekToken.Type == lexer.WITH {
+			p.nextToken() // consume WITH
+			filter.Operator = "ends with"
+		}
+	case lexer.MATCHES:
+		filter.Operator = p.curToken.Literal
+	case lexer.EQ, lexer.NE, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE:
+		filter.Operator = p.curToken.Literal
+	default:
+		p.addError(fmt.Sprintf("unexpected filter operator: %s", p.curToken.Type))
+		return nil
+	}
+
+	// Parse value
+	if !p.expectPeek(lexer.STRING) && !p.expectPeek(lexer.IDENT) && !p.expectPeek(lexer.NUMBER) {
+		return nil
+	}
+	filter.Value = p.curToken.Literal
+
+	return filter
+}
+
+// isBreakContinueToken checks if a token represents break or continue
+func (p *Parser) isBreakContinueToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.BREAK, lexer.CONTINUE:
+		return true
+	default:
+		return false
+	}
+}
+
+// parseBreakContinueStatement parses break and continue statements
+func (p *Parser) parseBreakContinueStatement() ast.Statement {
+	switch p.curToken.Type {
+	case lexer.BREAK:
+		return p.parseBreakStatement()
+	case lexer.CONTINUE:
+		return p.parseContinueStatement()
+	default:
+		p.addError(fmt.Sprintf("unexpected break/continue token: %s", p.curToken.Type))
+		return nil
+	}
+}
+
+// parseBreakStatement parses break statements
+func (p *Parser) parseBreakStatement() *ast.BreakStatement {
+	stmt := &ast.BreakStatement{
+		Token: p.curToken,
+	}
+
+	// Check for conditional break: "break when condition"
+	if p.peekToken.Type == lexer.WHEN {
+		p.nextToken() // consume WHEN
+		stmt.Condition = p.parseSimpleCondition()
+	}
+
+	return stmt
+}
+
+// parseContinueStatement parses continue statements
+func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
+	stmt := &ast.ContinueStatement{
+		Token: p.curToken,
+	}
+
+	// Check for conditional continue: "continue if condition"
+	if p.peekToken.Type == lexer.IF {
+		p.nextToken() // consume IF
+		stmt.Condition = p.parseSimpleCondition()
+	}
+
+	return stmt
+}
+
 // parseConditionExpression parses condition expressions like "environment is production"
 func (p *Parser) parseConditionExpression() string {
 	var parts []string
 
 	// Read tokens until we hit a colon
 	for p.peekToken.Type != lexer.COLON && p.peekToken.Type != lexer.EOF {
+		p.nextToken()
+		parts = append(parts, p.curToken.Literal)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// parseSimpleCondition parses simple conditions for break/continue statements
+func (p *Parser) parseSimpleCondition() string {
+	var parts []string
+
+	// Parse a simple expression: variable operator value
+	// This should be something like "item == 'stop'" or "count > 10"
+
+	// Get the variable
+	if p.peekToken.Type == lexer.IDENT {
+		p.nextToken()
+		parts = append(parts, p.curToken.Literal)
+	}
+
+	// Get the operator
+	if p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE ||
+		p.peekToken.Type == lexer.GT || p.peekToken.Type == lexer.GTE ||
+		p.peekToken.Type == lexer.LT || p.peekToken.Type == lexer.LTE ||
+		p.peekToken.Type == lexer.CONTAINS || p.peekToken.Type == lexer.STARTS ||
+		p.peekToken.Type == lexer.ENDS || p.peekToken.Type == lexer.MATCHES {
+		p.nextToken()
+		parts = append(parts, p.curToken.Literal)
+
+		// Handle "starts with" and "ends with"
+		if (p.curToken.Type == lexer.STARTS || p.curToken.Type == lexer.ENDS) && p.peekToken.Type == lexer.WITH {
+			p.nextToken() // consume WITH
+			parts = append(parts, p.curToken.Literal)
+		}
+	}
+
+	// Get the value
+	if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER || p.peekToken.Type == lexer.IDENT {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 	}
@@ -1810,6 +2095,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			http := p.parseHTTPStatement()
 			if http != nil {
 				body = append(body, http)
+			}
+		} else if p.isBreakContinueToken(p.curToken.Type) {
+			breakContinue := p.parseBreakContinueStatement()
+			if breakContinue != nil {
+				body = append(body, breakContinue)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {

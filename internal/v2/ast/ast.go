@@ -514,6 +514,34 @@ func (ds *DetectionStatement) String() string {
 	return out.String()
 }
 
+// BreakStatement represents break statements in loops
+type BreakStatement struct {
+	Token     lexer.Token // the BREAK token
+	Condition string      // optional condition (for "break when condition")
+}
+
+func (bs *BreakStatement) statementNode() {}
+func (bs *BreakStatement) String() string {
+	if bs.Condition != "" {
+		return "break when " + bs.Condition
+	}
+	return "break"
+}
+
+// ContinueStatement represents continue statements in loops
+type ContinueStatement struct {
+	Token     lexer.Token // the CONTINUE token
+	Condition string      // optional condition (for "continue if condition")
+}
+
+func (cs *ContinueStatement) statementNode() {}
+func (cs *ContinueStatement) String() string {
+	if cs.Condition != "" {
+		return "continue if " + cs.Condition
+	}
+	return "continue"
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)
@@ -588,22 +616,68 @@ func (cs *ConditionalStatement) String() string {
 
 // LoopStatement represents for each loops
 type LoopStatement struct {
-	Token      lexer.Token // the FOR token
-	Variable   string      // loop variable name
-	Iterable   string      // what to iterate over
-	Parallel   bool        // whether to run in parallel
-	MaxWorkers int         // maximum number of parallel workers (0 = unlimited)
-	FailFast   bool        // whether to stop on first error
-	Body       []Statement // statements in the loop body
+	Token      lexer.Token       // the FOR token
+	Type       string            // "each", "range", "line", "match"
+	Variable   string            // loop variable name
+	Iterable   string            // what to iterate over
+	RangeStart string            // start value for range loops
+	RangeEnd   string            // end value for range loops
+	RangeStep  string            // step value for range loops (optional)
+	Filter     *FilterExpression // filter condition (optional)
+	Parallel   bool              // whether to run in parallel
+	MaxWorkers int               // maximum number of parallel workers (0 = unlimited)
+	FailFast   bool              // whether to stop on first error
+	Body       []Statement       // statements in the loop body
+}
+
+// FilterExpression represents filter conditions in loops
+type FilterExpression struct {
+	Variable string // variable being filtered
+	Operator string // "contains", "starts", "ends", "matches", "==", "!=", etc.
+	Value    string // value to compare against
 }
 
 func (ls *LoopStatement) statementNode() {}
 func (ls *LoopStatement) String() string {
 	var out strings.Builder
-	out.WriteString("for each ")
-	out.WriteString(ls.Variable)
-	out.WriteString(" in ")
-	out.WriteString(ls.Iterable)
+
+	switch ls.Type {
+	case "range":
+		out.WriteString("for ")
+		out.WriteString(ls.Variable)
+		out.WriteString(" in range ")
+		out.WriteString(ls.RangeStart)
+		out.WriteString(" to ")
+		out.WriteString(ls.RangeEnd)
+		if ls.RangeStep != "" {
+			out.WriteString(" step ")
+			out.WriteString(ls.RangeStep)
+		}
+	case "line":
+		out.WriteString("for each line ")
+		out.WriteString(ls.Variable)
+		out.WriteString(" in file ")
+		out.WriteString(ls.Iterable)
+	case "match":
+		out.WriteString("for each match ")
+		out.WriteString(ls.Variable)
+		out.WriteString(" in pattern ")
+		out.WriteString(ls.Iterable)
+	default: // "each"
+		out.WriteString("for each ")
+		out.WriteString(ls.Variable)
+		out.WriteString(" in ")
+		out.WriteString(ls.Iterable)
+	}
+
+	if ls.Filter != nil {
+		out.WriteString(" where ")
+		out.WriteString(ls.Filter.Variable)
+		out.WriteString(" ")
+		out.WriteString(ls.Filter.Operator)
+		out.WriteString(" ")
+		out.WriteString(ls.Filter.Value)
+	}
 
 	if ls.Parallel {
 		out.WriteString(" in parallel")

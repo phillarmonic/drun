@@ -147,6 +147,19 @@ const (
 	SPRING      // spring
 	LARAVEL     // laravel
 
+	// Advanced Control Flow keywords
+	RANGE    // range
+	WHERE    // where
+	BREAK    // break
+	CONTINUE // continue
+	CONTAINS // contains
+	STARTS   // starts
+	ENDS     // ends
+	MATCHES  // matches
+	LINE     // line
+	MATCH    // match
+	PATTERN  // pattern
+
 	// Comparison operators
 	GTE // >=
 	GT  // >
@@ -508,6 +521,28 @@ func (t TokenType) String() string {
 		return "SPRING"
 	case LARAVEL:
 		return "LARAVEL"
+	case RANGE:
+		return "RANGE"
+	case WHERE:
+		return "WHERE"
+	case BREAK:
+		return "BREAK"
+	case CONTINUE:
+		return "CONTINUE"
+	case CONTAINS:
+		return "CONTAINS"
+	case STARTS:
+		return "STARTS"
+	case ENDS:
+		return "ENDS"
+	case MATCHES:
+		return "MATCHES"
+	case LINE:
+		return "LINE"
+	case MATCH:
+		return "MATCH"
+	case PATTERN:
+		return "PATTERN"
 	case GTE:
 		return "GTE"
 	case GT:
@@ -779,6 +814,17 @@ var keywords = map[string]TokenType{
 	"express":     EXPRESS,
 	"spring":      SPRING,
 	"laravel":     LARAVEL,
+	"range":       RANGE,
+	"where":       WHERE,
+	"break":       BREAK,
+	"continue":    CONTINUE,
+	"contains":    CONTAINS,
+	"starts":      STARTS,
+	"ends":        ENDS,
+	"matches":     MATCHES,
+	"line":        LINE,
+	"match":       MATCH,
+	"pattern":     PATTERN,
 	">=":          GTE,
 	">":           GT,
 	"<=":          LTE,
