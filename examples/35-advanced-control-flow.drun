@@ -1,0 +1,96 @@
+version: 2.0
+
+project "Advanced Control Flow Demo" version "1.0"
+
+task "showcase_advanced_loops":
+  given items defaults to "item1,test_item,item2,skip_item,item3.js,item4.py,test_file.js"
+  
+  info "🚀 Starting Advanced Control Flow Showcase"
+  
+  # Range iteration with step
+  info "📊 Range Loop Example:"
+  for i in range 1 to 5 step 2:
+    info "  Processing range item: {i}"
+  
+  # Filtered loops with string operations
+  info "🔍 Filtered Loop Examples:"
+  for each item in items where item contains "test":
+    info "  Found test item: {item}"
+  
+  for each item in items where item ends with ".js":
+    info "  Found JavaScript file: {item}"
+  
+  # Break and continue examples
+  info "⏭️ Break/Continue Examples:"
+  for each item in items:
+    continue if item == "skip_item"
+    info "  Processing: {item}"
+    break when item == "item3.js"
+    info "  Completed processing: {item}"
+  
+  # Line processing example (simulated)
+  info "📄 Line Processing Example:"
+  for each line text in file "sample.txt":
+    info "  Line content: {text}"
+  
+  # Pattern matching example (simulated)
+  info "🔍 Pattern Matching Example:"
+  for each match result in pattern "[0-9]+":
+    info "  Found number: {result}"
+  
+  success "✅ Advanced Control Flow Showcase completed!"
+
+task "parallel_advanced_loops":
+  given items defaults to "file1.js,file2.py,file3.js,file4.txt,file5.js"
+  
+  info "🚀 Starting Parallel Advanced Control Flow"
+  
+  # Parallel filtered processing
+  for each item in items where item ends with ".js" in parallel:
+    info "  Processing JavaScript file in parallel: {item}"
+    step "Analyzing {item}"
+    step "Optimizing {item}"
+  
+  success "✅ Parallel Advanced Control Flow completed!"
+
+task "conditional_advanced_loops":
+  given env defaults to "development"
+  given items defaults to "item1,critical_item,item2,error_item,item3"
+  
+  info "🚀 Starting Conditional Advanced Control Flow"
+  
+  when env == "development":
+    info "🔧 Running in development mode"
+    for each item in items:
+      continue if item == "critical_item"
+      info "  Dev processing: {item}"
+      break when item == "error_item"
+  
+  when env == "production":
+    warn "⚠️ Running in production mode - being careful"
+    for each item in items where item != "error_item":
+      info "  Prod processing: {item}"
+  
+  success "✅ Conditional Advanced Control Flow completed!"
+
+task "range_operations":
+  info "🚀 Starting Range Operations"
+  
+  # Simple range
+  info "📊 Simple Range (1 to 3):"
+  for i in range 1 to 3:
+    info "  Item {i}"
+  
+  # Range with step
+  info "📊 Range with Step (0 to 10 step 3):"
+  for i in range 0 to 10 step 3:
+    info "  Item {i}"
+  
+  # Nested ranges (simulated with break/continue)
+  info "📊 Complex Range Processing:"
+  for i in range 1 to 5:
+    continue if i == 3
+    info "  Processing batch {i}"
+    break when i == 4
+  
+  success "✅ Range Operations completed!"

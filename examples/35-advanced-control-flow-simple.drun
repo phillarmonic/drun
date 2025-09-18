@@ -1,0 +1,21 @@
+version: 2.0
+
+task "simple_range_test":
+  for each i in range:
+    info "Processing item {i}"
+  success "Range test completed!"
+
+task "simple_filter_test":
+  given items defaults to "test1,normal,test2"
+  
+  for each item in items where item contains "test":
+    info "Found test item: {item}"
+  success "Filter test completed!"
+
+task "simple_break_test":
+  given items defaults to "item1,stop,item3"
+  
+  for each item in items:
+    info "Processing: {item}"
+    break when item == "stop"
+  success "Break test completed!"
