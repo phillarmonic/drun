@@ -9,15 +9,27 @@ import (
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	configFile  string
-	listTasks   bool
-	dryRun      bool
-	showVersion bool
-	initConfig  bool
+	configFile    string
+	listTasks     bool
+	dryRun        bool
+	showVersion   bool
+	initConfig    bool
+	saveAsDefault bool
+	setWorkspace  string
 )
+
+// WorkspaceConfig represents the workspace configuration
+type WorkspaceConfig struct {
+	DefaultTaskFile string            `yaml:"default_task_file"`
+	ParallelJobs    int               `yaml:"parallel_jobs"`
+	Shell           string            `yaml:"shell"`
+	Variables       map[string]string `yaml:"variables"`
+	Defaults        map[string]string `yaml:"defaults"`
+}
 
 // Version information (set at build time)
 var (
@@ -26,15 +38,8 @@ var (
 	date    = "unknown"
 )
 
-// Default filenames for v2 drun files
-var DefaultFilenames = []string{
-	".drun/default.drun",
-	".ops/drun/spec.drun",
-	"ops.drun",
-	"spec.drun",
-	"drun.drun",
-	".drun.drun",
-}
+// Default filename for v2 drun files
+var DefaultFilename = ".drun/spec.drun"
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -60,11 +65,13 @@ Examples:
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "Configuration file (default: auto-detect .drun files)")
+	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "Task file (default: .drun/spec.drun or workspace configured file)")
 	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "List available tasks")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be executed without running")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
-	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new drun configuration file")
+	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new .drun task file")
+	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "Save custom file name as workspace default (use with --init)")
+	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "Set workspace default task file location")
 }
 
 func runDrun(cmd *cobra.Command, args []string) error {
@@ -78,10 +85,15 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return initializeConfig(configFile)
 	}
 
+	// Handle --set-workspace flag
+	if setWorkspace != "" {
+		return setWorkspaceDefault(setWorkspace)
+	}
+
 	// Determine the config file to use
 	actualConfigFile, err := findConfigFile(configFile)
 	if err != nil {
-		return fmt.Errorf("no drun configuration file found: %w\n\nTo get started:\n  drun --init          # Create a starter configuration", err)
+		return fmt.Errorf("no drun task file found: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 	}
 
 	// Read the drun file
@@ -136,14 +148,110 @@ func findConfigFile(filename string) (string, error) {
 		return filename, nil
 	}
 
-	// Auto-detect configuration file
-	for _, defaultName := range DefaultFilenames {
-		if _, err := os.Stat(defaultName); err == nil {
-			return defaultName, nil
+	// Check workspace configuration first
+	if workspaceFile := getWorkspaceDefaultFile(); workspaceFile != "" {
+		if _, err := os.Stat(workspaceFile); err == nil {
+			return workspaceFile, nil
+		} else {
+			return "", fmt.Errorf("workspace default file '%s' not found", workspaceFile)
 		}
 	}
 
-	return "", fmt.Errorf("no drun configuration file found in current directory")
+	// Check default file location
+	if _, err := os.Stat(DefaultFilename); err == nil {
+		return DefaultFilename, nil
+	}
+
+	return "", fmt.Errorf("no drun task file found - expected '%s' or use --file to specify location", DefaultFilename)
+}
+
+// getWorkspaceDefaultFile checks for workspace configuration and returns default file
+func getWorkspaceDefaultFile() string {
+	workspaceConfigPath := ".drun/.drun_workspace.yml"
+	if _, err := os.Stat(workspaceConfigPath); err != nil {
+		return ""
+	}
+
+	// Read and parse workspace configuration
+	data, err := os.ReadFile(workspaceConfigPath)
+	if err != nil {
+		return ""
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return ""
+	}
+
+	// Return the default task file if specified
+	if config.DefaultTaskFile != "" {
+		return config.DefaultTaskFile
+	}
+
+	return ""
+}
+
+// saveWorkspaceConfig saves a workspace configuration
+func saveWorkspaceConfig(config WorkspaceConfig) error {
+	workspaceConfigPath := ".drun/.drun_workspace.yml"
+
+	// Create .drun directory if it doesn't exist
+	if err := os.MkdirAll(".drun", 0755); err != nil {
+		return fmt.Errorf("failed to create .drun directory: %w", err)
+	}
+
+	// Marshal configuration to YAML
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal workspace config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(workspaceConfigPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write workspace config: %w", err)
+	}
+
+	return nil
+}
+
+// loadWorkspaceConfig loads the workspace configuration
+func loadWorkspaceConfig() (*WorkspaceConfig, error) {
+	workspaceConfigPath := ".drun/.drun_workspace.yml"
+	if _, err := os.Stat(workspaceConfigPath); err != nil {
+		// Return default config if file doesn't exist
+		return &WorkspaceConfig{
+			ParallelJobs: 4,
+			Shell:        "/bin/bash",
+			Variables:    make(map[string]string),
+			Defaults:     make(map[string]string),
+		}, nil
+	}
+
+	data, err := os.ReadFile(workspaceConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read workspace config: %w", err)
+	}
+
+	var config WorkspaceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
+	}
+
+	// Set defaults if not specified
+	if config.ParallelJobs == 0 {
+		config.ParallelJobs = 4
+	}
+	if config.Shell == "" {
+		config.Shell = "/bin/bash"
+	}
+	if config.Variables == nil {
+		config.Variables = make(map[string]string)
+	}
+	if config.Defaults == nil {
+		config.Defaults = make(map[string]string)
+	}
+
+	return &config, nil
 }
 
 // listAllTasks lists all available tasks
@@ -211,14 +319,14 @@ func showVersionInfo() error {
 // initializeConfig creates a new drun configuration file
 func initializeConfig(filename string) error {
 	// Determine the target filename
-	targetFile := "spec.drun"
+	targetFile := ".drun/spec.drun"
 	if filename != "" {
 		targetFile = filename
 	}
 
 	// Check if file already exists
 	if _, err := os.Stat(targetFile); err == nil {
-		return fmt.Errorf("configuration file '%s' already exists", targetFile)
+		return fmt.Errorf("task file '%s' already exists", targetFile)
 	}
 
 	// Check if the directory needs to be created
@@ -238,11 +346,72 @@ func initializeConfig(filename string) error {
 
 	// Write the file
 	if err := os.WriteFile(targetFile, []byte(config), 0644); err != nil {
-		return fmt.Errorf("failed to write configuration file: %w", err)
+		return fmt.Errorf("failed to write task file: %w", err)
 	}
 
 	fmt.Printf("✅ Created %s\n", targetFile)
+
+	// Save as workspace default if requested or if using custom filename
+	if saveAsDefault || (filename != "" && filename != ".drun/spec.drun") {
+		if err := saveCustomFileAsDefault(targetFile); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to save as workspace default: %v\n", err)
+		} else {
+			fmt.Printf("💾 Saved '%s' as workspace default\n", targetFile)
+		}
+	}
+
 	fmt.Println("🚀 Get started with: drun --list")
+	return nil
+}
+
+// saveCustomFileAsDefault saves a custom file name as the workspace default
+func saveCustomFileAsDefault(filename string) error {
+	// Load existing workspace config or create new one
+	config, err := loadWorkspaceConfig()
+	if err != nil {
+		config = &WorkspaceConfig{
+			ParallelJobs: 4,
+			Shell:        "/bin/bash",
+			Variables:    make(map[string]string),
+			Defaults:     make(map[string]string),
+		}
+	}
+
+	// Set the default task file
+	config.DefaultTaskFile = filename
+
+	// Save the updated configuration
+	return saveWorkspaceConfig(*config)
+}
+
+// setWorkspaceDefault sets the workspace default task file
+func setWorkspaceDefault(filename string) error {
+	// Check if the specified file exists
+	if _, err := os.Stat(filename); err != nil {
+		return fmt.Errorf("specified file '%s' not found", filename)
+	}
+
+	// Load existing workspace config or create new one
+	config, err := loadWorkspaceConfig()
+	if err != nil {
+		config = &WorkspaceConfig{
+			ParallelJobs: 4,
+			Shell:        "/bin/bash",
+			Variables:    make(map[string]string),
+			Defaults:     make(map[string]string),
+		}
+	}
+
+	// Set the default task file
+	config.DefaultTaskFile = filename
+
+	// Save the updated configuration
+	if err := saveWorkspaceConfig(*config); err != nil {
+		return fmt.Errorf("failed to save workspace configuration: %w", err)
+	}
+
+	fmt.Printf("✅ Set workspace default task file to: %s\n", filename)
+	fmt.Printf("💾 Saved to .drun/.drun_workspace.yml\n")
 	return nil
 }
 
@@ -250,28 +419,31 @@ func initializeConfig(filename string) error {
 func generateStarterConfig() string {
 	return `version: 2.0
 
-task "default":
+project "my-app" version "1.0":
+
+task "default" means "Welcome to drun v2":
   info "Welcome to drun v2! 🚀"
-  step "This is your starter configuration"
+  step "This is your starter task file"
   success "Ready to build amazing automation!"
 
-task "hello":
+task "hello" means "Say hello":
   info "Hello from the semantic task runner!"
 
-task "build":
+task "build" means "Build the project":
   step "Building project..."
   info "Add your build commands here"
   success "Build completed!"
 
-task "test":
+task "test" means "Run tests":
   step "Running tests..."
   info "Add your test commands here"
   success "All tests passed!"
 
-task "deploy":
-  step "Deploying application..."
+task "deploy" means "Deploy application":
+  given $environment defaults to "development"
+  step "Deploying application to {$environment}..."
   warn "Make sure you're deploying to the right environment!"
   info "Add your deployment commands here"
-  success "Deployment completed!"
+  success "Deployment to {$environment} completed!"
 `
 }

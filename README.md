@@ -68,20 +68,27 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 ### 📁 **File Structure**
 
-drun automatically discovers task files in these locations:
+drun uses a simple, predictable file discovery system:
 
-- **`.drun`** - Main task file in project root
-- **`.drun/.drun`** - Task file in .drun directory  
-- **`ops/.drun`** - Task file in ops directory
-- **`.ops/.drun`** - Task file in .ops directory
-- **Custom files** - `spec.drun`, `tasks.drun`, etc.
+- **`.drun/spec.drun`** - Default task file location
+- **Custom locations** - Use `--file` to specify any other location
+- **Workspace configuration** - `.drun/.drun_workspace.yml` for custom defaults
 
-**Workspace configuration** (optional):
-- **`.drun/.drun_workspace.yml`** - Workspace settings and global configuration
+**Moving your spec file:**
+```bash
+# Move your spec file anywhere
+mv .drun/spec.drun ./my-project.drun
+
+# Update workspace to point to new location
+drun --set-workspace my-project.drun
+
+# Now drun automatically uses your custom location
+drun --list
+```
 
 ### 🚀 **Getting Started**
 
-1. **Create a simple task file** (`.drun`):
+1. **Create a simple task file** (`.drun/spec.drun`):
    
    ```drun
    project "my-app" version "1.0"
@@ -122,15 +129,11 @@ drun automatically discovers task files in these locations:
 
 ## Configuration
 
-drun automatically discovers task files in this order:
+drun uses a simple file discovery system:
 
 1. **Workspace default** (if configured in `.drun/.drun_workspace.yml`)
-2. **Standard locations**:
-   - `.drun` - Main task file in project root
-   - `.drun/.drun` - Task file in .drun directory  
-   - `ops/.drun` - Task file in ops directory
-   - `.ops/.drun` - Task file in .ops directory
-3. **Custom files**: `spec.drun`, `tasks.drun`, `automation.drun`, etc.
+2. **Default location**: `.drun/spec.drun`
+3. **Explicit specification**: Use `--file` for any other location
 
 ### 🔧 **Workspace Configuration**
 
@@ -158,14 +161,15 @@ defaults:
 Use `drun --init` to create a starter task file:
 
 ```bash
-# Create .drun file in current directory
+# Create default .drun/spec.drun
 drun --init
 
-# Create custom task file
-drun --init --file=spec.drun
+# Create custom task file and save as workspace default
+drun --init --file=my-project.drun --save-as-default
 
-# Create with workspace configuration
-drun --init --workspace
+# Move existing file and update workspace
+mv .drun/spec.drun ./tasks.drun
+drun --set-workspace tasks.drun
 ```
 
 See the included examples for comprehensive task configurations.
