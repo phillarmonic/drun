@@ -12,28 +12,28 @@ task "shell demo" means "Demonstrate shell command execution":
 task "capture demo" means "Demonstrate command output capture":
   info "Testing command capture functionality"
   
-  capture "echo 'This will be captured'" as message
-  capture "date +%Y" as year
+  capture "echo 'This will be captured'" as $result
+  capture "date +%Y" as $year
   
-  info "Captured message: {message}"
-  info "Current year: {year}"
+  info "Captured message: {$result}"
+  info "Current year: {$year}"
   
   success "Capture demonstration completed!"
 
 task "build info" means "Generate build information using shell commands":
   info "Gathering build information"
   
-  capture "git rev-parse --short HEAD" as commit
-  capture "date +%Y%m%d-%H%M%S" as timestamp
-  capture "whoami" as user
+  capture "git rev-parse --short HEAD" as $git_hash
+  capture "date +%Y%m%d-%H%M%S" as $timestamp
+  capture "whoami" as $username
   
   info "Build Details:"
-  info "  Commit: {commit}"
-  info "  Timestamp: {timestamp}"
-  info "  Built by: {user}"
+  info "  Commit: {$git_hash}"
+  info "  Timestamp: {$timestamp}"
+  info "  Built by: {$username}"
   info "  Host: {hostname}"
   
-  run "echo 'Build {commit}-{timestamp} by {user}@{hostname}'"
+  run "echo 'Build {$git_hash}-{$timestamp} by {$username}@{hostname}'"
   
   success "Build information generated!"
 

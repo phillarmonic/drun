@@ -139,7 +139,7 @@ func (l *Lexer) NextToken() Token {
 			tok.Type = EQ
 			tok.Literal = string(ch) + string(l.ch)
 		} else {
-			tok.Type = ILLEGAL
+			tok.Type = EQUALS
 			tok.Literal = string(l.ch)
 		}
 	case '!':
@@ -160,6 +160,10 @@ func (l *Lexer) NextToken() Token {
 		tok.Type = NEWLINE
 		tok.Literal = string(l.ch)
 		l.atLineStart = true
+	case '$':
+		tok.Type = VARIABLE
+		tok.Literal = l.readVariable()
+		return tok // Don't call readChar() again
 	case 0:
 		tok.Literal = ""
 		tok.Type = EOF
@@ -298,6 +302,25 @@ func (l *Lexer) readIdentifier() string {
 	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
 		l.readChar()
 	}
+	return l.input[position:l.position]
+}
+
+// readVariable reads a variable starting with $
+func (l *Lexer) readVariable() string {
+	position := l.position
+	l.readChar() // consume the '$'
+
+	// Variable name must start with letter or underscore (not digit)
+	if !isLetter(l.ch) && l.ch != '_' {
+		// Invalid variable name - but still return the $ for error reporting
+		return "$"
+	}
+
+	// Read the rest of the variable name (letters, digits, underscores)
+	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+		l.readChar()
+	}
+
 	return l.input[position:l.position]
 }
 

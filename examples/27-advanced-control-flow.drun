@@ -1,9 +1,9 @@
 version: 2.0
 
-project "Advanced Control Flow Demo" version "1.0"
+project "Advanced Control Flow Demo" version "1.0":
 
 task "showcase_advanced_loops":
-  given items defaults to "item1,test_item,item2,skip_item,item3.js,item4.py,test_file.js"
+  given $items defaults to "item1,test_item,item2,skip_item,item3.js,item4.py,test_file.js"
   
   info "🚀 Starting Advanced Control Flow Showcase"
   
@@ -41,7 +41,7 @@ task "showcase_advanced_loops":
   success "✅ Advanced Control Flow Showcase completed!"
 
 task "parallel_advanced_loops":
-  given items defaults to "file1.js,file2.py,file3.js,file4.txt,file5.js"
+  given $items defaults to "file1.js,file2.py,file3.js,file4.txt,file5.js"
   
   info "🚀 Starting Parallel Advanced Control Flow"
   
@@ -54,8 +54,8 @@ task "parallel_advanced_loops":
   success "✅ Parallel Advanced Control Flow completed!"
 
 task "conditional_advanced_loops":
-  given env defaults to "development"
-  given items defaults to "item1,critical_item,item2,error_item,item3"
+  given $env defaults to "development"
+  given $items defaults to "item1,critical_item,item2,error_item,item3"
   
   info "🚀 Starting Conditional Advanced Control Flow"
   

@@ -282,6 +282,10 @@ string_literal = '"' { string_character } '"' ;
 interpolated_string = '"' { string_character | interpolation } '"' ;
 interpolation = "{" expression "}" ;
 
+(* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
+variable = "$" identifier ;  (* Declared variables: $name, $environment *)
+loop_variable = identifier ; (* Loop variables: item, i, file *)
+
 number_literal = integer_literal | float_literal ;
 integer_literal = digit { digit } ;
 float_literal = integer_literal "." integer_literal ;
@@ -359,11 +363,15 @@ Can span multiple lines
 
 ### String Interpolation
 
-Strings support variable interpolation using `{variable}` syntax:
+Strings support variable interpolation using `{$variable}` syntax for declared variables and `{variable}` for loop variables:
 
 ```
-let name be "world"
-info "Hello, {name}!"  # Outputs: Hello, world!
+let $name = "world"
+info "Hello, {$name}!"  # Outputs: Hello, world!
+
+# Loop variables use bare identifiers
+for each item in items:
+  info "Processing {item}"  # Loop variable without $
 
 # Complex expressions in interpolation
 info "Current time: {now.format('HH:mm:ss')}"
@@ -404,10 +412,10 @@ task "hello":
   info "Hello, world!"
 
 task "deploy" means "Deploy application to environment":
-  requires environment from ["dev", "staging", "production"]
+  requires $environment from ["dev", "staging", "production"]
   depends on build and test
   
-  deploy myapp to kubernetes namespace {environment}
+  deploy myapp to kubernetes namespace {$environment}
 ```
 
 ### Parameter Declarations
@@ -418,10 +426,10 @@ task "deploy" means "Deploy application to environment":
 requires <name> [constraints]
 
 # Examples:
-requires environment from ["dev", "staging", "production"]
-requires version matching pattern "v\d+\.\d+\.\d+"
-requires port as number between 1000 and 9999
-requires email matching email format
+requires $environment from ["dev", "staging", "production"]
+requires $version matching pattern "v\d+\.\d+\.\d+"
+requires $port as number between 1000 and 9999
+requires $email matching email format
 requires files as list of strings
 ```
 
@@ -773,12 +781,53 @@ for each service in services:
 
 ### Variable Declaration
 
+All variables in drun v2 must be prefixed with `$` to distinguish them from keywords and improve syntax clarity.
+
+### Variable Syntax Rules
+
+#### Variable Naming Convention
+
+1. **Declared Variables**: Must start with `$` prefix
+   - `$name`, `$environment`, `$commit_hash`
+   - Used in: parameter declarations, let/set statements, variable references
+
+2. **Loop Variables**: Use bare identifiers (no `$` prefix)
+   - `item`, `file`, `i`, `attempt`
+   - Used in: `for each item in items`, `for i in range 1 to 10`
+
+3. **Interpolation Syntax**:
+   - Declared variables: `{$variable_name}`
+   - Loop variables: `{variable_name}`
+   - Built-in functions: `{now.format()}`, `{pwd}`
+
+#### Examples
+
+```
+# Parameter declarations
+requires $environment from ["dev", "staging", "production"]
+given $tag defaults to "latest"
+
+# Variable declarations
+let $commit = current git commit
+set $counter to 0
+
+# Loop variables (bare identifiers)
+for each item in items:
+  info "Processing {item}"  # Loop variable interpolation
+
+for i in range 1 to 5:
+  info "Attempt {i} of 5"   # Loop variable interpolation
+
+# Mixed interpolation
+info "Deploying {$tag} to {$environment} - item {item}"
+```
+
 #### Let Bindings (Immutable)
 
 ```
-let name be "value"           # Simple assignment
-let result be compute_value() # Function result
-let config be {              # Object literal
+let $name = "value"           # Simple assignment
+let $result = compute_value() # Function result
+let $config = {              # Object literal
   port: 8080,
   host: "localhost"
 }
@@ -787,8 +836,8 @@ let config be {              # Object literal
 #### Set Statements (Mutable)
 
 ```
-set counter to 0
-set counter to {counter} + 1  # Increment
+set $counter to 0
+set $counter to {$counter} + 1  # Increment
 
 set environment to:
   when running_locally: "development"
@@ -875,17 +924,17 @@ run "kubectl set image deployment/{app_name} {app_name}={image_name}"
 #### Array Operations
 
 ```
-let files be ["app.js", "lib.js", "test.js"]
-let js_files be {files} filtered by extension ".js"
-let minified_files be {files} with extension changed to ".min.js"
-let file_count be {files}.length
+let $files = ["app.js", "lib.js", "test.js"]
+let $js_files = {$files} filtered by extension ".js"
+let $minified_files = {$files} with extension changed to ".min.js"
+let $file_count = {$files}.length
 ```
 
 #### String Operations
 
 ```
-let version be "v1.2.3"
-let numeric_version be {version} without prefix "v"
+let $version = "v1.2.3"
+let $numeric_version = {$version} without prefix "v"
 let major_version be {version}.split(".")[0]
 let uppercase_name be {app_name}.uppercase
 ```
@@ -908,29 +957,43 @@ let updated_config be {config} with {timeout: "30s"}
 
 ```
 task "deploy":
-  requires environment from ["dev", "staging", "production"]
-  requires version matching pattern "v\d+\.\d+\.\d+"
+  requires $environment from ["dev", "staging", "production"]
+  requires $version matching pattern "v\d+\.\d+\.\d+"
   
-  # Usage: drun deploy --environment=production --version=v1.2.3
+  # Usage: drun deploy environment=production version=v1.2.3
+```
+
+#### CLI Argument Syntax
+
+Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix required):
+
+```bash
+# Parameter passing examples
+drun deploy environment=production
+drun build tag=v1.2.3 push=true
+drun test suites=unit,integration verbose=true
+
+# Multiple parameters
+drun deploy environment=staging replicas=5 timeout=300
 ```
 
 #### Optional Parameters
 
 ```
 task "build":
-  given tag defaults to current git commit
-  given push defaults to false
-  given platforms defaults to ["linux/amd64"]
+  given $tag defaults to current git commit
+  given $push defaults to false
+  given $platforms defaults to ["linux/amd64"]
   
   # Usage: drun build
-  # Usage: drun build --tag=custom --push
+  # Usage: drun build tag=custom push=true
 ```
 
 #### Variadic Parameters
 
 ```
 task "test":
-  accepts suites as list of strings
+  accepts $suites as list of strings
   accepts flags as list
   
   # Usage: drun test --suites=unit,integration --flags=--verbose,--coverage

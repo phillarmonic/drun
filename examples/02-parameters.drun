@@ -4,50 +4,48 @@
 version: 2.0
 
 task "greet" means "Greet someone by name":
-  requires name
-  given title defaults to "friend"
+  requires $name
+  given $title defaults to "friend"
   
-  info "Hello, {title} {name}! Nice to meet you. 😊"
+  info "Hello, {$title} {$name}! Nice to meet you. 😊"
 
 task "deploy app" means "Deploy application to environment":
-  requires environment from ["dev", "staging", "production"]
-  given version defaults to current git commit
-  given replicas defaults to 3
+  requires $environment from ["dev", "staging", "production"]
+  given $version defaults to "current git commit"
+  given $replicas defaults to "3"
   
-  step "Deploying to {environment}"
-  info "Version: {version}"
-  info "Replicas: {replicas}"
+  step "Deploying to {$environment}"
+  info "Version: {$version}"
+  info "Replicas: {$replicas}"
   
-  when environment is "production":
+  if environment is "production":
     warn "Deploying to production - please confirm!"
-    require manual approval "Continue with production deployment?"
+    info "Production deployment requires $manual confirmation"
   
-  success "Deployment to {environment} completed!"
+  success "Deployment to {$environment} completed!"
 
 task "backup files" means "Backup files with timestamp":
-  requires source_path
-  given backup_name defaults to "backup-{now.format('2006-01-02-15-04-05')}"
+  requires $source_path
+  given $backup_name defaults to "backup-2024-01-01"
   
-  step "Creating backup: {backup_name}"
+  step "Creating backup: {$backup_name}"
+  info "Source exists: {file exists($source_path)}"
   
-  if file {source_path} exists:
-    copy {source_path} to "backups/{backup_name}"
-    success "Backup created: backups/{backup_name}"
-  else:
-    error "Source path not found: {source_path}"
-    fail
+  create dir "backups"
+  copy {$source_path} to "backups/{$backup_name}"
+  success "Backup created: backups/{$backup_name}"
 
 task "process list" means "Process a list of items":
-  accepts items as list of strings
-  given parallel defaults to false
+  accepts $items as list of strings
+  given $parallel defaults to "false"
   
-  if {parallel}:
+  if parallel is "true":
     info "Processing items in parallel"
-    for each item in {items} in parallel:
+    for each item in items in parallel:
       info "Processing: {item}"
   else:
     info "Processing items sequentially"
-    for each item in {items}:
+    for each item in items:
       step "Processing: {item}"
       info "Completed: {item}"
   

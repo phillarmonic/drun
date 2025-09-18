@@ -4,8 +4,8 @@ task "simple error test":
   try:
     info "Testing error handling"
     throw "Test error"
-  catch as e:
-    warn "Caught: {e}"
+  catch as $e:
+    warn "Caught: {$e}"
   finally:
     info "Cleanup done"
   success "Error handling test completed!"

@@ -1,27 +1,27 @@
 version: 2.0
 
 task "greet" means "Greet someone by name":
-  requires name
-  given title defaults to "friend"
+  requires $name
+  given $title defaults to "friend"
   
-  info "Hello, {title} {name}! Nice to meet you."
-  step "Processing greeting for {name}"
-  success "Greeting completed for {title} {name}!"
+  info "Hello, {$title} {$name}! Nice to meet you."
+  step "Processing greeting for {$name}"
+  success "Greeting completed for {$title} {$name}!"
 
 task "deploy" means "Deploy to environment":
-  requires environment from ["dev", "staging", "production"]
-  given app_version defaults to "latest"
+  requires $environment from ["dev", "staging", "production"]
+  given $app_version defaults to "latest"
   
-  step "Deploying version {app_version} to {environment}"
-  info "Environment: {environment}"
-  info "Version: {app_version}"
-  success "Deployment to {environment} completed!"
+  step "Deploying version {$app_version} to {$environment}"
+  info "Environment: {$environment}"
+  info "Version: {$app_version}"
+  success "Deployment to {$environment} completed!"
 
 task "backup" means "Create backup with custom name":
-  requires source_path
-  given backup_name defaults to "backup-2024-01-01"
+  requires $source_path
+  given $backup_name defaults to "backup-2024-01-01"
   
-  step "Creating backup: {backup_name}"
-  info "Source: {source_path}"
-  info "Backup: {backup_name}"
-  success "Backup created: {backup_name}"
+  step "Creating backup: {$backup_name}"
+  info "Source: {$source_path}"
+  info "Backup: {$backup_name}"
+  success "Backup created: {$backup_name}"

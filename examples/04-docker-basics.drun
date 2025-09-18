@@ -1,112 +1,54 @@
-# Docker Workflow Examples
-# Demonstrates Docker operations in semantic syntax
-
-project "webapp" version "1.0.0":
-  set registry to "ghcr.io/company"
-  set image_name to "webapp"
+# Simple Docker Workflow Examples
+version: 2.0
 
 task "build" means "Build Docker image":
-  given tag defaults to current git commit
+  given $tag defaults to "latest"
   
   step "Building Docker image"
+  info "Building image with tag: {$tag}"
   
-  # Smart Docker detection and building
-  build docker image "{registry}/{image_name}:{tag}"
+  # Use shell commands for Docker operations
+  run "docker build -t myapp:{$tag} ."
   
-  # Also tag as latest
-  tag image "{registry}/{image_name}:{tag}" as "{registry}/{image_name}:latest"
-  
-  success "Built image: {registry}/{image_name}:{tag}"
+  success "Built image: myapp:{$tag}"
 
-task "build multiarch" means "Build multi-architecture image":
-  given tag defaults to current git commit
-  given platforms defaults to ["linux/amd64", "linux/arm64"]
-  
-  step "Building multi-architecture image"
-  
-  build docker image "{registry}/{image_name}:{tag}" for platforms {platforms}
-  
-  success "Multi-arch build completed for: {platforms}"
-
-task "test image" means "Test Docker image functionality":
-  depends on build
-  
+task "test" means "Test Docker image":
   step "Testing Docker image"
   
-  # Start container for testing
-  let container_name be "test-{image_name}-{now.unix}"
+  # Check if Docker is available
+  if file "/usr/bin/docker" exists:
+    info "Docker is available"
+    run "docker images myapp"
+  else:
+    warn "Docker not found, skipping test"
   
-  try:
-    run container "{registry}/{image_name}:latest" as {container_name} on port 8080
-    
-    # Wait for container to be ready
-    wait 5 seconds
-    
-    # Test health endpoint
-    check health of service at "http://localhost:8080/health"
-    
-    success "Image test passed"
-    
-  catch test_error:
-    error "Image test failed: {test_error}"
-    
-    # Get logs for debugging
-    get logs from container {container_name}
-    fail
-    
-  finally:
-    # Cleanup
-    stop container {container_name}
-    remove container {container_name}
+  success "Docker test completed"
 
 task "push" means "Push image to registry":
-  requires tag
-  depends on build and test_image
+  requires $registry
+  given $tag defaults to "latest"
   
   step "Pushing image to registry"
+  info "Pushing to registry: {$registry}"
   
-  # Login to registry (assumes credentials are available)
-  login to docker registry {registry}
+  run "docker tag myapp:{$tag} {$registry}/myapp:{$tag}"
+  run "docker push {$registry}/myapp:{$tag}"
   
-  # Push both specific tag and latest
-  push image "{registry}/{image_name}:{tag}"
-  push image "{registry}/{image_name}:latest"
-  
-  success "Images pushed to {registry}"
+  success "Image pushed to {$registry}"
 
-task "run local" means "Run container locally for development":
-  given port defaults to 8080
-  given env_file defaults to ".env.local"
-  depends on build
+task "run local" means "Run container locally":
+  given $port defaults to "8080"
   
-  step "Starting local development container"
+  step "Starting local container"
+  info "Starting container on port {$port}"
   
-  # Check if port is available
-  if port {port} is available:
-    info "Starting container on port {port}"
-  else:
-    error "Port {port} is already in use"
-    fail
+  run "docker run -d -p {$port}:8080 myapp:latest"
   
-  # Run with environment file if it exists
-  if file {env_file} exists:
-    run container "{registry}/{image_name}:latest" on port {port} with env file {env_file}
-  else:
-    run container "{registry}/{image_name}:latest" on port {port}
-  
-  info "Container running at http://localhost:{port}"
-  info "Press Ctrl+C to stop"
+  success "Container running on port {$port}"
 
 task "clean" means "Clean up Docker resources":
   step "Cleaning Docker resources"
   
-  # Remove old images
-  remove docker images older than 7 days for "{registry}/{image_name}"
-  
-  # Clean up build cache
-  clean docker build cache
-  
-  # Remove unused volumes
-  remove unused docker volumes
+  run "docker system prune -f"
   
   success "Docker cleanup completed"

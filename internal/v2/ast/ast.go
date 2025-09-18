@@ -542,6 +542,53 @@ func (cs *ContinueStatement) String() string {
 	return "continue"
 }
 
+// VariableStatement represents variable operations (let, set, transform)
+type VariableStatement struct {
+	Token     lexer.Token // the LET, SET, or TRANSFORM token
+	Operation string      // "let", "set", "transform"
+	Variable  string      // variable name
+	Value     string      // value or expression
+	Function  string      // function name for operations (concat, split, etc.)
+	Arguments []string    // function arguments
+}
+
+func (vs *VariableStatement) statementNode() {}
+func (vs *VariableStatement) String() string {
+	var out strings.Builder
+
+	switch vs.Operation {
+	case "let":
+		out.WriteString("let ")
+		out.WriteString(vs.Variable)
+		out.WriteString(" = ")
+		out.WriteString(vs.Value)
+	case "set":
+		out.WriteString("set ")
+		out.WriteString(vs.Variable)
+		out.WriteString(" to ")
+		out.WriteString(vs.Value)
+	case "transform":
+		out.WriteString("transform ")
+		out.WriteString(vs.Variable)
+		out.WriteString(" with ")
+		out.WriteString(vs.Function)
+		if len(vs.Arguments) > 0 {
+			out.WriteString(" ")
+			out.WriteString(strings.Join(vs.Arguments, " "))
+		}
+	default:
+		out.WriteString(vs.Operation)
+		out.WriteString(" ")
+		out.WriteString(vs.Variable)
+		if vs.Value != "" {
+			out.WriteString(" ")
+			out.WriteString(vs.Value)
+		}
+	}
+
+	return out.String()
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)

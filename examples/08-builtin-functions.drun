@@ -22,27 +22,27 @@ task "git info" means "Display git repository information":
   success "Git information retrieved!"
 
 task "environment check" means "Check environment variables":
-  given home_var defaults to "HOME"
-  given user_var defaults to "USER"
+  given $home_var defaults to "HOME"
+  given $user_var defaults to "USER"
   
   info "🌍 Environment Variables Check"
   step "Reading environment variables..."
   
-  info "🏠 Home directory: {env(home_var)}"
-  info "👤 Current user: {env(user_var, 'unknown')}"
+  info "🏠 Home directory: {env($home_var)}"
+  info "👤 Current user: {env($user_var, 'unknown')}"
   info "🔧 PATH exists: {env('PATH') != '' ? 'yes' : 'no'}"
   
   success "Environment check completed!"
 
 task "file operations" means "Demonstrate file system operations":
-  requires target_path
-  given backup_dir defaults to "/tmp"
+  requires $target_path
+  given $backup_dir defaults to "/tmp"
   
   info "📁 File System Operations"
   step "Checking file system..."
   
-  info "📄 Target exists: {file exists(target_path)}"
-  info "📂 Backup dir exists: {dir exists(backup_dir)}"
+  info "📄 Target exists: {file exists($target_path)}"
+  info "📂 Backup dir exists: {dir exists($backup_dir)}"
   info "🕐 Timestamp: {now.format('2006-01-02-15-04-05')}"
   
   when file exists(target_path) is "true":
@@ -52,14 +52,14 @@ task "file operations" means "Demonstrate file system operations":
   success "File operations check completed!"
 
 task "deployment info" means "Generate deployment information":
-  requires environment from ["dev", "staging", "production"]
-  given app_name defaults to "myapp"
+  requires $environment from ["dev", "staging", "production"]
+  given $app_name defaults to "myapp"
   
   info "🚀 Deployment Information Generator"
   step "Generating deployment details..."
   
-  info "📦 Application: {app_name}"
-  info "🌍 Environment: {environment}"
+  info "📦 Application: {$app_name}"
+  info "🌍 Environment: {$environment}"
   info "🏷️  Build ID: {current git commit('short')}-{now.format('20060102-1504')}"
   info "🖥️  Deploy host: {hostname}"
   info "📁 Deploy path: {pwd}/releases/{now.format('20060102-150405')}"
@@ -69,26 +69,26 @@ task "deployment info" means "Generate deployment information":
     step "Extra validation for production"
     info "🔒 Security checks enabled"
   
-  success "🎉 Deployment info generated for {environment}!"
+  success "🎉 Deployment info generated for {$environment}!"
 
 task "backup with timestamp" means "Create timestamped backup":
-  requires source_path
-  given backup_root defaults to "/backups"
+  requires $source_path
+  given $backup_root defaults to "/backups"
   
   info "💾 Timestamped Backup Creation"
   step "Preparing backup operation..."
   
-  info "📂 Source: {source_path}"
-  info "📁 Backup root: {backup_root}"
+  info "📂 Source: {$source_path}"
+  info "📁 Backup root: {$backup_root}"
   info "🕐 Timestamp: {now.format('2006-01-02_15-04-05')}"
   info "📦 Backup name: backup-{now.format('2006-01-02_15-04-05')}.tar.gz"
   info "🖥️  Created on: {hostname}"
   
   if file exists(source_path) is "true":
     step "Source verified - creating backup"
-    info "✅ Backup would be created at {backup_root}/backup-{now.format('2006-01-02_15-04-05')}.tar.gz"
+    info "✅ Backup would be created at {$backup_root}/backup-{now.format('2006-01-02_15-04-05')}.tar.gz"
   else:
-    error "❌ Source path does not exist: {source_path}"
-    fail
+    error "❌ Source path does not exist: {$source_path}"
+    throw "Backup failed - source path not found"
   
   success "💾 Backup operation completed!"

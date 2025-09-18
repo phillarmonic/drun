@@ -1,308 +1,34 @@
-# Complete CI/CD Pipeline Example
-# Demonstrates a full production-ready pipeline with semantic syntax
+# CI/CD Pipeline
+version: 2.0
 
-project "ecommerce-platform" version "2.1.0":
-  set registry to "ghcr.io/company"
-  set environments to ["dev", "staging", "production"]
-  set notification_webhook to secret "slack_webhook"
-  
-  # Global lifecycle hooks
-  before any task:
-    capture start_time from now
-    info "🚀 Starting task at {start_time.format('15:04:05')}"
-  
-  after any task:
-    capture end_time from now
-    let duration be {end_time} - {start_time}
-    info "⏱️ Task completed in {duration}"
+task "test" means "Run tests":
+  step "Running test suite"
+  run "npm test"
+  run "npm run lint"
+  success "All tests passed"
 
-# Build and Test Phase
-task "lint" means "Run code quality checks":
-  step "Running linters and code quality checks"
-  
-  when project type:
-    is "node":
-      run "npm run lint"
-      run "npm run type-check"
-    is "go":
-      run "golangci-lint run ./..."
-      run "go vet ./..."
-    is "python":
-      run "flake8 ."
-      run "mypy ."
-    else:
-      info "No specific linting rules for this project type"
-  
-  success "Code quality checks passed"
-
-task "test unit" means "Run unit tests":
-  step "Running unit tests"
-  
-  when project type:
-    is "node":
-      run "npm test -- --coverage"
-    is "go":
-      run "go test -v -race -coverprofile=coverage.out ./..."
-    is "python":
-      run "pytest --cov=. --cov-report=xml"
-    else:
-      warn "No unit tests configured for this project type"
-  
-  success "Unit tests passed"
-
-task "test integration" means "Run integration tests":
-  step "Running integration tests"
-  
-  # Start required services
-  if file "docker-compose.test.yml" exists:
-    start docker compose services from "docker-compose.test.yml"
-    
-    try:
-      # Wait for services to be ready
-      wait for service "database" to be healthy
-      wait for service "redis" to be healthy
-      
-      # Run integration tests
-      when project type:
-        is "node": run "npm run test:integration"
-        is "go": run "go test -tags=integration ./..."
-        is "python": run "pytest tests/integration/"
-      
-      success "Integration tests passed"
-      
-    finally:
-      # Cleanup services
-      stop docker compose services from "docker-compose.test.yml"
-  else:
-    info "No integration test services configured"
-
-task "security scan" means "Run security vulnerability scan":
-  step "Running security scans"
-  
-  # Dependency vulnerability scan
-  when project type:
-    is "node":
-      run "npm audit --audit-level=moderate"
-      run "snyk test"
-    is "go":
-      run "govulncheck ./..."
-    is "python":
-      run "safety check"
-  
-  # Container security scan (if Dockerfile exists)
-  if file "Dockerfile" exists:
-    build docker image "security-scan:temp"
-    run "trivy image security-scan:temp"
-    remove docker image "security-scan:temp"
-  
-  success "Security scans completed"
-
-# Build Phase
-task "build" means "Build application artifacts":
-  depends on lint, test_unit, and security_scan
-  given tag defaults to current git commit
-  
+task "build" means "Build application":
   step "Building application"
-  
-  # Smart build based on project type
-  when project type:
-    is "node":
-      run "npm run build"
-      if file "Dockerfile" exists:
-        build docker image "{registry}/ecommerce-platform:{tag}"
-    is "go":
-      run "go build -o bin/app ./cmd/..."
-      if file "Dockerfile" exists:
-        build docker image "{registry}/ecommerce-platform:{tag}"
-    is "python":
-      run "python -m build"
-      if file "Dockerfile" exists:
-        build docker image "{registry}/ecommerce-platform:{tag}"
-  
-  success "Build completed: {tag}"
+  run "npm run build"
+  success "Build completed"
 
-# Deployment Tasks
-task "deploy to dev" means "Deploy to development environment":
-  depends on build and test_integration
+task "deploy" means "Deploy application":
+  requires $environment
   
-  step "Deploying to development"
+  step "Deploying to {$environment}"
   
-  let image_tag be current git commit
+  if $environment is "production":
+    info "Production deployment"
+  else:
+    info "Non-production deployment"
   
-  deploy ecommerce-platform:{image_tag} to kubernetes namespace "ecommerce-dev" with 2 replicas
-  
-  # Run smoke tests
-  wait for deployment to be ready
-  check health of service at "https://dev.ecommerce.company.com/health"
-  
-  success "Development deployment completed"
+  run "deploy.sh {$environment}"
+  success "Deployed to {$environment}"
 
-task "deploy to staging" means "Deploy to staging environment":
-  depends on "deploy to dev"
+task "pipeline" means "Full CI/CD pipeline":
+  step "Running full pipeline"
   
-  step "Deploying to staging"
+  run "npm test"
+  run "npm run build"
   
-  let image_tag be current git commit
-  
-  # Staging-specific checks
-  if not all tests pass:
-    error "Cannot deploy to staging with failing tests"
-    fail
-  
-  deploy ecommerce-platform:{image_tag} to kubernetes namespace "ecommerce-staging" with 3 replicas
-  
-  # Extended health checks for staging
-  wait for deployment to be ready
-  check health of service at "https://staging.ecommerce.company.com/health"
-  
-  # Run end-to-end tests
-  step "Running E2E tests on staging"
-  run "npm run test:e2e -- --baseUrl=https://staging.ecommerce.company.com"
-  
-  success "Staging deployment and E2E tests completed"
-
-task "deploy to production" means "Deploy to production environment":
-  requires approval_token
-  depends on "deploy to staging"
-  
-  step "Deploying to production"
-  
-  # Production safety checks
-  if git repo is dirty:
-    error "Cannot deploy dirty repository to production"
-    fail
-  
-  if not git tag exists for current commit:
-    error "Production deployments require a git tag"
-    fail
-  
-  # Manual approval for production
-  warn "🚨 PRODUCTION DEPLOYMENT"
-  require manual approval "Deploy to production? This will affect live users."
-  
-  let image_tag be current git commit
-  
-  # Blue-green deployment strategy
-  try:
-    step "Starting blue-green deployment"
-    
-    # Deploy to green environment first
-    deploy ecommerce-platform:{image_tag} to kubernetes namespace "ecommerce-prod-green" with 5 replicas
-    
-    # Health check green environment
-    wait for deployment to be ready in "ecommerce-prod-green"
-    check health of service at "https://green.ecommerce.company.com/health"
-    
-    # Switch traffic to green
-    step "Switching traffic to new version"
-    switch traffic from "ecommerce-prod-blue" to "ecommerce-prod-green"
-    
-    # Monitor for 5 minutes
-    step "Monitoring new deployment"
-    for minute from 1 to 5:
-      info "Monitoring minute {minute}/5..."
-      check health of service at "https://ecommerce.company.com/health"
-      check error rate is below 1%
-      wait 60 seconds
-    
-    # Cleanup old blue environment
-    step "Cleaning up old deployment"
-    scale deployment in "ecommerce-prod-blue" to 0 replicas
-    
-    success "Production deployment completed successfully!"
-    
-  catch deployment_error:
-    error "Production deployment failed: {deployment_error}"
-    
-    # Automatic rollback
-    warn "Performing automatic rollback"
-    switch traffic from "ecommerce-prod-green" to "ecommerce-prod-blue"
-    scale deployment in "ecommerce-prod-green" to 0 replicas
-    
-    fail "Production deployment failed and rolled back"
-
-# Pipeline Orchestration
-task "ci pipeline" means "Complete CI pipeline":
-  step "🔄 Starting CI Pipeline"
-  
-  # Run all CI tasks in parallel where possible
-  run in parallel:
-    - lint -> lint_result
-    - test_unit -> test_result
-    - security_scan -> security_result
-  
-  wait for all to complete
-  
-  # Check if any CI task failed
-  if {lint_result} != "success" or {test_result} != "success" or {security_result} != "success":
-    error "CI pipeline failed"
-    notify slack "❌ CI pipeline failed for {current git branch}"
-    fail
-  
-  # Build after CI passes
-  run build
-  
-  success "✅ CI pipeline completed successfully"
-  notify slack "✅ CI pipeline passed for {current git branch}"
-
-task "cd pipeline" means "Complete CD pipeline":
-  requires target_env from ["dev", "staging", "production"]
-  depends on "ci pipeline"
-  
-  step "🚀 Starting CD Pipeline to {target_env}"
-  
-  when target_env:
-    is "dev":
-      run "deploy to dev"
-    is "staging":
-      run "deploy to staging"  
-    is "production":
-      run "deploy to production"
-  
-  success "✅ CD pipeline to {target_env} completed"
-  notify slack "🚀 Deployed to {target_env}"
-
-task "full pipeline" means "Complete CI/CD pipeline":
-  step "🎯 Starting Full CI/CD Pipeline"
-  
-  # CI first
-  run "ci pipeline"
-  
-  # Then deploy to dev and staging automatically
-  run "deploy to dev"
-  run "deploy to staging"
-  
-  # Production requires manual trigger
-  info "🎯 CI/CD pipeline completed"
-  info "To deploy to production, run: drun 'deploy to production' --approval_token=<token>"
-  
-  success "Full pipeline completed - ready for production deployment"
-
-# Utility Tasks
-task "rollback" means "Rollback production deployment":
-  requires approval_token
-  
-  warn "🔄 Rolling back production deployment"
-  require manual approval "Confirm production rollback?"
-  
-  # Switch traffic back to blue environment
-  switch traffic from "ecommerce-prod-green" to "ecommerce-prod-blue"
-  scale deployment in "ecommerce-prod-blue" to 5 replicas
-  scale deployment in "ecommerce-prod-green" to 0 replicas
-  
-  success "Production rollback completed"
-  notify slack "🔄 Production rolled back"
-
-task "status" means "Check pipeline and deployment status":
-  step "📊 Checking system status"
-  
-  for each env in {environments}:
-    info "Environment: {env}"
-    check status of deployment "ecommerce-platform" in namespace "ecommerce-{env}"
-    check health of service at "https://{env}.ecommerce.company.com/health"
-  
-  # Check recent deployments
-  info "Recent deployments:"
-  get recent deployments from kubernetes
-  
-  success "Status check completed"
+  success "Pipeline completed"

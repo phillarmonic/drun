@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/v2/ast"
@@ -267,6 +268,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeBreak(s, ctx)
 	case *ast.ContinueStatement:
 		return e.executeContinue(s, ctx)
+	case *ast.VariableStatement:
+		return e.executeVariable(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -768,9 +771,10 @@ func (e *Engine) buildGitCommand(operation, resource, name string, options map[s
 		// git show current branch
 		// git show current commit
 		if current, exists := options["current"]; exists && current == "true" {
-			if resource == "branch" {
+			switch resource {
+			case "branch":
 				gitCmd = append(gitCmd, "branch", "--show-current")
-			} else if resource == "commit" {
+			case "commit":
 				gitCmd = append(gitCmd, "rev-parse", "HEAD")
 			}
 		} else {
@@ -1160,6 +1164,136 @@ func (e *Engine) evaluateSimpleCondition(condition string, ctx *ExecutionContext
 	// In a real implementation, you would parse and evaluate the condition properly
 	// For now, we'll just return true to demonstrate the flow
 	return true
+}
+
+// executeVariable executes variable operation statements
+func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	switch varStmt.Operation {
+	case "let":
+		return e.executeLetStatement(varStmt, ctx)
+	case "set":
+		return e.executeSetStatement(varStmt, ctx)
+	case "transform":
+		return e.executeTransformStatement(varStmt, ctx)
+	default:
+		return fmt.Errorf("unknown variable operation: %s", varStmt.Operation)
+	}
+}
+
+// executeLetStatement executes "let variable = value" statements
+func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	value := e.interpolateVariables(varStmt.Value, ctx)
+
+	// Store the variable in the context even in dry run for interpolation
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, value)
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, value)
+
+	return nil
+}
+
+// executeSetStatement executes "set variable to value" statements
+func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	value := e.interpolateVariables(varStmt.Value, ctx)
+
+	// Store the variable in the context even in dry run for interpolation
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, value)
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, value)
+
+	return nil
+}
+
+// executeTransformStatement executes "transform variable with function args" statements
+func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	// Get the current value of the variable
+	currentValue, exists := ctx.Variables[varStmt.Variable]
+	if !exists {
+		return fmt.Errorf("variable '%s' not found", varStmt.Variable)
+	}
+
+	// Apply the transformation function
+	newValue, err := e.applyTransformation(currentValue, varStmt.Function, varStmt.Arguments, ctx)
+	if err != nil {
+		return fmt.Errorf("transformation failed: %v", err)
+	}
+
+	// Update the variable with the transformed value even in dry run for interpolation
+	ctx.Variables[varStmt.Variable] = newValue
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would transform variable %s with %s: %s -> %s\n",
+			varStmt.Variable, varStmt.Function, currentValue, newValue)
+		return nil
+	}
+	_, _ = fmt.Fprintf(e.output, "🔄 Transformed variable %s with %s: %s -> %s\n",
+		varStmt.Variable, varStmt.Function, currentValue, newValue)
+
+	return nil
+}
+
+// applyTransformation applies a transformation function to a value
+func (e *Engine) applyTransformation(value, function string, args []string, ctx *ExecutionContext) (string, error) {
+	// Interpolate arguments
+	interpolatedArgs := make([]string, len(args))
+	for i, arg := range args {
+		interpolatedArgs[i] = e.interpolateVariables(arg, ctx)
+	}
+
+	switch function {
+	case "uppercase":
+		return strings.ToUpper(value), nil
+	case "lowercase":
+		return strings.ToLower(value), nil
+	case "trim":
+		return strings.TrimSpace(value), nil
+	case "concat":
+		if len(interpolatedArgs) > 0 {
+			return value + interpolatedArgs[0], nil
+		}
+		return value, nil
+	case "split":
+		if len(interpolatedArgs) > 0 {
+			parts := strings.Split(value, interpolatedArgs[0])
+			return strings.Join(parts, "\n"), nil // Return as newline-separated for display
+		}
+		return value, nil
+	case "replace":
+		if len(interpolatedArgs) >= 2 {
+			return strings.ReplaceAll(value, interpolatedArgs[0], interpolatedArgs[1]), nil
+		}
+		return value, nil
+	case "join":
+		if len(interpolatedArgs) > 0 {
+			// Assume value is a newline-separated list
+			parts := strings.Split(value, "\n")
+			return strings.Join(parts, interpolatedArgs[0]), nil
+		}
+		return value, nil
+	case "length":
+		return fmt.Sprintf("%d", len(value)), nil
+	case "slice":
+		if len(interpolatedArgs) >= 2 {
+			start, err1 := strconv.Atoi(interpolatedArgs[0])
+			end, err2 := strconv.Atoi(interpolatedArgs[1])
+			if err1 == nil && err2 == nil && start >= 0 && end <= len(value) && start <= end {
+				return value[start:end], nil
+			}
+		}
+		return value, nil
+	default:
+		return "", fmt.Errorf("unknown transformation function: %s", function)
+	}
 }
 
 // shouldHandleError determines if a catch clause should handle the given error

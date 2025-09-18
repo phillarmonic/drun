@@ -11,9 +11,10 @@ const (
 	EOF
 
 	// Literals
-	STRING  // "hello world"
-	NUMBER  // 2.0, 42
-	BOOLEAN // true, false
+	STRING   // "hello world"
+	NUMBER   // 2.0, 42
+	BOOLEAN  // true, false
+	VARIABLE // $variable
 
 	// Keywords
 	VERSION // version
@@ -160,6 +161,27 @@ const (
 	MATCH    // match
 	PATTERN  // pattern
 
+	// Variable Operations keywords
+	LET       // let
+	CONCAT    // concat
+	SPLIT     // split
+	REPLACE   // replace
+	TRIM      // trim
+	UPPERCASE // uppercase
+	LOWERCASE // lowercase
+	PREPEND   // prepend
+	JOIN      // join
+	SLICE     // slice
+	LENGTH    // length
+	KEYS      // keys
+	VALUES    // values
+	TRANSFORM // transform
+	SUBTRACT  // subtract
+	MULTIPLY  // multiply
+	DIVIDE    // divide
+	MODULO    // modulo
+	PROPERTY  // property
+
 	// Comparison operators
 	GTE // >=
 	GT  // >
@@ -235,6 +257,7 @@ const (
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
+	EQUALS // =
 
 	// Punctuation
 	COLON    // :
@@ -277,6 +300,8 @@ func (t TokenType) String() string {
 		return "NUMBER"
 	case BOOLEAN:
 		return "BOOLEAN"
+	case VARIABLE:
+		return "VARIABLE"
 	case VERSION:
 		return "VERSION"
 	case TASK:
@@ -543,6 +568,44 @@ func (t TokenType) String() string {
 		return "MATCH"
 	case PATTERN:
 		return "PATTERN"
+	case LET:
+		return "LET"
+	case CONCAT:
+		return "CONCAT"
+	case SPLIT:
+		return "SPLIT"
+	case REPLACE:
+		return "REPLACE"
+	case TRIM:
+		return "TRIM"
+	case UPPERCASE:
+		return "UPPERCASE"
+	case LOWERCASE:
+		return "LOWERCASE"
+	case PREPEND:
+		return "PREPEND"
+	case JOIN:
+		return "JOIN"
+	case SLICE:
+		return "SLICE"
+	case LENGTH:
+		return "LENGTH"
+	case KEYS:
+		return "KEYS"
+	case VALUES:
+		return "VALUES"
+	case TRANSFORM:
+		return "TRANSFORM"
+	case SUBTRACT:
+		return "SUBTRACT"
+	case MULTIPLY:
+		return "MULTIPLY"
+	case DIVIDE:
+		return "DIVIDE"
+	case MODULO:
+		return "MODULO"
+	case PROPERTY:
+		return "PROPERTY"
 	case GTE:
 		return "GTE"
 	case GT:
@@ -655,6 +718,8 @@ func (t TokenType) String() string {
 		return "IDENT"
 	case ASSIGN:
 		return "ASSIGN"
+	case EQUALS:
+		return "EQUALS"
 	case COLON:
 		return "COLON"
 	case COMMA:
@@ -825,6 +890,25 @@ var keywords = map[string]TokenType{
 	"line":        LINE,
 	"match":       MATCH,
 	"pattern":     PATTERN,
+	"let":         LET,
+	"concat":      CONCAT,
+	"split":       SPLIT,
+	"replace":     REPLACE,
+	"trim":        TRIM,
+	"uppercase":   UPPERCASE,
+	"lowercase":   LOWERCASE,
+	"prepend":     PREPEND,
+	"join":        JOIN,
+	"slice":       SLICE,
+	"length":      LENGTH,
+	"keys":        KEYS,
+	"values":      VALUES,
+	"transform":   TRANSFORM,
+	"subtract":    SUBTRACT,
+	"multiply":    MULTIPLY,
+	"divide":      DIVIDE,
+	"modulo":      MODULO,
+	"property":    PROPERTY,
 	">=":          GTE,
 	">":           GT,
 	"<=":          LTE,
