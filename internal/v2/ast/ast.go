@@ -21,6 +21,7 @@ type Statement interface {
 // Program represents the root of the AST
 type Program struct {
 	Version *VersionStatement
+	Project *ProjectStatement
 	Tasks   []*TaskStatement
 }
 
@@ -28,6 +29,10 @@ func (p *Program) String() string {
 	var out strings.Builder
 	if p.Version != nil {
 		out.WriteString(p.Version.String())
+		out.WriteString("\n")
+	}
+	if p.Project != nil {
+		out.WriteString(p.Project.String())
 		out.WriteString("\n")
 	}
 	for _, task := range p.Tasks {
@@ -46,6 +51,85 @@ type VersionStatement struct {
 func (vs *VersionStatement) statementNode() {}
 func (vs *VersionStatement) String() string {
 	return fmt.Sprintf("version: %s", vs.Value)
+}
+
+// ProjectStatement represents a project declaration
+type ProjectStatement struct {
+	Token    lexer.Token      // the PROJECT token
+	Name     string           // project name
+	Version  string           // optional project version
+	Settings []ProjectSetting // project settings (set, include, hooks)
+}
+
+func (ps *ProjectStatement) statementNode() {}
+func (ps *ProjectStatement) String() string {
+	var out strings.Builder
+	out.WriteString("project ")
+	out.WriteString(ps.Name)
+	if ps.Version != "" {
+		out.WriteString(" version ")
+		out.WriteString(ps.Version)
+	}
+	out.WriteString(":")
+	for _, setting := range ps.Settings {
+		out.WriteString("\n  ")
+		out.WriteString(setting.String())
+	}
+	return out.String()
+}
+
+// ProjectSetting represents a project-level setting
+type ProjectSetting interface {
+	Node
+	projectSettingNode()
+}
+
+// SetStatement represents a project setting (set key to value)
+type SetStatement struct {
+	Token lexer.Token // the SET token
+	Key   string      // setting key
+	Value string      // setting value
+}
+
+func (ss *SetStatement) statementNode()      {}
+func (ss *SetStatement) projectSettingNode() {}
+func (ss *SetStatement) String() string {
+	return fmt.Sprintf("set %s to %s", ss.Key, ss.Value)
+}
+
+// IncludeStatement represents an include directive
+type IncludeStatement struct {
+	Token lexer.Token // the INCLUDE token
+	Path  string      // path to include
+}
+
+func (is *IncludeStatement) statementNode()      {}
+func (is *IncludeStatement) projectSettingNode() {}
+func (is *IncludeStatement) String() string {
+	return fmt.Sprintf("include %s", is.Path)
+}
+
+// LifecycleHook represents before/after hooks
+type LifecycleHook struct {
+	Token lexer.Token // the BEFORE or AFTER token
+	Type  string      // "before" or "after"
+	Scope string      // "any" for global hooks
+	Body  []Statement // hook body statements
+}
+
+func (lh *LifecycleHook) statementNode()      {}
+func (lh *LifecycleHook) projectSettingNode() {}
+func (lh *LifecycleHook) String() string {
+	var out strings.Builder
+	out.WriteString(lh.Type)
+	out.WriteString(" ")
+	out.WriteString(lh.Scope)
+	out.WriteString(" task:")
+	for _, stmt := range lh.Body {
+		out.WriteString("\n    ")
+		out.WriteString(stmt.String())
+	}
+	return out.String()
 }
 
 // TaskStatement represents a task definition

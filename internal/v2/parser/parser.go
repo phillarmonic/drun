@@ -53,8 +53,14 @@ func (p *Parser) ParseProgram() *ast.Program {
 		return nil
 	}
 
-	// Skip comments between version and tasks
+	// Skip comments between version and project/tasks
 	p.skipComments()
+
+	// Parse optional project statement
+	if p.curToken.Type == lexer.PROJECT {
+		program.Project = p.parseProjectStatement()
+		p.skipComments()
+	}
 
 	// Parse task statements
 	for p.curToken.Type != lexer.EOF {
@@ -94,6 +100,165 @@ func (p *Parser) parseVersionStatement() *ast.VersionStatement {
 	p.nextToken()
 
 	return stmt
+}
+
+// parseProjectStatement parses a project statement
+func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
+	stmt := &ast.ProjectStatement{Token: p.curToken}
+
+	// Expect project name (string)
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Name = p.curToken.Literal
+
+	// Check for optional version
+	if p.peekToken.Type == lexer.VERSION {
+		p.nextToken() // consume VERSION token
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Version = p.curToken.Literal
+	}
+
+	// Expect colon
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse project settings
+	if p.peekToken.Type == lexer.INDENT {
+		p.nextToken() // consume INDENT
+		p.nextToken() // move to first token inside the block
+
+		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+			switch p.curToken.Type {
+			case lexer.SET:
+				setting := p.parseSetStatement()
+				if setting != nil {
+					stmt.Settings = append(stmt.Settings, setting)
+				}
+			case lexer.INCLUDE:
+				setting := p.parseIncludeStatement()
+				if setting != nil {
+					stmt.Settings = append(stmt.Settings, setting)
+				}
+			case lexer.BEFORE, lexer.AFTER:
+				hook := p.parseLifecycleHook()
+				if hook != nil {
+					stmt.Settings = append(stmt.Settings, hook)
+				}
+			case lexer.COMMENT:
+				p.nextToken() // Skip comments
+			default:
+				p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
+				p.nextToken()
+			}
+		}
+
+		if p.curToken.Type == lexer.DEDENT {
+			p.nextToken() // consume DEDENT
+		}
+	}
+
+	return stmt
+}
+
+// parseSetStatement parses a set statement (set key to value)
+func (p *Parser) parseSetStatement() *ast.SetStatement {
+	stmt := &ast.SetStatement{Token: p.curToken}
+
+	// Expect identifier (key)
+	if !p.expectPeek(lexer.IDENT) {
+		return nil
+	}
+	stmt.Key = p.curToken.Literal
+
+	// Expect "to"
+	if !p.expectPeek(lexer.TO) {
+		return nil
+	}
+
+	// Expect value (string)
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Value = p.curToken.Literal
+
+	p.nextToken()
+	return stmt
+}
+
+// parseIncludeStatement parses an include statement
+func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
+	stmt := &ast.IncludeStatement{Token: p.curToken}
+
+	// Expect path (string)
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Path = p.curToken.Literal
+
+	p.nextToken()
+	return stmt
+}
+
+// parseLifecycleHook parses before/after hooks
+func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
+	hook := &ast.LifecycleHook{Token: p.curToken}
+	hook.Type = p.curToken.Literal // "before" or "after"
+
+	// Expect "any"
+	if !p.expectPeek(lexer.ANY) {
+		return nil
+	}
+	hook.Scope = p.curToken.Literal
+
+	// Expect "task"
+	if !p.expectPeek(lexer.TASK) {
+		return nil
+	}
+
+	// Expect colon
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse hook body - expect INDENT and parse statements
+	if p.peekToken.Type == lexer.INDENT {
+		p.nextToken() // consume INDENT
+		p.nextToken() // move to first statement
+
+		// Parse statements until DEDENT
+		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+			if p.isActionToken(p.curToken.Type) {
+				if p.isShellActionToken(p.curToken.Type) {
+					shell := p.parseShellStatement()
+					if shell != nil {
+						hook.Body = append(hook.Body, shell)
+					}
+				} else {
+					action := p.parseActionStatement()
+					if action != nil {
+						hook.Body = append(hook.Body, action)
+					}
+				}
+				p.nextToken() // advance to next token after parsing
+			} else if p.curToken.Type == lexer.COMMENT {
+				p.nextToken() // Skip comments
+				continue
+			} else {
+				p.addError(fmt.Sprintf("unexpected token in lifecycle hook body: %s", p.curToken.Type))
+				p.nextToken()
+			}
+		}
+
+		if p.curToken.Type == lexer.DEDENT {
+			p.nextToken() // consume DEDENT for hook body
+		}
+	}
+
+	return hook
 }
 
 // parseTaskStatement parses a task statement

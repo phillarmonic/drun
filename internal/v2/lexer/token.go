@@ -19,6 +19,12 @@ const (
 	VERSION // version
 	TASK    // task
 	MEANS   // means
+	PROJECT // project
+	SET     // set
+	INCLUDE // include
+	BEFORE  // before
+	AFTER   // after
+	ANY     // any
 
 	// Action keywords (built-in actions)
 	INFO    // info
@@ -135,6 +141,18 @@ func (t TokenType) String() string {
 		return "TASK"
 	case MEANS:
 		return "MEANS"
+	case PROJECT:
+		return "PROJECT"
+	case SET:
+		return "SET"
+	case INCLUDE:
+		return "INCLUDE"
+	case BEFORE:
+		return "BEFORE"
+	case AFTER:
+		return "AFTER"
+	case ANY:
+		return "ANY"
 	case INFO:
 		return "INFO"
 	case STEP:
@@ -275,6 +293,12 @@ var keywords = map[string]TokenType{
 	"version":  VERSION,
 	"task":     TASK,
 	"means":    MEANS,
+	"project":  PROJECT,
+	"set":      SET,
+	"include":  INCLUDE,
+	"before":   BEFORE,
+	"after":    AFTER,
+	"any":      ANY,
 	"info":     INFO,
 	"step":     STEP,
 	"warn":     WARN,

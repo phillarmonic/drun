@@ -27,6 +27,16 @@ type Engine struct {
 type ExecutionContext struct {
 	Parameters map[string]*types.Value // parameter name -> typed value
 	Variables  map[string]string       // captured variables from shell commands
+	Project    *ProjectContext         // project-level settings and hooks
+}
+
+// ProjectContext holds project-level configuration
+type ProjectContext struct {
+	Name        string            // project name
+	Version     string            // project version
+	Settings    map[string]string // project settings (set key to value)
+	BeforeHooks []ast.Statement   // before any task hooks
+	AfterHooks  []ast.Statement   // after any task hooks
 }
 
 // NewEngine creates a new v2 execution engine
@@ -73,6 +83,7 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 	ctx := &ExecutionContext{
 		Parameters: make(map[string]*types.Value),
 		Variables:  make(map[string]string),
+		Project:    e.createProjectContext(program.Project),
 	}
 
 	// Set up parameters with defaults and validation
@@ -115,7 +126,60 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		}
 	}
 
-	return e.executeTask(targetTask, ctx)
+	// Execute before hooks
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.BeforeHooks {
+			if err := e.executeStatement(hook, ctx); err != nil {
+				return fmt.Errorf("before hook failed: %v", err)
+			}
+		}
+	}
+
+	// Execute the task
+	err := e.executeTask(targetTask, ctx)
+
+	// Execute after hooks (even if task failed)
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.AfterHooks {
+			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
+			}
+		}
+	}
+
+	return err
+}
+
+// createProjectContext creates a project context from the project statement
+func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectContext {
+	if project == nil {
+		return nil
+	}
+
+	ctx := &ProjectContext{
+		Name:        project.Name,
+		Version:     project.Version,
+		Settings:    make(map[string]string),
+		BeforeHooks: []ast.Statement{},
+		AfterHooks:  []ast.Statement{},
+	}
+
+	// Process project settings
+	for _, setting := range project.Settings {
+		switch s := setting.(type) {
+		case *ast.SetStatement:
+			ctx.Settings[s.Key] = s.Value
+		case *ast.LifecycleHook:
+			switch s.Type {
+			case "before":
+				ctx.BeforeHooks = append(ctx.BeforeHooks, s.Body...)
+			case "after":
+				ctx.AfterHooks = append(ctx.AfterHooks, s.Body...)
+			}
+		}
+	}
+
+	return ctx
 }
 
 // executeTask executes a single task with the given context
@@ -616,6 +680,19 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		if value, exists := ctx.Variables[expr]; exists {
 			return value
 		}
+		// Check project settings
+		if ctx.Project != nil {
+			if value, exists := ctx.Project.Settings[expr]; exists {
+				return value
+			}
+			// Check special project variables
+			if expr == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version
+			}
+			if expr == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name
+			}
+		}
 	}
 
 	return ""
@@ -739,6 +816,7 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 		loopCtx := &ExecutionContext{
 			Parameters: make(map[string]*types.Value),
 			Variables:  make(map[string]string),
+			Project:    ctx.Project, // inherit project context
 		}
 
 		// Copy existing parameters and variables
@@ -794,6 +872,7 @@ func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string
 	loopCtx := &ExecutionContext{
 		Parameters: make(map[string]*types.Value),
 		Variables:  make(map[string]string),
+		Project:    ctx.Project, // inherit project context
 	}
 
 	// Copy existing parameters and variables

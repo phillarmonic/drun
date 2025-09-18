@@ -1,0 +1,38 @@
+version: 2.0
+
+project "webapp" version "1.2.0":
+  set registry to "ghcr.io/company"
+  set environment to "production"
+  set timeout to "300s"
+  include "shared/docker.drun"
+  
+  before any task:
+    info "🚀 Starting {project} v{version} task execution"
+    info "📊 Environment: {environment}"
+    info "🏗️  Registry: {registry}"
+  
+  after any task:
+    info "✅ Task execution completed for {project}"
+    info "🕐 Timeout was set to {timeout}"
+
+task "build" means "Build the application":
+  info "Building {project}:{version}"
+  step "Compiling source code"
+  step "Running tests"
+  step "Building Docker image {registry}/{project}:{version}"
+  success "Build completed successfully!"
+
+task "deploy" means "Deploy to environment":
+  requires target_env from ["dev", "staging", "production"]
+  
+  info "Deploying {project}:{version} to {target_env}"
+  step "Validating deployment target: {target_env}"
+  step "Pushing image to {registry}"
+  step "Updating {target_env} environment"
+  success "Deployment to {target_env} completed!"
+
+task "status" means "Check application status":
+  info "Checking status of {project} v{version}"
+  step "Verifying deployment in {environment}"
+  step "Running health checks"
+  success "All systems operational!"
