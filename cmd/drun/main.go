@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/v2/ast"
-	"github.com/phillarmonic/drun/internal/v2/engine"
+	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/spf13/cobra"
 )
 

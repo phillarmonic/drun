@@ -310,63 +310,35 @@ recipes:
 
 ### 🌐 HTTP Integration
 
-Integrate with APIs, send notifications, and fetch data directly from your recipes:
+Integrate with APIs, send notifications, and fetch data using semantic HTTP actions:
 
-```yaml
-version: 1.0
+```drun
+task "notify slack" means "Send notification to Slack":
+  requires $message
+  given $channel defaults to "#general"
+  
+  post "https://hooks.slack.com/services/..." with body {
+    "text": "{$message}",
+    "channel": "{$channel}"
+  } with header "Content-Type: application/json"
 
-# Define HTTP endpoints with authentication and caching
-http:
-  github:
-    url: "https://api.github.com"
-    headers:
-      Accept: "application/vnd.github.v3+json"
-      Authorization: "token {{ secret \"github_token\" }}"
-    timeout: 30s
-    cache:
-      ttl: 5m
+task "check api" means "Check API status":
+  let $response = get "https://api.example.com/health"
+  
+  if $response contains "ok":
+    success "API is healthy"
+  else:
+    fail "API is down"
 
-  slack:
-    url: "{{ env \"SLACK_WEBHOOK_URL\" }}"
-    method: "POST"
-    headers:
-      Content-Type: "application/json"
-
-secrets:
-  github_token:
-    source: "env://GITHUB_TOKEN"
-    required: true
-
-recipes:
-  deploy-notify:
-    help: "Deploy with GitHub integration and Slack notifications"
-    run: |
-      {{ step "Starting deployment with API integration" }}
-      
-      # Get current user from GitHub API
-      {{ $user := httpCallJSON "github" (dict "url" "/user") }}
-      {{ info (printf "Deploying as: %s" $user.login) }}
-      
-      # Perform deployment
-      echo "Building and deploying application..."
-      
-      # Send success notification to Slack
-      {{ $message := dict 
-           "text" (printf "✅ Deployment completed by %s" $user.login)
-           "username" "drun-bot"
-      }}
-      {{ httpPost (env "SLACK_WEBHOOK_URL") $message }}
-      
-      {{ success "Deployment completed with notifications" }}
 ```
 
-**Features:**
+**Key HTTP features:**
 
-- 🔐 **Authentication**: Bearer, Basic, API Key, OAuth2 support
-- 🔄 **Retries**: Configurable retry strategies with exponential backoff
-- 💾 **Caching**: Response caching for improved performance
-- 📊 **JSON Support**: Automatic JSON parsing and generation
-- ⚡ **Direct Calls**: Use predefined endpoints or direct HTTP calls
+- 🌐 **Semantic HTTP Actions**: `get`, `post`, `put`, `delete` with natural syntax
+- 🔗 **Authentication**: Built-in support for bearer tokens, basic auth, API keys
+- 📊 **JSON Support**: Automatic JSON parsing and response handling
+- 🔄 **Error Handling**: Intelligent retry and error management
+- ⚡ **Response Capture**: Store responses in variables for processing
 
 ### 🔄 Matrix Execution
 
@@ -793,14 +765,12 @@ drun includes 20+ powerful built-in template functions plus all [Sprig](https://
 - `{{ gitShortCommit }}`: Short commit hash (7 chars)
 - `{{ isDirty }}`: True if working directory has uncommitted changes
 
-### 🌐 **HTTP Integration**
+### 🌐 **HTTP Actions**
 
-- `{{ httpCall "endpoint" }}`: Call predefined HTTP endpoint
-- `{{ httpCallJSON "endpoint" }}`: Call endpoint and parse JSON response
-- `{{ httpGet "url" }}`: Direct GET request to any URL
-- `{{ httpPost "url" data }}`: Direct POST request with data
-- `{{ httpPut "url" data }}`: Direct PUT request with data
-- `{{ httpDelete "url" }}`: Direct DELETE request
+- `get "url"`: HTTP GET request with response capture
+- `post "url" with body "data"`: HTTP POST with JSON body
+- `put "url" with header "key: value"`: HTTP PUT with custom headers
+- `delete "url" with auth bearer "token"`: HTTP DELETE with authentication
 
 ### 📦 **Project Detection**
 
@@ -1007,6 +977,6 @@ Run benchmarks yourself:
 ## 📚 Documentation
 
 - **[Template Functions Reference](TEMPLATE_FUNCTIONS.md)** - Complete guide to all built-in template functions
-- **[HTTP Integration Guide](HTTP_INTEGRATION.md)** - Comprehensive HTTP client documentation with examples
-- **[YAML Specification](YAML_SPEC.md)** - Complete YAML configuration reference
+- **[drun v2 Specification](DRUN_V2_SPECIFICATION.md)** - Complete v2 language specification with HTTP actions
+- **[YAML Specification](YAML_SPEC.md)** - Legacy v1 YAML reference (deprecated)
 - **[Examples Directory](examples/)** - Real-world usage examples and patterns

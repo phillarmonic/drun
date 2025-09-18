@@ -3,10 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
-	"github.com/phillarmonic/drun/internal/v2/debug"
+	"github.com/phillarmonic/drun/internal/debug"
 )
 
 func main() {
@@ -26,7 +25,7 @@ func main() {
 	if *input != "" {
 		content = *input
 	} else if *file != "" {
-		data, err := ioutil.ReadFile(*file)
+		data, err := os.ReadFile(*file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
 			os.Exit(1)
