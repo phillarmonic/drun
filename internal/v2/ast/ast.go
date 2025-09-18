@@ -420,6 +420,49 @@ func (gs *GitStatement) String() string {
 	return out.String()
 }
 
+// HTTPStatement represents HTTP operations
+type HTTPStatement struct {
+	Token   lexer.Token       // the HTTP token or method token
+	Method  string            // "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"
+	URL     string            // the target URL
+	Body    string            // request body (for POST, PUT, PATCH)
+	Headers map[string]string // HTTP headers
+	Auth    map[string]string // authentication options
+	Options map[string]string // additional options (timeout, retry, etc.)
+}
+
+func (hs *HTTPStatement) statementNode() {}
+func (hs *HTTPStatement) String() string {
+	var out strings.Builder
+	out.WriteString(strings.ToLower(hs.Method) + " request")
+
+	if hs.URL != "" {
+		out.WriteString(fmt.Sprintf(" to \"%s\"", hs.URL))
+	}
+
+	// Add headers
+	for key, value := range hs.Headers {
+		out.WriteString(fmt.Sprintf(" with header \"%s: %s\"", key, value))
+	}
+
+	// Add body
+	if hs.Body != "" {
+		out.WriteString(fmt.Sprintf(" with body \"%s\"", hs.Body))
+	}
+
+	// Add auth
+	for key, value := range hs.Auth {
+		out.WriteString(fmt.Sprintf(" with %s \"%s\"", key, value))
+	}
+
+	// Add options
+	for key, value := range hs.Options {
+		out.WriteString(fmt.Sprintf(" %s \"%s\"", key, value))
+	}
+
+	return out.String()
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)

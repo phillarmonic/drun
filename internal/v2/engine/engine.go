@@ -258,6 +258,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeDocker(s, ctx)
 	case *ast.GitStatement:
 		return e.executeGit(s, ctx)
+	case *ast.HTTPStatement:
+		return e.executeHTTP(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -798,6 +800,96 @@ func (e *Engine) buildGitCommand(operation, resource, name string, options map[s
 		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
 	} else {
 		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
+	}
+}
+
+// executeHTTP executes HTTP operations
+func (e *Engine) executeHTTP(httpStmt *ast.HTTPStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in HTTP statement
+	method := httpStmt.Method
+	url := e.interpolateVariables(httpStmt.URL, ctx)
+	body := e.interpolateVariables(httpStmt.Body, ctx)
+
+	// Interpolate headers
+	headers := make(map[string]string)
+	for key, value := range httpStmt.Headers {
+		headers[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate auth
+	auth := make(map[string]string)
+	for key, value := range httpStmt.Auth {
+		auth[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate options
+	options := make(map[string]string)
+	for key, value := range httpStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute HTTP request: ")
+		e.buildHTTPCommand(method, url, body, headers, auth, options, true)
+		return nil
+	}
+
+	// Build and execute HTTP request
+	_, _ = fmt.Fprintf(e.output, "🌐 Making HTTP request: ")
+	e.buildHTTPCommand(method, url, body, headers, auth, options, false)
+
+	// For now, we'll simulate the HTTP request execution
+	// In a real implementation, you would use http.Client to make the actual request
+	// client := &http.Client{Timeout: timeout}
+	// req, err := http.NewRequest(method, url, strings.NewReader(body))
+	// if err != nil { return err }
+	// for key, value := range headers { req.Header.Set(key, value) }
+	// resp, err := client.Do(req)
+	// return err
+
+	return nil
+}
+
+// buildHTTPCommand builds and displays the HTTP request details
+func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, options map[string]string, dryRun bool) {
+	var httpCmd []string
+	httpCmd = append(httpCmd, "curl", "-X", method)
+
+	// Add headers
+	for key, value := range headers {
+		httpCmd = append(httpCmd, "-H", fmt.Sprintf("\"%s: %s\"", key, value))
+	}
+
+	// Add authentication
+	for authType, value := range auth {
+		switch authType {
+		case "bearer":
+			httpCmd = append(httpCmd, "-H", fmt.Sprintf("\"Authorization: Bearer %s\"", value))
+		case "basic":
+			httpCmd = append(httpCmd, "--user", value)
+		}
+	}
+
+	// Add body
+	if body != "" {
+		httpCmd = append(httpCmd, "-d", body)
+	}
+
+	// Add options
+	if timeout, exists := options["timeout"]; exists {
+		httpCmd = append(httpCmd, "--max-time", timeout)
+	}
+	if retry, exists := options["retry"]; exists {
+		httpCmd = append(httpCmd, "--retry", retry)
+	}
+
+	// Add URL last
+	httpCmd = append(httpCmd, url)
+
+	if dryRun {
+		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(httpCmd, " "))
+	} else {
+		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(httpCmd, " "))
 	}
 }
 

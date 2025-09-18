@@ -68,6 +68,47 @@ const (
 	WITH       // with
 	INTO       // into
 
+	// HTTP keywords
+	HTTP      // http
+	HTTPS     // https
+	GET       // get
+	POST      // post
+	PUT       // put
+	PATCH     // patch
+	HEAD      // head
+	OPTIONS   // options
+	REQUEST   // request
+	RESPONSE  // response
+	BODY      // body
+	HEADERS   // headers
+	HEADER    // header
+	URL       // url
+	ENDPOINT  // endpoint
+	API       // api
+	JSON      // json
+	XML       // xml
+	FORM      // form
+	DATA      // data
+	TIMEOUT   // timeout
+	RETRY     // retry
+	FOLLOW    // follow
+	REDIRECTS // redirects
+	VERIFY    // verify
+	SSL       // ssl
+	AUTH      // auth
+	BEARER    // bearer
+	BASIC     // basic
+	TOKEN     // token
+	USER      // user
+	PASSWORD  // password
+	CONTENT   // content
+	TYPE      // type
+	ACCEPT    // accept
+	SEND      // send
+	RECEIVE   // receive
+	DOWNLOAD  // download
+	UPLOAD    // upload
+
 	// Action keywords (built-in actions)
 	INFO    // info
 	STEP    // step
@@ -271,6 +312,84 @@ func (t TokenType) String() string {
 		return "WITH"
 	case INTO:
 		return "INTO"
+	case HTTP:
+		return "HTTP"
+	case HTTPS:
+		return "HTTPS"
+	case GET:
+		return "GET"
+	case POST:
+		return "POST"
+	case PUT:
+		return "PUT"
+	case PATCH:
+		return "PATCH"
+	case HEAD:
+		return "HEAD"
+	case OPTIONS:
+		return "OPTIONS"
+	case REQUEST:
+		return "REQUEST"
+	case RESPONSE:
+		return "RESPONSE"
+	case BODY:
+		return "BODY"
+	case HEADERS:
+		return "HEADERS"
+	case HEADER:
+		return "HEADER"
+	case URL:
+		return "URL"
+	case ENDPOINT:
+		return "ENDPOINT"
+	case API:
+		return "API"
+	case JSON:
+		return "JSON"
+	case XML:
+		return "XML"
+	case FORM:
+		return "FORM"
+	case DATA:
+		return "DATA"
+	case TIMEOUT:
+		return "TIMEOUT"
+	case RETRY:
+		return "RETRY"
+	case FOLLOW:
+		return "FOLLOW"
+	case REDIRECTS:
+		return "REDIRECTS"
+	case VERIFY:
+		return "VERIFY"
+	case SSL:
+		return "SSL"
+	case AUTH:
+		return "AUTH"
+	case BEARER:
+		return "BEARER"
+	case BASIC:
+		return "BASIC"
+	case TOKEN:
+		return "TOKEN"
+	case USER:
+		return "USER"
+	case PASSWORD:
+		return "PASSWORD"
+	case CONTENT:
+		return "CONTENT"
+	case TYPE:
+		return "TYPE"
+	case ACCEPT:
+		return "ACCEPT"
+	case SEND:
+		return "SEND"
+	case RECEIVE:
+		return "RECEIVE"
+	case DOWNLOAD:
+		return "DOWNLOAD"
+	case UPLOAD:
+		return "UPLOAD"
 	case INFO:
 		return "INFO"
 	case STEP:
@@ -455,6 +574,45 @@ var keywords = map[string]TokenType{
 	"all":        ALL,
 	"with":       WITH,
 	"into":       INTO,
+	"http":       HTTP,
+	"https":      HTTPS,
+	"get":        GET,
+	"post":       POST,
+	"put":        PUT,
+	"patch":      PATCH,
+	"head":       HEAD,
+	"options":    OPTIONS,
+	"request":    REQUEST,
+	"response":   RESPONSE,
+	"body":       BODY,
+	"headers":    HEADERS,
+	"header":     HEADER,
+	"url":        URL,
+	"endpoint":   ENDPOINT,
+	"api":        API,
+	"json":       JSON,
+	"xml":        XML,
+	"form":       FORM,
+	"data":       DATA,
+	"timeout":    TIMEOUT,
+	"retry":      RETRY,
+	"follow":     FOLLOW,
+	"redirects":  REDIRECTS,
+	"verify":     VERIFY,
+	"ssl":        SSL,
+	"auth":       AUTH,
+	"bearer":     BEARER,
+	"basic":      BASIC,
+	"token":      TOKEN,
+	"user":       USER,
+	"password":   PASSWORD,
+	"content":    CONTENT,
+	"type":       TYPE,
+	"accept":     ACCEPT,
+	"send":       SEND,
+	"receive":    RECEIVE,
+	"download":   DOWNLOAD,
+	"upload":     UPLOAD,
 	"info":       INFO,
 	"step":       STEP,
 	"warn":       WARN,

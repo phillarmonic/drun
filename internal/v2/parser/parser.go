@@ -180,9 +180,11 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 func (p *Parser) parseSetStatement() *ast.SetStatement {
 	stmt := &ast.SetStatement{Token: p.curToken}
 
-	// Expect identifier (key) - allow Git keywords as set keys
+	// Expect identifier (key) - allow Git and HTTP keywords as set keys
 	switch p.peekToken.Type {
-	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL:
+	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL,
+		lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS, lexer.URL, lexer.API, lexer.JSON, lexer.XML,
+		lexer.TIMEOUT, lexer.RETRY, lexer.AUTH, lexer.BEARER, lexer.BASIC, lexer.TOKEN, lexer.HEADER, lexer.BODY, lexer.DATA:
 		p.nextToken()
 	default:
 		p.addError(fmt.Sprintf("expected set key, got %s instead", p.peekToken.Type))
@@ -345,6 +347,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			git := p.parseGitStatement()
 			if git != nil {
 				stmt.Body = append(stmt.Body, git)
+			}
+		} else if p.isHTTPToken(p.curToken.Type) {
+			http := p.parseHTTPStatement()
+			if http != nil {
+				stmt.Body = append(stmt.Body, http)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
@@ -734,9 +741,11 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		DataType: "string", // default type
 	}
 
-	// Parse parameter name (allow Git keywords as parameter names)
+	// Parse parameter name (allow Git and HTTP keywords as parameter names)
 	switch p.peekToken.Type {
-	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL:
+	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL,
+		lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS, lexer.URL, lexer.API, lexer.JSON, lexer.XML,
+		lexer.TIMEOUT, lexer.RETRY, lexer.AUTH, lexer.BEARER, lexer.BASIC, lexer.TOKEN, lexer.HEADER, lexer.BODY, lexer.DATA:
 		p.nextToken()
 	default:
 		p.addError(fmt.Sprintf("expected parameter name, got %s instead", p.peekToken.Type))
@@ -828,7 +837,8 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 		case lexer.IDENT:
 			p.nextToken()
 		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN,
-			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW:
+			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW,
+			lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS:
 			p.nextToken()
 		default:
 			p.addError(fmt.Sprintf("expected task name, got %s instead", p.peekToken.Type))
@@ -1131,6 +1141,185 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 	return stmt
 }
 
+// parseHTTPStatement parses HTTP operations
+func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
+	stmt := &ast.HTTPStatement{
+		Token:   p.curToken,
+		Headers: make(map[string]string),
+		Auth:    make(map[string]string),
+		Options: make(map[string]string),
+	}
+
+	// Determine HTTP method
+	switch p.curToken.Type {
+	case lexer.GET:
+		stmt.Method = "GET"
+	case lexer.POST:
+		stmt.Method = "POST"
+	case lexer.PUT:
+		stmt.Method = "PUT"
+	case lexer.DELETE:
+		stmt.Method = "DELETE"
+	case lexer.PATCH:
+		stmt.Method = "PATCH"
+	case lexer.HEAD:
+		stmt.Method = "HEAD"
+	case lexer.OPTIONS:
+		stmt.Method = "OPTIONS"
+	case lexer.HTTP, lexer.HTTPS:
+		// For "http request" or "https request" syntax
+		if p.peekToken.Type == lexer.REQUEST {
+			p.nextToken()       // consume REQUEST
+			stmt.Method = "GET" // default to GET
+		} else {
+			return nil
+		}
+	default:
+		return nil
+	}
+
+	// Parse URL/endpoint
+	if p.peekToken.Type == lexer.REQUEST {
+		p.nextToken() // consume REQUEST
+		if p.peekToken.Type == lexer.TO {
+			p.nextToken() // consume TO
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.URL = p.curToken.Literal
+			}
+		}
+	} else if p.peekToken.Type == lexer.TO || p.peekToken.Type == lexer.STRING {
+		if p.peekToken.Type == lexer.TO {
+			p.nextToken() // consume TO
+		}
+		if p.peekToken.Type == lexer.STRING {
+			p.nextToken()
+			stmt.URL = p.curToken.Literal
+		}
+	}
+
+	// Parse additional options (headers, body, auth, etc.)
+	for p.peekToken.Type == lexer.WITH || p.peekToken.Type == lexer.HEADER || p.peekToken.Type == lexer.HEADERS ||
+		p.peekToken.Type == lexer.BODY || p.peekToken.Type == lexer.DATA || p.peekToken.Type == lexer.AUTH ||
+		p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC || p.peekToken.Type == lexer.TOKEN ||
+		p.peekToken.Type == lexer.TIMEOUT || p.peekToken.Type == lexer.RETRY || p.peekToken.Type == lexer.ACCEPT ||
+		p.peekToken.Type == lexer.CONTENT || p.peekToken.Type == lexer.TYPE {
+
+		p.nextToken()
+
+		switch p.curToken.Type {
+		case lexer.WITH:
+			// Parse "with header", "with body", "with auth", etc.
+			if p.peekToken.Type == lexer.HEADER {
+				p.nextToken() // consume HEADER
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					headerValue := p.curToken.Literal
+					// Parse "key: value" format
+					if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
+						key := strings.TrimSpace(headerValue[:colonIdx])
+						value := strings.TrimSpace(headerValue[colonIdx+1:])
+						stmt.Headers[key] = value
+					}
+				}
+			} else if p.peekToken.Type == lexer.BODY || p.peekToken.Type == lexer.DATA {
+				p.nextToken() // consume BODY/DATA
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Body = p.curToken.Literal
+				}
+			} else if p.peekToken.Type == lexer.AUTH {
+				p.nextToken() // consume AUTH
+				if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
+					p.nextToken()
+					authType := p.curToken.Literal
+					if p.peekToken.Type == lexer.STRING {
+						p.nextToken()
+						stmt.Auth[authType] = p.curToken.Literal
+					}
+				}
+			} else if p.peekToken.Type == lexer.TOKEN {
+				p.nextToken() // consume TOKEN
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Auth["bearer"] = p.curToken.Literal
+				}
+			}
+
+		case lexer.HEADER, lexer.HEADERS:
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				headerValue := p.curToken.Literal
+				// Parse "key: value" format
+				if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
+					key := strings.TrimSpace(headerValue[:colonIdx])
+					value := strings.TrimSpace(headerValue[colonIdx+1:])
+					stmt.Headers[key] = value
+				}
+			}
+
+		case lexer.BODY, lexer.DATA:
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Body = p.curToken.Literal
+			}
+
+		case lexer.AUTH:
+			if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
+				p.nextToken()
+				authType := p.curToken.Literal
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Auth[authType] = p.curToken.Literal
+				}
+			}
+
+		case lexer.BEARER, lexer.BASIC:
+			authType := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Auth[authType] = p.curToken.Literal
+			}
+
+		case lexer.TOKEN:
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Auth["bearer"] = p.curToken.Literal
+			}
+
+		case lexer.TIMEOUT, lexer.RETRY:
+			optionKey := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[optionKey] = p.curToken.Literal
+			}
+
+		case lexer.ACCEPT:
+			if p.peekToken.Type == lexer.JSON || p.peekToken.Type == lexer.XML {
+				p.nextToken()
+				stmt.Headers["Accept"] = "application/" + p.curToken.Literal
+			} else if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Headers["Accept"] = p.curToken.Literal
+			}
+
+		case lexer.CONTENT:
+			if p.peekToken.Type == lexer.TYPE {
+				p.nextToken() // consume TYPE
+				if p.peekToken.Type == lexer.JSON || p.peekToken.Type == lexer.XML {
+					p.nextToken()
+					stmt.Headers["Content-Type"] = "application/" + p.curToken.Literal
+				} else if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Headers["Content-Type"] = p.curToken.Literal
+				}
+			}
+		}
+	}
+
+	return stmt
+}
+
 // parseStringList parses a list of strings like ["dev", "staging", "production"]
 func (p *Parser) parseStringList() []string {
 	var items []string
@@ -1168,6 +1357,16 @@ func (p *Parser) isDockerToken(tokenType lexer.TokenType) bool {
 // isGitToken checks if a token type represents a Git statement
 func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 	return tokenType == lexer.GIT
+}
+
+// isHTTPToken checks if a token type represents an HTTP statement
+func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS:
+		return true
+	default:
+		return false
+	}
 }
 
 // isParameterToken checks if a token type represents a parameter declaration
@@ -1446,6 +1645,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			git := p.parseGitStatement()
 			if git != nil {
 				body = append(body, git)
+			}
+		} else if p.isHTTPToken(p.curToken.Type) {
+			http := p.parseHTTPStatement()
+			if http != nil {
+				body = append(body, http)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
