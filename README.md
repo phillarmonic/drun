@@ -66,10 +66,25 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 ## Quick Start
 
-1. **Create a simple task file** (`ops.drun`):
+### 📁 **File Structure**
+
+drun automatically discovers task files in these locations:
+
+- **`.drun`** - Main task file in project root
+- **`.drun/.drun`** - Task file in .drun directory  
+- **`ops/.drun`** - Task file in ops directory
+- **`.ops/.drun`** - Task file in .ops directory
+- **Custom files** - `spec.drun`, `tasks.drun`, etc.
+
+**Workspace configuration** (optional):
+- **`.drun/.drun_workspace.yml`** - Workspace settings and global configuration
+
+### 🚀 **Getting Started**
+
+1. **Create a simple task file** (`.drun`):
    
    ```drun
-   version: 2.0
+   project "my-app" version "1.0"
    
    task "hello" means "Say hello":
      info "Hello from drun v2! 🚀"
@@ -107,40 +122,53 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 ## Configuration
 
-drun automatically looks for configuration files in this order:
+drun automatically discovers task files in this order:
 
-1. **Workspace default** (if configured in `.drun/workspace.yml`)
+1. **Workspace default** (if configured in `.drun/.drun_workspace.yml`)
 2. **Standard locations**:
-   - `drun.yml`
-   - `drun.yaml` 
-   - `.drun.yml`
-   - `.drun.yaml`
-   - `.drun/drun.yml`
-   - `.drun/drun.yaml`
-   - `ops.drun.yml`
-   - `ops.drun.yaml`
+   - `.drun` - Main task file in project root
+   - `.drun/.drun` - Task file in .drun directory  
+   - `ops/.drun` - Task file in ops directory
+   - `.ops/.drun` - Task file in .ops directory
+3. **Custom files**: `spec.drun`, `tasks.drun`, `automation.drun`, etc.
+
+### 🔧 **Workspace Configuration**
+
+Create a workspace configuration file at `.drun/.drun_workspace.yml`:
+
+```yaml
+# Workspace settings
+default_task_file: "custom-tasks.drun"
+parallel_jobs: 4
+shell: "/bin/bash"
+
+# Global variables
+variables:
+  project_name: "my-app"
+  environment: "development"
+
+# Default parameters
+defaults:
+  environment: "dev"
+  verbose: true
+```
 
 ### Getting Started
 
-Use `drun --init` to create a starter configuration:
+Use `drun --init` to create a starter task file:
 
 ```bash
-# Create config in current directory
+# Create .drun file in current directory
 drun --init
 
-# Create config in custom location (will prompt to create directory)
-drun --init --file=.drun/drun.yml
-drun --init --file=config/my-project.yml
+# Create custom task file
+drun --init --file=spec.drun
 
-# Save custom location as workspace default
-# (drun will prompt when using non-standard filenames)
+# Create with workspace configuration
+drun --init --workspace
 ```
 
-When you specify a custom config file path:
-- **Directory creation**: drun will ask if you want to create missing directories
-- **Workspace default**: drun will ask if you want to save custom paths as the default for this workspace
-
-See the included examples for comprehensive configurations.
+See the included examples for comprehensive task configurations.
 
 📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
@@ -603,12 +631,12 @@ recipes:
 
 ## Command Line Options
 
-- `--init`: Initialize a new drun.yml configuration file
+- `--init`: Initialize a new .drun task file
 - `--list, -l`: List available recipes
 - `--dry-run`: Show what would be executed without running
 - `--explain`: Show rendered scripts and environment variables
 - `--update`: Update drun to the latest version from GitHub releases
-- `--file, -f`: Specify configuration file (default: auto-discover)
+- `--file, -f`: Specify task file (default: auto-discover .drun files)
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)
 - `--shell`: Override shell type (linux/darwin/windows)
@@ -839,7 +867,7 @@ drun is **production-ready** with enterprise-grade features:
 
 ### ✅ **Implemented Features**
 
-- **Core Functionality**: YAML config, positional args, templating, dependencies
+- **Core Functionality**: .drun semantic language, parameters, variables, control flow
 - **Advanced Features**: Remote includes, matrix execution, secrets management
 - **Developer Experience**: 15+ template functions, intelligent caching, rich errors
 - **Performance**: Microsecond-level operations, high test coverage (71-83%)
