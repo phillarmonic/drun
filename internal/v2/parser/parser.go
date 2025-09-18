@@ -126,7 +126,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 		return nil
 	}
 
-	// Parse project settings
+	// Parse project settings (optional)
 	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 		p.nextToken() // move to first token inside the block
@@ -137,16 +137,25 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 				setting := p.parseSetStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
 				}
 			case lexer.INCLUDE:
 				setting := p.parseIncludeStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
 				}
 			case lexer.BEFORE, lexer.AFTER:
 				hook := p.parseLifecycleHook()
 				if hook != nil {
 					stmt.Settings = append(stmt.Settings, hook)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
 				}
 			case lexer.COMMENT:
 				p.nextToken() // Skip comments
@@ -159,6 +168,9 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 		if p.curToken.Type == lexer.DEDENT {
 			p.nextToken() // consume DEDENT
 		}
+	} else {
+		// No INDENT found, advance to next token for proper parsing flow
+		p.nextToken()
 	}
 
 	return stmt
@@ -168,8 +180,12 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 func (p *Parser) parseSetStatement() *ast.SetStatement {
 	stmt := &ast.SetStatement{Token: p.curToken}
 
-	// Expect identifier (key)
-	if !p.expectPeek(lexer.IDENT) {
+	// Expect identifier (key) - allow Git keywords as set keys
+	switch p.peekToken.Type {
+	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL:
+		p.nextToken()
+	default:
+		p.addError(fmt.Sprintf("expected set key, got %s instead", p.peekToken.Type))
 		return nil
 	}
 	stmt.Key = p.curToken.Literal
@@ -324,6 +340,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			docker := p.parseDockerStatement()
 			if docker != nil {
 				stmt.Body = append(stmt.Body, docker)
+			}
+		} else if p.isGitToken(p.curToken.Type) {
+			git := p.parseGitStatement()
+			if git != nil {
+				stmt.Body = append(stmt.Body, git)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
@@ -713,8 +734,12 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		DataType: "string", // default type
 	}
 
-	// Parse parameter name
-	if !p.expectPeek(lexer.IDENT) {
+	// Parse parameter name (allow Git keywords as parameter names)
+	switch p.peekToken.Type {
+	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL:
+		p.nextToken()
+	default:
+		p.addError(fmt.Sprintf("expected parameter name, got %s instead", p.peekToken.Type))
 		return nil
 	}
 	stmt.Name = p.curToken.Literal
@@ -802,7 +827,8 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 		switch p.peekToken.Type {
 		case lexer.IDENT:
 			p.nextToken()
-		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN:
+		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN,
+			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW:
 			p.nextToken()
 		default:
 			p.addError(fmt.Sprintf("expected task name, got %s instead", p.peekToken.Type))
@@ -911,6 +937,200 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 	return stmt
 }
 
+// parseGitStatement parses Git operations
+func (p *Parser) parseGitStatement() *ast.GitStatement {
+	stmt := &ast.GitStatement{
+		Token:   p.curToken,
+		Options: make(map[string]string),
+	}
+
+	// Parse Git operation
+	switch p.peekToken.Type {
+	case lexer.CLONE:
+		// git clone repository "url" to "dir"
+		p.nextToken() // consume CLONE
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.REPOSITORY {
+			p.nextToken() // consume REPOSITORY
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
+	case lexer.INIT:
+		// git init repository in "dir"
+		p.nextToken() // consume INIT
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.REPOSITORY {
+			p.nextToken() // consume REPOSITORY
+			stmt.Resource = p.curToken.Literal
+		}
+
+	case lexer.ADD:
+		// git add files "pattern"
+		p.nextToken() // consume ADD
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.FILES {
+			p.nextToken() // consume FILES
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
+	case lexer.COMMIT:
+		// git commit changes with message "msg"
+		// git commit all changes with message "msg"
+		p.nextToken() // consume COMMIT
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.ALL {
+			p.nextToken() // consume ALL
+			stmt.Options["all"] = "true"
+		}
+
+		if p.peekToken.Type == lexer.CHANGES {
+			p.nextToken() // consume CHANGES
+			stmt.Resource = p.curToken.Literal
+		}
+
+		// Parse "with message 'text'"
+		if p.peekToken.Type == lexer.WITH {
+			p.nextToken() // consume WITH
+			if p.peekToken.Type == lexer.MESSAGE {
+				p.nextToken() // consume MESSAGE
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Options["message"] = p.curToken.Literal
+				}
+			}
+		}
+
+	case lexer.PUSH:
+		// git push to remote "origin" branch "main"
+		// git push tag "v1.0.0" to remote "origin"
+		p.nextToken() // consume PUSH
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.TAG {
+			p.nextToken() // consume TAG
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
+		// Handle "to remote 'origin' branch 'main'" - this will be handled in options parsing
+
+	case lexer.PULL:
+		// git pull from remote "origin" branch "main"
+		p.nextToken() // consume PULL
+		stmt.Operation = p.curToken.Literal
+
+	case lexer.FETCH:
+		// git fetch from remote "origin"
+		p.nextToken() // consume FETCH
+		stmt.Operation = p.curToken.Literal
+
+	case lexer.BRANCH:
+		// git create branch "name"
+		// git switch to branch "name"
+		// git delete branch "name"
+		// git merge branch "name" into "target"
+		p.nextToken() // consume BRANCH
+		stmt.Resource = p.curToken.Literal
+
+		// Look for operation before branch
+		if stmt.Token.Literal == "git" {
+			// This should be handled by looking at previous tokens
+			// For now, assume it's a create operation
+			stmt.Operation = "create"
+		}
+
+	case lexer.STATUS:
+		// git status
+		p.nextToken() // consume STATUS
+		stmt.Operation = p.curToken.Literal
+
+	case lexer.LOG:
+		// git log --oneline
+		p.nextToken() // consume LOG
+		stmt.Operation = p.curToken.Literal
+
+	case lexer.SHOW:
+		// git show current branch
+		// git show current commit
+		p.nextToken() // consume SHOW
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer.CURRENT {
+			p.nextToken() // consume CURRENT
+			stmt.Options["current"] = "true"
+
+			if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.COMMIT {
+				p.nextToken()
+				stmt.Resource = p.curToken.Literal
+			}
+		}
+
+	default:
+		// Handle operations that come before git (create, switch, delete, merge)
+		if p.peekToken.Type == lexer.IDENT {
+			p.nextToken()
+			stmt.Operation = p.curToken.Literal
+		} else {
+			return nil
+		}
+	}
+
+	// Parse additional options (to, from, with, into, in, etc.)
+	for p.peekToken.Type == lexer.TO || p.peekToken.Type == lexer.FROM || p.peekToken.Type == lexer.WITH ||
+		p.peekToken.Type == lexer.INTO || p.peekToken.Type == lexer.IN || p.peekToken.Type == lexer.REMOTE ||
+		p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.MESSAGE || p.peekToken.Type == lexer.IDENT {
+		p.nextToken()
+
+		switch p.curToken.Type {
+		case lexer.TO, lexer.FROM, lexer.WITH, lexer.INTO, lexer.IN:
+			optionKey := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[optionKey] = p.curToken.Literal
+			} else if p.peekToken.Type == lexer.REMOTE || p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.MESSAGE {
+				p.nextToken()
+				keywordType := p.curToken.Literal
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					stmt.Options[keywordType] = p.curToken.Literal
+				}
+			}
+		case lexer.REMOTE, lexer.BRANCH, lexer.MESSAGE:
+			keywordType := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[keywordType] = p.curToken.Literal
+			}
+		case lexer.IDENT:
+			optionKey := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[optionKey] = p.curToken.Literal
+			}
+		}
+	}
+
+	return stmt
+}
+
 // parseStringList parses a list of strings like ["dev", "staging", "production"]
 func (p *Parser) parseStringList() []string {
 	var items []string
@@ -943,6 +1163,11 @@ func (p *Parser) isDependencyToken(tokenType lexer.TokenType) bool {
 // isDockerToken checks if a token type represents a Docker statement
 func (p *Parser) isDockerToken(tokenType lexer.TokenType) bool {
 	return tokenType == lexer.DOCKER
+}
+
+// isGitToken checks if a token type represents a Git statement
+func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
+	return tokenType == lexer.GIT
 }
 
 // isParameterToken checks if a token type represents a parameter declaration
@@ -1216,6 +1441,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			docker := p.parseDockerStatement()
 			if docker != nil {
 				body = append(body, docker)
+			}
+		} else if p.isGitToken(p.curToken.Type) {
+			git := p.parseGitStatement()
+			if git != nil {
+				body = append(body, git)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {

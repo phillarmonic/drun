@@ -390,6 +390,36 @@ func (ds *DockerStatement) String() string {
 	return out.String()
 }
 
+// GitStatement represents Git operations
+type GitStatement struct {
+	Token     lexer.Token       // the GIT token
+	Operation string            // "clone", "init", "add", "commit", "push", "pull", etc.
+	Resource  string            // "repository", "branch", "files", "changes", "tag", etc.
+	Name      string            // repository URL, branch name, file pattern, etc.
+	Options   map[string]string // additional options (to, from, with, into, etc.)
+}
+
+func (gs *GitStatement) statementNode() {}
+func (gs *GitStatement) String() string {
+	var out strings.Builder
+	out.WriteString("git " + gs.Operation)
+
+	if gs.Resource != "" {
+		out.WriteString(" " + gs.Resource)
+	}
+
+	if gs.Name != "" {
+		out.WriteString(fmt.Sprintf(" \"%s\"", gs.Name))
+	}
+
+	// Add options
+	for key, value := range gs.Options {
+		out.WriteString(fmt.Sprintf(" %s \"%s\"", key, value))
+	}
+
+	return out.String()
+}
+
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)

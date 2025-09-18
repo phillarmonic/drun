@@ -256,6 +256,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeThrow(s, ctx)
 	case *ast.DockerStatement:
 		return e.executeDocker(s, ctx)
+	case *ast.GitStatement:
+		return e.executeGit(s, ctx)
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		return nil
@@ -633,6 +635,170 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 	// return cmd.Run()
 
 	return nil
+}
+
+// executeGit executes Git operations
+func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in Git statement
+	operation := gitStmt.Operation
+	resource := gitStmt.Resource
+	name := e.interpolateVariables(gitStmt.Name, ctx)
+
+	// Interpolate options
+	options := make(map[string]string)
+	for key, value := range gitStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Git command: ")
+		e.buildGitCommand(operation, resource, name, options, true)
+		return nil
+	}
+
+	// Build and execute Git command
+	_, _ = fmt.Fprintf(e.output, "🔗 Running Git: ")
+	e.buildGitCommand(operation, resource, name, options, false)
+
+	// For now, we'll simulate the command execution
+	// In a real implementation, you would use exec.Command to run the git command
+	// cmd := exec.Command("git", args...)
+	// return cmd.Run()
+
+	return nil
+}
+
+// buildGitCommand builds and displays the git command
+func (e *Engine) buildGitCommand(operation, resource, name string, options map[string]string, dryRun bool) {
+	var gitCmd []string
+	gitCmd = append(gitCmd, "git")
+
+	switch operation {
+	case "clone":
+		// git clone repository "url" to "dir"
+		gitCmd = append(gitCmd, "clone")
+		if name != "" {
+			gitCmd = append(gitCmd, name)
+		}
+		if to, exists := options["to"]; exists {
+			gitCmd = append(gitCmd, to)
+		}
+
+	case "init":
+		// git init repository in "dir"
+		gitCmd = append(gitCmd, "init")
+		if in, exists := options["in"]; exists {
+			gitCmd = append(gitCmd, in)
+		}
+
+	case "add":
+		// git add files "pattern"
+		gitCmd = append(gitCmd, "add")
+		if name != "" {
+			gitCmd = append(gitCmd, name)
+		}
+
+	case "commit":
+		// git commit changes with message "msg"
+		// git commit all changes with message "msg"
+		gitCmd = append(gitCmd, "commit")
+		if all, exists := options["all"]; exists && all == "true" {
+			gitCmd = append(gitCmd, "-a")
+		}
+		if message, exists := options["message"]; exists {
+			gitCmd = append(gitCmd, "-m", fmt.Sprintf("\"%s\"", message))
+		}
+
+	case "push":
+		// git push to remote "origin" branch "main"
+		// git push tag "v1.0.0" to remote "origin"
+		gitCmd = append(gitCmd, "push")
+		if resource == "tag" && name != "" {
+			gitCmd = append(gitCmd, "origin", name)
+		} else {
+			if remote, exists := options["remote"]; exists {
+				gitCmd = append(gitCmd, remote)
+			}
+			if branch, exists := options["branch"]; exists {
+				gitCmd = append(gitCmd, branch)
+			}
+		}
+
+	case "pull":
+		// git pull from remote "origin" branch "main"
+		gitCmd = append(gitCmd, "pull")
+		if from, exists := options["from"]; exists {
+			gitCmd = append(gitCmd, from)
+		}
+		if remote, exists := options["remote"]; exists {
+			gitCmd = append(gitCmd, remote)
+		}
+		if branch, exists := options["branch"]; exists {
+			gitCmd = append(gitCmd, branch)
+		}
+
+	case "fetch":
+		// git fetch from remote "origin"
+		gitCmd = append(gitCmd, "fetch")
+		if from, exists := options["from"]; exists {
+			gitCmd = append(gitCmd, from)
+		}
+		if remote, exists := options["remote"]; exists {
+			gitCmd = append(gitCmd, remote)
+		}
+
+	case "status":
+		// git status
+		gitCmd = append(gitCmd, "status")
+
+	case "log":
+		// git log --oneline
+		gitCmd = append(gitCmd, "log", "--oneline")
+
+	case "show":
+		// git show current branch
+		// git show current commit
+		if current, exists := options["current"]; exists && current == "true" {
+			if resource == "branch" {
+				gitCmd = append(gitCmd, "branch", "--show-current")
+			} else if resource == "commit" {
+				gitCmd = append(gitCmd, "rev-parse", "HEAD")
+			}
+		} else {
+			gitCmd = append(gitCmd, "show")
+		}
+
+	case "create":
+		// git create branch "name"
+		if resource == "branch" && name != "" {
+			gitCmd = append(gitCmd, "checkout", "-b", name)
+		}
+
+	case "switch":
+		// git switch to branch "name"
+		if resource == "branch" && name != "" {
+			gitCmd = append(gitCmd, "checkout", name)
+		}
+
+	case "delete":
+		// git delete branch "name"
+		if resource == "branch" && name != "" {
+			gitCmd = append(gitCmd, "branch", "-d", name)
+		}
+
+	case "merge":
+		// git merge branch "name" into "target"
+		gitCmd = append(gitCmd, "merge")
+		if name != "" {
+			gitCmd = append(gitCmd, name)
+		}
+	}
+
+	if dryRun {
+		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
+	} else {
+		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
+	}
 }
 
 // shouldHandleError determines if a catch clause should handle the given error

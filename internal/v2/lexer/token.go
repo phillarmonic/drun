@@ -45,6 +45,29 @@ const (
 	UP        // up
 	DOWN      // down
 
+	// Git keywords
+	GIT        // git
+	CLONE      // clone
+	INIT       // init
+	BRANCH     // branch
+	SWITCH     // switch
+	MERGE      // merge
+	ADD        // add
+	COMMIT     // commit
+	FETCH      // fetch
+	STATUS     // status
+	LOG        // log
+	SHOW       // show
+	REPOSITORY // repository
+	REMOTE     // remote
+	CHANGES    // changes
+	MESSAGE    // message
+	FILES      // files
+	CURRENT    // current
+	ALL        // all
+	WITH       // with
+	INTO       // into
+
 	// Action keywords (built-in actions)
 	INFO    // info
 	STEP    // step
@@ -206,6 +229,48 @@ func (t TokenType) String() string {
 		return "UP"
 	case DOWN:
 		return "DOWN"
+	case GIT:
+		return "GIT"
+	case CLONE:
+		return "CLONE"
+	case INIT:
+		return "INIT"
+	case BRANCH:
+		return "BRANCH"
+	case SWITCH:
+		return "SWITCH"
+	case MERGE:
+		return "MERGE"
+	case ADD:
+		return "ADD"
+	case COMMIT:
+		return "COMMIT"
+	case FETCH:
+		return "FETCH"
+	case STATUS:
+		return "STATUS"
+	case LOG:
+		return "LOG"
+	case SHOW:
+		return "SHOW"
+	case REPOSITORY:
+		return "REPOSITORY"
+	case REMOTE:
+		return "REMOTE"
+	case CHANGES:
+		return "CHANGES"
+	case MESSAGE:
+		return "MESSAGE"
+	case FILES:
+		return "FILES"
+	case CURRENT:
+		return "CURRENT"
+	case ALL:
+		return "ALL"
+	case WITH:
+		return "WITH"
+	case INTO:
+		return "INTO"
 	case INFO:
 		return "INFO"
 	case STEP:
@@ -343,81 +408,102 @@ func (t Token) String() string {
 
 // Keywords maps string literals to their token types
 var keywords = map[string]TokenType{
-	"version":   VERSION,
-	"task":      TASK,
-	"means":     MEANS,
-	"project":   PROJECT,
-	"set":       SET,
-	"include":   INCLUDE,
-	"before":    BEFORE,
-	"after":     AFTER,
-	"any":       ANY,
-	"depends":   DEPENDS,
-	"on":        ON,
-	"then":      THEN,
-	"and":       AND,
-	"docker":    DOCKER,
-	"image":     IMAGE,
-	"container": CONTAINER,
-	"compose":   COMPOSE,
-	"build":     BUILD,
-	"push":      PUSH,
-	"pull":      PULL,
-	"tag":       TAG,
-	"remove":    REMOVE,
-	"start":     START,
-	"stop":      STOP,
-	"up":        UP,
-	"down":      DOWN,
-	"info":      INFO,
-	"step":      STEP,
-	"warn":      WARN,
-	"error":     ERROR,
-	"success":   SUCCESS,
-	"fail":      FAIL,
-	"requires":  REQUIRES,
-	"given":     GIVEN,
-	"accepts":   ACCEPTS,
-	"defaults":  DEFAULTS,
-	"to":        TO,
-	"from":      FROM,
-	"as":        AS,
-	"list":      LIST,
-	"of":        OF,
-	"when":      WHEN,
-	"if":        IF,
-	"else":      ELSE,
-	"for":       FOR,
-	"each":      EACH,
-	"in":        IN,
-	"parallel":  PARALLEL,
-	"is":        IS,
-	"file":      FILE,
-	"exists":    EXISTS,
-	"run":       RUN,
-	"exec":      EXEC,
-	"shell":     SHELL,
-	"capture":   CAPTURE,
-	"output":    OUTPUT,
-	"string":    STRING_TYPE,
-	"number":    NUMBER_TYPE,
-	"boolean":   BOOLEAN_TYPE,
-	"create":    CREATE,
-	"copy":      COPY,
-	"move":      MOVE,
-	"delete":    DELETE,
-	"read":      READ,
-	"write":     WRITE,
-	"append":    APPEND,
-	"dir":       DIR,
-	"try":       TRY,
-	"catch":     CATCH,
-	"finally":   FINALLY,
-	"throw":     THROW,
-	"rethrow":   RETHROW,
-	"ignore":    IGNORE,
-	"true":      BOOLEAN,
-	"false":     BOOLEAN,
+	"version":    VERSION,
+	"task":       TASK,
+	"means":      MEANS,
+	"project":    PROJECT,
+	"set":        SET,
+	"include":    INCLUDE,
+	"before":     BEFORE,
+	"after":      AFTER,
+	"any":        ANY,
+	"depends":    DEPENDS,
+	"on":         ON,
+	"then":       THEN,
+	"and":        AND,
+	"docker":     DOCKER,
+	"image":      IMAGE,
+	"container":  CONTAINER,
+	"compose":    COMPOSE,
+	"build":      BUILD,
+	"push":       PUSH,
+	"pull":       PULL,
+	"tag":        TAG,
+	"remove":     REMOVE,
+	"start":      START,
+	"stop":       STOP,
+	"up":         UP,
+	"down":       DOWN,
+	"git":        GIT,
+	"clone":      CLONE,
+	"init":       INIT,
+	"branch":     BRANCH,
+	"switch":     SWITCH,
+	"merge":      MERGE,
+	"add":        ADD,
+	"commit":     COMMIT,
+	"fetch":      FETCH,
+	"status":     STATUS,
+	"log":        LOG,
+	"show":       SHOW,
+	"repository": REPOSITORY,
+	"remote":     REMOTE,
+	"changes":    CHANGES,
+	"message":    MESSAGE,
+	"files":      FILES,
+	"current":    CURRENT,
+	"all":        ALL,
+	"with":       WITH,
+	"into":       INTO,
+	"info":       INFO,
+	"step":       STEP,
+	"warn":       WARN,
+	"error":      ERROR,
+	"success":    SUCCESS,
+	"fail":       FAIL,
+	"requires":   REQUIRES,
+	"given":      GIVEN,
+	"accepts":    ACCEPTS,
+	"defaults":   DEFAULTS,
+	"to":         TO,
+	"from":       FROM,
+	"as":         AS,
+	"list":       LIST,
+	"of":         OF,
+	"when":       WHEN,
+	"if":         IF,
+	"else":       ELSE,
+	"for":        FOR,
+	"each":       EACH,
+	"in":         IN,
+	"parallel":   PARALLEL,
+	"is":         IS,
+	"file":       FILE,
+	"exists":     EXISTS,
+	"run":        RUN,
+	"exec":       EXEC,
+	"shell":      SHELL,
+	"capture":    CAPTURE,
+	"output":     OUTPUT,
+	"string":     STRING_TYPE,
+	"number":     NUMBER_TYPE,
+	"boolean":    BOOLEAN_TYPE,
+	"create":     CREATE,
+	"copy":       COPY,
+	"move":       MOVE,
+	"delete":     DELETE,
+	"read":       READ,
+	"write":      WRITE,
+	"append":     APPEND,
+	"dir":        DIR,
+	"try":        TRY,
+	"catch":      CATCH,
+	"finally":    FINALLY,
+	"throw":      THROW,
+	"rethrow":    RETHROW,
+	"ignore":     IGNORE,
+	"true":       BOOLEAN,
+	"false":      BOOLEAN,
 }
 
 // LookupIdent checks if an identifier is a keyword
