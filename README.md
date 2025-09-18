@@ -1,31 +1,33 @@
 # drun (do run)
 
-A **high-performance** YAML-based task runner with first-class arguments, powerful templating, and intelligent dependency management. Optimized for speed with microsecond-level operations and minimal memory usage.
+A **semantic, English-like** task automation language with intelligent execution, smart detection, and powerful built-in actions. Write automation tasks in natural language that compiles to efficient shell commands.
 
 ## Features
 
 ### 🚀 **Core Features**
 
-- **YAML Configuration**: Define tasks in a simple, readable YAML format
-- **Positional Arguments**: First-class support for positional arguments with validation
-- **Named Arguments**: Pass positional arguments by name for clarity (`--name=value` or `name=value`)
-- **Prerun Snippets**: Common setup code that runs before every recipe (colors, functions, etc.)
-- **Templating**: Powerful Go template engine with custom functions and caching
-- **Dependencies**: Automatic dependency resolution and parallel execution
-- **High Performance**: Microsecond-level operations with intelligent caching
-- **Cross-Platform**: Works on Linux, macOS, and Windows with appropriate shell selection
+- **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
+- **Smart Parameters**: Type-safe parameters with constraints and defaults (`requires $env from ["dev", "prod"]`)
+- **Variable System**: Powerful variable interpolation with `$variable` syntax and built-in functions
+- **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
+- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands
+- **Smart Detection**: Auto-detect project types, tools, and environments
+- **Shell Integration**: Seamless shell command execution with output capture
+- **Cross-Platform**: Works on Linux, macOS, and Windows with intelligent shell selection
 - **Dry Run & Explain**: See what would be executed without running it
-- **Recipe Flags**: Command-line flags specific to individual recipes
+- **Type Safety**: Static analysis with runtime validation
 
 ### 🌟 **Advanced Features**
 
-- **🔗 Remote Includes**: Include recipes from HTTP/HTTPS URLs and Git repositories
-- **🌐 HTTP Integration**: Built-in HTTP client with authentication, retries, caching, and JSON support
-- **🔄 Matrix Execution**: Run recipes across multiple configurations (OS, versions, architectures)
-- **🔐 Secrets Management**: Secure handling of sensitive data with multiple sources
-- **📊 Advanced Logging**: Structured logging with emoji status messages and metrics
-- **🎯 Smart Detection**: Auto-detect Docker commands, Git info, package managers, and CI environments
-- **📁 File Watching**: Auto-execution on file changes (coming soon)
+- **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
+- **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
+- **🌐 HTTP Actions**: Built-in HTTP requests with authentication and response handling
+- **🐳 Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
+- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management
+- **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
+- **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
+- **🎯 Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
+- **📁 File Operations**: Built-in file system operations with path interpolation
 
 ### 🛠️ **Developer Experience**
 
@@ -64,41 +66,37 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 ## Quick Start
 
-1. **Initialize a new project**:
+1. **Create a simple task file** (`ops.drun`):
    
-   ```bash
-   drun --init
+   ```drun
+   version: 2.0
+   
+   task "hello" means "Say hello":
+     info "Hello from drun v2! 🚀"
    ```
 
-2. **List available recipes**:
+2. **List available tasks**:
    
    ```bash
    drun --list
    ```
 
-3. **Run a recipe called build**:
+3. **Run a task**:
    
    ```bash
-   drun build
+   drun hello
    ```
 
-4. **Use positional arguments**:
+4. **Use parameters**:
    
    ```bash
-   drun release v1.0.0 amd64
+   drun deploy environment=production version=v1.0.0
    ```
 
-5. **Use named arguments for clarity**:
+5. **Explore examples**:
    
    ```bash
-   # Flag-style named arguments
-   drun release --version=v1.0.0 --arch=amd64
-   
-   # Assignment-style named arguments
-   drun release version=v1.0.0 arch=amd64
-   
-   # Mix positional and named
-   drun release v1.0.0 --arch=amd64
+   drun -f examples/01-hello-world.drun hello
    ```
 
 6. **Dry run to see what would execute**:
@@ -144,106 +142,79 @@ When you specify a custom config file path:
 
 See the included examples for comprehensive configurations.
 
-📖 **For complete YAML specification**: See [YAML_SPEC.md](YAML_SPEC.md) for detailed field reference and examples.
+📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
-### Basic Recipe
+### Basic Task
 
-```yaml
-version: 1.0
+```drun
+version: 2.0
 
-recipes:
-  hello:
-    help: "Say hello"
-    run: |
-      echo "Hello, World!"
+task "hello" means "Say hello":
+  info "Hello, World! 👋"
 ```
 
-### Recipe with Positional Arguments
+### Task with Parameters
 
-```yaml
-recipes:
-  greet:
-    help: "Greet someone"
-    positionals:
-      - name: name
-        required: true
-      - name: title
-        default: "friend"
-    run: |
-      echo "Hello, {{ .title }} {{ .name }}!"
+```drun
+task "greet" means "Greet someone":
+  requires $name
+  given $title defaults to "friend"
+  
+  info "Hello, {$title} {$name}! 🎉"
 ```
 
 **Usage examples:**
 
 ```bash
-# Traditional positional arguments
-drun greet Alice
-drun greet Bob Mr.
+# Simple parameter passing
+drun greet name=Alice
+drun greet name=Bob title=Mr.
 
-# Named arguments (flag-style)
-drun greet --name=Alice --title=Ms.
-
-# Named arguments (assignment-style)  
-drun greet name=Bob title=Dr.
-
-# Mixed usage
-drun greet Alice --title=Ms.
+# All parameters
+drun greet name=Alice title=Ms.
 ```
 
-### Advanced Named Arguments
+### Advanced Parameters with Control Flow
 
-```yaml
-recipes:
-  deploy:
-    help: "Deploy to environment with version"
-    positionals:
-      - name: environment
-        required: true
-        one_of: ["dev", "staging", "prod"]
-      - name: version
-        default: "latest"
-      - name: features
-        variadic: true
-    flags:
-      force:
-        type: bool
-        default: false
-    run: |
-      echo "Deploying {{ .version }} to {{ .environment }}"
-      {{ if .features }}echo "Features: {{ range .features }}{{ . }} {{ end }}"{{ end }}
-      {{ if .force }}echo "Force deployment enabled"{{ end }}
+```drun
+task "deploy" means "Deploy to environment with version":
+  requires $environment from ["dev", "staging", "prod"]
+  given $version defaults to "latest"
+  given $features as list defaults to ""
+  given $force as boolean defaults to false
+  
+  info "Deploying {$version} to {$environment}"
+  
+  if $features is not "":
+    info "Features: {$features}"
+  
+  if $force is true:
+    info "Force deployment enabled"
 ```
 
 **Usage examples:**
 
 ```bash
-# All positional
-drun deploy prod v1.2.3 feature1 feature2 --force
+# Basic deployment
+drun deploy environment=prod
 
-# All named arguments
-drun deploy --environment=prod --version=v1.2.3 --force
+# With version and features
+drun deploy environment=staging version=v1.1.0 features=auth,ui
 
-# Mixed style
-drun deploy prod --version=v1.2.3 --force
-
-# Assignment style with variadic
-drun deploy environment=staging version=v1.1.0 features=auth,ui --force
+# Force deployment
+drun deploy environment=prod version=v1.2.0 force=true
 ```
 
-### Recipe with Dependencies
+### Task with Dependencies
 
-```yaml
-recipes:
-  test:
-    help: "Run tests"
-    deps: [build]
-    run: |
-      go test ./...
+```drun
+task "test" means "Run tests":
+  depends on build
+  
+  run "go test ./..."
 
-  build:
-    help: "Build the project"
-    run: |
-      go build ./...
+task "build" means "Build the project":
+  run "go build ./..."
 ```
 
 ### Prerun Snippets - DRY Common Setup
@@ -865,29 +836,29 @@ Explore comprehensive examples in the `examples/` directory:
 
 ### 📚 **Example Files**
 
-- **`examples/simple.yml`** - Basic recipes and patterns
-- **`examples/docker-devops.yml`** - Docker workflows with auto-detection
-- **`examples/includes-demo.yml`** - Local and remote includes
-- **`examples/matrix-working-demo.yml`** - Matrix execution examples
-- **`examples/secrets-demo.yml`** - Secrets management patterns
-- **`examples/logging-demo.yml`** - Advanced logging and metrics
-- **`examples/feature-showcase.yml`** - All features in one place
-- **`examples/remote-includes-showcase.yml`** - Remote includes deep dive
+- **`examples/01-hello-world.drun`** - Basic introduction to drun v2
+- **`examples/02-parameters.drun`** - Parameter handling and validation
+- **`examples/03-interpolation.drun`** - Variable interpolation examples
+- **`examples/04-docker-basics.drun`** - Docker operations and workflows
+- **`examples/05-kubernetes.drun`** - Kubernetes deployment examples
+- **`examples/06-cicd-pipeline.drun`** - CI/CD pipeline automation
+- **`examples/07-final-showcase.drun`** - Comprehensive feature showcase
+- **`examples/26-smart-detection.drun`** - Smart tool and environment detection
 
 ### 🎯 **Quick Examples**
 
 ```bash
-# Try the feature showcase
-drun -f examples/feature-showcase.yml showcase-all
+# Try the hello world example
+drun -f examples/01-hello-world.drun hello
 
-# Test matrix execution
-drun -f examples/matrix-working-demo.yml test-matrix
+# Test parameters and validation
+drun -f examples/02-parameters.drun "deploy app" environment=dev
 
-# Explore remote includes
-drun -f examples/remote-includes-showcase.yml show-remote-capabilities
+# Explore smart detection
+drun -f examples/26-smart-detection.drun "detect project"
 
-# See smart template functions
-drun -f examples/feature-showcase.yml smart-build
+# See comprehensive features
+drun -f examples/07-final-showcase.drun showcase project_name=MyApp
 ```
 
 Each example includes comprehensive documentation and demonstrates best practices for different use cases.
