@@ -29,6 +29,7 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[33-semantic-actions-showcase.drun](33-semantic-actions-showcase.drun)** - Comprehensive showcase of all semantic actions
 - **[34-working-semantic-actions.drun](34-working-semantic-actions.drun)** - Working examples of implemented semantic actions
 - **[35-advanced-parameter-validation.drun](35-advanced-parameter-validation.drun)** - Advanced parameter validation with pattern macros (`semver`, `uuid`, `url`)
+- **[36-advanced-variable-operations.drun](36-advanced-variable-operations.drun)** - Comprehensive showcase of variable operations (`filtered`, `sorted`, `without`, `split`, chaining)
 
 ## 🚀 Quick Start
 
@@ -249,6 +250,36 @@ capture result from "command"       # Capture command output
 let config be:
   when environment is "prod": production_config
   else: development_config
+```
+
+### Variable Operations
+```drun
+# String operations
+set $version to "v2.1.0-beta"
+info "Clean version: {$version without prefix 'v' | without suffix '-beta'}"
+# Output: 2.1.0
+
+# Array operations
+set $files to "app.js test.js config.json readme.md"
+info "JS files: {$files filtered by extension '.js'}"
+# Output: app.js test.js
+
+info "Sorted files: {$files sorted by name}"
+# Output: app.js config.json readme.md test.js
+
+# Path operations
+set $config_path to "/etc/nginx/default.conf"
+info "Filename: {$config_path basename}"
+# Output: default.conf
+
+# Complex chaining
+set $source_files to "src/app.js src/utils.js tests/app.test.js"
+info "Source JS files: {$source_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
+# Output: src/app.js src/utils.js
+
+# Loop integration
+for each img in $docker_images:
+  info "Processing: {img split by ':' | first}"
 ```
 
 ### Control Flow

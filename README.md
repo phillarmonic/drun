@@ -30,6 +30,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **🔧 DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **📁 File Operations**: Built-in file system operations with path interpolation
 - **🎯 Pattern Macros**: Built-in validation patterns (`matching semver`, `matching uuid`, `matching url`) with descriptive error messages
+- **🔄 Advanced Variable Operations**: Powerful data transformation (`{$files filtered by extension '.js' | sorted by name}`, `{$version without prefix 'v'}`, `{$path basename}`)
 
 ### 🛠️ **Developer Experience**
 
@@ -731,6 +732,113 @@ task "validation-errors-demo" means "Show validation error messages":
 - **🔒 Type-Safe**: Clear, descriptive error messages
 - **⚡ Performance**: Efficient validation with minimal overhead
 - **🔄 Extensible**: Easy to add new macros as needed
+
+### 🔄 Advanced Variable Operations
+
+Powerful data transformation operations with intuitive chaining syntax:
+
+```drun
+project "data-processing" version "1.0":
+
+task "string_transformations" means "Demonstrate string operations":
+  set $version to "v2.1.0-beta"
+  set $filename to "my-app.tar.gz"
+  set $docker_image to "nginx:1.21"
+  
+  info "🔤 String Operations:"
+  info "  Clean version: {$version without prefix 'v' | without suffix '-beta'}"
+  info "  App name: {$filename without suffix '.tar.gz'}"
+  info "  Image name: {$docker_image split by ':' | first}"
+  
+  # Output:
+  # Clean version: 2.1.0
+  # App name: my-app
+  # Image name: nginx
+
+task "array_operations" means "Demonstrate array manipulation":
+  set $files to "src/app.js src/utils.js tests/app.test.js docs/readme.md config.json"
+  
+  info "📋 Array Operations:"
+  info "  JavaScript files: {$files filtered by extension '.js'}"
+  info "  Source files (sorted): {$files filtered by prefix 'src/' | sorted by name}"
+  info "  First file: {$files first}"
+  info "  All files (sorted): {$files sorted by name}"
+  
+  # Output:
+  # JavaScript files: src/app.js src/utils.js tests/app.test.js
+  # Source files (sorted): src/app.js src/utils.js
+  # First file: src/app.js
+  # All files (sorted): config.json docs/readme.md src/app.js src/utils.js tests/app.test.js
+
+task "path_operations" means "Demonstrate path manipulation":
+  set $config_file to "/etc/nginx/sites-available/default.conf"
+  
+  info "📁 Path Operations:"
+  info "  Filename: {$config_file basename}"
+  info "  Directory: {$config_file dirname}"
+  info "  Extension: {$config_file extension}"
+  info "  Name without extension: {$config_file basename | without suffix '.conf'}"
+  
+  # Output:
+  # Filename: default.conf
+  # Directory: /etc/nginx/sites-available
+  # Extension: conf
+  # Name without extension: default
+
+task "complex_chaining" means "Demonstrate operation chaining":
+  set $project_files to "src/app.js src/utils.js tests/app.test.js tests/utils.test.js docs/readme.md"
+  set $docker_images to "nginx:1.21 postgres:13 redis:6.2 node:16-alpine"
+  
+  info "⛓️ Complex Operation Chaining:"
+  info "  Source JS files: {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
+  info "  Test files: {$project_files filtered by prefix 'tests/' | sorted by name}"
+  
+  info "🐳 Processing Docker images:"
+  for each img in $docker_images:
+    info "    {img} -> {img split by ':' | first} (version: {img split by ':' | last})"
+  
+  # Output:
+  # Source JS files: src/app.js src/utils.js
+  # Test files: tests/app.test.js tests/utils.test.js
+  # Processing Docker images:
+  #   nginx:1.21 -> nginx (version: 1.21)
+  #   postgres:13 -> postgres (version: 13)
+  #   redis:6.2 -> redis (version: 6.2)
+  #   node:16-alpine -> node (version: 16-alpine)
+```
+
+**Available Operations:**
+
+**String Operations:**
+- **`without prefix "text"`** - Remove prefix from string
+- **`without suffix "text"`** - Remove suffix from string
+- **`split by "delimiter"`** - Split string into space-separated parts
+
+**Array Operations:**
+- **`filtered by extension "ext"`** - Filter by file extension
+- **`filtered by prefix "text"`** - Filter by prefix
+- **`filtered by suffix "text"`** - Filter by suffix
+- **`filtered by name "text"`** - Filter by name containing text
+- **`sorted by name`** - Sort alphabetically
+- **`sorted by length`** - Sort by string length
+- **`reversed`** - Reverse order
+- **`unique`** - Remove duplicates
+- **`first`** - Get first item
+- **`last`** - Get last item
+
+**Path Operations:**
+- **`basename`** - Extract filename from path
+- **`dirname`** - Extract directory from path
+- **`extension`** - Extract file extension (without dot)
+
+**Benefits:**
+
+- **🔥 Eliminates Shell Scripting**: No more complex `sed`, `awk`, or `cut` commands
+- **⚡ Intuitive Syntax**: English-like operations that are self-documenting
+- **🔗 Chainable**: Combine operations with pipe (`|`) for complex transformations
+- **🎯 Type-Aware**: Works seamlessly with strings, arrays, and paths
+- **🔄 Loop Integration**: Perfect integration with `for each` loops
+- **📊 Performance**: Efficient operations with minimal overhead
 
 ### 📊 Advanced Logging & Metrics
 

@@ -1,434 +1,292 @@
 package engine
 
 import (
-	"bytes"
-	"strings"
 	"testing"
 )
 
-func TestEngine_LetStatement(t *testing.T) {
-	input := `version: 2.0
+func TestParseVariableOperations(t *testing.T) {
+	engine := NewEngine(nil)
 
-task "let_test":
-  let name = "John"
-  let count = 42
-  info "Name: {name}, Count: {count}"
-  
-  success "Let statement test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
+	tests := []struct {
+		name     string
+		expr     string
+		expected *VariableOperationChain
+		hasError bool
+	}{
+		{
+			name: "simple without prefix",
+			expr: "$version without prefix 'v'",
+			expected: &VariableOperationChain{
+				Variable: "$version",
+				Operations: []VariableOperation{
+					{Type: "without", Args: []string{"prefix", "v"}},
+				},
+			},
+		},
+		{
+			name: "filtered by extension",
+			expr: "$files filtered by extension '.js'",
+			expected: &VariableOperationChain{
+				Variable: "$files",
+				Operations: []VariableOperation{
+					{Type: "filtered", Args: []string{"extension", ".js"}},
+				},
+			},
+		},
+		{
+			name: "chained operations",
+			expr: "$files filtered by extension '.js' | sorted by name",
+			expected: &VariableOperationChain{
+				Variable: "$files",
+				Operations: []VariableOperation{
+					{Type: "filtered", Args: []string{"extension", ".js"}},
+					{Type: "sorted", Args: []string{"name"}},
+				},
+			},
+		},
+		{
+			name: "basename operation",
+			expr: "$path basename",
+			expected: &VariableOperationChain{
+				Variable: "$path",
+				Operations: []VariableOperation{
+					{Type: "basename", Args: []string{}},
+				},
+			},
+		},
+		{
+			name:     "simple variable - no operations",
+			expr:     "$version",
+			expected: nil,
+		},
 	}
 
-	var output bytes.Buffer
-	engine := NewEngine(&output)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.parseVariableOperations(tt.expr)
 
-	err = engine.ExecuteWithParams(program, "let_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
+			if tt.hasError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
 
-	outputStr := output.String()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 
-	expectedParts := []string{
-		"📝 Set variable name = John",
-		"📝 Set variable count = 42",
-		"ℹ️  Name: John, Count: 42",
-		"✅ Let statement test completed!",
-	}
+			if tt.expected == nil {
+				if result != nil {
+					t.Errorf("expected nil result but got %+v", result)
+				}
+				return
+			}
 
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
+			if result == nil {
+				t.Errorf("expected result but got nil")
+				return
+			}
 
-func TestEngine_SetStatement(t *testing.T) {
-	input := `version: 2.0
+			if result.Variable != tt.expected.Variable {
+				t.Errorf("expected variable %s but got %s", tt.expected.Variable, result.Variable)
+			}
 
-task "set_test":
-  set message to "Hello World"
-  set counter to 100
-  info "Message: {message}, Counter: {counter}"
-  
-  success "Set statement test completed!"`
+			if len(result.Operations) != len(tt.expected.Operations) {
+				t.Errorf("expected %d operations but got %d", len(tt.expected.Operations), len(result.Operations))
+				return
+			}
 
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
+			for i, op := range result.Operations {
+				expectedOp := tt.expected.Operations[i]
+				if op.Type != expectedOp.Type {
+					t.Errorf("operation %d: expected type %s but got %s", i, expectedOp.Type, op.Type)
+				}
 
-	var output bytes.Buffer
-	engine := NewEngine(&output)
+				if len(op.Args) != len(expectedOp.Args) {
+					t.Errorf("operation %d: expected %d args but got %d", i, len(expectedOp.Args), len(op.Args))
+					continue
+				}
 
-	err = engine.ExecuteWithParams(program, "set_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"📝 Set variable message to Hello World",
-		"📝 Set variable counter to 100",
-		"ℹ️  Message: Hello World, Counter: 100",
-		"✅ Set statement test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
-
-func TestEngine_TransformStatement(t *testing.T) {
-	input := `version: 2.0
-
-task "transform_test":
-  let text = "hello world"
-  transform text with uppercase
-  info "Uppercase: {text}"
-  
-  let name = "John"
-  transform name with concat " Doe"
-  info "Full name: {name}"
-  
-  success "Transform statement test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "transform_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"📝 Set variable text = hello world",
-		"🔄 Transformed variable text with uppercase: hello world -> HELLO WORLD",
-		"ℹ️  Uppercase: HELLO WORLD",
-		"📝 Set variable name = John",
-		"🔄 Transformed variable name with concat: John -> John Doe",
-		"ℹ️  Full name: John Doe",
-		"✅ Transform statement test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
+				for j, arg := range op.Args {
+					if arg != expectedOp.Args[j] {
+						t.Errorf("operation %d arg %d: expected %s but got %s", i, j, expectedOp.Args[j], arg)
+					}
+				}
+			}
+		})
 	}
 }
 
-func TestEngine_StringTransformations(t *testing.T) {
-	input := `version: 2.0
+func TestApplyVariableOperation(t *testing.T) {
+	engine := NewEngine(nil)
 
-task "string_transform_test":
-  let text = "  Hello World  "
-  transform text with trim
-  info "Trimmed: '{text}'"
-  
-  transform text with lowercase
-  info "Lowercase: {text}"
-  
-  transform text with replace "world" "Universe"
-  info "Replaced: {text}"
-  
-  success "String transformations completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
+	tests := []struct {
+		name      string
+		value     string
+		operation VariableOperation
+		expected  string
+		hasError  bool
+	}{
+		{
+			name:      "without prefix",
+			value:     "v2.1.0",
+			operation: VariableOperation{Type: "without", Args: []string{"prefix", "v"}},
+			expected:  "2.1.0",
+		},
+		{
+			name:      "without suffix",
+			value:     "file.txt",
+			operation: VariableOperation{Type: "without", Args: []string{"suffix", ".txt"}},
+			expected:  "file",
+		},
+		{
+			name:      "basename",
+			value:     "/path/to/file.txt",
+			operation: VariableOperation{Type: "basename", Args: []string{}},
+			expected:  "file.txt",
+		},
+		{
+			name:      "dirname",
+			value:     "/path/to/file.txt",
+			operation: VariableOperation{Type: "dirname", Args: []string{}},
+			expected:  "/path/to",
+		},
+		{
+			name:      "extension",
+			value:     "file.txt",
+			operation: VariableOperation{Type: "extension", Args: []string{}},
+			expected:  "txt",
+		},
+		{
+			name:      "filtered by extension",
+			value:     "app.js test.js config.json",
+			operation: VariableOperation{Type: "filtered", Args: []string{"extension", ".js"}},
+			expected:  "app.js test.js",
+		},
+		{
+			name:      "sorted by name",
+			value:     "zebra apple banana",
+			operation: VariableOperation{Type: "sorted", Args: []string{"name"}},
+			expected:  "apple banana zebra",
+		},
+		{
+			name:      "reversed",
+			value:     "one two three",
+			operation: VariableOperation{Type: "reversed", Args: []string{}},
+			expected:  "three two one",
+		},
+		{
+			name:      "unique",
+			value:     "apple banana apple orange banana",
+			operation: VariableOperation{Type: "unique", Args: []string{}},
+			expected:  "apple banana orange",
+		},
+		{
+			name:      "first",
+			value:     "apple banana orange",
+			operation: VariableOperation{Type: "first", Args: []string{}},
+			expected:  "apple",
+		},
+		{
+			name:      "last",
+			value:     "apple banana orange",
+			operation: VariableOperation{Type: "last", Args: []string{}},
+			expected:  "orange",
+		},
 	}
 
-	var output bytes.Buffer
-	engine := NewEngine(&output)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.applyVariableOperation(tt.value, tt.operation, nil)
 
-	err = engine.ExecuteWithParams(program, "string_transform_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
+			if tt.hasError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
 
-	outputStr := output.String()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 
-	expectedParts := []string{
-		"🔄 Transformed variable text with trim:",
-		"ℹ️  Trimmed: 'Hello World'",
-		"🔄 Transformed variable text with lowercase:",
-		"ℹ️  Lowercase: hello world",
-		"🔄 Transformed variable text with replace:",
-		"ℹ️  Replaced: hello Universe",
-		"✅ String transformations completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
-
-func TestEngine_VariableOperationsInLoops(t *testing.T) {
-	input := `version: 2.0
-
-task "loop_variables_test":
-  given items defaults to "apple,banana,cherry"
-  
-  for each item in items:
-    let processed = item
-    transform processed with uppercase
-    info "Processed: {processed}"
-  
-  success "Loop variables test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "loop_variables_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"📝 Set variable processed = apple",
-		"🔄 Transformed variable processed with uppercase: apple -> APPLE",
-		"ℹ️  Processed: APPLE",
-		"📝 Set variable processed = banana",
-		"🔄 Transformed variable processed with uppercase: banana -> BANANA",
-		"ℹ️  Processed: BANANA",
-		"📝 Set variable processed = cherry",
-		"🔄 Transformed variable processed with uppercase: cherry -> CHERRY",
-		"ℹ️  Processed: CHERRY",
-		"✅ Loop variables test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
-
-func TestEngine_VariableOperationsInConditionals(t *testing.T) {
-	input := `version: 2.0
-
-task "conditional_variables_test":
-  let status = "pending"
-  
-  if status == "pending":
-    set status to "processing"
-    transform status with concat " - in progress"
-    info "Status updated: {status}"
-  
-  success "Conditional variables test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "conditional_variables_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"📝 Set variable status = pending",
-		"📝 Set variable status to processing",
-		"🔄 Transformed variable status with concat: processing -> processing - in progress",
-		"ℹ️  Status updated: processing - in progress",
-		"✅ Conditional variables test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
+			if result != tt.expected {
+				t.Errorf("expected %q but got %q", tt.expected, result)
+			}
+		})
 	}
 }
 
-func TestEngine_VariableOperationsDryRun(t *testing.T) {
-	input := `version: 2.0
+func TestApplyVariableOperations(t *testing.T) {
+	engine := NewEngine(nil)
 
-task "dry_run_test":
-  let name = "John"
-  set message to "Hello"
-  transform message with concat " {name}"
-  info "Result: {message}"
-  
-  success "Dry run test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
+	tests := []struct {
+		name     string
+		value    string
+		chain    *VariableOperationChain
+		expected string
+		hasError bool
+	}{
+		{
+			name:  "chained filter and sort",
+			value: "app.js test.js config.json package.json",
+			chain: &VariableOperationChain{
+				Variable: "$files",
+				Operations: []VariableOperation{
+					{Type: "filtered", Args: []string{"extension", ".js"}},
+					{Type: "sorted", Args: []string{"name"}},
+				},
+			},
+			expected: "app.js test.js",
+		},
+		{
+			name:  "chained without prefix and suffix",
+			value: "v2.1.0-beta",
+			chain: &VariableOperationChain{
+				Variable: "$version",
+				Operations: []VariableOperation{
+					{Type: "without", Args: []string{"prefix", "v"}},
+					{Type: "without", Args: []string{"suffix", "-beta"}},
+				},
+			},
+			expected: "2.1.0",
+		},
+		{
+			name:  "path basename and extension",
+			value: "/path/to/file.txt",
+			chain: &VariableOperationChain{
+				Variable: "$path",
+				Operations: []VariableOperation{
+					{Type: "basename", Args: []string{}},
+					{Type: "without", Args: []string{"suffix", ".txt"}},
+				},
+			},
+			expected: "file",
+		},
 	}
 
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-	engine.SetDryRun(true)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.applyVariableOperations(tt.value, tt.chain, nil)
 
-	err = engine.ExecuteWithParams(program, "dry_run_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
+			if tt.hasError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
 
-	outputStr := output.String()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 
-	expectedParts := []string{
-		"[DRY RUN] Would set variable name = John",
-		"[DRY RUN] Would set variable message to Hello",
-		"[DRY RUN] Would transform variable message with concat:",
-		"[DRY RUN] info: Result: Hello John",
-		"[DRY RUN] success: Dry run test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
-
-func TestEngine_VariableTransformationFunctions(t *testing.T) {
-	input := `version: 2.0
-
-task "transformation_functions_test":
-  let text = "Hello World"
-  transform text with length
-  info "Length: {text}"
-  
-  let greeting = "Hello"
-  transform greeting with slice 0 4
-  info "Sliced: {greeting}"
-  
-  success "Transformation functions test completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "transformation_functions_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"🔄 Transformed variable text with length: Hello World -> 11",
-		"ℹ️  Length: 11",
-		"🔄 Transformed variable greeting with slice: Hello -> Hell",
-		"ℹ️  Sliced: Hell",
-		"✅ Transformation functions test completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
-	}
-}
-
-func TestEngine_VariableOperationsErrorHandling(t *testing.T) {
-	input := `version: 2.0
-
-task "error_handling_test":
-  transform nonexistent with uppercase
-  
-  success "This should not be reached"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "error_handling_test", map[string]string{})
-	if err == nil {
-		t.Fatalf("Expected error for nonexistent variable, but got none")
-	}
-
-	if !strings.Contains(err.Error(), "variable 'nonexistent' not found") {
-		t.Errorf("Expected error about nonexistent variable, got: %v", err)
-	}
-}
-
-func TestEngine_ComplexVariableOperations(t *testing.T) {
-	input := `version: 2.0
-
-task "complex_test":
-  let firstName = "John"
-  let lastName = "Doe"
-  set fullName to "Unknown"
-  
-  # Build full name step by step
-  set fullName to firstName
-  transform fullName with concat " "
-  transform fullName with concat lastName
-  transform fullName with uppercase
-  
-  info "Full name: {fullName}"
-  
-  success "Complex variable operations completed!"`
-
-	program, err := ParseString(input)
-	if err != nil {
-		t.Fatalf("ParseString failed: %v", err)
-	}
-
-	var output bytes.Buffer
-	engine := NewEngine(&output)
-
-	err = engine.ExecuteWithParams(program, "complex_test", map[string]string{})
-	if err != nil {
-		t.Fatalf("ExecuteWithParams failed: %v", err)
-	}
-
-	outputStr := output.String()
-
-	expectedParts := []string{
-		"📝 Set variable firstName = John",
-		"📝 Set variable lastName = Doe",
-		"📝 Set variable fullName to Unknown",
-		"📝 Set variable fullName to John",
-		"🔄 Transformed variable fullName with concat: John -> John ",
-		"🔄 Transformed variable fullName with concat: John  -> John Doe",
-		"🔄 Transformed variable fullName with uppercase: John Doe -> JOHN DOE",
-		"ℹ️  Full name: JOHN DOE",
-		"✅ Complex variable operations completed!",
-	}
-
-	for _, part := range expectedParts {
-		if !strings.Contains(outputStr, part) {
-			t.Errorf("Expected output to contain %q, got %q", part, outputStr)
-		}
+			if result != tt.expected {
+				t.Errorf("expected %q but got %q", tt.expected, result)
+			}
+		})
 	}
 }

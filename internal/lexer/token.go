@@ -191,6 +191,20 @@ const (
 	MODULO    // modulo
 	PROPERTY  // property
 
+	// Advanced Variable Operations
+	WITHOUT   // without
+	FILTERED  // filtered
+	SORTED    // sorted
+	REVERSED  // reversed
+	UNIQUE    // unique
+	FIRST     // first
+	LAST      // last
+	BASENAME  // basename
+	DIRNAME   // dirname
+	EXTENSION // extension
+	PREFIX    // prefix
+	SUFFIX    // suffix
+
 	// Comparison operators
 	GTE // >=
 	GT  // >
@@ -638,6 +652,30 @@ func (t TokenType) String() string {
 		return "MODULO"
 	case PROPERTY:
 		return "PROPERTY"
+	case WITHOUT:
+		return "WITHOUT"
+	case FILTERED:
+		return "FILTERED"
+	case SORTED:
+		return "SORTED"
+	case REVERSED:
+		return "REVERSED"
+	case UNIQUE:
+		return "UNIQUE"
+	case FIRST:
+		return "FIRST"
+	case LAST:
+		return "LAST"
+	case BASENAME:
+		return "BASENAME"
+	case DIRNAME:
+		return "DIRNAME"
+	case EXTENSION:
+		return "EXTENSION"
+	case PREFIX:
+		return "PREFIX"
+	case SUFFIX:
+		return "SUFFIX"
 	case GTE:
 		return "GTE"
 	case GT:
@@ -960,6 +998,18 @@ var keywords = map[string]TokenType{
 	"divide":      DIVIDE,
 	"modulo":      MODULO,
 	"property":    PROPERTY,
+	"without":     WITHOUT,
+	"filtered":    FILTERED,
+	"sorted":      SORTED,
+	"reversed":    REVERSED,
+	"unique":      UNIQUE,
+	"first":       FIRST,
+	"last":        LAST,
+	"basename":    BASENAME,
+	"dirname":     DIRNAME,
+	"extension":   EXTENSION,
+	"prefix":      PREFIX,
+	"suffix":      SUFFIX,
 	">=":          GTE,
 	">":           GT,
 	"<=":          LTE,

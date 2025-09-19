@@ -49,12 +49,12 @@ This roadmap tracks the implementation progress of features documented in the [D
 - ✅ Variable interpolation (`{$variable}`)
 - ✅ Variable scoping (global, task, block)
 
-### 📋 Advanced Variable Operations
-- 📋 Array operations (`{$files} filtered by extension ".js"`)
-- 📋 String operations (`{$version} without prefix "v"`)
-- 📋 Object operations (`{$config}.port`)
-- 📋 Variable transformations
-- 📋 Built-in variable functions
+### ✅ Advanced Variable Operations
+- ✅ Array operations (`{$files} filtered by extension ".js"`, `{$files} sorted by name`, `{$files} first`)
+- ✅ String operations (`{$version} without prefix "v"`, `{$image} split by ':'`)
+- ✅ Path operations (`{$path} basename`, `{$path} dirname`, `{$path} extension`)
+- ✅ Operation chaining (`{$files} filtered by extension ".js" | sorted by name`)
+- ✅ For each loop integration (`for each item in $variable`)
 
 ---
 

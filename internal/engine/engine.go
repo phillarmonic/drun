@@ -1886,14 +1886,26 @@ func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) str
 
 // resolveExpression resolves various types of expressions
 func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
-	// 1. Check if it's a simple builtin function call (no arguments)
+	// 1. Check for variable operations (e.g., "$version without prefix 'v'")
+	if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
+		// Get the base variable value
+		baseValue := e.resolveSimpleVariable(chain.Variable, ctx)
+		if baseValue != "" {
+			// Apply operations chain
+			if result, err := e.applyVariableOperations(baseValue, chain, ctx); err == nil {
+				return result
+			}
+		}
+	}
+
+	// 2. Check if it's a simple builtin function call (no arguments)
 	if builtins.IsBuiltin(expr) {
 		if result, err := builtins.CallBuiltin(expr); err == nil {
 			return result
 		}
 	}
 
-	// 2. Check for function calls with quoted string arguments
+	// 3. Check for function calls with quoted string arguments
 	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
 	quotedArgRe := regexp.MustCompile(`^([^(]+)\((.+)\)$`)
 	if matches := quotedArgRe.FindStringSubmatch(expr); len(matches) == 3 {
@@ -1910,7 +1922,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 3. Check for function calls with parameter arguments
+	// 4. Check for function calls with parameter arguments
 	// Pattern: "function(param)" where param is a parameter name
 	paramArgRe := regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`)
 	if matches := paramArgRe.FindStringSubmatch(expr); len(matches) == 3 {
@@ -1929,7 +1941,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 4. Check for $globals.key syntax for project settings
+	// 5. Check for $globals.key syntax for project settings
 	if strings.HasPrefix(expr, "$globals.") {
 		if ctx != nil && ctx.Project != nil {
 			key := expr[9:] // Remove "$globals." prefix
@@ -1947,7 +1959,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		return ""
 	}
 
-	// 5. Check for simple parameter lookup
+	// 6. Check for simple parameter lookup
 	if ctx != nil {
 		if value, exists := ctx.Parameters[expr]; exists {
 			return value.AsString()
@@ -1960,6 +1972,54 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		if strings.HasPrefix(expr, "$") {
 			varName := expr[1:] // Remove the $ prefix
 			if value, exists := ctx.Variables[varName]; exists {
+				return value
+			}
+		}
+	}
+
+	return ""
+}
+
+// resolveSimpleVariable resolves a simple variable without operations
+func (e *Engine) resolveSimpleVariable(variable string, ctx *ExecutionContext) string {
+	// Handle $globals.key syntax
+	if strings.HasPrefix(variable, "$globals.") {
+		if ctx != nil && ctx.Project != nil {
+			key := variable[9:] // Remove "$globals." prefix
+			if value, exists := ctx.Project.Settings[key]; exists {
+				return value
+			}
+			// Check special project variables
+			if key == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version
+			}
+			if key == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name
+			}
+		}
+		return ""
+	}
+
+	// Handle regular variables
+	if ctx != nil {
+		// Check parameters
+		if value, exists := ctx.Parameters[variable]; exists {
+			return value.AsString()
+		}
+		// Check captured variables
+		if value, exists := ctx.Variables[variable]; exists {
+			return value
+		}
+		// Check for variables with $ prefix (task-scoped variables)
+		if strings.HasPrefix(variable, "$") {
+			varName := variable[1:] // Remove the $ prefix
+			if value, exists := ctx.Variables[varName]; exists {
+				return value
+			}
+		}
+		// Check loop variables (bare identifiers)
+		if !strings.HasPrefix(variable, "$") {
+			if value, exists := ctx.Variables[variable]; exists {
 				return value
 			}
 		}
@@ -2226,25 +2286,36 @@ func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 
 // executeEachLoop executes traditional each loops
 func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
-	// Resolve the iterable (could be a parameter, file list, etc.)
-	iterableValue, exists := ctx.Parameters[stmt.Iterable]
-	if !exists {
-		return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+	// Resolve the iterable (could be a parameter, variable, file list, etc.)
+	var iterableStr string
+
+	// First check if it's a variable (starts with $)
+	if strings.HasPrefix(stmt.Iterable, "$") {
+		// Try both with and without $ prefix to handle different storage methods
+		if value, exists := ctx.Variables[stmt.Iterable]; exists {
+			iterableStr = value
+		} else if value, exists := ctx.Variables[stmt.Iterable[1:]]; exists {
+			iterableStr = value
+		} else {
+			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
+		}
+	} else {
+		// Check parameters
+		iterableValue, exists := ctx.Parameters[stmt.Iterable]
+		if !exists {
+			return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+		}
+		iterableStr = iterableValue.AsString()
 	}
 
-	// Split by comma to get items (simple implementation)
-	iterableStr := strings.TrimSpace(iterableValue.AsString())
+	// Split by space to get items (for our variable operations system)
+	iterableStr = strings.TrimSpace(iterableStr)
 	if iterableStr == "" {
 		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
 		return nil
 	}
 
-	items := strings.Split(iterableStr, ",")
-
-	// Trim whitespace from items
-	for i, item := range items {
-		items[i] = strings.TrimSpace(item)
-	}
+	items := strings.Fields(iterableStr) // Use Fields to split by any whitespace
 
 	if len(items) == 0 {
 		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")

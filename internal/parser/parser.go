@@ -2564,10 +2564,15 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.IDENT) {
+		// Accept both IDENT and VARIABLE for iterable
+		switch p.peekToken.Type {
+		case lexer2.IDENT, lexer2.VARIABLE:
+			p.nextToken()
+			stmt.Iterable = p.curToken.Literal
+		default:
+			p.addError(fmt.Sprintf("expected identifier or variable for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
-		stmt.Iterable = p.curToken.Literal
 	}
 
 	// Check for filter: "where variable operator value"
@@ -2637,10 +2642,15 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 	} else {
 		// Regular "for variable in iterable"
 		stmt.Type = "each"
-		if !p.expectPeek(lexer2.IDENT) {
+		// Accept both IDENT and VARIABLE for iterable
+		switch p.peekToken.Type {
+		case lexer2.IDENT, lexer2.VARIABLE:
+			p.nextToken()
+			stmt.Iterable = p.curToken.Literal
+		default:
+			p.addError(fmt.Sprintf("expected identifier or variable for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
-		stmt.Iterable = p.curToken.Literal
 	}
 
 	// Check for filter: "where variable operator value"

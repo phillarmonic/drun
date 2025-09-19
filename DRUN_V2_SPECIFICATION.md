@@ -1091,33 +1091,143 @@ run "docker push {image_name}"
 run "kubectl set image deployment/{app_name} {app_name}={image_name}"
 ```
 
-### Variable Transformation
+### Advanced Variable Operations
 
-#### Array Operations
-
-```
-let $files = ["app.js", "lib.js", "test.js"]
-let $js_files = {$files} filtered by extension ".js"
-let $minified_files = {$files} with extension changed to ".min.js"
-let $file_count = {$files}.length
-```
+drun v2 provides powerful variable transformation operations that can be chained together for complex data manipulation.
 
 #### String Operations
 
-```
-let $version = "v1.2.3"
-let $numeric_version = {$version} without prefix "v"
-let major_version be {version}.split(".")[0]
-let uppercase_name be {app_name}.uppercase
+Transform string values with intuitive operations:
+
+```drun
+task "string_operations":
+  set $version to "v2.1.0-beta"
+  set $filename to "my-app.tar.gz"
+  set $url to "https://api.example.com/v1/users"
+  
+  info "Clean version: {$version without prefix 'v' | without suffix '-beta'}"
+  # Output: 2.1.0
+  
+  info "App name: {$filename without suffix '.tar.gz'}"
+  # Output: my-app
+  
+  info "Domain: {$url without prefix 'https://' | without suffix '/v1/users'}"
+  # Output: api.example.com
 ```
 
-#### Object Operations
+#### Array Operations
 
+Manipulate space-separated lists with filtering, sorting, and selection:
+
+```drun
+task "array_operations":
+  set $files to "app.js test.js config.json package.json readme.md"
+  
+  info "JavaScript files: {$files filtered by extension '.js'}"
+  # Output: app.js test.js
+  
+  info "Sorted files: {$files sorted by name}"
+  # Output: app.js config.json package.json readme.md test.js
+  
+  info "First file: {$files first}"
+  # Output: app.js
+  
+  info "Unique items: {$files unique}"
+  # Removes duplicates if any exist
 ```
-let config be {port: 8080, host: "localhost"}
-let port be {config}.port
-let updated_config be {config} with {timeout: "30s"}
+
+#### Path Operations
+
+Extract components from file paths:
+
+```drun
+task "path_operations":
+  set $source_file to "/home/user/projects/myapp/src/main.js"
+  
+  info "Filename: {$source_file basename}"
+  # Output: main.js
+  
+  info "Directory: {$source_file dirname}"
+  # Output: /home/user/projects/myapp/src
+  
+  info "Extension: {$source_file extension}"
+  # Output: js
+  
+  info "Name without extension: {$source_file basename | without suffix '.js'}"
+  # Output: main
 ```
+
+#### Advanced String Operations
+
+Split strings and extract parts:
+
+```drun
+task "advanced_string_ops":
+  set $docker_image to "nginx:1.21"
+  set $csv_data to "name,age,city"
+  
+  info "Image name: {$docker_image split by ':' | first}"
+  # Output: nginx
+  
+  info "CSV headers: {$csv_data split by ','}"
+  # Output: name age city (space-separated for further processing)
+```
+
+#### Operation Chaining
+
+Combine multiple operations with the pipe (`|`) operator:
+
+```drun
+task "complex_chaining":
+  set $project_files to "src/app.js src/utils.js tests/app.test.js docs/readme.md"
+  
+  # Complex filtering and sorting chain
+  info "Source JS files: {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
+  # Output: src/app.js src/utils.js
+  
+  # Path manipulation chain
+  set $config_path to "/etc/nginx/sites-available/default.conf"
+  info "Config name: {$config_path basename | without suffix '.conf'}"
+  # Output: default
+```
+
+#### For Each Loop Integration
+
+Variable operations work seamlessly with for each loops:
+
+```drun
+task "loop_with_operations":
+  set $docker_images to "nginx:1.21 postgres:13 redis:6.2"
+  
+  for each img in $docker_images:
+    info "Processing: {img}"
+    info "Image name: {img split by ':' | first}"
+    info "Version: {img split by ':' | last}"
+```
+
+#### Available Operations Reference
+
+**String Operations:**
+- `without prefix "text"` - Remove prefix from string
+- `without suffix "text"` - Remove suffix from string  
+- `split by "delimiter"` - Split string into space-separated parts
+
+**Array Operations:**
+- `filtered by extension "ext"` - Filter by file extension
+- `filtered by prefix "text"` - Filter by prefix
+- `filtered by suffix "text"` - Filter by suffix
+- `filtered by name "text"` - Filter by name containing text
+- `sorted by name` - Sort alphabetically
+- `sorted by length` - Sort by string length
+- `reversed` - Reverse order
+- `unique` - Remove duplicates
+- `first` - Get first item
+- `last` - Get last item
+
+**Path Operations:**
+- `basename` - Extract filename from path
+- `dirname` - Extract directory from path
+- `extension` - Extract file extension (without dot)
 
 ---
 
