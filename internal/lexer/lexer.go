@@ -362,6 +362,11 @@ func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
 
+// GetInput returns the input string being lexed
+func (l *Lexer) GetInput() string {
+	return l.input
+}
+
 // AllTokens returns all tokens from the input (useful for testing)
 func (l *Lexer) AllTokens() []Token {
 	var tokens []Token

@@ -626,9 +626,42 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, shell)
 				}
 			} else if p.isFileActionToken(p.curToken.Type) {
-				file := p.parseFileStatement()
-				if file != nil {
-					stmt.Body = append(stmt.Body, file)
+				// Special handling for CHECK token
+				if p.curToken.Type == lexer2.CHECK {
+					if p.peekToken.Type == lexer2.HEALTH {
+						// Definitely a network health check
+						network := p.parseNetworkStatement()
+						if network != nil {
+							stmt.Body = append(stmt.Body, network)
+						}
+					} else if p.peekToken.Type == lexer2.IF {
+						// This is "check if X" - determine if it's a port check
+						if p.isPortCheckPattern() {
+							// This is "check if port" - network operation
+							network := p.parseNetworkStatement()
+							if network != nil {
+								stmt.Body = append(stmt.Body, network)
+							}
+						} else {
+							// This is "check if file" or other - file operation
+							file := p.parseFileStatement()
+							if file != nil {
+								stmt.Body = append(stmt.Body, file)
+							}
+						}
+					} else {
+						// Other check operations (check size, etc.) - file operations
+						file := p.parseFileStatement()
+						if file != nil {
+							stmt.Body = append(stmt.Body, file)
+						}
+					}
+				} else {
+					// Regular file operation
+					file := p.parseFileStatement()
+					if file != nil {
+						stmt.Body = append(stmt.Body, file)
+					}
 				}
 			} else if p.isThrowActionToken(p.curToken.Type) {
 				throw := p.parseThrowStatement()
@@ -1090,7 +1123,7 @@ func (p *Parser) parseBackupStatement(stmt *ast.FileStatement) *ast.FileStatemen
 // parseCheckStatement parses "check" statements
 func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: check if file "path" exists
-	// Expect: get size of file "path"
+	// Expect: check size of file "path"
 	switch p.peekToken.Type {
 	case lexer2.IF:
 		p.nextToken() // consume IF
@@ -2292,6 +2325,55 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 				}
 			}
 		}
+
+	case lexer2.CHECK:
+		// "check health of service at URL" or "check if port X is open on host"
+		if p.peekToken.Type == lexer2.HEALTH {
+			p.nextToken() // consume HEALTH
+			stmt.Action = "health_check"
+
+			// Expect "of service at"
+			if p.peekToken.Type == lexer2.OF {
+				p.nextToken() // consume OF
+				if p.peekToken.Type == lexer2.SERVICE {
+					p.nextToken() // consume SERVICE
+					if p.peekToken.Type == lexer2.AT {
+						p.nextToken() // consume AT
+						if p.peekToken.Type == lexer2.STRING {
+							p.nextToken()
+							stmt.Target = p.curToken.Literal
+						}
+					}
+				}
+			}
+		} else if p.peekToken.Type == lexer2.IF {
+			p.nextToken() // consume IF
+			if p.peekToken.Type == lexer2.PORT {
+				p.nextToken() // consume PORT
+				stmt.Action = "port_check"
+
+				// Expect port number
+				if p.peekToken.Type == lexer2.NUMBER {
+					p.nextToken()
+					stmt.Port = p.curToken.Literal
+
+					// Expect "is open on"
+					if p.peekToken.Type == lexer2.IS {
+						p.nextToken() // consume IS
+						if p.peekToken.Type == lexer2.OPEN {
+							p.nextToken() // consume OPEN
+							if p.peekToken.Type == lexer2.ON {
+								p.nextToken() // consume ON
+								if p.peekToken.Type == lexer2.STRING {
+									p.nextToken()
+									stmt.Target = p.curToken.Literal
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Parse additional options (timeout, retry, expect, etc.)
@@ -2688,7 +2770,7 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 
 	default:
 		// Regular "for each variable in iterable"
-		if !p.expectPeek(lexer2.IDENT) {
+		if !p.expectPeekIdentifierLike() {
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
@@ -3068,6 +3150,54 @@ func (p *Parser) getVariableName() string {
 	return p.curToken.Literal
 }
 
+// expectPeekIdentifierLike checks for identifier-like tokens (IDENT or keywords that can be used as identifiers)
+func (p *Parser) expectPeekIdentifierLike() bool {
+	switch p.peekToken.Type {
+	case lexer2.IDENT, lexer2.SERVICE, lexer2.ENVIRONMENT, lexer2.HOST, lexer2.PORT:
+		p.nextToken()
+		return true
+	default:
+		p.addError(fmt.Sprintf("expected identifier, got %s instead", p.peekToken.Type))
+		return false
+	}
+}
+
+// isPortCheckPattern checks if the current "check if" is a port check without consuming tokens
+func (p *Parser) isPortCheckPattern() bool {
+	// We're currently at CHECK token, peek is IF
+	// We need to check if the pattern is "check if port"
+
+	// Use a simple string-based approach by examining the lexer's input
+	// Get the current position and look for "port" after "if"
+
+	// This is a simplified approach - look at the raw input around current position
+	if p.lexer == nil {
+		return false
+	}
+
+	// Create a temporary lexer from current position to peek ahead
+	// We'll use a different approach: examine the input string directly
+
+	// Get current token position and look ahead in the input
+	currentPos := p.curToken.Position
+	input := p.lexer.GetInput() // We need to add this method to lexer
+
+	// Look for "if port" pattern starting from current position
+	if currentPos >= 0 && currentPos < len(input) {
+		// Find "if" after current position
+		remaining := input[currentPos:]
+		ifIndex := strings.Index(remaining, "if")
+		if ifIndex >= 0 {
+			afterIf := remaining[ifIndex+2:]
+			// Skip whitespace and look for "port"
+			afterIf = strings.TrimLeft(afterIf, " \t")
+			return strings.HasPrefix(afterIf, "port")
+		}
+	}
+
+	return false
+}
+
 // expectPeekFunctionName checks for function names (can be IDENT or reserved keywords)
 func (p *Parser) expectPeekFunctionName() bool {
 	// Function names can be regular identifiers or reserved keywords used as function names
@@ -3206,6 +3336,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if http != nil {
 				body = append(body, http)
 			}
+		} else if p.isNetworkToken(p.curToken.Type) {
+			network := p.parseNetworkStatement()
+			if network != nil {
+				body = append(body, network)
+			}
 		} else if p.isBreakContinueToken(p.curToken.Type) {
 			breakContinue := p.parseBreakContinueStatement()
 			if breakContinue != nil {
@@ -3223,9 +3358,42 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 					body = append(body, shell)
 				}
 			} else if p.isFileActionToken(p.curToken.Type) {
-				file := p.parseFileStatement()
-				if file != nil {
-					body = append(body, file)
+				// Special handling for CHECK token
+				if p.curToken.Type == lexer2.CHECK {
+					if p.peekToken.Type == lexer2.HEALTH {
+						// Definitely a network health check
+						network := p.parseNetworkStatement()
+						if network != nil {
+							body = append(body, network)
+						}
+					} else if p.peekToken.Type == lexer2.IF {
+						// This is "check if X" - determine if it's a port check
+						if p.isPortCheckPattern() {
+							// This is "check if port" - network operation
+							network := p.parseNetworkStatement()
+							if network != nil {
+								body = append(body, network)
+							}
+						} else {
+							// This is "check if file" or other - file operation
+							file := p.parseFileStatement()
+							if file != nil {
+								body = append(body, file)
+							}
+						}
+					} else {
+						// Other check operations (check size, etc.) - file operations
+						file := p.parseFileStatement()
+						if file != nil {
+							body = append(body, file)
+						}
+					}
+				} else {
+					// Regular file operation
+					file := p.parseFileStatement()
+					if file != nil {
+						body = append(body, file)
+					}
 				}
 			} else if p.isThrowActionToken(p.curToken.Type) {
 				throw := p.parseThrowStatement()

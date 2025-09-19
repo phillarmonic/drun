@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFormatCurrentTime(t *testing.T) {
@@ -186,7 +187,11 @@ func TestCallBuiltin(t *testing.T) {
 
 func TestIsBuiltin(t *testing.T) {
 	// Test existing builtins
-	builtins := []string{"hostname", "pwd", "env", "file exists", "now.format"}
+	builtins := []string{
+		"hostname", "pwd", "env", "file exists", "now.format",
+		"start progress", "update progress", "finish progress",
+		"start timer", "stop timer", "show elapsed time",
+	}
 
 	for _, builtin := range builtins {
 		if !IsBuiltin(builtin) {
@@ -222,4 +227,245 @@ func TestGetCurrentGitCommit(t *testing.T) {
 
 	// Note: We don't fail the test if git is not available or we're not in a git repo
 	// This makes the test more robust in different environments
+}
+
+func TestProgressFunctions(t *testing.T) {
+	// Clear any existing progress states
+	stateMutex.Lock()
+	progressStates = make(map[string]*ProgressState)
+	stateMutex.Unlock()
+
+	// Test start progress
+	result, err := startProgress("Starting task")
+	if err != nil {
+		t.Fatalf("startProgress() failed: %v", err)
+	}
+
+	expected := "📋 Starting task"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+
+	// Test start progress with custom name
+	result, err = startProgress("Custom task", "custom")
+	if err != nil {
+		t.Fatalf("startProgress() with custom name failed: %v", err)
+	}
+
+	expected = "📋 Custom task"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+
+	// Test update progress
+	result, err = updateProgress("50", "Halfway done")
+	if err != nil {
+		t.Fatalf("updateProgress() failed: %v", err)
+	}
+
+	if !strings.Contains(result, "📋 Halfway done") {
+		t.Errorf("Expected result to contain progress message, got %q", result)
+	}
+	if !strings.Contains(result, "(50%)") {
+		t.Errorf("Expected result to contain percentage, got %q", result)
+	}
+	if !strings.Contains(result, "[") {
+		t.Errorf("Expected result to contain progress bar, got %q", result)
+	}
+
+	// Test update progress with custom name
+	result, err = updateProgress("75", "Almost done", "custom")
+	if err != nil {
+		t.Fatalf("updateProgress() with custom name failed: %v", err)
+	}
+
+	if !strings.Contains(result, "📋 Almost done") {
+		t.Errorf("Expected result to contain progress message, got %q", result)
+	}
+	if !strings.Contains(result, "(75%)") {
+		t.Errorf("Expected result to contain percentage, got %q", result)
+	}
+
+	// Test finish progress
+	result, err = finishProgress("Task completed")
+	if err != nil {
+		t.Fatalf("finishProgress() failed: %v", err)
+	}
+
+	if !strings.Contains(result, "✅ Task completed") {
+		t.Errorf("Expected result to contain completion message, got %q", result)
+	}
+	if !strings.Contains(result, "(completed in") {
+		t.Errorf("Expected result to contain elapsed time, got %q", result)
+	}
+
+	// Test finish progress with custom name
+	result, err = finishProgress("Custom task completed", "custom")
+	if err != nil {
+		t.Fatalf("finishProgress() with custom name failed: %v", err)
+	}
+
+	if !strings.Contains(result, "✅ Custom task completed") {
+		t.Errorf("Expected result to contain completion message, got %q", result)
+	}
+
+	// Test error cases
+	_, err = startProgress()
+	if err == nil {
+		t.Error("Expected error when no message provided to startProgress")
+	}
+
+	_, err = updateProgress("50")
+	if err == nil {
+		t.Error("Expected error when no message provided to updateProgress")
+	}
+
+	_, err = updateProgress("invalid", "message")
+	if err == nil {
+		t.Error("Expected error when invalid percentage provided to updateProgress")
+	}
+
+	_, err = updateProgress("150", "message")
+	if err == nil {
+		t.Error("Expected error when percentage > 100 provided to updateProgress")
+	}
+
+	_, err = finishProgress()
+	if err == nil {
+		t.Error("Expected error when no message provided to finishProgress")
+	}
+
+	_, err = updateProgress("50", "message", "nonexistent")
+	if err == nil {
+		t.Error("Expected error when updating non-existent progress")
+	}
+
+	_, err = finishProgress("message", "nonexistent")
+	if err == nil {
+		t.Error("Expected error when finishing non-existent progress")
+	}
+}
+
+func TestTimerFunctions(t *testing.T) {
+	// Clear any existing timer states
+	stateMutex.Lock()
+	timerStates = make(map[string]*TimerState)
+	stateMutex.Unlock()
+
+	// Test start timer
+	result, err := startTimer("test_timer")
+	if err != nil {
+		t.Fatalf("startTimer() failed: %v", err)
+	}
+
+	expected := "⏱️  Started timer 'test_timer'"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+
+	// Test show elapsed time for running timer
+	result, err = showElapsedTime("test_timer")
+	if err != nil {
+		t.Fatalf("showElapsedTime() for running timer failed: %v", err)
+	}
+
+	if !strings.Contains(result, "⏱️  Timer 'test_timer' (running):") {
+		t.Errorf("Expected result to contain running timer info, got %q", result)
+	}
+
+	// Wait a bit to ensure measurable elapsed time
+	time.Sleep(10 * time.Millisecond)
+
+	// Test stop timer
+	result, err = stopTimer("test_timer")
+	if err != nil {
+		t.Fatalf("stopTimer() failed: %v", err)
+	}
+
+	if !strings.Contains(result, "⏹️  Stopped timer 'test_timer'") {
+		t.Errorf("Expected result to contain stopped timer info, got %q", result)
+	}
+	if !strings.Contains(result, "(elapsed:") {
+		t.Errorf("Expected result to contain elapsed time, got %q", result)
+	}
+
+	// Test show elapsed time for stopped timer
+	result, err = showElapsedTime("test_timer")
+	if err != nil {
+		t.Fatalf("showElapsedTime() for stopped timer failed: %v", err)
+	}
+
+	if !strings.Contains(result, "⏱️  Timer 'test_timer' (stopped):") {
+		t.Errorf("Expected result to contain stopped timer info, got %q", result)
+	}
+
+	// Test error cases
+	_, err = startTimer()
+	if err == nil {
+		t.Error("Expected error when no timer name provided to startTimer")
+	}
+
+	// Try to start the same timer again while it's stopped (should work)
+	_, err = startTimer("test_timer")
+	if err != nil {
+		t.Errorf("Expected to be able to restart stopped timer, got error: %v", err)
+	}
+
+	// Now try to start it again while it's running (should fail)
+	_, err = startTimer("test_timer")
+	if err == nil {
+		t.Error("Expected error when starting already running timer")
+	}
+
+	_, err = stopTimer()
+	if err == nil {
+		t.Error("Expected error when no timer name provided to stopTimer")
+	}
+
+	_, err = stopTimer("nonexistent")
+	if err == nil {
+		t.Error("Expected error when stopping non-existent timer")
+	}
+
+	// Stop the timer again (should work since we restarted it)
+	_, err = stopTimer("test_timer")
+	if err != nil {
+		t.Errorf("Expected to be able to stop running timer, got error: %v", err)
+	}
+
+	// Now try to stop it again while it's already stopped (should fail)
+	_, err = stopTimer("test_timer")
+	if err == nil {
+		t.Error("Expected error when stopping already stopped timer")
+	}
+
+	_, err = showElapsedTime()
+	if err == nil {
+		t.Error("Expected error when no timer name provided to showElapsedTime")
+	}
+
+	_, err = showElapsedTime("nonexistent")
+	if err == nil {
+		t.Error("Expected error when showing elapsed time for non-existent timer")
+	}
+}
+
+func TestProgressBar(t *testing.T) {
+	tests := []struct {
+		percentage int
+		expected   string
+	}{
+		{0, "[░░░░░░░░░░░░░░░░░░░░]"},
+		{25, "[█████░░░░░░░░░░░░░░░]"},
+		{50, "[██████████░░░░░░░░░░]"},
+		{75, "[███████████████░░░░░]"},
+		{100, "[████████████████████]"},
+	}
+
+	for _, test := range tests {
+		result := createProgressBar(test.percentage)
+		if result != test.expected {
+			t.Errorf("For percentage %d, expected %q, got %q", test.percentage, test.expected, result)
+		}
+	}
 }

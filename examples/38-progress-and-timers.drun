@@ -1,0 +1,214 @@
+version: 2.0
+
+# Progress and Timer Functions Demo
+# This example demonstrates the new progress and timer functionality in drun v2
+
+task "progress demo":
+  info "🚀 Starting progress indicator demo"
+  
+  # Start a progress indicator with default name
+  info "{start progress('Initializing application')}"
+  
+  # Simulate some work and update progress
+  info "{update progress('20', 'Loading configuration files')}"
+  shell "sleep 0.5"
+  
+  info "{update progress('40', 'Connecting to database')}"
+  shell "sleep 0.3"
+  
+  info "{update progress('60', 'Loading user data')}"
+  shell "sleep 0.4"
+  
+  info "{update progress('80', 'Preparing user interface')}"
+  shell "sleep 0.2"
+  
+  info "{update progress('95', 'Finalizing setup')}"
+  shell "sleep 0.1"
+  
+  # Complete the progress
+  info "{finish progress('Application ready!')}"
+  
+  success "Progress demo completed!"
+
+task "timer demo":
+  info "⏱️  Starting timer demo"
+  
+  # Start a timer
+  info "{start timer('main_process')}"
+  
+  # Do some work
+  info "Performing task 1..."
+  shell "sleep 0.3"
+  
+  # Check elapsed time
+  info "{show elapsed time('main_process')}"
+  
+  info "Performing task 2..."
+  shell "sleep 0.2"
+  
+  # Check elapsed time again
+  info "{show elapsed time('main_process')}"
+  
+  info "Performing task 3..."
+  shell "sleep 0.1"
+  
+  # Stop the timer
+  info "{stop timer('main_process')}"
+  
+  # Show final elapsed time
+  info "{show elapsed time('main_process')}"
+  
+  success "Timer demo completed!"
+
+task "multiple progress and timers":
+  info "🔄 Starting multiple progress and timer demo"
+  
+  # Start multiple timers
+  info "{start timer('frontend_build')}"
+  info "{start timer('backend_build')}"
+  
+  # Start multiple progress indicators
+  info "{start progress('Building frontend', 'frontend')}"
+  info "{start progress('Building backend', 'backend')}"
+  
+  # Simulate frontend build progress
+  info "{update progress('25', 'Compiling TypeScript', 'frontend')}"
+  shell "sleep 0.2"
+  
+  # Simulate backend build progress
+  info "{update progress('30', 'Compiling Go code', 'backend')}"
+  shell "sleep 0.1"
+  
+  # Continue frontend
+  info "{update progress('50', 'Bundling assets', 'frontend')}"
+  shell "sleep 0.3"
+  
+  # Continue backend
+  info "{update progress('60', 'Running tests', 'backend')}"
+  shell "sleep 0.2"
+  
+  # Show timer status
+  info "{show elapsed time('frontend_build')}"
+  info "{show elapsed time('backend_build')}"
+  
+  # Finish frontend first
+  info "{update progress('100', 'Frontend optimization complete', 'frontend')}"
+  info "{finish progress('Frontend build successful!', 'frontend')}"
+  info "{stop timer('frontend_build')}"
+  
+  # Finish backend
+  info "{update progress('90', 'Creating binary', 'backend')}"
+  shell "sleep 0.1"
+  
+  info "{finish progress('Backend build successful!', 'backend')}"
+  info "{stop timer('backend_build')}"
+  
+  # Show final times
+  info "Final build times:"
+  info "  Frontend: {show elapsed time('frontend_build')}"
+  info "  Backend: {show elapsed time('backend_build')}"
+  
+  success "Multiple progress and timer demo completed!"
+
+task "deployment with progress":
+  info "🚀 Starting deployment with progress tracking"
+  
+  # Start deployment timer
+  info "{start timer('deployment')}"
+  
+  # Start deployment progress
+  info "{start progress('Preparing deployment')}"
+  
+  # Step 1: Build
+  info "{update progress('10', 'Building application')}"
+  shell "sleep 0.2"
+  
+  # Step 2: Test
+  info "{update progress('30', 'Running tests')}"
+  shell "sleep 0.3"
+  
+  # Step 3: Package
+  info "{update progress('50', 'Creating deployment package')}"
+  shell "sleep 0.2"
+  
+  # Step 4: Upload
+  info "{update progress('70', 'Uploading to server')}"
+  shell "sleep 0.4"
+  
+  # Step 5: Deploy
+  info "{update progress('85', 'Deploying to production')}"
+  shell "sleep 0.3"
+  
+  # Step 6: Verify
+  info "{update progress('95', 'Verifying deployment')}"
+  shell "sleep 0.1"
+  
+  # Complete
+  info "{finish progress('Deployment successful!')}"
+  info "{stop timer('deployment')}"
+  
+  # Show deployment summary
+  info "📊 Deployment Summary:"
+  info "  Total time: {show elapsed time('deployment')}"
+  
+  success "Deployment completed successfully!"
+
+task "error handling demo":
+  info "⚠️  Demonstrating error handling"
+  
+  # Valid operations
+  info "{start progress('Valid progress')}"
+  info "{start timer('valid_timer')}"
+  
+  # These will show as placeholders since they're invalid
+  info "Invalid calls (will show as placeholders):"
+  info "  No message: {start progress()}"
+  info "  Invalid percentage: {update progress('150', 'message')}"
+  info "  Non-existent timer: {show elapsed time('nonexistent')}"
+  
+  # Clean up valid operations
+  info "{finish progress('Valid progress completed')}"
+  info "{stop timer('valid_timer')}"
+  
+  success "Error handling demo completed!"
+
+task "comprehensive demo":
+  info "🎯 Running comprehensive progress and timer demo"
+  
+  # This task combines all the functionality
+  info "{start timer('comprehensive')}"
+  info "{start progress('Starting comprehensive demo')}"
+  
+  # Phase 1: Initialization
+  info "{update progress('10', 'Phase 1: Initialization')}"
+  info "{start timer('phase1')}"
+  shell "sleep 0.2"
+  info "{stop timer('phase1')}"
+  info "Phase 1 completed in: {show elapsed time('phase1')}"
+  
+  # Phase 2: Processing
+  info "{update progress('40', 'Phase 2: Processing data')}"
+  info "{start timer('phase2')}"
+  shell "sleep 0.3"
+  info "{stop timer('phase2')}"
+  info "Phase 2 completed in: {show elapsed time('phase2')}"
+  
+  # Phase 3: Finalization
+  info "{update progress('80', 'Phase 3: Finalization')}"
+  info "{start timer('phase3')}"
+  shell "sleep 0.1"
+  info "{stop timer('phase3')}"
+  info "Phase 3 completed in: {show elapsed time('phase3')}"
+  
+  # Complete
+  info "{finish progress('All phases completed successfully!')}"
+  info "{stop timer('comprehensive')}"
+  
+  # Summary
+  info "📈 Performance Summary:"
+  info "  Total time: {show elapsed time('comprehensive')}"
+  info "  Phase 1: {show elapsed time('phase1')}"
+  info "  Phase 2: {show elapsed time('phase2')}"
+  info "  Phase 3: {show elapsed time('phase3')}"
+  
+  success "Comprehensive demo completed successfully!"

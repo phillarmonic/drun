@@ -5,12 +5,38 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // BuiltinFunction represents a built-in function
 type BuiltinFunction func(args ...string) (string, error)
+
+// ProgressState holds the state of a progress indicator
+type ProgressState struct {
+	Name       string
+	Message    string
+	Percentage int
+	StartTime  time.Time
+	IsActive   bool
+}
+
+// TimerState holds the state of a timer
+type TimerState struct {
+	Name      string
+	StartTime time.Time
+	EndTime   *time.Time
+	IsRunning bool
+}
+
+// Global state for progress and timers
+var (
+	progressStates = make(map[string]*ProgressState)
+	timerStates    = make(map[string]*TimerState)
+	stateMutex     sync.RWMutex
+)
 
 // Registry holds all built-in functions
 var Registry = map[string]BuiltinFunction{
@@ -21,6 +47,12 @@ var Registry = map[string]BuiltinFunction{
 	"env":                getEnvironmentVariable,
 	"pwd":                getCurrentDirectory,
 	"hostname":           getHostname,
+	"start progress":     startProgress,
+	"update progress":    updateProgress,
+	"finish progress":    finishProgress,
+	"start timer":        startTimer,
+	"stop timer":         stopTimer,
+	"show elapsed time":  showElapsedTime,
 }
 
 // getCurrentGitCommit returns the current git commit hash
@@ -149,4 +181,212 @@ func CallBuiltin(name string, args ...string) (string, error) {
 func IsBuiltin(name string) bool {
 	_, exists := Registry[name]
 	return exists
+}
+
+// startProgress starts a new progress indicator
+func startProgress(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("progress message required")
+	}
+
+	message := args[0]
+	name := "default"
+	if len(args) > 1 {
+		name = args[1]
+	}
+
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	progressStates[name] = &ProgressState{
+		Name:       name,
+		Message:    message,
+		Percentage: 0,
+		StartTime:  time.Now(),
+		IsActive:   true,
+	}
+
+	return fmt.Sprintf("📋 %s", message), nil
+}
+
+// updateProgress updates an existing progress indicator
+func updateProgress(args ...string) (string, error) {
+	if len(args) < 2 {
+		return "", fmt.Errorf("percentage and message required")
+	}
+
+	percentageStr := args[0]
+	message := args[1]
+	name := "default"
+	if len(args) > 2 {
+		name = args[2]
+	}
+
+	percentage, err := strconv.Atoi(percentageStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid percentage: %s", percentageStr)
+	}
+
+	if percentage < 0 || percentage > 100 {
+		return "", fmt.Errorf("percentage must be between 0 and 100")
+	}
+
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	progress, exists := progressStates[name]
+	if !exists {
+		return "", fmt.Errorf("progress indicator '%s' not found", name)
+	}
+
+	if !progress.IsActive {
+		return "", fmt.Errorf("progress indicator '%s' is not active", name)
+	}
+
+	progress.Percentage = percentage
+	progress.Message = message
+
+	// Create progress bar
+	progressBar := createProgressBar(percentage)
+
+	return fmt.Sprintf("📋 %s %s (%d%%)", message, progressBar, percentage), nil
+}
+
+// finishProgress completes a progress indicator
+func finishProgress(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("completion message required")
+	}
+
+	message := args[0]
+	name := "default"
+	if len(args) > 1 {
+		name = args[1]
+	}
+
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	progress, exists := progressStates[name]
+	if !exists {
+		return "", fmt.Errorf("progress indicator '%s' not found", name)
+	}
+
+	if !progress.IsActive {
+		return "", fmt.Errorf("progress indicator '%s' is not active", name)
+	}
+
+	progress.IsActive = false
+	progress.Percentage = 100
+	progress.Message = message
+
+	elapsed := time.Since(progress.StartTime)
+
+	return fmt.Sprintf("✅ %s (completed in %v)", message, elapsed.Round(time.Millisecond)), nil
+}
+
+// startTimer starts a new timer
+func startTimer(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("timer name required")
+	}
+
+	name := args[0]
+
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	// Check if timer already exists and is running
+	if timer, exists := timerStates[name]; exists && timer.IsRunning {
+		return "", fmt.Errorf("timer '%s' is already running", name)
+	}
+
+	timerStates[name] = &TimerState{
+		Name:      name,
+		StartTime: time.Now(),
+		EndTime:   nil,
+		IsRunning: true,
+	}
+
+	return fmt.Sprintf("⏱️  Started timer '%s'", name), nil
+}
+
+// stopTimer stops a running timer
+func stopTimer(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("timer name required")
+	}
+
+	name := args[0]
+
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
+	timer, exists := timerStates[name]
+	if !exists {
+		return "", fmt.Errorf("timer '%s' not found", name)
+	}
+
+	if !timer.IsRunning {
+		return "", fmt.Errorf("timer '%s' is not running", name)
+	}
+
+	now := time.Now()
+	timer.EndTime = &now
+	timer.IsRunning = false
+
+	elapsed := now.Sub(timer.StartTime)
+
+	return fmt.Sprintf("⏹️  Stopped timer '%s' (elapsed: %v)", name, elapsed.Round(time.Millisecond)), nil
+}
+
+// showElapsedTime shows the elapsed time for a timer
+func showElapsedTime(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("timer name required")
+	}
+
+	name := args[0]
+
+	stateMutex.RLock()
+	defer stateMutex.RUnlock()
+
+	timer, exists := timerStates[name]
+	if !exists {
+		return "", fmt.Errorf("timer '%s' not found", name)
+	}
+
+	var elapsed time.Duration
+	if timer.IsRunning {
+		elapsed = time.Since(timer.StartTime)
+	} else if timer.EndTime != nil {
+		elapsed = timer.EndTime.Sub(timer.StartTime)
+	} else {
+		return "", fmt.Errorf("timer '%s' has no valid end time", name)
+	}
+
+	status := "stopped"
+	if timer.IsRunning {
+		status = "running"
+	}
+
+	return fmt.Sprintf("⏱️  Timer '%s' (%s): %v", name, status, elapsed.Round(time.Millisecond)), nil
+}
+
+// createProgressBar creates a visual progress bar
+func createProgressBar(percentage int) string {
+	const barLength = 20
+	filled := (percentage * barLength) / 100
+
+	bar := "["
+	for i := 0; i < barLength; i++ {
+		if i < filled {
+			bar += "█"
+		} else {
+			bar += "░"
+		}
+	}
+	bar += "]"
+
+	return bar
 }

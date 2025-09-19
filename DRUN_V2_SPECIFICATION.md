@@ -1763,17 +1763,100 @@ exit with code 0                        # Exit with specific code
 
 #### Progress Tracking
 
-```
-# Progress indicators
-start progress "Downloading dependencies"
-update progress to 50% with message "Half complete"
-finish progress with "Download completed"
+drun v2 provides built-in progress indicators and timer functions for tracking long-running operations:
 
-# Timing
-start timer "deployment"
-stop timer "deployment"
-show elapsed time for "deployment"
+##### Progress Indicators
+
 ```
+# Start a progress indicator
+info "{start progress('Initializing system')}"
+
+# Update progress with percentage and message
+info "{update progress('25', 'Loading configuration')}"
+info "{update progress('50', 'Processing data')}"
+info "{update progress('75', 'Finalizing setup')}"
+
+# Complete the progress indicator
+info "{finish progress('System ready!')}"
+```
+
+##### Timer Functions
+
+```
+# Start a named timer
+info "{start timer('deployment_timer')}"
+
+# Show elapsed time for a running timer
+info "{show elapsed time('deployment_timer')}"
+
+# Stop a timer and show final elapsed time
+info "{stop timer('deployment_timer')}"
+```
+
+##### Advanced Progress and Timer Usage
+
+```
+task "deployment with progress":
+  # Start both progress and timer
+  info "{start progress('Starting deployment')}"
+  info "{start timer('deploy')}"
+  
+  # Simulate deployment steps with progress updates
+  info "{update progress('20', 'Building application')}"
+  shell "sleep 1"  # Simulate build time
+  
+  info "{update progress('40', 'Pushing to registry')}"
+  shell "sleep 1"  # Simulate push time
+  
+  info "{update progress('60', 'Deploying to cluster')}"
+  shell "sleep 1"  # Simulate deploy time
+  
+  info "{update progress('80', 'Running health checks')}"
+  shell "sleep 1"  # Simulate health check time
+  
+  info "{update progress('100', 'Deployment verification')}"
+  
+  # Show final timing and complete progress
+  info "{show elapsed time('deploy')}"
+  info "{finish progress('Deployment completed successfully!')}"
+  info "{stop timer('deploy')}"
+```
+
+##### Multiple Named Progress Indicators and Timers
+
+```
+task "parallel operations":
+  # Multiple progress indicators
+  info "{start progress('Database migration', 'db_progress')}"
+  info "{start progress('Asset compilation', 'asset_progress')}"
+  
+  # Multiple timers
+  info "{start timer('db_timer')}"
+  info "{start timer('asset_timer')}"
+  
+  # Update different progress indicators
+  info "{update progress('30', 'Migrating users table', 'db_progress')}"
+  info "{update progress('50', 'Compiling CSS', 'asset_progress')}"
+  
+  # Complete operations
+  info "{finish progress('Database migration complete', 'db_progress')}"
+  info "{stop timer('db_timer')}"
+  
+  info "{finish progress('Asset compilation complete', 'asset_progress')}"
+  info "{stop timer('asset_timer')}"
+```
+
+**Built-in Function Reference:**
+
+- `{start progress('message')}` - Start default progress indicator
+- `{start progress('message', 'name')}` - Start named progress indicator  
+- `{update progress('percentage', 'message')}` - Update default progress (0-100)
+- `{update progress('percentage', 'message', 'name')}` - Update named progress
+- `{finish progress('message')}` - Complete default progress indicator
+- `{finish progress('message', 'name')}` - Complete named progress indicator
+- `{start timer('name')}` - Start a named timer
+- `{stop timer('name')}` - Stop timer and show elapsed time
+- `{show elapsed time('name')}` - Show elapsed time for running timer
 
 ---
 

@@ -26,6 +26,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management
 - **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
+- **📊 Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
 - **🎯 Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
 - **🔧 DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **📁 File Operations**: Built-in file system operations with path interpolation
@@ -39,6 +40,62 @@ A **semantic, English-like** task automation language with intelligent execution
 - **Rich Error Messages**: Helpful suggestions and context for debugging
 - **Shell Completion**: Intelligent completion for bash, zsh, fish, and PowerShell
 - **Self-Update**: Built-in update mechanism with backup management
+
+### 📋 **Built-in Functions**
+
+drun includes powerful built-in functions for common operations:
+
+#### **System Information**
+- `{hostname}` - Get system hostname
+- `{pwd}` - Get current working directory
+- `{pwd('basename')}` - Get directory name only
+- `{env('VAR_NAME')}` - Get environment variable
+- `{env('VAR_NAME', 'default')}` - Get environment variable with default
+
+#### **Time & Date**
+- `{now.format('2006-01-02 15:04:05')}` - Format current time
+- `{now.format('Monday, January 2, 2006')}` - Custom date formats
+
+#### **File System**
+- `{file exists('path/to/file')}` - Check if file exists (returns "true"/"false")
+- `{dir exists('path/to/dir')}` - Check if directory exists (returns "true"/"false")
+
+#### **Git Integration**
+- `{current git commit}` - Get full commit hash
+- `{current git commit('short')}` - Get short commit hash
+
+#### **Progress & Timing** ⭐ *New*
+- `{start progress('message')}` - Start a progress indicator
+- `{update progress('50', 'message')}` - Update progress with percentage and message
+- `{finish progress('message')}` - Complete progress indicator
+- `{start timer('name')}` - Start a named timer
+- `{stop timer('name')}` - Stop a timer and show elapsed time
+- `{show elapsed time('name')}` - Show current elapsed time for a timer
+
+#### **Usage Examples**
+
+```yaml
+version: 2.0
+
+task "system info":
+  info "🖥️  Running on: {hostname}"
+  info "📁 Current directory: {pwd('basename')}"
+  info "🕒 Current time: {now.format('2006-01-02 15:04:05')}"
+  info "🔗 Git commit: {current git commit('short')}"
+
+task "progress demo":
+  info "{start progress('Building application')}"
+  info "{update progress('25', 'Compiling sources')}"
+  info "{update progress('50', 'Running tests')}"
+  info "{update progress('75', 'Creating package')}"
+  info "{finish progress('Build completed successfully!')}"
+
+task "timing demo":
+  info "{start timer('build_time')}"
+  # ... build operations ...
+  info "{stop timer('build_time')}"
+  info "Total build time: {show elapsed time('build_time')}"
+```
 
 ## Installation
 
@@ -1191,7 +1248,9 @@ Explore comprehensive examples in the `examples/` directory:
 - **`examples/05-kubernetes.drun`** - Kubernetes deployment examples
 - **`examples/06-cicd-pipeline.drun`** - CI/CD pipeline automation
 - **`examples/07-final-showcase.drun`** - Comprehensive feature showcase
+- **`examples/08-builtin-functions.drun`** - Built-in function examples
 - **`examples/26-smart-detection.drun`** - Smart tool and environment detection
+- **`examples/38-progress-and-timers.drun`** - Progress indicators and timing operations
 
 ### 🎯 **Quick Examples**
 
@@ -1201,6 +1260,12 @@ drun -f examples/01-hello-world.drun hello
 
 # Test parameters and validation
 drun -f examples/02-parameters.drun "deploy app" environment=dev
+
+# Explore built-in functions
+drun -f examples/08-builtin-functions.drun "system info"
+
+# Try progress indicators and timers
+drun -f examples/38-progress-and-timers.drun "progress demo"
 
 # Explore smart detection
 drun -f examples/26-smart-detection.drun "detect project"
