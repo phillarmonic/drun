@@ -438,7 +438,11 @@ func parseTaskParameters(args []string) map[string]string {
 
 // showVersionInfo displays version information
 func showVersionInfo() error {
-	fmt.Printf("drun version %s\n", version)
+	fmt.Println("drun (do-run) CLI")
+	fmt.Println("Effortless tasks, serious speed.")
+	fmt.Println("By Phillarmonic Software <https://github.com/phillarmonic/drun>")
+	fmt.Println("")
+	fmt.Printf("Version %s\n", version)
 	if commit != "unknown" {
 		fmt.Printf("commit: %s\n", commit)
 	}
