@@ -13,6 +13,7 @@ import (
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/detection"
+	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/fileops"
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parallel"
@@ -163,7 +164,7 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 			rawValue = param.DefaultValue
 			hasValue = true
 		} else if param.Required {
-			return fmt.Errorf("required parameter '%s' not provided", param.Name)
+			return errors.NewParameterValidationError(fmt.Sprintf("required parameter '%s' not provided", param.Name))
 		}
 
 		// Create typed value if we have a value
@@ -178,13 +179,18 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 			// Create typed value
 			typedValue, err := types.NewValue(paramType, rawValue)
 			if err != nil {
-				return fmt.Errorf("parameter '%s': invalid %s value '%s': %w",
-					param.Name, paramType, rawValue, err)
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': invalid %s value '%s': %v",
+					param.Name, paramType, rawValue, err))
 			}
 
-			// Validate constraints
+			// Validate basic constraints (list constraints)
 			if err := typedValue.ValidateConstraints(param.Constraints); err != nil {
-				return fmt.Errorf("parameter '%s': %w", param.Name, err)
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
+			}
+
+			// Validate advanced constraints
+			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.EmailFormat); err != nil {
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
 			}
 
 			ctx.Parameters[param.Name] = typedValue

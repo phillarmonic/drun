@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -244,6 +245,65 @@ func (v *Value) ValidateConstraints(constraints []string) error {
 	}
 
 	return fmt.Errorf("value '%s' is not in allowed values: %v", valueStr, constraints)
+}
+
+// ValidateAdvancedConstraints validates a value against advanced constraints
+func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern string, emailFormat bool) error {
+	// Validate range constraints for numbers
+	if minValue != nil || maxValue != nil {
+		if v.Type != NumberType {
+			return fmt.Errorf("range constraints can only be applied to number types")
+		}
+
+		num, err := v.AsNumber()
+		if err != nil {
+			return fmt.Errorf("failed to convert to number: %w", err)
+		}
+
+		if minValue != nil && num < *minValue {
+			return fmt.Errorf("value %.2f is less than minimum %.2f", num, *minValue)
+		}
+
+		if maxValue != nil && num > *maxValue {
+			return fmt.Errorf("value %.2f is greater than maximum %.2f", num, *maxValue)
+		}
+	}
+
+	// Validate pattern constraints
+	if pattern != "" {
+		if v.Type != StringType {
+			return fmt.Errorf("pattern constraints can only be applied to string types")
+		}
+
+		matched, err := regexp.MatchString(pattern, v.AsString())
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern '%s': %w", pattern, err)
+		}
+
+		if !matched {
+			return fmt.Errorf("value '%s' does not match pattern '%s'", v.AsString(), pattern)
+		}
+	}
+
+	// Validate email format
+	if emailFormat {
+		if v.Type != StringType {
+			return fmt.Errorf("email format validation can only be applied to string types")
+		}
+
+		if !isValidEmail(v.AsString()) {
+			return fmt.Errorf("value '%s' is not a valid email address", v.AsString())
+		}
+	}
+
+	return nil
+}
+
+// isValidEmail validates email format using a simple regex
+func isValidEmail(email string) bool {
+	// Simple email validation regex
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	return emailRegex.MatchString(email)
 }
 
 // InferType attempts to infer the type from a string value

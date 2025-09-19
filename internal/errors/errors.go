@@ -167,3 +167,20 @@ func (el *ParseErrorList) Add(message string, token lexer.Token) {
 func (el *ParseErrorList) HasErrors() bool {
 	return len(el.Errors) > 0
 }
+
+// ParameterValidationError represents a parameter validation error that should not show usage
+type ParameterValidationError struct {
+	Message string
+}
+
+// Error implements the error interface
+func (e *ParameterValidationError) Error() string {
+	return e.Message
+}
+
+// NewParameterValidationError creates a new parameter validation error
+func NewParameterValidationError(message string) *ParameterValidationError {
+	return &ParameterValidationError{
+		Message: message,
+	}
+}

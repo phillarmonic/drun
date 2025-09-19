@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/ast"
@@ -1248,9 +1249,13 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		if p.isTypeToken(p.peekToken.Type) {
 			p.nextToken() // consume type token
 			stmt.DataType = p.curToken.Literal
+
+			// Check for advanced constraints after type
+			p.parseAdvancedConstraints(stmt)
 		} else if p.peekToken.Type == lexer2.LIST {
 			p.nextToken() // consume LIST
 			stmt.DataType = "list"
+			stmt.Variadic = true // list parameters are variadic by default
 			if p.peekToken.Type == lexer2.OF {
 				p.nextToken() // consume OF
 				if p.isTypeToken(p.peekToken.Type) {
@@ -1307,6 +1312,15 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			return nil
 		}
 
+		// Check for constraints after default value: given name defaults to "value" from ["list"]
+		if p.peekToken.Type == lexer2.FROM {
+			p.nextToken() // consume FROM
+			if p.peekToken.Type == lexer2.LBRACKET {
+				p.nextToken() // consume LBRACKET
+				stmt.Constraints = p.parseStringList()
+			}
+		}
+
 	case "accepts":
 		stmt.Required = false
 		// accepts can have constraints too
@@ -1320,6 +1334,78 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	}
 
 	return stmt
+}
+
+// parseAdvancedConstraints parses advanced parameter constraints
+func (p *Parser) parseAdvancedConstraints(stmt *ast.ParameterStatement) {
+	for {
+		switch p.peekToken.Type {
+		case lexer2.BETWEEN:
+			p.parseRangeConstraint(stmt)
+		case lexer2.MATCHING:
+			p.parsePatternConstraint(stmt)
+		default:
+			return // No more constraints
+		}
+	}
+}
+
+// parseRangeConstraint parses "between min and max" constraints
+func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
+	p.nextToken() // consume BETWEEN
+
+	// Expect a number for minimum value
+	if !p.expectPeek(lexer2.NUMBER) {
+		return
+	}
+
+	minVal, err := strconv.ParseFloat(p.curToken.Literal, 64)
+	if err != nil {
+		p.addError(fmt.Sprintf("invalid minimum value: %s", p.curToken.Literal))
+		return
+	}
+	stmt.MinValue = &minVal
+
+	// Expect AND
+	if !p.expectPeek(lexer2.AND) {
+		return
+	}
+
+	// Expect a number for maximum value
+	if !p.expectPeek(lexer2.NUMBER) {
+		return
+	}
+
+	maxVal, err := strconv.ParseFloat(p.curToken.Literal, 64)
+	if err != nil {
+		p.addError(fmt.Sprintf("invalid maximum value: %s", p.curToken.Literal))
+		return
+	}
+	stmt.MaxValue = &maxVal
+}
+
+// parsePatternConstraint parses "matching pattern" or "matching email format" constraints
+func (p *Parser) parsePatternConstraint(stmt *ast.ParameterStatement) {
+	p.nextToken() // consume MATCHING
+
+	switch p.peekToken.Type {
+	case lexer2.PATTERN:
+		p.nextToken() // consume PATTERN
+		if !p.expectPeek(lexer2.STRING) {
+			return
+		}
+		stmt.Pattern = p.curToken.Literal
+
+	case lexer2.EMAIL:
+		p.nextToken() // consume EMAIL
+		if p.peekToken.Type == lexer2.FORMAT {
+			p.nextToken() // consume FORMAT
+		}
+		stmt.EmailFormat = true
+
+	default:
+		p.addError("expected 'pattern' or 'email' after 'matching'")
+	}
 }
 
 // parseDependencyStatement parses a dependency declaration

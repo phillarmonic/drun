@@ -80,7 +80,7 @@ func TestParser_ParameterConstraints(t *testing.T) {
 	input := `version: 2.0
 
 task "deploy":
-  requires environment from ["dev", "staging", "production"]
+  requires $environment from ["dev", "staging", "production"]
   
   step "Deploying to {environment}"`
 

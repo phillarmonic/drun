@@ -1,0 +1,43 @@
+version: 2.0
+
+project "advanced-validation" version "1.0.0":
+
+task "validate_port" means "Demonstrate number range validation":
+  given $port as number between 1000 and 9999 defaults to "8080"
+  
+  info "Using port {port}"
+
+task "validate_version" means "Demonstrate pattern matching":
+  given $version as string matching pattern "v\d+\.\d+\.\d+" defaults to "v1.0.0"
+  
+  info "Version: {version}"
+
+task "validate_email" means "Demonstrate email validation":
+  given $email as string matching email format defaults to "test@example.com"
+  
+  info "Email: {email}"
+
+task "validate_environment" means "Demonstrate list constraints":
+  given $env defaults to "dev" from ["dev", "staging", "production"]
+  
+  info "Environment: {env}"
+
+task "validate_flags" means "Demonstrate variadic parameters":
+  accepts $flags as list
+  
+  info "Flags: {flags}"
+
+task "comprehensive_validation" means "Demonstrate multiple constraints":
+  given $port as number between 8000 and 9000 defaults to "8080"
+  given $version as string matching pattern "v\d+\.\d+\.\d+" defaults to "v2.0.0"
+  given $email as string matching email format defaults to "admin@company.com"
+  given $env defaults to "production" from ["dev", "staging", "production"]
+  accepts $debug_flags as list
+  given $timeout as number between 1 and 300 defaults to "30"
+  
+  info "Port: {port}"
+  info "Version: {version}"  
+  info "Email: {email}"
+  info "Environment: {env}"
+  info "Debug flags: {debug_flags}"
+  info "Timeout: {timeout} seconds"

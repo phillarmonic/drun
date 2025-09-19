@@ -84,7 +84,7 @@ func TestParser_ListWithConstraints(t *testing.T) {
 	input := `version: 2.0
 
 task "list constraints":
-  requires environments as list from ["dev", "staging", "production"]`
+  requires $environments as list from ["dev", "staging", "production"]`
 
 	l := lexer.NewLexer(input)
 	p := NewParser(l)

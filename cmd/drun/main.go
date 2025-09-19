@@ -145,7 +145,17 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute the task with parameters
-	return eng.ExecuteWithParams(program, target, params)
+	err = eng.ExecuteWithParams(program, target, params)
+	if err != nil {
+		// Check if it's a parameter validation error (don't show usage)
+		if paramErr, ok := err.(*errors.ParameterValidationError); ok {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", paramErr.Message)
+			os.Exit(1)
+		}
+		// For other errors, return normally (will show usage)
+		return err
+	}
+	return nil
 }
 
 // findConfigFile finds the drun configuration file to use

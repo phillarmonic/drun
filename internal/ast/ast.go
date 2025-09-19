@@ -660,6 +660,13 @@ type ParameterStatement struct {
 	Constraints  []string    // constraints like ["dev", "staging", "production"]
 	DataType     string      // "string", "number", "boolean", "list", etc.
 	Required     bool        // true for "requires", false for "given"/"accepts"
+	Variadic     bool        // true for variadic parameters (accepts $flags as list)
+
+	// Advanced constraints
+	MinValue    *float64 // minimum value for numbers (between constraint)
+	MaxValue    *float64 // maximum value for numbers (between constraint)
+	Pattern     string   // regex pattern for string validation
+	EmailFormat bool     // true if parameter should validate as email
 }
 
 func (ps *ParameterStatement) statementNode() {}

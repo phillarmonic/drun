@@ -162,9 +162,13 @@ const (
 	STARTS   // starts
 	ENDS     // ends
 	MATCHES  // matches
+	MATCHING // matching
 	LINE     // line
 	MATCH    // match
 	PATTERN  // pattern
+	BETWEEN  // between
+	EMAIL    // email
+	FORMAT   // format
 
 	// Variable Operations keywords
 	LET       // let
@@ -582,12 +586,20 @@ func (t TokenType) String() string {
 		return "ENDS"
 	case MATCHES:
 		return "MATCHES"
+	case MATCHING:
+		return "MATCHING"
 	case LINE:
 		return "LINE"
 	case MATCH:
 		return "MATCH"
 	case PATTERN:
 		return "PATTERN"
+	case BETWEEN:
+		return "BETWEEN"
+	case EMAIL:
+		return "EMAIL"
+	case FORMAT:
+		return "FORMAT"
 	case LET:
 		return "LET"
 	case CONCAT:
@@ -922,9 +934,13 @@ var keywords = map[string]TokenType{
 	"starts":      STARTS,
 	"ends":        ENDS,
 	"matches":     MATCHES,
+	"matching":    MATCHING,
 	"line":        LINE,
 	"match":       MATCH,
 	"pattern":     PATTERN,
+	"between":     BETWEEN,
+	"email":       EMAIL,
+	"format":      FORMAT,
 	"let":         LET,
 	"concat":      CONCAT,
 	"split":       SPLIT,
