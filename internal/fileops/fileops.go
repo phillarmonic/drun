@@ -99,7 +99,7 @@ func (op *FileOperation) executeCreate() (*Result, error) {
 
 	if op.IsDir {
 		// Create directory
-		err := os.MkdirAll(op.Target, 0755)
+		err := os.MkdirAll(op.Target, 0750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create directory '%s': %v", op.Target, err)
 			return result, err
@@ -110,7 +110,7 @@ func (op *FileOperation) executeCreate() (*Result, error) {
 		// Create file (and parent directories if needed)
 		dir := filepath.Dir(op.Target)
 		if dir != "." {
-			err := os.MkdirAll(dir, 0755)
+			err := os.MkdirAll(dir, 0750)
 			if err != nil {
 				result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 				return result, err
@@ -196,7 +196,7 @@ func (op *FileOperation) executeMove() (*Result, error) {
 	// Create parent directory for target if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 			return result, err
@@ -283,14 +283,14 @@ func (op *FileOperation) executeWrite() (*Result, error) {
 	// Create parent directory if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 			return result, err
 		}
 	}
 
-	err := os.WriteFile(op.Target, []byte(op.Content), 0644)
+	err := os.WriteFile(op.Target, []byte(op.Content), 0600)
 	if err != nil {
 		result.Message = fmt.Sprintf("Failed to write to file '%s': %v", op.Target, err)
 		return result, err
@@ -311,14 +311,14 @@ func (op *FileOperation) executeAppend() (*Result, error) {
 	// Create parent directory if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 			return result, err
 		}
 	}
 
-	file, err := os.OpenFile(op.Target, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(op.Target, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		result.Message = fmt.Sprintf("Failed to open file '%s' for appending: %v", op.Target, err)
 		return result, err
@@ -343,7 +343,7 @@ func copyFile(src, dst string) error {
 	// Create parent directory for destination if needed
 	dir := filepath.Dir(dst)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0755)
+		err := os.MkdirAll(dir, 0750)
 		if err != nil {
 			return err
 		}

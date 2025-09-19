@@ -1,3 +1,4 @@
+// Package errors provides error handling utilities for the drun v2 language.
 package errors
 
 import (

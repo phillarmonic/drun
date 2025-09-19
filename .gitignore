@@ -100,7 +100,6 @@ go.work
 *.temp
 *.log
 *.bak
-*~
 
 # Environment files
 .env

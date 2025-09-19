@@ -325,7 +325,7 @@ func saveWorkspaceConfig(config WorkspaceConfig) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(workspaceConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(workspaceConfigPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write workspace config: %w", err)
 	}
 
@@ -463,7 +463,7 @@ func initializeConfig(filename string) error {
 	config := generateStarterConfig()
 
 	// Write the file
-	if err := os.WriteFile(targetFile, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(targetFile, []byte(config), 0600); err != nil {
 		return fmt.Errorf("failed to write task file: %w", err)
 	}
 

@@ -17,7 +17,7 @@ type Lexer struct {
 	pendingDedents int   // number of DEDENT tokens to emit
 }
 
-// New creates a new lexer instance
+// NewLexer creates a new lexer instance
 func NewLexer(input string) *Lexer {
 	l := &Lexer{
 		input:       input,

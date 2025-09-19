@@ -1,3 +1,4 @@
+// Package ast defines the Abstract Syntax Tree nodes for the drun v2 language.
 package ast
 
 import (

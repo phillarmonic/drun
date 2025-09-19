@@ -1,3 +1,4 @@
+// Package patterns provides pattern matching utilities for the drun v2 language.
 package patterns
 
 import (
