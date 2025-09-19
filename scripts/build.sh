@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # Get version information
-VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo "dev")}
+VERSION=${VERSION:-"2-dev"}
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
