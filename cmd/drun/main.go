@@ -16,6 +16,7 @@ import (
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/phillarmonic/drun/internal/errors"
+	"github.com/phillarmonic/figlet/figletlib"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -438,6 +439,22 @@ func parseTaskParameters(args []string) map[string]string {
 
 // showVersionInfo displays version information
 func showVersionInfo() error {
+	loader := figletlib.NewEmbededLoader()
+	font, err := loader.GetFontByName("standard")
+	startColor, _ := figletlib.ParseColor("#00FF95")
+	endColor, _ := figletlib.ParseColor("#00C2FF")
+	gradientConfig := figletlib.ColorConfig{
+		Mode:       figletlib.ColorModeGradient,
+		StartColor: startColor,
+		EndColor:   endColor,
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("")
+	figletlib.PrintColoredMsg("dRun CLI", font, 80, font.Settings(), "left", gradientConfig)
+
 	fmt.Println("drun (do-run) CLI")
 	fmt.Println("Effortless tasks, serious speed.")
 	fmt.Println("By Phillarmonic Software <https://github.com/phillarmonic/drun>")
