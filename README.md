@@ -932,15 +932,50 @@ recipes:
 
 ## Shell Completion
 
-drun supports intelligent shell completion for bash, zsh, fish, and PowerShell. The completion includes:
+drun supports intelligent shell completion for bash, zsh, fish, and PowerShell with smart task and command detection. The completion system provides:
 
-- **Recipe names** with descriptions
-- **Positional arguments** with named syntax support (`--name=value` and `name=value`)
-- **Recipe-specific flags** with type information and defaults
-- **Value completion** for `one_of` constraints
-- **Context-aware suggestions** based on what's already been typed
+- **🎯 Task Names**: Auto-complete available tasks from your drun file with `[task]` prefix
+- **⚙️ CLI Commands**: Complete drun CLI commands with `[drun CLI cmd]` prefix  
+- **📝 Descriptions**: Show task descriptions alongside completions
+- **🔄 Dynamic Updates**: Completions automatically reflect your current drun file
 
-### Installation
+### Quick Setup (Recommended)
+
+For **persistent autocompletion** that stays up-to-date with your tasks, add this to your shell configuration:
+
+#### Zsh (Most Common)
+
+```bash
+# Add to ~/.zshrc for persistent, always up-to-date completion
+echo 'source <(drun completion zsh)' >> ~/.zshrc
+
+# Reload your shell
+source ~/.zshrc
+```
+
+#### Bash
+
+```bash
+# Add to ~/.bashrc for persistent, always up-to-date completion  
+echo 'source <(drun completion bash)' >> ~/.bashrc
+
+# Reload your shell
+source ~/.bashrc
+```
+
+#### Fish
+
+```bash
+# Add to Fish config for persistent completion
+echo 'drun completion fish | source' >> ~/.config/fish/config.fish
+
+# Reload Fish
+source ~/.config/fish/config.fish
+```
+
+### Alternative Installation Methods
+
+If you prefer static completion files (updated less frequently):
 
 #### Bash
 
@@ -991,22 +1026,50 @@ drun completion powershell > drun.ps1
 # Then source this file from your PowerShell profile
 ```
 
+### Completion Features
+
+The completion system intelligently distinguishes between:
+
+- **`[task] Task Name`** - Tasks defined in your drun file
+- **`[drun CLI cmd] Command`** - Built-in drun CLI commands
+
 ### Completion Examples
 
 ```bash
-# Recipe completion
-drun <TAB>                    # Shows all recipes with descriptions
-drun rel<TAB>                 # Completes to "release"
+# Task and command completion with prefixes
+drun <TAB>
+# Shows:
+#   completion    [drun CLI cmd] Generate completion script
+#   help          Help about any command  
+#   default       [task] Welcome to drun v2
+#   hello         [task] Say hello
+#   build         [task] Build the project
+#   test          [task] Run tests
+#   deploy        [task] Deploy application
 
-# Named argument completion  
-drun release <TAB>            # Shows: version= --version= --arch= --push
-drun release --<TAB>          # Shows: --version= --arch= --push
-drun release version=<TAB>    # Shows available values if one_of is defined
+# Task name completion
+drun hel<TAB>                 # Completes to "hello"
+drun dep<TAB>                 # Completes to "deploy"
 
-# Mixed completion
-drun release v1.0.0 <TAB>     # Shows remaining arguments: --arch= --push
-drun release --arch=<TAB>     # Shows: amd64, arm64, both
+# CLI command completion
+drun comp<TAB>                # Completes to "completion"
+
+# Flag completion
+drun --<TAB>                  # Shows all available flags with descriptions
+drun --list                   # Lists all tasks
 ```
+
+### Why Use Dynamic Completion?
+
+**Recommended approach**: `source <(drun completion zsh)` in your shell config
+
+**Benefits:**
+- ✅ **Always Current**: Reflects your latest task definitions
+- ✅ **No Maintenance**: No need to regenerate completion files
+- ✅ **Project Aware**: Works with different drun files in different directories
+- ✅ **Fast**: Completion generation is highly optimized (microseconds)
+
+**Static files** work but require manual updates when you add/remove tasks.
 
 ## Self-Update & Backup Management
 
