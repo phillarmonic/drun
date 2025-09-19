@@ -8,6 +8,7 @@ import (
 
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/engine"
+	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -105,8 +106,14 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse the drun file
-	program, err := engine.ParseString(string(content))
+	program, err := engine.ParseStringWithFilename(string(content), actualConfigFile)
 	if err != nil {
+		// Check if it's an enhanced error list
+		if errorList, ok := err.(*errors.ParseErrorList); ok {
+			fmt.Fprint(os.Stderr, errorList.FormatErrors())
+			return fmt.Errorf("failed to parse drun file '%s'", actualConfigFile)
+		}
+		// Fallback to regular error
 		return fmt.Errorf("failed to parse drun file '%s': %w", actualConfigFile, err)
 	}
 

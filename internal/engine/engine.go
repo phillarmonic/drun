@@ -1837,10 +1837,21 @@ func ExecuteString(input string, taskName string, output io.Writer) error {
 
 // ParseString is a convenience function that parses v2 source code
 func ParseString(input string) (*ast.Program, error) {
+	return ParseStringWithFilename(input, "<input>")
+}
+
+// ParseStringWithFilename parses v2 source code with filename for better error reporting
+func ParseStringWithFilename(input, filename string) (*ast.Program, error) {
 	lexer := lexer.NewLexer(input)
-	parser := parser.NewParser(lexer)
+	parser := parser.NewParserWithSource(lexer, filename, input)
 	program := parser.ParseProgram()
 
+	// Check for enhanced errors first
+	if parser.ErrorList() != nil && parser.ErrorList().HasErrors() {
+		return nil, parser.ErrorList()
+	}
+
+	// Fallback to legacy errors
 	if len(parser.Errors()) > 0 {
 		return nil, fmt.Errorf("parse errors: %s", strings.Join(parser.Errors(), "; "))
 	}

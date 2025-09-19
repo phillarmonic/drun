@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/errors"
 	lexer2 "github.com/phillarmonic/drun/internal/lexer"
 )
 
@@ -15,7 +16,8 @@ type Parser struct {
 	curToken  lexer2.Token
 	peekToken lexer2.Token
 
-	errors []string
+	errors    []string // Legacy error list for backward compatibility
+	errorList *errors.ParseErrorList
 }
 
 // New creates a new parser instance
@@ -23,6 +25,21 @@ func NewParser(l *lexer2.Lexer) *Parser {
 	p := &Parser{
 		lexer:  l,
 		errors: []string{},
+	}
+
+	// Read two tokens, so curToken and peekToken are both set
+	p.nextToken()
+	p.nextToken()
+
+	return p
+}
+
+// NewParserWithSource creates a new parser instance with source information for better error reporting
+func NewParserWithSource(l *lexer2.Lexer, filename, source string) *Parser {
+	p := &Parser{
+		lexer:     l,
+		errors:    []string{},
+		errorList: errors.NewParseErrorList(filename, source),
 	}
 
 	// Read two tokens, so curToken and peekToken are both set
@@ -2250,11 +2267,21 @@ func (p *Parser) expectPeek(t lexer2.TokenType) bool {
 func (p *Parser) peekError(t lexer2.TokenType) {
 	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
 	p.errors = append(p.errors, msg)
+
+	// Also add to new error system if available
+	if p.errorList != nil {
+		p.errorList.Add(msg, p.peekToken)
+	}
 }
 
 // addError adds an error message
 func (p *Parser) addError(msg string) {
 	p.errors = append(p.errors, msg)
+
+	// Also add to new error system if available
+	if p.errorList != nil {
+		p.errorList.Add(msg, p.curToken)
+	}
 }
 
 // skipComments skips over comment tokens
@@ -2267,6 +2294,11 @@ func (p *Parser) skipComments() {
 // Errors returns any parsing errors
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+// ErrorList returns the enhanced error list with position information
+func (p *Parser) ErrorList() *errors.ParseErrorList {
+	return p.errorList
 }
 
 // parseControlFlowStatement parses control flow statements (when, if, for)
