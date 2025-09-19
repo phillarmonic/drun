@@ -100,7 +100,6 @@ go.work
 *.temp
 *.log
 *.bak
-*~
 
 # Environment files
 .env
@@ -109,3 +108,7 @@ go.work
 
 # OS-specific
 workspace
+
+drun
+debug-tool
+drun-test

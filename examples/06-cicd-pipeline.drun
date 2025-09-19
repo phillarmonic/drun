@@ -1,0 +1,34 @@
+# CI/CD Pipeline
+version: 2.0
+
+task "test" means "Run tests":
+  step "Running test suite"
+  run "npm test"
+  run "npm run lint"
+  success "All tests passed"
+
+task "build" means "Build application":
+  step "Building application"
+  run "npm run build"
+  success "Build completed"
+
+task "deploy" means "Deploy application":
+  requires $environment
+  
+  step "Deploying to {$environment}"
+  
+  if $environment is "production":
+    info "Production deployment"
+  else:
+    info "Non-production deployment"
+  
+  run "deploy.sh {$environment}"
+  success "Deployed to {$environment}"
+
+task "pipeline" means "Full CI/CD pipeline":
+  step "Running full pipeline"
+  
+  run "npm test"
+  run "npm run build"
+  
+  success "Pipeline completed"

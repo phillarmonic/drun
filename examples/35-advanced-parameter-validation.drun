@@ -1,0 +1,65 @@
+version: 2.0
+
+project "advanced-validation" version "1.0.0":
+
+task "validate_port" means "Demonstrate number range validation":
+  given $port as number between 1000 and 9999 defaults to "8080"
+  
+  info "Using port {port}"
+
+task "validate_version" means "Demonstrate pattern matching":
+  given $version as string matching semver defaults to "v1.0.0"
+  
+  info "Version: {version}"
+
+task "validate_version_extended" means "Demonstrate extended semver matching":
+  given $version as string matching semver_extended defaults to "v2.0.1-RC2"
+  
+  info "Extended version: {version}"
+
+task "validate_email" means "Demonstrate email validation":
+  given $email as string matching email format defaults to "test@example.com"
+  
+  info "Email: {email}"
+
+task "validate_environment" means "Demonstrate list constraints":
+  given $env defaults to "dev" from ["dev", "staging", "production"]
+  
+  info "Environment: {env}"
+
+task "validate_flags" means "Demonstrate variadic parameters":
+  accepts $flags as list
+  
+  info "Flags: {flags}"
+
+task "validate_uuid" means "Demonstrate UUID validation":
+  given $id as string matching uuid defaults to "550e8400-e29b-41d4-a716-446655440000"
+  
+  info "UUID: {id}"
+
+task "validate_url" means "Demonstrate URL validation":
+  given $endpoint as string matching url defaults to "https://api.example.com"
+  
+  info "Endpoint: {endpoint}"
+
+task "validate_docker_tag" means "Demonstrate Docker tag validation":
+  given $tag as string matching docker_tag defaults to "latest"
+  
+  info "Docker tag: {tag}"
+
+task "comprehensive_validation" means "Demonstrate multiple constraints":
+  given $port as number between 8000 and 9000 defaults to "8080"
+  given $version as string matching semver_extended defaults to "v2.0.0-beta.1"
+  given $email as string matching email format defaults to "admin@company.com"
+  given $env defaults to "production" from ["dev", "staging", "production"]
+  given $uuid as string matching uuid defaults to "550e8400-e29b-41d4-a716-446655440000"
+  accepts $debug_flags as list
+  given $timeout as number between 1 and 300 defaults to "30"
+  
+  info "Port: {port}"
+  info "Version: {version}"  
+  info "Email: {email}"
+  info "Environment: {env}"
+  info "UUID: {uuid}"
+  info "Debug flags: {debug_flags}"
+  info "Timeout: {timeout} seconds"

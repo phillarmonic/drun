@@ -1,182 +1,199 @@
 package shell
 
 import (
+	"bufio"
+	"context"
 	"fmt"
-	"runtime"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
-
-	"github.com/phillarmonic/drun/internal/model"
+	"time"
 )
 
-// Shell represents a shell configuration
-type Shell struct {
-	Cmd  string
-	Args []string
-	OS   string
+// Result represents the result of a shell command execution
+type Result struct {
+	Command  string        // The command that was executed
+	ExitCode int           // Exit code of the command
+	Stdout   string        // Standard output
+	Stderr   string        // Standard error
+	Duration time.Duration // How long the command took
+	Success  bool          // Whether the command succeeded (exit code 0)
 }
 
-// Selector handles shell selection based on OS and configuration
-type Selector struct {
-	shellConfigs map[string]model.ShellConfig
+// Options configures shell command execution
+type Options struct {
+	WorkingDir    string            // Working directory for the command
+	Environment   map[string]string // Additional environment variables
+	Timeout       time.Duration     // Command timeout (0 = no timeout)
+	CaptureOutput bool              // Whether to capture stdout/stderr
+	StreamOutput  bool              // Whether to stream output in real-time
+	Output        io.Writer         // Where to stream output (if StreamOutput is true)
+	Shell         string            // Shell to use (default: /bin/sh)
+	IgnoreErrors  bool              // Whether to ignore non-zero exit codes
 }
 
-// NewSelector creates a new shell selector
-func NewSelector(shellConfigs map[string]model.ShellConfig) *Selector {
-	if shellConfigs == nil {
-		shellConfigs = getDefaultShellConfigs()
-	}
-	return &Selector{
-		shellConfigs: shellConfigs,
-	}
-}
-
-// getDefaultShellConfigs returns the default shell configurations
-func getDefaultShellConfigs() map[string]model.ShellConfig {
-	return map[string]model.ShellConfig{
-		"linux": {
-			Cmd:  "/bin/sh",
-			Args: []string{"-ceu"},
-		},
-		"darwin": {
-			Cmd:  "/bin/zsh",
-			Args: []string{"-ceu"},
-		},
-		"windows": {
-			Cmd:  "pwsh",
-			Args: []string{"-NoLogo", "-Command"},
-		},
+// DefaultOptions returns sensible default options
+func DefaultOptions() *Options {
+	return &Options{
+		WorkingDir:    "",
+		Environment:   make(map[string]string),
+		Timeout:       30 * time.Second,
+		CaptureOutput: true,
+		StreamOutput:  false,
+		Output:        os.Stdout,
+		Shell:         "/bin/sh",
+		IgnoreErrors:  false,
 	}
 }
 
-// Select selects the appropriate shell based on the shell preference and current OS
-func (s *Selector) Select(shellPref string, targetOS string) (*Shell, error) {
-	if targetOS == "" {
-		targetOS = runtime.GOOS
+// Execute runs a shell command with the given options
+func Execute(command string, opts *Options) (*Result, error) {
+	if opts == nil {
+		opts = DefaultOptions()
 	}
 
-	var shellConfig model.ShellConfig
-	var found bool
+	start := time.Now()
 
-	if shellPref == "auto" || shellPref == "" {
-		// Use OS-specific default
-		shellConfig, found = s.shellConfigs[targetOS]
-		if !found {
-			// Fall back to Linux default for unknown OS
-			shellConfig, found = s.shellConfigs["linux"]
-			if !found {
-				return nil, fmt.Errorf("no shell configuration found for OS: %s", targetOS)
-			}
-		}
+	// Create context with timeout if specified
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	if opts.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), opts.Timeout)
+		defer cancel()
 	} else {
-		// Use specific shell configuration
-		shellConfig, found = s.shellConfigs[shellPref]
-		if !found {
-			return nil, fmt.Errorf("shell configuration '%s' not found", shellPref)
+		ctx = context.Background()
+	}
+
+	// Create the command
+	cmd := exec.CommandContext(ctx, opts.Shell, "-c", command)
+
+	// Set working directory
+	if opts.WorkingDir != "" {
+		cmd.Dir = opts.WorkingDir
+	}
+
+	// Set environment variables
+	if len(opts.Environment) > 0 {
+		env := os.Environ()
+		for key, value := range opts.Environment {
+			env = append(env, fmt.Sprintf("%s=%s", key, value))
 		}
+		cmd.Env = env
 	}
 
-	return &Shell{
-		Cmd:  shellConfig.Cmd,
-		Args: shellConfig.Args,
-		OS:   targetOS,
-	}, nil
-}
-
-// BuildCommand builds the command arguments for executing a script
-func (sh *Shell) BuildCommand(script string) []string {
-	if sh.OS == "windows" {
-		// For PowerShell, we need to handle the script differently
-		// Convert some common shell idioms
-		script = sh.convertShellIdioms(script)
+	result := &Result{
+		Command: command,
 	}
 
-	// Build full command: [cmd, ...args, script]
-	result := []string{sh.Cmd}
-	result = append(result, sh.Args...)
-	result = append(result, script)
-	return result
-}
+	// Handle output capture and streaming
+	if opts.CaptureOutput {
+		var stdoutBuf, stderrBuf strings.Builder
 
-// convertShellIdioms converts common POSIX shell idioms to PowerShell equivalents
-func (sh *Shell) convertShellIdioms(script string) string {
-	if sh.OS != "windows" {
-		return script
-	}
+		if opts.StreamOutput && opts.Output != nil {
+			// Stream and capture simultaneously
+			stdoutPipe, err := cmd.StdoutPipe()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+			}
 
-	// Basic conversions for PowerShell compatibility
-	// This is a simplified version - a full implementation would be more comprehensive
+			stderrPipe, err := cmd.StderrPipe()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+			}
 
-	lines := strings.Split(script, "\n")
-	var converted []string
+			// Start the command
+			if err := cmd.Start(); err != nil {
+				return nil, fmt.Errorf("failed to start command: %w", err)
+			}
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			converted = append(converted, "")
-			continue
-		}
+			// Stream stdout
+			go func() {
+				scanner := bufio.NewScanner(stdoutPipe)
+				for scanner.Scan() {
+					line := scanner.Text()
+					stdoutBuf.WriteString(line + "\n")
+					_, _ = fmt.Fprintln(opts.Output, line)
+				}
+			}()
 
-		// Convert export statements to PowerShell
-		if strings.HasPrefix(line, "export ") {
-			// Extract variable assignment: export VAR=value
-			assignment := strings.TrimPrefix(line, "export ")
-			if strings.Contains(assignment, "=") {
-				parts := strings.SplitN(assignment, "=", 2)
-				if len(parts) == 2 {
-					varName := parts[0]
-					varValue := parts[1]
-					converted = append(converted, fmt.Sprintf("$env:%s='%s'", varName, varValue))
-					continue
+			// Stream stderr
+			go func() {
+				scanner := bufio.NewScanner(stderrPipe)
+				for scanner.Scan() {
+					line := scanner.Text()
+					stderrBuf.WriteString(line + "\n")
+					_, _ = fmt.Fprintln(opts.Output, line)
+				}
+			}()
+
+			// Wait for completion
+			err = cmd.Wait()
+			result.Stdout = strings.TrimSuffix(stdoutBuf.String(), "\n")
+			result.Stderr = strings.TrimSuffix(stderrBuf.String(), "\n")
+
+			if err != nil {
+				if exitError, ok := err.(*exec.ExitError); ok {
+					result.ExitCode = exitError.ExitCode()
+				} else {
+					return nil, fmt.Errorf("command execution failed: %w", err)
 				}
 			}
+		} else {
+			// Just capture without streaming
+			stdout, err := cmd.Output()
+			if err != nil {
+				if exitError, ok := err.(*exec.ExitError); ok {
+					result.ExitCode = exitError.ExitCode()
+					result.Stderr = string(exitError.Stderr)
+				} else {
+					return nil, fmt.Errorf("command execution failed: %w", err)
+				}
+			}
+			result.Stdout = strings.TrimSpace(string(stdout))
+		}
+	} else {
+		// No capture, just run
+		if opts.StreamOutput && opts.Output != nil {
+			cmd.Stdout = opts.Output
+			cmd.Stderr = opts.Output
 		}
 
-		// Convert && to PowerShell equivalent
-		if strings.Contains(line, " && ") {
-			parts := strings.Split(line, " && ")
-			line = strings.Join(parts, "; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; ")
+		err := cmd.Run()
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				result.ExitCode = exitError.ExitCode()
+			} else {
+				return nil, fmt.Errorf("command execution failed: %w", err)
+			}
 		}
-
-		// Convert || to PowerShell equivalent
-		if strings.Contains(line, " || ") {
-			parts := strings.Split(line, " || ")
-			line = strings.Join(parts, "; if ($LASTEXITCODE -eq 0) { } else { ")
-			line += " }"
-		}
-
-		converted = append(converted, line)
 	}
 
-	return strings.Join(converted, "\n")
-}
+	result.Duration = time.Since(start)
+	result.Success = result.ExitCode == 0
 
-// Quote quotes a string for the shell
-func (sh *Shell) Quote(s string) string {
-	if sh.OS == "windows" {
-		// PowerShell quoting
-		if strings.Contains(s, " ") || strings.Contains(s, "'") || strings.Contains(s, "\"") {
-			// Use single quotes and escape single quotes
-			return "'" + strings.ReplaceAll(s, "'", "''") + "'"
-		}
-		return s
+	// Check if we should treat this as an error
+	if !result.Success && !opts.IgnoreErrors {
+		return result, fmt.Errorf("command failed with exit code %d: %s", result.ExitCode, result.Stderr)
 	}
 
-	// POSIX shell quoting
-	if strings.Contains(s, "'") {
-		// If string contains single quotes, use double quotes
-		return "\"" + strings.ReplaceAll(s, "\"", "\\\"") + "\""
+	return result, nil
+}
+
+// ExecuteSimple runs a command with default options and returns just the output
+func ExecuteSimple(command string) (string, error) {
+	result, err := Execute(command, DefaultOptions())
+	if err != nil {
+		return "", err
 	}
-
-	// Use single quotes for simplicity
-	return "'" + s + "'"
+	return result.Stdout, nil
 }
 
-// IsWindows returns true if this is a Windows shell
-func (sh *Shell) IsWindows() bool {
-	return sh.OS == "windows"
-}
-
-// IsPOSIX returns true if this is a POSIX-compatible shell
-func (sh *Shell) IsPOSIX() bool {
-	return !sh.IsWindows()
+// ExecuteWithOutput runs a command and streams output to the given writer
+func ExecuteWithOutput(command string, output io.Writer) (*Result, error) {
+	opts := DefaultOptions()
+	opts.StreamOutput = true
+	opts.Output = output
+	return Execute(command, opts)
 }

@@ -1,455 +1,392 @@
-# 📚 drun Examples
+# drun v2 Examples
 
-This directory contains comprehensive examples showcasing all of drun's powerful features. Each example is designed to be educational and demonstrates real-world usage patterns.
+Welcome to drun v2! This directory contains examples showcasing the new **semantic, English-like language** for defining automation tasks. The v2 language compiles to shell commands while providing intuitive, readable syntax that anyone can understand.
 
-## 🎯 Quick Start
+## 🌟 What's New in v2
 
-```bash
-# Initialize a new drun configuration
-drun --init                                    # Create drun.yml in current directory
-drun --init --file=.drun/drun.yml             # Create in custom location (prompts for directory creation)
-drun --init --file=config/my-project.yml      # Custom location with workspace default option
+drun v2 introduces a revolutionary approach to task automation:
 
-# Try the comprehensive feature showcase
-./bin/drun -f examples/feature-showcase.yml showcase-all
+- **🗣️ Natural Language Syntax**: Write tasks in English-like sentences
+- **🧠 Smart Detection**: Automatically detect tools, frameworks, and environments  
+- **🔄 Intelligent Compilation**: Compiles to optimized shell commands
+- **📚 Type Safety**: Parameters with validation and constraints
+- **🎯 Intent-Focused**: Describe *what* you want, not *how* to do it
 
-# Test matrix execution across multiple configurations
-./bin/drun -f examples/matrix-working-demo.yml test-matrix
+## 📁 Example Files
 
-# Explore remote includes and caching
-./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
+### Basic Examples
+- **[01-hello-world.drun](01-hello-world.drun)** - Your first drun v2 tasks
+- **[02-parameters.drun](02-parameters.drun)** - Parameters, defaults, and validation
+- **[03-control-flow.drun](03-control-flow.drun)** - If statements, loops, and error handling
 
-# See smart template functions in action
-./bin/drun -f examples/next-level-features.yml smart-detection
+### Infrastructure Examples  
+- **[04-docker-basics.drun](04-docker-basics.drun)** - Docker workflows and container management
+- **[05-kubernetes.drun](05-kubernetes.drun)** - Kubernetes deployments and operations
+
+### Advanced Examples
+- **[06-cicd-pipeline.drun](06-cicd-pipeline.drun)** - Complete CI/CD pipeline with blue-green deployment
+- **[07-smart-detection.drun](07-smart-detection.drun)** - Intelligent project and framework detection
+- **[33-semantic-actions-showcase.drun](33-semantic-actions-showcase.drun)** - Comprehensive showcase of all semantic actions
+- **[34-working-semantic-actions.drun](34-working-semantic-actions.drun)** - Working examples of implemented semantic actions
+- **[35-advanced-parameter-validation.drun](35-advanced-parameter-validation.drun)** - Advanced parameter validation with pattern macros (`semver`, `uuid`, `url`)
+- **[36-advanced-variable-operations.drun](36-advanced-variable-operations.drun)** - Comprehensive showcase of variable operations (`filtered`, `sorted`, `without`, `split`, chaining)
+
+## 🚀 Quick Start
+
+### Hello World
+```
+task "hello":
+  info "Hello from drun v2! 👋"
 ```
 
-## 📖 Example Files
-
-### 🚀 **Core Features**
-
-#### [`simple.yml`](simple.yml)
-**Basic recipes and fundamental patterns**
-- Simple recipe definitions
-- Positional arguments
-- Basic templating
-- Environment variables
-
-```bash
-# Run basic examples
-./bin/drun -f examples/simple.yml hello
-./bin/drun -f examples/simple.yml greet Alice
+### With Parameters
+```
+task "greet" means "Greet someone by name":
+  requires name
+  given title defaults to "friend"
+  
+  info "Hello, {title} {name}!"
 ```
 
-#### [`prerun-demo.yml`](prerun-demo.yml) ⭐ **UPDATED**
-**Recipe-prerun and recipe-postrun snippets for DRY common setup**
-- Universal ANSI color codes for any project type
-- Generic helper functions (log_info, log_success, etc.)
-- Common shell settings and error handling
-- Per-recipe completion logging and cleanup
-- Language-agnostic project workflow examples
-
-```bash
-# See recipe-prerun and recipe-postrun snippets in action
-./bin/drun -f examples/prerun-demo.yml setup --dry-run
-./bin/drun -f examples/prerun-demo.yml build --target=production
-./bin/drun -f examples/prerun-demo.yml test --coverage
-./bin/drun -f examples/prerun-demo.yml deploy --environment=staging --dry-run
+### Smart Docker Build
+```
+task "build" means "Build Docker image":
+  given tag defaults to current git commit
+  
+  build docker image "myapp:{tag}"
+  success "Built image: myapp:{tag}"
 ```
 
-#### [`lifecycle-demo.yml`](lifecycle-demo.yml) ⭐ **NEW v1.4.0**
-**Complete execution lifecycle with before/after blocks**
-- **Before blocks**: Run once before any recipe execution (setup, validation)
-- **After blocks**: Run once after all recipes complete (cleanup, reporting)
-- **State management**: Shared state across lifecycle phases
-- **Error handling**: After blocks run even when recipes fail
-- **Pipeline reporting**: JSON reports and execution metrics
-
-```bash
-# See lifecycle management in action
-./bin/drun -f examples/lifecycle-demo.yml build
-./bin/drun -f examples/lifecycle-demo.yml deploy staging
-./bin/drun -f examples/lifecycle-demo.yml fail  # After blocks still run!
+### Kubernetes Deployment
+```
+task "deploy" means "Deploy to Kubernetes":
+  requires environment from ["dev", "staging", "production"]
+  
+  deploy myapp:latest to kubernetes namespace {environment}
+  wait for rollout to complete
 ```
 
-#### [`namespacing-demo.yml`](namespacing-demo.yml) ⭐ **NEW v1.4.0**
-**Recipe namespacing to prevent collisions**
-- **Namespace syntax**: `namespace::path` in include statements
-- **Collision prevention**: Multiple files can have recipes with same names
-- **Organization**: Clear separation by source (docker:build, k8s:deploy, etc.)
-- **Mixed dependencies**: Recipes can depend on namespaced recipes
+## 🎯 Key Language Features
 
-```bash
-# Explore namespacing features
-./bin/drun -f examples/namespacing-demo.yml list-recipes
-./bin/drun -f examples/namespacing-demo.yml build        # Local recipe
-./bin/drun -f examples/namespacing-demo.yml docker:build # Namespaced recipe
-./bin/drun -f examples/namespacing-demo.yml full-build   # Mixed dependencies
+### Natural Parameter Declaration
+```
+# Required parameters with validation
+requires environment from ["dev", "staging", "production"]
+requires port as number between 1000 and 9999
+requires email matching email format
+
+# Optional parameters with defaults
+given replicas defaults to 3
+given timeout defaults to "5m"
+given force defaults to false
+
+# Lists and arrays
+accepts features as list of strings
+accepts configs as list
 ```
 
-#### [`complete-demo.yml`](complete-demo.yml) ⭐ **NEW v1.4.0**
-**Production-ready pipeline combining lifecycle + namespacing**
-- **Full CI pipeline**: Complete build, test, package, deploy workflow
-- **Mixed dependencies**: Local and namespaced recipe dependencies
-- **Pipeline reporting**: JSON reports and artifact archiving
-- **Real-world patterns**: Production-ready configuration examples
+### Smart Control Flow
+```
+# Natural conditionals
+if docker is running:
+  build container
+else:
+  error "Docker is not available"
 
-```bash
-# Run complete CI pipeline
-./bin/drun -f examples/complete-demo.yml full-ci
-./bin/drun -f examples/complete-demo.yml deploy production
-./bin/drun -f examples/complete-demo.yml status
+# Pattern matching
+when environment:
+  is "production": require manual approval
+  is "staging": run integration tests
+  else: skip validation
+
+# Intelligent loops
+for each service in ["api", "web", "worker"]:
+  deploy service {service}
+
+# Parallel execution
+for each region in ["us-east", "eu-west"] in parallel:
+  deploy to {region}
 ```
 
-#### [`snippets-showcase.yml`](snippets-showcase.yml) ⭐ **NEW**
-**Comprehensive snippet library and patterns**
-- Advanced snippet patterns and best practices
-- Prerun snippet calls with `{{ snippet "name" }}`
-- Conditional snippet usage with flags
-- Environment detection and tool checking
-- Professional logging and error handling
-- Real-world development workflow examples
+### Smart Detection
+```
+# Framework detection
+when symfony is detected:
+  run symfony console commands
 
-```bash
-# Explore snippet capabilities
-./bin/drun -f examples/snippets-showcase.yml demo-snippets --dry-run
-./bin/drun -f examples/snippets-showcase.yml hello
-./bin/drun -f examples/snippets-showcase.yml setup --tools --node
-./bin/drun -f examples/snippets-showcase.yml test --unit --coverage
-./bin/drun -f examples/snippets-showcase.yml build --docker --push
+when laravel is detected:
+  run artisan commands
+
+# Tool detection  
+if docker is running:
+  build containerized app
+
+if kubernetes is available:
+  deploy to cluster
+
+# Project type detection
+when package manager:
+  is "npm": run "npm ci && npm run build"
+  is "yarn": run "yarn install && yarn build"
+  is "go": run "go build ./..."
 ```
 
-#### [`docker-devops.yml`](docker-devops.yml)
-**Docker workflows with intelligent auto-detection**
-- Auto-detect Docker Compose vs docker-compose
-- Auto-detect Docker Buildx vs docker build
-- Multi-stage builds and deployments
-- Environment-specific configurations
+### Built-in Actions
+```
+# Docker operations
+build docker image "myapp:latest"
+push image "myapp:latest" to "ghcr.io"
+run container "myapp:latest" on port 8080
 
-```bash
-# Smart Docker operations
-./bin/drun -f examples/docker-devops.yml build
-./bin/drun -f examples/docker-devops.yml deploy production
+# Kubernetes operations
+deploy myapp:latest to kubernetes namespace production
+scale deployment "myapp" to 5 replicas
+rollback deployment "myapp"
+
+# Git operations
+commit changes with message "Add new feature"
+push to branch "main"
+create tag "v1.2.3"
+
+# File operations
+copy "source.txt" to "destination.txt"
+backup "important.txt" as "backup-{now.date}"
+remove "old-files/"
+
+# Status messages
+step "Starting deployment"
+info "Configuration loaded"
+warn "Using default settings"
+error "Connection failed"
+success "Deployment completed"
 ```
 
-**Features demonstrated:**
-- `{{ dockerCompose }}` and `{{ dockerBuildx }}` functions
-- Conditional Docker command usage
-- Multi-environment deployments
+## 🔄 Migration from v1
 
-### 🌟 **Advanced Features**
+The v2 language compiles to drun v1 YAML, so you can gradually migrate:
 
-#### [`matrix-working-demo.yml`](matrix-working-demo.yml)
-**Matrix execution across multiple configurations**
-- Multi-dimensional matrix builds
-- OS, version, and architecture combinations
-- Matrix variable access in templates
-- Conditional logic based on matrix values
-
-```bash
-# Run matrix tests (generates multiple jobs)
-./bin/drun -f examples/matrix-working-demo.yml test-matrix
-
-# Matrix with dependencies
-./bin/drun -f examples/matrix-working-demo.yml build-matrix
-```
-
-**Matrix expansion:**
-- `test-matrix` → 18 jobs (3 OS × 3 versions × 2 arch)
-- `build-matrix` → 4 jobs (2 arch × 2 variants)
-
-#### [`secrets-demo.yml`](secrets-demo.yml)
-**Secure secrets management**
-- Environment variable secrets (`env://`)
-- File-based secrets (`file://`)
-- Required vs optional secrets
-- Secure usage patterns
-
-```bash
-# Set up secrets
-export API_KEY="your-api-key"
-echo "deploy-token-123" > ~/.secrets/deploy-token
-
-# Run with secrets
-./bin/drun -f examples/secrets-demo.yml secure-deploy
-```
-
-**Security features:**
-- Secrets not logged in plain text
-- Multiple source types
-- Validation and error handling
-
-#### [`includes-demo.yml`](includes-demo.yml)
-**Local and remote recipe includes**
-- Local file includes with glob patterns
-- Shared recipe libraries
-- Modular configuration management
-
-```bash
-# Demonstrate local includes
-./bin/drun -f examples/includes-demo.yml deploy-with-shared
-```
-
-#### [`remote-includes-showcase.yml`](remote-includes-showcase.yml)
-**Remote includes deep dive**
-- HTTP/HTTPS includes with caching
-- Git repository includes with branch/tag references
-- Performance optimization through intelligent caching
-- Enterprise-grade recipe sharing
-
-```bash
-# Explore remote capabilities
-./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
-
-# Test HTTP includes
-./bin/drun -f examples/remote-includes-showcase.yml test-http-includes
-
-# Test Git includes with versioning
-./bin/drun -f examples/remote-includes-showcase.yml test-git-includes
-```
-
-**Remote sources:**
-- Raw GitHub URLs
-- Git repositories with refs
-- Intelligent caching system
-
-### 📊 **Developer Experience**
-
-#### [`logging-demo.yml`](logging-demo.yml)
-**Advanced logging and metrics**
-- Structured status messages with emojis
-- Performance tracking and metrics
-- Progress indicators
-- Error handling patterns
-
-```bash
-# See beautiful logging in action
-./bin/drun -f examples/logging-demo.yml performance-test
-./bin/drun -f examples/logging-demo.yml status-showcase
-```
-
-**Logging features:**
-- 🚀 Step indicators
-- ℹ️ Info messages
-- ⚠️ Warnings
-- ❌ Errors
-- ✅ Success messages
-
-#### [`next-level-features.yml`](next-level-features.yml)
-**Smart detection and automation**
-- Auto-detect project types (npm, go, python, etc.)
-- Git integration (branch, commit, dirty status)
-- CI environment detection
-- Intelligent command selection
-
-```bash
-# Smart project detection
-./bin/drun -f examples/next-level-features.yml smart-detection
-
-# Git integration
-./bin/drun -f examples/next-level-features.yml git-info
-
-# CI detection
-./bin/drun -f examples/next-level-features.yml ci-check
-```
-
-#### [`feature-showcase.yml`](feature-showcase.yml)
-**Comprehensive feature demonstration**
-- All features in one place
-- Real-world usage patterns
-- Best practices examples
-- Performance demonstrations
-
-```bash
-# Complete feature tour
-./bin/drun -f examples/feature-showcase.yml showcase-all
-
-# Individual feature demos
-./bin/drun -f examples/feature-showcase.yml smart-build
-./bin/drun -f examples/feature-showcase.yml comprehensive-workflow
-```
-
-## 🎓 Learning Path
-
-### 1. **Start Here** - Basic Concepts
-```bash
-# Initialize your first configuration
-drun --init
-
-# Learn the fundamentals
-./bin/drun -f examples/simple.yml hello
-./bin/drun -f examples/simple.yml greet Alice
-
-# Try custom configuration locations
-drun --init --file=.drun/drun.yml    # Creates directory and offers workspace default
-```
-
-### 2. **New Features (v1.4.0)** - Lifecycle & Namespacing ⭐
-```bash
-# Try lifecycle management
-./bin/drun -f examples/lifecycle-demo.yml build
-
-# Explore recipe namespacing
-./bin/drun -f examples/namespacing-demo.yml list-recipes
-./bin/drun -f examples/namespacing-demo.yml docker:build
-
-# Complete production pipeline
-./bin/drun -f examples/complete-demo.yml full-ci
-```
-
-### 3. **Docker Integration** - Smart Detection
-```bash
-# See auto-detection in action
-./bin/drun -f examples/docker-devops.yml build
-```
-
-### 4. **Advanced Features** - Matrix & Secrets
-```bash
-# Try matrix execution
-./bin/drun -f examples/matrix-working-demo.yml test-matrix
-
-# Set up and use secrets
-export API_KEY="test-key"
-./bin/drun -f examples/secrets-demo.yml secure-deploy
-```
-
-### 5. **Remote Includes** - Collaboration
-```bash
-# Explore remote recipe sharing
-./bin/drun -f examples/remote-includes-showcase.yml show-remote-capabilities
-```
-
-### 6. **Complete Tour** - Everything Together
-```bash
-# See all features working together
-./bin/drun -f examples/feature-showcase.yml showcase-all
-```
-
-## 🛠️ Template Functions Reference
-
-All examples demonstrate these powerful template functions:
-
-### 🐳 **Docker Integration**
-- `{{ dockerCompose }}` - Auto-detect Docker Compose command
-- `{{ dockerBuildx }}` - Auto-detect Docker Buildx command
-- `{{ hasCommand "kubectl" }}` - Check command availability
-
-### 🔗 **Git Integration**
-- `{{ gitBranch }}` - Current branch name
-- `{{ gitCommit }}` - Full commit hash
-- `{{ gitShortCommit }}` - Short commit hash (7 chars)
-- `{{ isDirty }}` - Working directory status
-
-### 📦 **Project Detection**
-- `{{ packageManager }}` - Auto-detect npm, yarn, go, pip, etc.
-- `{{ hasFile "go.mod" }}` - File existence check
-- `{{ isCI }}` - CI environment detection
-
-### 📊 **Status Messages**
-- `{{ step "message" }}` - 🚀 Step indicator
-- `{{ info "message" }}` - ℹ️ Information
-- `{{ warn "message" }}` - ⚠️ Warning
-- `{{ error "message" }}` - ❌ Error (non-fatal)
-- `{{ success "message" }}` - ✅ Success
-
-### 🔐 **Secrets Management**
-- `{{ secret "name" }}` - Access secret securely
-- `{{ hasSecret "name" }}` - Check secret availability
-
-## 🏗️ Real-World Patterns
-
-### **Enterprise Workflow**
+### v1 YAML:
 ```yaml
-# Complete CI/CD pipeline
-matrix:
-  environment: ["dev", "staging", "prod"]
-  arch: ["amd64", "arm64"]
-
-secrets:
-  deploy_token:
-    source: "env://DEPLOY_TOKEN"
-    required: true
-
-include:
-  - "git+https://company.com/drun-recipes.git@v1.0.0:ci/common.yml"
-
 recipes:
   deploy:
-    deps: [test, build]
+    help: "Deploy to environment"
+    positionals:
+      - name: environment
+        required: true
+        one_of: ["dev", "staging", "production"]
+    deps: [build]
     run: |
-      {{ step "Deploying to {{ .matrix_environment }}/{{ .matrix_arch }}" }}
-      {{ if eq .matrix_environment "prod" }}
-      {{ warn "Production deployment - extra validation" }}
-      {{ end }}
-      # Deploy using shared recipes and secrets
+      kubectl set image deployment/myapp myapp=myapp:latest --namespace={{ .environment }}
 ```
 
-### **Multi-Project Monorepo**
-```yaml
-# Smart project detection
-recipes:
-  build-all:
-    run: |
-      for dir in */; do
-        cd "$dir"
-        {{ step "Building $dir ({{ packageManager }})" }}
-        
-        {{ if eq (packageManager) "npm" }}
-        npm ci && npm run build
-        {{ else if eq (packageManager) "go" }}
-        go build ./...
-        {{ else if eq (packageManager) "python" }}
-        pip install -r requirements.txt
-        {{ end }}
-        
-        cd ..
-      done
+### v2 Semantic:
+```
+task "deploy" means "Deploy to environment":
+  requires environment from ["dev", "staging", "production"]
+  depends on build
+  
+  deploy myapp:latest to kubernetes namespace {environment}
 ```
 
-### **Docker Multi-Architecture**
-```yaml
-# Cross-platform builds
-matrix:
-  arch: ["amd64", "arm64"]
-  variant: ["alpine", "debian"]
+## 🛠️ Running Examples
 
-recipes:
-  docker-build:
-    run: |
-      {{ step "Building for {{ .matrix_arch }}/{{ .matrix_variant }}" }}
-      
-      {{ dockerBuildx }} build \
-        --platform linux/{{ .matrix_arch }} \
-        -f Dockerfile.{{ .matrix_variant }} \
-        -t myapp:{{ gitShortCommit }}-{{ .matrix_arch }}-{{ .matrix_variant }} \
-        .
+*Note: drun v2 compiler is not yet implemented. These examples show the target syntax.*
+
+Once the v2 compiler is ready, you'll run examples like this:
+
+```bash
+# Basic examples
+drun -f 01-hello-world.drun hello
+drun -f 02-parameters.drun greet --name=Alice --title=Ms.
+
+# Docker examples  
+drun -f 04-docker-basics.drun build --tag=v1.0.0
+drun -f 04-docker-basics.drun "run local" --port=3000
+
+# Kubernetes examples
+drun -f 05-kubernetes.drun deploy --environment=staging
+drun -f 05-kubernetes.drun scale --environment=production --replica_count=10
+
+# CI/CD pipeline
+drun -f 06-cicd-pipeline.drun "ci pipeline"
+drun -f 06-cicd-pipeline.drun "deploy to staging"
 ```
 
-## 🚀 Performance Tips
+## 📖 Language Reference
 
-1. **Use Matrix Execution** for parallel builds across configurations
-2. **Leverage Remote Includes** for shared recipes (cached automatically)
-3. **Smart Detection Functions** reduce conditional complexity
-4. **Secrets Management** keeps sensitive data secure
-5. **Status Messages** provide clear feedback and debugging
+### Task Definition
+```
+task <name> [means <description>]:
+  [parameters]
+  [dependencies] 
+  [lifecycle_hooks]
+  [variables]
+  <statements>
+```
 
-## 🤝 Contributing Examples
+### Parameter Types
+- **String**: `requires name`
+- **Number**: `requires port as number`
+- **Boolean**: `given force defaults to false`
+- **List**: `accepts items as list of strings`
+- **Constrained**: `requires env from ["dev", "prod"]`
+- **Pattern**: `requires version matching pattern "v\d+\.\d+\.\d+"`
 
-Have a great drun pattern? Add it to the examples!
+### Dependencies
+```
+depends on build                    # Single dependency
+depends on build and test          # Multiple dependencies  
+depends on build then deploy       # Sequential dependencies
+depends on lint, test, scan        # Parallel dependencies
+```
 
-1. Create a new `.yml` file with clear naming
-2. Add comprehensive comments explaining the pattern
-3. Include usage examples in comments
-4. Update this README with your example
-5. Test thoroughly with `./bin/drun -f your-example.yml recipe-name`
+### Variables
+```
+let name be "value"                 # Immutable binding
+set counter to 0                    # Mutable variable
+capture result from "command"       # Capture command output
 
-## 📚 Additional Resources
+# Conditional assignment
+let config be:
+  when environment is "prod": production_config
+  else: development_config
+```
 
-- **Main README**: [`../README.md`](../README.md) - Complete drun documentation
-- **Specification**: [`../spec.md`](../spec.md) - Detailed YAML format reference
-- **Roadmap**: [`../ROADMAP.md`](../ROADMAP.md) - Future features and enhancements
+### Variable Operations
+```drun
+# String operations
+set $version to "v2.1.0-beta"
+info "Clean version: {$version without prefix 'v' | without suffix '-beta'}"
+# Output: 2.1.0
+
+# Array operations
+set $files to "app.js test.js config.json readme.md"
+info "JS files: {$files filtered by extension '.js'}"
+# Output: app.js test.js
+
+info "Sorted files: {$files sorted by name}"
+# Output: app.js config.json readme.md test.js
+
+# Path operations
+set $config_path to "/etc/nginx/default.conf"
+info "Filename: {$config_path basename}"
+# Output: default.conf
+
+# Complex chaining
+set $source_files to "src/app.js src/utils.js tests/app.test.js"
+info "Source JS files: {$source_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
+# Output: src/app.js src/utils.js
+
+# Loop integration
+for each img in $docker_images:
+  info "Processing: {img split by ':' | first}"
+```
+
+### Control Flow
+```
+# Conditionals
+if condition:
+  statements
+else if other_condition:
+  statements  
+else:
+  statements
+
+# Pattern matching
+when expression:
+  is value1: statements
+  is value2: statements
+  else: statements
+
+# Loops
+for each item in collection:
+  process item
+
+for i from 1 to 10:
+  step "Iteration {i}"
+
+# Error handling
+try:
+  risky_operation
+catch error_type:
+  handle_error
+finally:
+  cleanup
+```
+
+## 🎨 Best Practices
+
+### 1. Use Descriptive Task Names
+```
+# Good
+task "deploy to production" means "Deploy application to production environment"
+
+# Avoid
+task "deploy"
+```
+
+### 2. Leverage Smart Detection
+```
+# Good - let drun detect the right approach
+when symfony is detected:
+  run symfony console commands
+
+# Avoid - hardcoding specific commands
+run "php bin/console cache:clear"
+```
+
+### 3. Use Natural Parameter Names
+```
+# Good
+requires target_environment from ["dev", "staging", "production"]
+given replica_count defaults to 3
+
+# Avoid
+requires env from ["dev", "staging", "production"]  
+given replicas defaults to 3
+```
+
+### 4. Structure Complex Workflows
+```
+# Break down complex operations
+task "full deployment":
+  depends on "run tests" and "build image" then "deploy to staging"
+  
+  step "Starting production deployment"
+  run "deploy to production"
+  run "verify deployment"
+  run "notify team"
+```
+
+### 5. Use Meaningful Status Messages
+```
+step "Building Docker image for {environment}"
+info "Using configuration: {config_file}"
+warn "No SSL certificate found, using HTTP"
+error "Database connection failed: {error_message}"
+success "Deployment completed in {duration}"
+```
+
+## 🔮 Future Features
+
+The v2 language is designed for extensibility. Planned features include:
+
+- **Plugin System**: Custom actions and detectors
+- **Advanced Templates**: More sophisticated templating
+- **IDE Integration**: Syntax highlighting, completion, debugging
+- **Visual Editor**: Drag-and-drop task builder
+- **AI Assistant**: Natural language to drun conversion
+
+## 🤝 Contributing
+
+These examples represent the target syntax for drun v2. As we implement the compiler, examples may evolve. Contributions and feedback are welcome!
+
+## 📚 Learn More
+
+- **[drun v2 Specification](../DRUN_V2_SPECIFICATION.md)** - Complete language specification
+- **[Migration Guide](../docs/v2-migration.md)** - Migrating from v1 to v2
+- **[Language Reference](../docs/v2-reference.md)** - Detailed syntax reference
 
 ---
 
-**Happy automating with drun!** 🎉
-
-These examples demonstrate that drun isn't just a task runner—it's a **comprehensive automation platform** that scales from simple scripts to enterprise-grade CI/CD pipelines.
+**Ready to revolutionize your automation workflows?** Start with `01-hello-world.drun` and experience the future of task automation! 🚀

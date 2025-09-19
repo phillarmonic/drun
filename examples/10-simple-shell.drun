@@ -1,0 +1,7 @@
+version: 2.0
+
+task "simple":
+  info "Starting"
+  run "echo 'test'"
+  success "Done"
+

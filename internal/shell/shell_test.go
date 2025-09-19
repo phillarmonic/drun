@@ -1,293 +1,201 @@
 package shell
 
 import (
+	"bytes"
+	"strings"
 	"testing"
-
-	"github.com/phillarmonic/drun/internal/model"
+	"time"
 )
 
-func TestNewSelector(t *testing.T) {
-	shellConfigs := map[string]model.ShellConfig{
-		"linux": {
-			Cmd:  "/bin/bash",
-			Args: []string{"-c"},
-		},
-	}
-
-	selector := NewSelector(shellConfigs)
-
-	if selector == nil {
-		t.Fatal("Expected selector to be created, got nil")
-	}
-}
-
-func TestSelector_GetShell_CustomConfig(t *testing.T) {
-	shellConfigs := map[string]model.ShellConfig{
-		"linux": {
-			Cmd:  "/bin/bash",
-			Args: []string{"-c"},
-		},
-		"darwin": {
-			Cmd:  "/bin/zsh",
-			Args: []string{"-c"},
-		},
-	}
-
-	selector := NewSelector(shellConfigs)
-
-	shell, err := selector.Select("", "linux")
+func TestExecuteSimple(t *testing.T) {
+	// Test simple command execution
+	output, err := ExecuteSimple("echo 'Hello, World!'")
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("ExecuteSimple failed: %v", err)
 	}
 
-	if shell.Cmd != "/bin/bash" {
-		t.Errorf("Expected cmd '/bin/bash', got %q", shell.Cmd)
-	}
-
-	if len(shell.Args) != 1 || shell.Args[0] != "-c" {
-		t.Errorf("Expected args ['-c'], got %v", shell.Args)
-	}
-
-	if shell.OS != "linux" {
-		t.Errorf("Expected OS 'linux', got %q", shell.OS)
+	expected := "Hello, World!"
+	if output != expected {
+		t.Errorf("Expected %q, got %q", expected, output)
 	}
 }
 
-func TestSelector_GetShell_DefaultConfig(t *testing.T) {
-	selector := NewSelector(nil) // No custom configs
+func TestExecute_Success(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
 
-	// Test default Linux config
-	shell, err := selector.Select("", "linux")
+	result, err := Execute("echo 'test output'", opts)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if shell.Cmd != "/bin/sh" {
-		t.Errorf("Expected default Linux cmd '/bin/sh', got %q", shell.Cmd)
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	// Test default Darwin config
-	shell, err = selector.Select("", "darwin")
+	if !result.Success {
+		t.Errorf("Expected command to succeed")
+	}
+
+	if result.ExitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", result.ExitCode)
+	}
+
+	if result.Stdout != "test output" {
+		t.Errorf("Expected 'test output', got %q", result.Stdout)
+	}
+
+	if result.Duration <= 0 {
+		t.Errorf("Expected positive duration, got %v", result.Duration)
+	}
+}
+
+func TestExecute_Failure(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.IgnoreErrors = true // Don't return error for non-zero exit
+
+	result, err := Execute("exit 1", opts)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if shell.Cmd != "/bin/zsh" {
-		t.Errorf("Expected default Darwin cmd '/bin/zsh', got %q", shell.Cmd)
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	// Test default Windows config
-	shell, err = selector.Select("", "windows")
+	if result.Success {
+		t.Errorf("Expected command to fail")
+	}
+
+	if result.ExitCode != 1 {
+		t.Errorf("Expected exit code 1, got %d", result.ExitCode)
+	}
+}
+
+func TestExecute_WithEnvironment(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.Environment = map[string]string{
+		"TEST_VAR": "test_value_123",
+	}
+
+	result, err := Execute("echo $TEST_VAR", opts)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("Execute failed: %v", err)
 	}
-	if shell.Cmd != "pwsh" {
-		t.Errorf("Expected default Windows cmd 'pwsh', got %q", shell.Cmd)
+
+	if result.Stdout != "test_value_123" {
+		t.Errorf("Expected 'test_value_123', got %q", result.Stdout)
 	}
 }
 
-func TestSelector_GetShell_UnknownOS(t *testing.T) {
-	selector := NewSelector(nil)
+func TestExecute_WithWorkingDir(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.WorkingDir = "/tmp"
 
-	shell, err := selector.Select("", "unknown-os")
+	result, err := Execute("pwd", opts)
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	// Should fall back to Linux default
-	if shell.Cmd != "/bin/sh" {
-		t.Errorf("Expected fallback to Linux default '/bin/sh', got %q", shell.Cmd)
-	}
-
-	if shell.OS != "unknown-os" {
-		t.Errorf("Expected OS to be preserved as 'unknown-os', got %q", shell.OS)
+	if result.Stdout != "/tmp" {
+		t.Errorf("Expected '/tmp', got %q", result.Stdout)
 	}
 }
 
-func TestShell_BuildCommand_Linux(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "/bin/bash",
-		Args: []string{"-c"},
-		OS:   "linux",
+func TestExecute_WithTimeout(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.Timeout = 100 * time.Millisecond
+	opts.IgnoreErrors = true
+
+	start := time.Now()
+	result, err := Execute("sleep 1", opts)
+	duration := time.Since(start)
+
+	// Command should be killed by timeout
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	script := "echo hello world"
-	command := shell.BuildCommand(script)
-
-	expected := []string{"/bin/bash", "-c", "echo hello world"}
-
-	if len(command) != len(expected) {
-		t.Fatalf("Expected %d args, got %d", len(expected), len(command))
+	if result.Success {
+		t.Errorf("Expected command to fail due to timeout")
 	}
 
-	for i, arg := range command {
-		if arg != expected[i] {
-			t.Errorf("Arg %d: expected %q, got %q", i, expected[i], arg)
-		}
-	}
-}
-
-func TestShell_BuildCommand_Windows(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "pwsh",
-		Args: []string{"-NoLogo", "-Command"},
-		OS:   "windows",
-	}
-
-	script := "echo hello world"
-	command := shell.BuildCommand(script)
-
-	expected := []string{"pwsh", "-NoLogo", "-Command", "echo hello world"}
-
-	if len(command) != len(expected) {
-		t.Fatalf("Expected %d args, got %d", len(expected), len(command))
-	}
-
-	for i, arg := range command {
-		if arg != expected[i] {
-			t.Errorf("Arg %d: expected %q, got %q", i, expected[i], arg)
-		}
+	// Should complete within reasonable time (allowing some buffer for CI environments)
+	if duration > 2*time.Second {
+		t.Errorf("Command took too long, timeout may not be working: %v", duration)
 	}
 }
 
-func TestShell_BuildCommand_WithMultipleArgs(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "/bin/bash",
-		Args: []string{"-c", "-e", "-u"},
-		OS:   "linux",
+func TestExecuteWithOutput(t *testing.T) {
+	var output bytes.Buffer
+
+	result, err := ExecuteWithOutput("echo 'streaming test'", &output)
+	if err != nil {
+		t.Fatalf("ExecuteWithOutput failed: %v", err)
 	}
 
-	script := "echo test"
-	command := shell.BuildCommand(script)
-
-	expected := []string{"/bin/bash", "-c", "-e", "-u", "echo test"}
-
-	if len(command) != len(expected) {
-		t.Fatalf("Expected %d args, got %d", len(expected), len(command))
+	if !result.Success {
+		t.Errorf("Expected command to succeed")
 	}
 
-	for i, arg := range command {
-		if arg != expected[i] {
-			t.Errorf("Arg %d: expected %q, got %q", i, expected[i], arg)
-		}
-	}
-}
-
-func TestShell_convertShellIdioms_Windows(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "pwsh",
-		Args: []string{"-Command"},
-		OS:   "windows",
+	// Check that output was streamed
+	outputStr := output.String()
+	if !strings.Contains(outputStr, "streaming test") {
+		t.Errorf("Expected output to contain 'streaming test', got %q", outputStr)
 	}
 
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "simple command",
-			input:    "echo hello",
-			expected: "echo hello",
-		},
-		{
-			name:     "export command",
-			input:    "export VAR=value",
-			expected: "$env:VAR='value'",
-		},
-		{
-			name:     "multiple exports",
-			input:    "export A=1\nexport B=2",
-			expected: "$env:A='1'\n$env:B='2'",
-		},
-		{
-			name:     "mixed commands",
-			input:    "echo start\nexport VAR=test\necho end",
-			expected: "echo start\n$env:VAR='test'\necho end",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := shell.convertShellIdioms(tt.input)
-			if result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
-			}
-		})
+	// Check that result also captured the output
+	if result.Stdout != "streaming test" {
+		t.Errorf("Expected captured output 'streaming test', got %q", result.Stdout)
 	}
 }
 
-func TestShell_convertShellIdioms_NonWindows(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "/bin/bash",
-		Args: []string{"-c"},
-		OS:   "linux",
+func TestExecute_MultilineOutput(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+
+	result, err := Execute("echo 'line1'; echo 'line2'; echo 'line3'", opts)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	input := "export VAR=value\necho hello"
-	result := shell.convertShellIdioms(input)
-
-	// Should not modify non-Windows scripts
-	if result != input {
-		t.Errorf("Expected script to be unchanged for non-Windows OS, got %q", result)
-	}
-}
-
-func TestDefaultShellConfigs(t *testing.T) {
-	// Test that selector with nil configs uses reasonable defaults
-	selector := NewSelector(nil)
-
-	// Check that all expected OS configs work
-	expectedOS := []string{"linux", "darwin", "windows"}
-
-	for _, os := range expectedOS {
-		shell, err := selector.Select("", os)
-		if err != nil {
-			t.Errorf("Expected no error for %s, got %v", os, err)
-		}
-		if shell == nil {
-			t.Errorf("Expected shell for %s to be created", os)
-		}
+	expected := "line1\nline2\nline3"
+	if result.Stdout != expected {
+		t.Errorf("Expected %q, got %q", expected, result.Stdout)
 	}
 }
 
-func TestShell_BuildCommand_EmptyScript(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "/bin/bash",
-		Args: []string{"-c"},
-		OS:   "linux",
+func TestExecute_StderrCapture(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.IgnoreErrors = true
+
+	result, err := Execute("echo 'error message' >&2; exit 1", opts)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	command := shell.BuildCommand("")
-
-	expected := []string{"/bin/bash", "-c", ""}
-
-	if len(command) != len(expected) {
-		t.Fatalf("Expected %d args, got %d", len(expected), len(command))
+	if result.Success {
+		t.Errorf("Expected command to fail")
 	}
 
-	for i, arg := range command {
-		if arg != expected[i] {
-			t.Errorf("Arg %d: expected %q, got %q", i, expected[i], arg)
-		}
+	if !strings.Contains(result.Stderr, "error message") {
+		t.Errorf("Expected stderr to contain 'error message', got %q", result.Stderr)
 	}
 }
 
-func TestShell_BuildCommand_MultilineScript(t *testing.T) {
-	shell := &Shell{
-		Cmd:  "/bin/bash",
-		Args: []string{"-c"},
-		OS:   "linux",
+func TestDefaultOptions(t *testing.T) {
+	opts := DefaultOptions()
+
+	if opts.Shell != "/bin/sh" {
+		t.Errorf("Expected default shell '/bin/sh', got %q", opts.Shell)
 	}
 
-	script := "echo line1\necho line2\necho line3"
-	command := shell.BuildCommand(script)
-
-	expected := []string{"/bin/bash", "-c", "echo line1\necho line2\necho line3"}
-
-	if len(command) != len(expected) {
-		t.Fatalf("Expected %d args, got %d", len(expected), len(command))
+	if opts.Timeout != 30*time.Second {
+		t.Errorf("Expected default timeout 30s, got %v", opts.Timeout)
 	}
 
-	if command[2] != script {
-		t.Errorf("Expected script to be preserved as-is, got %q", command[2])
+	if !opts.CaptureOutput {
+		t.Errorf("Expected CaptureOutput to be true by default")
+	}
+
+	if opts.StreamOutput {
+		t.Errorf("Expected StreamOutput to be false by default")
 	}
 }

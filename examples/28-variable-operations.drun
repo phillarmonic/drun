@@ -1,0 +1,177 @@
+version: 2.0
+
+project "Variable Operations Demo" version "1.0":
+
+task "basic_variable_operations":
+  info "🚀 Starting Basic Variable Operations Demo"
+  
+  # Let statements for variable declaration
+  let $name = "John"
+  let $age = 30
+  let $active = true
+  
+  info "📝 Variables declared: name={$name}, age={$age}, active={$active}"
+  
+  # Set statements for variable assignment
+  set $greeting to "Hello"
+  set $counter to 0
+  
+  info "📝 Variables set: greeting={$greeting}, counter={$counter}"
+  
+  success "✅ Basic variable operations completed!"
+
+task "string_transformations":
+  info "🚀 Starting String Transformations Demo"
+  
+  let $text = "  Hello World  "
+  info "Original: '{$text}'"
+  
+  # String transformation functions
+  transform $text with trim
+  info "After trim: '{$text}'"
+  
+  transform $text with uppercase
+  info "After uppercase: '{$text}'"
+  
+  transform $text with lowercase
+  info "After lowercase: '{$text}'"
+  
+  transform $text with replace "world" "Universe"
+  info "After replace: '{$text}'"
+  
+  transform $text with concat " - Welcome!"
+  info "After concat: '{$text}'"
+  
+  success "✅ String transformations completed!"
+
+task "advanced_transformations":
+  info "🚀 Starting Advanced Transformations Demo"
+  
+  let $message = "Hello World"
+  
+  # Length function
+  transform $message with length
+  info "Length of 'Hello World': {$message}"
+  
+  # Reset for slice demo
+  set $message to "Programming"
+  transform $message with slice 0 7
+  info "Slice of 'Programming' (0-7): {$message}"
+  
+  # Reset for more demos
+  set $data to "apple,banana,cherry"
+  info "Original data: {$data}"
+  
+  transform $data with split ","
+  info "After split: {$data}"
+  
+  transform $data with join " | "
+  info "After join: {$data}"
+  
+  success "✅ Advanced transformations completed!"
+
+task "variables_in_loops":
+  given $items defaults to "apple,banana,cherry"
+  
+  info "🚀 Starting Variables in Loops Demo"
+  
+  for each item in items:
+    let $processed = $item
+    transform $processed with uppercase
+    transform $processed with concat " (processed)"
+    info "  Item: {$processed}"
+  
+  success "✅ Variables in loops completed!"
+
+task "variables_in_conditionals":
+  info "🚀 Starting Variables in Conditionals Demo"
+  
+  let $status = "pending"
+  info "Initial status: {$status}"
+  
+  if $status is "pending":
+    set $status to "processing"
+    transform $status with concat " - started"
+    info "  Status updated: {$status}"
+  
+  if $status is not "completed":
+    transform $status with replace "processing" "active"
+    info "  Status refined: {$status}"
+  
+  success "✅ Variables in conditionals completed!"
+
+task "complex_variable_workflow":
+  info "🚀 Starting Complex Variable Workflow Demo"
+  
+  # Initialize variables
+  let $firstName = "John"
+  let $lastName = "Doe"
+  let $title = "Mr"
+  set $fullName to "Unknown"
+  
+  # Build full name step by step
+  set $fullName to $title
+  transform $fullName with concat " "
+  transform $fullName with concat firstName
+  transform $fullName with concat " "
+  transform $fullName with concat lastName
+  
+  info "Built full name: {$fullName}"
+  
+  # Create email from name
+  let $email = firstName
+  transform $email with lowercase
+  transform $email with concat "."
+  let $lastLower = lastName
+  transform $lastLower with lowercase
+  transform $email with concat lastLower
+  transform $email with concat "@company.com"
+  
+  info "Generated email: {$email}"
+  
+  # Create initials
+  let $initials = firstName
+  transform $initials with slice 0 1
+  transform $initials with uppercase
+  let $lastInitial = lastName
+  transform $lastInitial with slice 0 1
+  transform $lastInitial with uppercase
+  transform $initials with concat lastInitial
+  
+  info "Initials: {$initials}"
+  
+  success "✅ Complex variable workflow completed!"
+
+task "variable_operations_showcase":
+  info "🚀 Starting Complete Variable Operations Showcase"
+  
+  # Demonstrate all variable operations in one task
+  let $data = "Hello, World!"
+  info "1. Original: {$data}"
+  
+  transform $data with uppercase
+  info "2. Uppercase: {$data}"
+  
+  transform $data with replace "HELLO" "Hi"
+  info "3. Replace: {$data}"
+  
+  transform $data with replace "!" " - How are you?"
+  info "4. Extended: {$data}"
+  
+  transform $data with length
+  info "5. Length: {$data} characters"
+  
+  # Reset and demonstrate more functions
+  set $text to "programming,is,fun"
+  transform $text with split ","
+  info "6. Split result: {$text}"
+  
+  transform $text with join " | "
+  info "7. Join result: {$text}"
+  
+  # Demonstrate slice
+  set $word to "Programming"
+  transform $word with slice 3 8
+  info "8. Slice 'Programming'[3:8]: {$word}"
+  
+  success "✅ Complete variable operations showcase completed!"

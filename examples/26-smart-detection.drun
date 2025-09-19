@@ -1,0 +1,203 @@
+version: 2.0
+
+project "smart-detection-demo" version "1.0.0":
+  set min_node_version to "16"
+  set min_go_version to "1.20"
+  
+  before any task:
+    info "Starting smart detection demo for {$globals.project} v{$globals.version}"
+  
+  after any task:
+    info "Smart detection demo completed"
+
+task "analyze_environment" means "Analyze the current development environment":
+  detect project type
+  
+  if docker is available:
+    info "✅ Docker is available for containerization"
+  else:
+    warn "❌ Docker is not available - some features may be limited"
+  
+  if git is available:
+    info "✅ Git is available for version control"
+  else:
+    warn "❌ Git is not available - version control features disabled"
+    
+  success "Environment analysis completed!"
+
+task "check_node_setup" means "Check Node.js development setup":
+  if node is available:
+    detect node version
+    
+    if node version >= "{$globals.min_node_version}":
+      info "✅ Node.js version meets minimum requirement ({$globals.min_node_version})"
+      
+      if npm is available:
+        info "✅ npm is available for package management"
+      
+      if yarn is available:
+        info "✅ Yarn is available as alternative package manager"
+    else:
+      warn "❌ Node.js version is below minimum requirement ({$globals.min_node_version})"
+      error "Please upgrade Node.js to continue"
+  else:
+    warn "❌ Node.js is not available"
+    
+  success "Node.js setup check completed!"
+
+task "check_go_setup" means "Check Go development setup":
+  if go is available:
+    detect go version
+    
+    if go version >= "{$globals.min_go_version}":
+      info "✅ Go version meets minimum requirement ({$globals.min_go_version})"
+    else:
+      warn "❌ Go version is below minimum requirement ({$globals.min_go_version})"
+      error "Please upgrade Go to continue"
+  else:
+    warn "❌ Go is not available"
+    
+  success "Go setup check completed!"
+
+task "check_python_setup" means "Check Python development setup":
+  if python is available:
+    detect python version
+    info "✅ Python is available"
+    
+    if pip is available:
+      info "✅ pip is available for package management"
+  else:
+    warn "❌ Python is not available"
+    
+  success "Python setup check completed!"
+
+task "check_container_tools" means "Check container and orchestration tools":
+  if docker is available:
+    info "✅ Docker is available"
+    
+    if kubectl is available:
+      info "✅ kubectl is available for Kubernetes"
+      
+      if helm is available:
+        info "✅ Helm is available for Kubernetes package management"
+    else:
+      warn "❌ kubectl is not available - Kubernetes features disabled"
+  else:
+    warn "❌ Docker is not available - containerization features disabled"
+    
+  success "Container tools check completed!"
+
+task "check_cloud_tools" means "Check cloud provider tools":
+  if aws is available:
+    info "✅ AWS CLI is available"
+  else:
+    warn "❌ AWS CLI is not available"
+  
+  if terraform is available:
+    info "✅ Terraform is available for infrastructure as code"
+  else:
+    warn "❌ Terraform is not available"
+    
+  success "Cloud tools check completed!"
+
+task "environment_specific_tasks" means "Run environment-specific tasks":
+  when in ci environment:
+    info "🤖 Running in CI environment"
+    warn "Using CI-specific configuration"
+    info "Skipping interactive prompts"
+  
+  when in local environment:
+    info "💻 Running in local development environment"
+    info "Interactive mode enabled"
+    info "Development tools available"
+  
+  when in production environment:
+    warn "🚨 Running in production environment"
+    error "Production deployment detected - use caution!"
+  
+  when in staging environment:
+    info "🎭 Running in staging environment"
+    info "Testing production-like configuration"
+    
+  success "Environment-specific tasks completed!"
+
+task "comprehensive_check" means "Comprehensive development environment check":
+  depends on analyze_environment
+  
+  info "Running comprehensive development environment analysis"
+  
+  # Check all major development tools
+  detect project type
+  
+  # Runtime environments
+  if node is available:
+    if node version >= "16":
+      info "✅ Node.js 16+ detected"
+  
+  if go is available:
+    if go version >= "1.20":
+      info "✅ Go 1.20+ detected"
+  
+  if python is available:
+    info "✅ Python detected"
+  
+  if java is available:
+    info "✅ Java detected"
+  
+  if ruby is available:
+    info "✅ Ruby detected"
+  
+  if php is available:
+    info "✅ PHP detected"
+  
+  if rust is available:
+    info "✅ Rust detected"
+  
+  # Development tools
+  if git is available:
+    info "✅ Git version control available"
+  
+  if docker is available:
+    info "✅ Docker containerization available"
+  
+  # Cloud and orchestration
+  if kubectl is available:
+    info "✅ Kubernetes tools available"
+  
+  if terraform is available:
+    info "✅ Infrastructure as Code tools available"
+  
+  # Environment detection
+  when in ci environment:
+    info "🤖 CI/CD environment detected"
+  
+  when in local environment:
+    info "💻 Local development environment detected"
+    
+  success "Comprehensive environment check completed!"
+
+task "smart_workflow" means "Smart workflow based on detected environment":
+  detect project type
+  
+  if docker is available:
+    info "Docker detected - containerized workflow available"
+    
+    if kubectl is available:
+      info "Kubernetes detected - cloud-native deployment available"
+  
+  if node is available:
+    info "Node.js detected - JavaScript/TypeScript workflow available"
+    
+    if npm is available:
+      info "Running npm-based workflow"
+  
+  if go is available:
+    info "Go detected - compiled binary workflow available"
+  
+  when in ci environment:
+    info "CI environment - automated testing and deployment"
+  
+  when in local environment:
+    info "Local environment - development and testing workflow"
+    
+  success "Smart workflow configuration completed!"

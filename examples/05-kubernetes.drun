@@ -1,0 +1,61 @@
+# Simple Kubernetes Operations
+version: 2.0
+
+task "deploy" means "Deploy application to Kubernetes":
+  given $app_name defaults to "myapp"
+  given $namespace defaults to "default"
+  given $replicas defaults to "3"
+  
+  step "Deploying {$app_name} to Kubernetes"
+  info "Namespace: {$namespace}, Replicas: {$replicas}"
+  
+  # Use kubectl commands for Kubernetes operations
+  run "kubectl create namespace {$namespace} --dry-run=client -o yaml | kubectl apply -f -"
+  run "kubectl set image deployment/{$app_name} {$app_name}=myregistry/{$app_name}:latest -n {$namespace}"
+  run "kubectl scale deployment {$app_name} --replicas={$replicas} -n {$namespace}"
+  
+  success "Deployed {$app_name} to {$namespace} with {$replicas} replicas"
+
+task "status" means "Check application status":
+  given $app_name defaults to "myapp"
+  given $namespace defaults to "default"
+  
+  step "Checking status of {$app_name}"
+  
+  run "kubectl get pods -l app={$app_name} -n {$namespace}"
+  run "kubectl get services -l app={$app_name} -n {$namespace}"
+  
+  success "Status check completed for {$app_name}"
+
+task "scale" means "Scale application":
+  given $app_name defaults to "myapp"
+  given $replicas defaults to "5"
+  given $namespace defaults to "default"
+  
+  step "Scaling {$app_name} to {$replicas} replicas"
+  
+  run "kubectl scale deployment {$app_name} --replicas={$replicas} -n {$namespace}"
+  
+  success "Scaled {$app_name} to {$replicas} replicas"
+
+task "logs" means "Get application logs":
+  given $app_name defaults to "myapp"
+  given $namespace defaults to "default"
+  given $lines defaults to "100"
+  
+  step "Getting logs for {$app_name}"
+  
+  run "kubectl logs -l app={$app_name} -n {$namespace} --tail={$lines}"
+  
+  success "Retrieved logs for {$app_name}"
+
+task "cleanup" means "Clean up resources":
+  given $app_name defaults to "myapp"
+  given $namespace defaults to "default"
+  
+  step "Cleaning up {$app_name} resources"
+  
+  run "kubectl delete deployment {$app_name} -n {$namespace}"
+  run "kubectl delete service {$app_name} -n {$namespace}"
+  
+  success "Cleaned up {$app_name} resources"

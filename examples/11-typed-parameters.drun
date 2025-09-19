@@ -1,0 +1,105 @@
+version: 2.0
+
+task "basic types" means "Demonstrate basic parameter types":
+  given $count as number defaults to "5"
+  given $enabled as boolean defaults to "true"
+  given $message as string defaults to "Hello World"
+  
+  info "🔢 Count: {$count}"
+  info "✅ Enabled: {$enabled}"
+  info "💬 Message: {$message}"
+  
+  if $enabled is "true":
+    info "🟢 Feature is enabled!"
+  else:
+    info "🔴 Feature is disabled!"
+  
+  success "Basic types demonstration completed!"
+
+task "list operations" means "Demonstrate list parameter types":
+  given $environments as list defaults to "dev,staging,production"
+  given $services as list defaults to "api,web,worker"
+  
+  info "🌍 Target environments: {$environments}"
+  info "🔧 Services to deploy: {$services}"
+  
+  for each env in environments:
+    info "📦 Processing environment: {$env}"
+    
+    for each service in services:
+      info "  🚀 Deploying {$service} to {$env}"
+  
+  success "List operations completed!"
+
+task "validation demo" means "Demonstrate parameter validation":
+  requires $port as number
+  requires $environment as string from ["dev", "staging", "production"]
+  given $timeout as number defaults to "30"
+  given $debug as boolean defaults to "false"
+  
+  info "🌐 Starting server on port {$port}"
+  info "🏷️  Environment: {$environment}"
+  info "⏱️  Timeout: {$timeout} seconds"
+  info "🐛 Debug mode: {$debug}"
+  
+  when environment is "production":
+    warn "⚠️  Running in PRODUCTION mode!"
+    info "🔒 Extra security checks enabled"
+  
+  when debug is "true":
+    info "🔍 Debug logging enabled"
+    info "📊 Performance metrics enabled"
+  
+  success "Validation demo completed!"
+
+task "type inference" means "Demonstrate automatic type inference":
+  given $count defaults to "42"
+  given $enabled defaults to "true"
+  given $ratio defaults to "3.14"
+  given $tags defaults to "frontend,backend,database"
+  
+  info "🔢 Count (inferred as number): {$count}"
+  info "✅ Enabled (inferred as boolean): {$enabled}"
+  info "📊 Ratio (inferred as number): {$ratio}"
+  info "🏷️  Tags (inferred as list): {$tags}"
+  
+  info "Processing tags:"
+  for each item in tags:
+    info "  📌 Tag: {$item}"
+  
+  success "Type inference demonstration completed!"
+
+task "complex example" means "Complex typed parameter example":
+  requires $replicas as number
+  requires $environment as string from ["dev", "staging", "production"]
+  given $services as list defaults to "api,web"
+  given $enable_monitoring as boolean defaults to "true"
+  given $cpu_limit as number defaults to "1.0"
+  
+  info "🚀 Deployment Configuration:"
+  info "  📊 Replicas: {$replicas}"
+  info "  🌍 Environment: {$environment}"
+  info "  🔧 Services: {$services}"
+  info "  📈 Monitoring: {$enable_monitoring}"
+  info "  💻 CPU Limit: {$cpu_limit}"
+  
+  when environment is "production":
+    info "🔒 Production deployment detected"
+    
+    when replicas < "3":
+      warn "⚠️  Low replica count for production!"
+    
+    when enable_monitoring is "false":
+      warn "⚠️  Monitoring disabled in production!"
+  
+  info "📦 Deploying services:"
+  for each service in services:
+    info "  🚀 Deploying {$service}..."
+    info "    📊 Replicas: {$replicas}"
+    info "    💻 CPU Limit: {$cpu_limit}"
+    
+    when enable_monitoring is "true":
+      info "    📈 Monitoring enabled for {$service}"
+  
+  success "🎉 Complex deployment completed!"
+
