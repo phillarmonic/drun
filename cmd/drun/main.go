@@ -26,8 +26,8 @@ var (
 
 // WorkspaceConfig represents the workspace configuration
 type WorkspaceConfig struct {
-	DefaultTaskFile string            `yaml:"default_task_file"`
-	ParallelJobs    int               `yaml:"parallel_jobs"`
+	DefaultTaskFile string            `yaml:"defaultTaskFile"`
+	ParallelJobs    int               `yaml:"parallelJobs"`
 	Shell           string            `yaml:"shell"`
 	Variables       map[string]string `yaml:"variables"`
 	Defaults        map[string]string `yaml:"defaults"`
@@ -251,7 +251,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 			os.Exit(1)
 		}
 		// For other errors, return normally (will show usage)
-		return err
+		return fmt.Errorf("execution failed: %w", err)
 	}
 	return nil
 }
