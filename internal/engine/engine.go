@@ -940,12 +940,13 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 	// Show what we're about to do with appropriate emoji
 	switch operation {
 	case "create":
-		if resource == "branch" {
+		switch resource {
+		case "branch":
 			_, _ = fmt.Fprintf(e.output, "🌿 Creating Git branch")
 			if name != "" {
 				_, _ = fmt.Fprintf(e.output, ": %s", name)
 			}
-		} else if resource == "tag" {
+		case "tag":
 			_, _ = fmt.Fprintf(e.output, "🏷️  Creating Git tag")
 			if name != "" {
 				_, _ = fmt.Fprintf(e.output, ": %s", name)
@@ -1030,13 +1031,14 @@ func (e *Engine) buildGitCommand(operation, resource, name string, options map[s
 
 	switch operation {
 	case "create":
-		if resource == "branch" {
+		switch resource {
+		case "branch":
 			// git checkout -b branch_name
 			gitCmd = append(gitCmd, "checkout", "-b")
 			if name != "" {
 				gitCmd = append(gitCmd, name)
 			}
-		} else if resource == "tag" {
+		case "tag":
 			// git tag tag_name
 			gitCmd = append(gitCmd, "tag")
 			if name != "" {

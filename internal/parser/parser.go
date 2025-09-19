@@ -1068,7 +1068,8 @@ func (p *Parser) parseBackupStatement(stmt *ast.FileStatement) *ast.FileStatemen
 func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: check if file "path" exists
 	// Expect: get size of file "path"
-	if p.peekToken.Type == lexer2.IF {
+	switch p.peekToken.Type {
+	case lexer2.IF:
 		p.nextToken() // consume IF
 		if !p.expectPeekFileKeyword() {
 			return nil
@@ -1082,7 +1083,7 @@ func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement
 			p.nextToken() // consume EXISTS
 			stmt.Action = "check_exists"
 		}
-	} else if p.peekToken.Type == lexer2.SIZE {
+	case lexer2.SIZE:
 		p.nextToken() // consume SIZE
 		if p.peekToken.Type == lexer2.OF {
 			p.nextToken() // consume OF
@@ -1483,7 +1484,8 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 		p.nextToken() // consume CREATE
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.BRANCH {
+		switch p.peekToken.Type {
+		case lexer2.BRANCH:
 			p.nextToken() // consume BRANCH
 			stmt.Resource = p.curToken.Literal
 
@@ -1491,7 +1493,7 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
-		} else if p.peekToken.Type == lexer2.TAG {
+		case lexer2.TAG:
 			p.nextToken() // consume TAG
 			stmt.Resource = p.curToken.Literal
 
