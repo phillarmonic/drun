@@ -22,8 +22,9 @@ import (
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output io.Writer
-	dryRun bool
+	output  io.Writer
+	dryRun  bool
+	verbose bool
 }
 
 // ExecutionContext holds parameter values and other runtime context
@@ -57,6 +58,11 @@ func NewEngine(output io.Writer) *Engine {
 // SetDryRun enables or disables dry run mode
 func (e *Engine) SetDryRun(dryRun bool) {
 	e.dryRun = dryRun
+}
+
+// SetVerbose enables or disables verbose mode
+func (e *Engine) SetVerbose(verbose bool) {
+	e.verbose = verbose
 }
 
 // Execute runs a v2 program with no parameters
@@ -395,16 +401,18 @@ func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *Exec
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output
 
-	// Show what we're about to execute
-	switch shellStmt.Action {
-	case "run":
-		_, _ = fmt.Fprintf(e.output, "🏃 Running: %s\n", interpolatedCommand)
-	case "exec":
-		_, _ = fmt.Fprintf(e.output, "⚡ Executing: %s\n", interpolatedCommand)
-	case "shell":
-		_, _ = fmt.Fprintf(e.output, "🐚 Shell: %s\n", interpolatedCommand)
-	case "capture":
-		_, _ = fmt.Fprintf(e.output, "📥 Capturing: %s\n", interpolatedCommand)
+	// Show what we're about to execute (verbose mode only)
+	if e.verbose {
+		switch shellStmt.Action {
+		case "run":
+			_, _ = fmt.Fprintf(e.output, "🏃 Running: %s\n", interpolatedCommand)
+		case "exec":
+			_, _ = fmt.Fprintf(e.output, "⚡ Executing: %s\n", interpolatedCommand)
+		case "shell":
+			_, _ = fmt.Fprintf(e.output, "🐚 Shell: %s\n", interpolatedCommand)
+		case "capture":
+			_, _ = fmt.Fprintf(e.output, "📥 Capturing: %s\n", interpolatedCommand)
+		}
 	}
 
 	// Execute the command
@@ -461,21 +469,23 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output
 
-	// Show what we're about to execute
-	switch shellStmt.Action {
-	case "run":
-		_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
-	case "exec":
-		_, _ = fmt.Fprintf(e.output, "⚡ Executing multiline commands (%d lines):\n", len(interpolatedCommands))
-	case "shell":
-		_, _ = fmt.Fprintf(e.output, "🐚 Shell multiline commands (%d lines):\n", len(interpolatedCommands))
-	case "capture":
-		_, _ = fmt.Fprintf(e.output, "📥 Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
-	}
+	// Show what we're about to execute (verbose mode only)
+	if e.verbose {
+		switch shellStmt.Action {
+		case "run":
+			_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+		case "exec":
+			_, _ = fmt.Fprintf(e.output, "⚡ Executing multiline commands (%d lines):\n", len(interpolatedCommands))
+		case "shell":
+			_, _ = fmt.Fprintf(e.output, "🐚 Shell multiline commands (%d lines):\n", len(interpolatedCommands))
+		case "capture":
+			_, _ = fmt.Fprintf(e.output, "📥 Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
+		}
 
-	// Show each command with line numbers
-	for i, cmd := range interpolatedCommands {
-		_, _ = fmt.Fprintf(e.output, "  %d: %s\n", i+1, cmd)
+		// Show each command with line numbers
+		for i, cmd := range interpolatedCommands {
+			_, _ = fmt.Fprintf(e.output, "  %d: %s\n", i+1, cmd)
+		}
 	}
 
 	// Execute the script as a single shell session

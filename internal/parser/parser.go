@@ -254,7 +254,8 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 	p.nextToken() // move to first token inside the block
 
 	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
-		if p.curToken.Type == lexer2.IDENT {
+		switch p.curToken.Type {
+		case lexer2.IDENT:
 			platform := p.curToken.Literal
 
 			// Expect colon after platform name
@@ -267,9 +268,9 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 			if config != nil {
 				stmt.Platforms[platform] = config
 			}
-		} else if p.curToken.Type == lexer2.COMMENT {
+		case lexer2.COMMENT:
 			p.nextToken() // Skip comments
-		} else {
+		default:
 			p.addError(fmt.Sprintf("unexpected token in shell config: %s", p.curToken.Type))
 			p.nextToken()
 		}
@@ -293,7 +294,8 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 	p.nextToken() // move to first token inside the block
 
 	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
-		if p.curToken.Type == lexer2.IDENT || p.curToken.Type == lexer2.ENVIRONMENT {
+		switch p.curToken.Type {
+		case lexer2.IDENT, lexer2.ENVIRONMENT:
 			key := p.curToken.Literal
 
 			// Expect colon
@@ -325,9 +327,9 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 				p.addError(fmt.Sprintf("unknown shell config key: %s", key))
 				p.nextToken()
 			}
-		} else if p.curToken.Type == lexer2.COMMENT {
+		case lexer2.COMMENT:
 			p.nextToken() // Skip comments
-		} else {
+		default:
 			p.addError(fmt.Sprintf("unexpected token in platform config: %s", p.curToken.Type))
 			p.nextToken()
 		}

@@ -16,6 +16,7 @@ var (
 	configFile    string
 	listTasks     bool
 	dryRun        bool
+	verbose       bool
 	showVersion   bool
 	initConfig    bool
 	saveAsDefault bool
@@ -68,6 +69,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "Task file (default: .drun/spec.drun or workspace configured file)")
 	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "List available tasks")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be executed without running")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed execution information")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new .drun task file")
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "Save custom file name as workspace default (use with --init)")
@@ -111,6 +113,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Create engine
 	eng := engine.NewEngine(os.Stdout)
 	eng.SetDryRun(dryRun)
+	eng.SetVerbose(verbose)
 
 	// Handle --list flag
 	if listTasks {
