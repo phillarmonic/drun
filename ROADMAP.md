@@ -65,12 +65,13 @@ This roadmap tracks the implementation progress of features documented in the [D
 - ✅ Optional parameters (`given $tag defaults to "latest"`)
 - ✅ CLI parameter passing (`drun task param=value`)
 
-### 📋 Advanced Parameter Validation
-- 📋 Type constraints (`as number between 1000 and 9999`)
-- 📋 Pattern matching (`matching pattern "v\d+\.\d+\.\d+"`)
-- 📋 Email format validation (`matching email format`)
-- 📋 List constraints (`from ["dev", "staging", "production"]`)
-- 📋 Variadic parameters (`accepts $flags as list`)
+### ✅ Advanced Parameter Validation
+- ✅ Type constraints (`as number between 1000 and 9999`)
+- ✅ Pattern matching (`matching pattern "v\d+\.\d+\.\d+"`)
+- ✅ Pattern macros (`matching semver`, `matching uuid`, `matching url`)
+- ✅ Email format validation (`matching email format`)
+- ✅ List constraints (`from ["dev", "staging", "production"]`)
+- ✅ Variadic parameters (`accepts $flags as list`)
 
 ---
 
@@ -90,7 +91,7 @@ This roadmap tracks the implementation progress of features documented in the [D
 - 📋 Command type (executable shell commands)
 - 📋 Path type with filesystem validation
 - 📋 URL type with protocol validation
-- 📋 Regex type for pattern matching
+- ✅ Regex type for pattern matching (via pattern macros and raw patterns)
 - 📋 Secret type (secure values, not logged)
 
 ### 📋 Type Inference & Validation

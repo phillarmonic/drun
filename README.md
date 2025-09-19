@@ -29,6 +29,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **🎯 Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
 - **🔧 DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **📁 File Operations**: Built-in file system operations with path interpolation
+- **🎯 Pattern Macros**: Built-in validation patterns (`matching semver`, `matching uuid`, `matching url`) with descriptive error messages
 
 ### 🛠️ **Developer Experience**
 
@@ -658,6 +659,78 @@ task "multi-tool-example" means "Multiple tool alternatives":
 - **🔧 Maintainable**: Single detection point, consistent usage throughout tasks
 - **⚡ Flexible**: Supports any number of tool alternatives with `or` syntax
 - **📝 Clear Intent**: Makes tool compatibility explicit and documented
+
+### 🎯 Pattern Macro Validation
+
+Built-in pattern macros provide common validation patterns without complex regex:
+
+```drun
+project "validation-demo" version "1.0":
+
+task "deploy" means "Deploy with comprehensive validation":
+  # Semantic versioning validation
+  requires $version as string matching semver
+  
+  # Extended semantic versioning (with pre-release/build info)
+  requires $release as string matching semver_extended
+  
+  # UUID validation for deployment tracking
+  requires $deployment_id as string matching uuid
+  
+  # URL validation for endpoints
+  requires $api_endpoint as string matching url
+  
+  # IPv4 address validation for servers
+  requires $server_ip as string matching ipv4
+  
+  # Project slug validation (URL-safe names)
+  requires $project_slug as string matching slug
+  
+  # Docker tag validation
+  requires $image_tag as string matching docker_tag
+  
+  # Git branch validation
+  requires $branch as string matching git_branch
+  
+  # Email validation (built-in)
+  requires $admin_email as string matching email format
+  
+  # Custom regex patterns still supported
+  requires $custom_id as string matching pattern "^DEPLOY-[0-9]{6}$"
+  
+  info "🚀 Deploying {version} to {server_ip}"
+  info "📦 Project: {project_slug}, Branch: {branch}"
+  info "🌐 API: {api_endpoint}"
+  info "📧 Admin: {admin_email}"
+  info "🆔 Deployment ID: {deployment_id}"
+  
+  success "Deployment validated and ready!"
+
+task "validation-errors-demo" means "Show validation error messages":
+  requires $version as string matching semver
+  
+  # This will show: Error: parameter 'version': value '1.2.3' does not match 
+  # semver pattern (Basic semantic versioning (e.g., v1.2.3))
+```
+
+**Available Pattern Macros:**
+
+- **`semver`**: Basic semantic versioning (`v1.2.3`)
+- **`semver_extended`**: Extended semver (`v2.0.1-RC2`, `v1.0.0-alpha.1+build.123`)
+- **`uuid`**: UUID format (`550e8400-e29b-41d4-a716-446655440000`)
+- **`url`**: HTTP/HTTPS URLs
+- **`ipv4`**: IPv4 addresses (`192.168.1.1`)
+- **`slug`**: URL slugs (`my-project-name`)
+- **`docker_tag`**: Docker image tags
+- **`git_branch`**: Git branch names
+
+**Benefits:**
+
+- **🎯 User-Friendly**: Simple, memorable names instead of complex regex
+- **📚 Self-Documenting**: Built-in descriptions explain validation rules
+- **🔒 Type-Safe**: Clear, descriptive error messages
+- **⚡ Performance**: Efficient validation with minimal overhead
+- **🔄 Extensible**: Easy to add new macros as needed
 
 ### 📊 Advanced Logging & Metrics
 
