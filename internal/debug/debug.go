@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/phillarmonic/drun/internal/ast"
-	lexer2 "github.com/phillarmonic/drun/internal/lexer"
+	lexer "github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
 )
 
@@ -22,12 +22,12 @@ func DebugTokens(input string) {
 	fmt.Printf("Input: %q\n", input)
 	fmt.Println("Tokens:")
 
-	l := lexer2.NewLexer(input)
+	l := lexer.NewLexer(input)
 	position := 0
 
 	for {
 		tok := l.NextToken()
-		if tok.Type == lexer2.EOF {
+		if tok.Type == lexer.EOF {
 			fmt.Printf("  %d: %s EOF\n", position, tok.Type)
 			break
 		}
@@ -237,7 +237,7 @@ func DebugFull(input string) (*ast.Program, []string) {
 	DebugTokens(input)
 
 	// Parse and debug AST
-	l := lexer2.NewLexer(input)
+	l := lexer.NewLexer(input)
 	p := parser.NewParser(l)
 	program := p.ParseProgram()
 	errors := p.Errors()

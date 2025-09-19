@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	lexer2 "github.com/phillarmonic/drun/internal/lexer"
+	lexer "github.com/phillarmonic/drun/internal/lexer"
 )
 
 func TestParser_LifecycleDebugTokens(t *testing.T) {
@@ -14,7 +14,7 @@ project "myapp":
   before any task:
     info "Starting task"`
 
-	l := lexer2.NewLexer(input)
+	l := lexer.NewLexer(input)
 
 	// Print all tokens to debug
 	fmt.Println("=== LIFECYCLE TOKENS ===")
@@ -22,7 +22,7 @@ project "myapp":
 		tok := l.NextToken()
 		fmt.Printf("Type: %s, Literal: %q, Line: %d, Column: %d\n",
 			tok.Type, tok.Literal, tok.Line, tok.Column)
-		if tok.Type == lexer2.EOF {
+		if tok.Type == lexer.EOF {
 			break
 		}
 	}

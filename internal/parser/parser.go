@@ -7,22 +7,22 @@ import (
 
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/errors"
-	lexer2 "github.com/phillarmonic/drun/internal/lexer"
+	lexer "github.com/phillarmonic/drun/internal/lexer"
 )
 
 // Parser parses drun v2 source code into an AST
 type Parser struct {
-	lexer *lexer2.Lexer
+	lexer *lexer.Lexer
 
-	curToken  lexer2.Token
-	peekToken lexer2.Token
+	curToken  lexer.Token
+	peekToken lexer.Token
 
 	errors    []string // Legacy error list for backward compatibility
 	errorList *errors.ParseErrorList
 }
 
 // New creates a new parser instance
-func NewParser(l *lexer2.Lexer) *Parser {
+func NewParser(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		lexer:  l,
 		errors: []string{},
@@ -36,7 +36,7 @@ func NewParser(l *lexer2.Lexer) *Parser {
 }
 
 // NewParserWithSource creates a new parser instance with source information for better error reporting
-func NewParserWithSource(l *lexer2.Lexer, filename, source string) *Parser {
+func NewParserWithSource(l *lexer.Lexer, filename, source string) *Parser {
 	p := &Parser{
 		lexer:     l,
 		errors:    []string{},
@@ -64,7 +64,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 	p.skipComments()
 
 	// Parse version statement (required)
-	if p.curToken.Type == lexer2.VERSION {
+	if p.curToken.Type == lexer.VERSION {
 		program.Version = p.parseVersionStatement()
 	} else {
 		p.addError(fmt.Sprintf("expected version statement, got %s", p.curToken.Type))
@@ -75,22 +75,22 @@ func (p *Parser) ParseProgram() *ast.Program {
 	p.skipComments()
 
 	// Parse optional project statement
-	if p.curToken.Type == lexer2.PROJECT {
+	if p.curToken.Type == lexer.PROJECT {
 		program.Project = p.parseProjectStatement()
 		p.skipComments()
 	}
 
 	// Parse task statements
-	for p.curToken.Type != lexer2.EOF {
+	for p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
-		case lexer2.TASK:
+		case lexer.TASK:
 			task := p.parseTaskStatement()
 			if task != nil {
 				program.Tasks = append(program.Tasks, task)
 			}
-		case lexer2.COMMENT:
+		case lexer.COMMENT:
 			p.nextToken() // Skip comments
-		case lexer2.DEDENT:
+		case lexer.DEDENT:
 			// Skip stray lexer.DEDENT tokens (they should be consumed by task parsing)
 			p.nextToken()
 		default:
@@ -106,11 +106,11 @@ func (p *Parser) ParseProgram() *ast.Program {
 func (p *Parser) parseVersionStatement() *ast.VersionStatement {
 	stmt := &ast.VersionStatement{Token: p.curToken}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.NUMBER) {
+	if !p.expectPeek(lexer.NUMBER) {
 		return nil
 	}
 
@@ -125,33 +125,33 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 	stmt := &ast.ProjectStatement{Token: p.curToken}
 
 	// Expect project name (string)
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Name = p.curToken.Literal
 
 	// Check for optional version
-	if p.peekToken.Type == lexer2.VERSION {
+	if p.peekToken.Type == lexer.VERSION {
 		p.nextToken() // consume VERSION token
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Version = p.curToken.Literal
 	}
 
 	// Expect colon
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
 	// Parse project settings (optional)
-	if p.peekToken.Type == lexer2.INDENT {
+	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 		p.nextToken() // move to first token inside the block
 
-		for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 			switch p.curToken.Type {
-			case lexer2.SET:
+			case lexer.SET:
 				setting := p.parseSetStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
@@ -159,7 +159,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer2.INCLUDE:
+			case lexer.INCLUDE:
 				setting := p.parseIncludeStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
@@ -167,7 +167,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer2.BEFORE, lexer2.AFTER:
+			case lexer.BEFORE, lexer.AFTER:
 				hook := p.parseLifecycleHook()
 				if hook != nil {
 					stmt.Settings = append(stmt.Settings, hook)
@@ -175,7 +175,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer2.SHELL:
+			case lexer.SHELL:
 				shellConfig := p.parseShellConfigStatement()
 				if shellConfig != nil {
 					stmt.Settings = append(stmt.Settings, shellConfig)
@@ -183,7 +183,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer2.COMMENT:
+			case lexer.COMMENT:
 				p.nextToken() // Skip comments
 			default:
 				p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
@@ -191,7 +191,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			}
 		}
 
-		if p.curToken.Type == lexer2.DEDENT {
+		if p.curToken.Type == lexer.DEDENT {
 			p.nextToken() // consume DEDENT
 		}
 	} else {
@@ -208,10 +208,10 @@ func (p *Parser) parseSetStatement() *ast.SetStatement {
 
 	// Expect identifier (key) - allow Git, HTTP, Docker, and File keywords as set keys
 	switch p.peekToken.Type {
-	case lexer2.IDENT, lexer2.MESSAGE, lexer2.BRANCH, lexer2.REMOTE, lexer2.STATUS, lexer2.LOG, lexer2.COMMIT, lexer2.ADD, lexer2.PUSH, lexer2.PULL,
-		lexer2.GET, lexer2.POST, lexer2.PUT, lexer2.DELETE, lexer2.PATCH, lexer2.HEAD, lexer2.OPTIONS, lexer2.HTTP, lexer2.HTTPS, lexer2.URL, lexer2.API, lexer2.JSON, lexer2.XML,
-		lexer2.TIMEOUT, lexer2.RETRY, lexer2.AUTH, lexer2.BEARER, lexer2.BASIC, lexer2.TOKEN, lexer2.HEADER, lexer2.BODY, lexer2.DATA,
-		lexer2.SCALE, lexer2.PORT, lexer2.REGISTRY, lexer2.CHECKOUT, lexer2.BACKUP, lexer2.CHECK, lexer2.SIZE, lexer2.DIRECTORY:
+	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL,
+		lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS, lexer.URL, lexer.API, lexer.JSON, lexer.XML,
+		lexer.TIMEOUT, lexer.RETRY, lexer.AUTH, lexer.BEARER, lexer.BASIC, lexer.TOKEN, lexer.HEADER, lexer.BODY, lexer.DATA,
+		lexer.SCALE, lexer.PORT, lexer.REGISTRY, lexer.CHECKOUT, lexer.BACKUP, lexer.CHECK, lexer.SIZE, lexer.DIRECTORY:
 		p.nextToken()
 	default:
 		p.addError(fmt.Sprintf("expected set key, got %s instead", p.peekToken.Type))
@@ -220,12 +220,12 @@ func (p *Parser) parseSetStatement() *ast.SetStatement {
 	stmt.Key = p.curToken.Literal
 
 	// Expect "to"
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
 	// Expect value (string)
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Value = p.curToken.Literal
@@ -239,7 +239,7 @@ func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 	stmt := &ast.IncludeStatement{Token: p.curToken}
 
 	// Expect path (string)
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Path = p.curToken.Literal
@@ -256,29 +256,29 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 	}
 
 	// Expect "config"
-	if !p.expectPeek(lexer2.CONFIG) {
+	if !p.expectPeek(lexer.CONFIG) {
 		return nil
 	}
 
 	// Expect colon
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
 	// Expect indented block with platform configurations
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return nil
 	}
 
 	p.nextToken() // move to first token inside the block
 
-	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
-		case lexer2.IDENT:
+		case lexer.IDENT:
 			platform := p.curToken.Literal
 
 			// Expect colon after platform name
-			if !p.expectPeek(lexer2.COLON) {
+			if !p.expectPeek(lexer.COLON) {
 				return nil
 			}
 
@@ -287,7 +287,7 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 			if config != nil {
 				stmt.Platforms[platform] = config
 			}
-		case lexer2.COMMENT:
+		case lexer.COMMENT:
 			p.nextToken() // Skip comments
 		default:
 			p.addError(fmt.Sprintf("unexpected token in shell config: %s", p.curToken.Type))
@@ -306,26 +306,26 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 	}
 
 	// Expect indented block
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return nil
 	}
 
 	p.nextToken() // move to first token inside the block
 
-	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
-		case lexer2.IDENT, lexer2.ENVIRONMENT:
+		case lexer.IDENT, lexer.ENVIRONMENT:
 			key := p.curToken.Literal
 
 			// Expect colon
-			if !p.expectPeek(lexer2.COLON) {
+			if !p.expectPeek(lexer.COLON) {
 				return nil
 			}
 
 			switch key {
 			case "executable":
 				// Expect string value
-				if !p.expectPeek(lexer2.STRING) {
+				if !p.expectPeek(lexer.STRING) {
 					return nil
 				}
 				config.Executable = p.curToken.Literal
@@ -346,7 +346,7 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 				p.addError(fmt.Sprintf("unknown shell config key: %s", key))
 				p.nextToken()
 			}
-		case lexer2.COMMENT:
+		case lexer.COMMENT:
 			p.nextToken() // Skip comments
 		default:
 			p.addError(fmt.Sprintf("unexpected token in platform config: %s", p.curToken.Type))
@@ -363,22 +363,22 @@ func (p *Parser) parseStringArray() []string {
 	var result []string
 
 	// Expect indented block
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return result
 	}
 
 	p.nextToken() // move to first token inside the block
 
-	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
-		if p.curToken.Type == lexer2.MINUS {
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		if p.curToken.Type == lexer.MINUS {
 			// Expect string after dash
-			if !p.expectPeek(lexer2.STRING) {
+			if !p.expectPeek(lexer.STRING) {
 				p.nextToken()
 				continue
 			}
 			result = append(result, p.curToken.Literal)
 			p.nextToken()
-		} else if p.curToken.Type == lexer2.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT {
 			p.nextToken() // Skip comments
 		} else {
 			p.addError(fmt.Sprintf("expected array item (- \"value\"), got %s", p.curToken.Type))
@@ -395,31 +395,31 @@ func (p *Parser) parseKeyValuePairs() map[string]string {
 	result := make(map[string]string)
 
 	// Expect indented block
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return result
 	}
 
 	p.nextToken() // move to first token inside the block
 
-	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
-		if p.curToken.Type == lexer2.IDENT {
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		if p.curToken.Type == lexer.IDENT {
 			key := p.curToken.Literal
 
 			// Expect colon
-			if !p.expectPeek(lexer2.COLON) {
+			if !p.expectPeek(lexer.COLON) {
 				p.nextToken()
 				continue
 			}
 
 			// Expect string value
-			if !p.expectPeek(lexer2.STRING) {
+			if !p.expectPeek(lexer.STRING) {
 				p.nextToken()
 				continue
 			}
 
 			result[key] = p.curToken.Literal
 			p.nextToken()
-		} else if p.curToken.Type == lexer2.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT {
 			p.nextToken() // Skip comments
 		} else {
 			p.addError(fmt.Sprintf("expected key-value pair (key: \"value\"), got %s", p.curToken.Type))
@@ -437,28 +437,28 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 	hook.Type = p.curToken.Literal // "before" or "after"
 
 	// Expect "any"
-	if !p.expectPeek(lexer2.ANY) {
+	if !p.expectPeek(lexer.ANY) {
 		return nil
 	}
 	hook.Scope = p.curToken.Literal
 
 	// Expect "task"
-	if !p.expectPeek(lexer2.TASK) {
+	if !p.expectPeek(lexer.TASK) {
 		return nil
 	}
 
 	// Expect colon
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
 	// Parse hook body - expect INDENT and parse statements
-	if p.peekToken.Type == lexer2.INDENT {
+	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 		p.nextToken() // move to first statement
 
 		// Parse statements until DEDENT
-		for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 			if p.isActionToken(p.curToken.Type) {
 				if p.isShellActionToken(p.curToken.Type) {
 					shell := p.parseShellStatement()
@@ -472,7 +472,7 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 					}
 				}
 				p.nextToken() // advance to next token after parsing
-			} else if p.curToken.Type == lexer2.COMMENT {
+			} else if p.curToken.Type == lexer.COMMENT {
 				p.nextToken() // Skip comments
 				continue
 			} else {
@@ -481,7 +481,7 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 			}
 		}
 
-		if p.curToken.Type == lexer2.DEDENT {
+		if p.curToken.Type == lexer.DEDENT {
 			p.nextToken() // consume DEDENT for hook body
 		}
 	}
@@ -493,34 +493,34 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	stmt := &ast.TaskStatement{Token: p.curToken}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 
 	stmt.Name = p.curToken.Literal
 
 	// Check for optional "means" clause
-	if p.peekToken.Type == lexer2.MEANS {
+	if p.peekToken.Type == lexer.MEANS {
 		p.nextToken() // consume lexer.MEANS
 
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 
 		stmt.Description = p.curToken.Literal
 	}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
 	// Expect lexer.INDENT to start task body
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return nil
 	}
 
 	// Parse task body (parameters and statements)
-	for p.peekToken.Type != lexer2.DEDENT && p.peekToken.Type != lexer2.EOF {
+	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
 		if p.isDependencyToken(p.curToken.Type) {
@@ -555,9 +555,9 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			}
 		} else if p.isDockerToken(p.curToken.Type) {
 			// Special handling for RUN token - check context
-			if p.curToken.Type == lexer2.RUN {
+			if p.curToken.Type == lexer.RUN {
 				// Look ahead to determine if this is shell or docker command
-				if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.COLON {
+				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
 					// This is "run 'command'" or "run:" - shell command
 					shell := p.parseShellStatement()
 					if shell != nil {
@@ -578,14 +578,14 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			}
 		} else if p.isGitToken(p.curToken.Type) {
 			// Special handling for CREATE token - check context
-			if p.curToken.Type == lexer2.CREATE {
+			if p.curToken.Type == lexer.CREATE {
 				// Look ahead to determine if this is git or file operation
-				if p.peekToken.Type == lexer2.BRANCH || p.peekToken.Type == lexer2.TAG {
+				if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
 					git := p.parseGitStatement()
 					if git != nil {
 						stmt.Body = append(stmt.Body, git)
 					}
-				} else if p.peekToken.Type == lexer2.DIRECTORY || p.peekToken.Type == lexer2.DIR || (p.peekToken.Type == lexer2.IDENT && p.peekToken.Literal == "file") {
+				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "file") {
 					file := p.parseFileStatement()
 					if file != nil {
 						stmt.Body = append(stmt.Body, file)
@@ -627,14 +627,14 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				}
 			} else if p.isFileActionToken(p.curToken.Type) {
 				// Special handling for CHECK token
-				if p.curToken.Type == lexer2.CHECK {
-					if p.peekToken.Type == lexer2.HEALTH {
+				if p.curToken.Type == lexer.CHECK {
+					if p.peekToken.Type == lexer.HEALTH {
 						// Definitely a network health check
 						network := p.parseNetworkStatement()
 						if network != nil {
 							stmt.Body = append(stmt.Body, network)
 						}
-					} else if p.peekToken.Type == lexer2.IF {
+					} else if p.peekToken.Type == lexer.IF {
 						// This is "check if X" - determine if it's a port check
 						if p.isPortCheckPattern() {
 							// This is "check if port" - network operation
@@ -674,10 +674,10 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, action)
 				}
 			}
-		} else if p.curToken.Type == lexer2.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT {
 			// Skip comments in task body
 			continue
-		} else if p.curToken.Type == lexer2.NEWLINE {
+		} else if p.curToken.Type == lexer.NEWLINE {
 			// Skip newlines in task body
 			continue
 		} else {
@@ -687,7 +687,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	}
 
 	// Consume lexer.DEDENT
-	if p.peekToken.Type == lexer2.DEDENT {
+	if p.peekToken.Type == lexer.DEDENT {
 		p.nextToken() // Move to lexer.DEDENT
 		p.nextToken() // Move past lexer.DEDENT
 	}
@@ -702,7 +702,7 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 		Action: p.curToken.Literal,
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 
@@ -719,12 +719,12 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 	}
 
 	// Check if this is multiline syntax (action followed by colon or capture with "as")
-	if p.peekToken.Type == lexer2.COLON {
+	if p.peekToken.Type == lexer.COLON {
 		return p.parseMultilineShellStatement(stmt)
 	}
 
 	// Special case for "capture as $var:" syntax
-	if stmt.Action == "capture" && p.peekToken.Type == lexer2.AS {
+	if stmt.Action == "capture" && p.peekToken.Type == lexer.AS {
 		return p.parseMultilineShellStatement(stmt)
 	}
 
@@ -734,7 +734,7 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 	}
 
 	// Regular shell command with string
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 
@@ -757,7 +757,7 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.ShellStatement {
 	// Handle capture with "as variable" syntax
 	if stmt.Action == "capture" {
-		if !p.expectPeek(lexer2.AS) {
+		if !p.expectPeek(lexer.AS) {
 			return nil
 		}
 		if !p.expectPeekVariableName() {
@@ -767,12 +767,12 @@ func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.She
 	}
 
 	// Expect colon
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
 	// Expect INDENT
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return nil
 	}
 
@@ -802,14 +802,14 @@ func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.She
 
 // parseCaptureStatement parses single-line capture statements
 func (p *Parser) parseCaptureStatement(stmt *ast.ShellStatement) *ast.ShellStatement {
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 
 	stmt.Command = p.curToken.Literal
 
 	// Check for capture syntax: capture "command" as variable_name
-	if p.peekToken.Type == lexer2.AS {
+	if p.peekToken.Type == lexer.AS {
 		p.nextToken() // consume AS
 		if !p.expectPeekVariableName() {
 			return nil
@@ -826,8 +826,8 @@ func (p *Parser) readCommandTokens() []string {
 	var commands []string
 	var currentCommand []string
 
-	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
-		if p.curToken.Type == lexer2.COMMENT {
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		if p.curToken.Type == lexer.COMMENT {
 			// Skip comments
 			p.nextToken()
 			continue
@@ -835,7 +835,7 @@ func (p *Parser) readCommandTokens() []string {
 
 		// If we encounter an IDENT token and we already have tokens in currentCommand,
 		// it might be a new command, but we need to be smart about it
-		if p.curToken.Type == lexer2.IDENT && len(currentCommand) > 0 {
+		if p.curToken.Type == lexer.IDENT && len(currentCommand) > 0 {
 			// Check if the previous token suggests this IDENT is part of the same command
 			// For example, if previous token was ILLEGAL (like "-"), this IDENT is likely part of the same command
 			prevTokenWasFlag := len(currentCommand) > 0 &&
@@ -851,7 +851,7 @@ func (p *Parser) readCommandTokens() []string {
 
 		// Handle different token types appropriately for shell commands
 		switch p.curToken.Type {
-		case lexer2.STRING:
+		case lexer.STRING:
 			// For STRING tokens, add quotes back to preserve shell semantics
 			currentCommand = append(currentCommand, fmt.Sprintf("\"%s\"", p.curToken.Literal))
 		default:
@@ -906,7 +906,7 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: create file "path" or create dir "path" or create directory "path"
 	switch p.peekToken.Type {
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		p.nextToken() // consume IDENT
 		if p.curToken.Literal == "file" {
 			stmt.IsDir = false
@@ -914,10 +914,10 @@ func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatemen
 			p.addError("expected 'file', 'dir', or 'directory' after 'create'")
 			return nil
 		}
-	case lexer2.DIR:
+	case lexer.DIR:
 		p.nextToken() // consume DIR
 		stmt.IsDir = true
-	case lexer2.DIRECTORY:
+	case lexer.DIRECTORY:
 		p.nextToken() // consume DIRECTORY
 		stmt.IsDir = true
 	default:
@@ -925,7 +925,7 @@ func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
@@ -942,7 +942,7 @@ func (p *Parser) parseCopyStatement(stmt *ast.FileStatement) *ast.FileStatement 
 	}
 	stmt.Source = source
 
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
@@ -960,15 +960,15 @@ func (p *Parser) parseFilePathOrVariable() string {
 	p.nextToken()
 
 	switch p.curToken.Type {
-	case lexer2.STRING:
+	case lexer.STRING:
 		return p.curToken.Literal
-	case lexer2.LBRACE:
+	case lexer.LBRACE:
 		// Parse {$variable} syntax
-		if !p.expectPeek(lexer2.VARIABLE) {
+		if !p.expectPeek(lexer.VARIABLE) {
 			return ""
 		}
 		variable := p.curToken.Literal
-		if !p.expectPeek(lexer2.RBRACE) {
+		if !p.expectPeek(lexer.RBRACE) {
 			return ""
 		}
 		return "{" + variable + "}"
@@ -981,16 +981,16 @@ func (p *Parser) parseFilePathOrVariable() string {
 // parseMoveStatement parses "move" statements
 func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: move "source" to "target"
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Source = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
@@ -1002,7 +1002,7 @@ func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement 
 func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: delete file "path" or delete dir "path"
 	switch p.peekToken.Type {
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		p.nextToken() // consume IDENT
 		if p.curToken.Literal == "file" {
 			stmt.IsDir = false
@@ -1010,7 +1010,7 @@ func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatemen
 			p.addError("expected 'file' or 'dir' after 'delete'")
 			return nil
 		}
-	case lexer2.DIR:
+	case lexer.DIR:
 		p.nextToken() // consume DIR
 		stmt.IsDir = true
 	default:
@@ -1018,7 +1018,7 @@ func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
@@ -1033,13 +1033,13 @@ func (p *Parser) parseReadStatement(stmt *ast.FileStatement) *ast.FileStatement 
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
 
 	// Check for capture syntax: read file "path" as variable
-	if p.peekToken.Type == lexer2.AS {
+	if p.peekToken.Type == lexer.AS {
 		p.nextToken() // consume AS
 		if !p.expectPeekVariableName() {
 			return nil
@@ -1053,12 +1053,12 @@ func (p *Parser) parseReadStatement(stmt *ast.FileStatement) *ast.FileStatement 
 // parseWriteStatement parses "write" statements
 func (p *Parser) parseWriteStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: write "content" to file "path"
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Content = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
@@ -1066,7 +1066,7 @@ func (p *Parser) parseWriteStatement(stmt *ast.FileStatement) *ast.FileStatement
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
@@ -1077,12 +1077,12 @@ func (p *Parser) parseWriteStatement(stmt *ast.FileStatement) *ast.FileStatement
 // parseAppendStatement parses "append" statements
 func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: append "content" to file "path"
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Content = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
@@ -1090,7 +1090,7 @@ func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
@@ -1101,14 +1101,14 @@ func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatemen
 // parseBackupStatement parses "backup" statements
 func (p *Parser) parseBackupStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: backup "source" as "backup-name"
-	if !p.expectPeek(lexer2.STRING) {
+	if !p.expectPeek(lexer.STRING) {
 		return nil
 	}
 	stmt.Source = p.curToken.Literal
 
-	if p.peekToken.Type == lexer2.AS {
+	if p.peekToken.Type == lexer.AS {
 		p.nextToken() // consume AS
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Target = p.curToken.Literal
@@ -1125,28 +1125,28 @@ func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement
 	// Expect: check if file "path" exists
 	// Expect: check size of file "path"
 	switch p.peekToken.Type {
-	case lexer2.IF:
+	case lexer.IF:
 		p.nextToken() // consume IF
 		if !p.expectPeekFileKeyword() {
 			return nil
 		}
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Target = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.EXISTS {
+		if p.peekToken.Type == lexer.EXISTS {
 			p.nextToken() // consume EXISTS
 			stmt.Action = "check_exists"
 		}
-	case lexer2.SIZE:
+	case lexer.SIZE:
 		p.nextToken() // consume SIZE
-		if p.peekToken.Type == lexer2.OF {
+		if p.peekToken.Type == lexer.OF {
 			p.nextToken() // consume OF
 			if !p.expectPeekFileKeyword() {
 				return nil
 			}
-			if !p.expectPeek(lexer2.STRING) {
+			if !p.expectPeek(lexer.STRING) {
 				return nil
 			}
 			stmt.Target = p.curToken.Literal
@@ -1159,7 +1159,7 @@ func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement
 
 // parseErrorHandlingStatement parses try/catch/finally statements
 func (p *Parser) parseErrorHandlingStatement() *ast.TryStatement {
-	if p.curToken.Type != lexer2.TRY {
+	if p.curToken.Type != lexer.TRY {
 		p.addError("expected 'try' keyword")
 		return nil
 	}
@@ -1168,7 +1168,7 @@ func (p *Parser) parseErrorHandlingStatement() *ast.TryStatement {
 		Token: p.curToken,
 	}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -1176,7 +1176,7 @@ func (p *Parser) parseErrorHandlingStatement() *ast.TryStatement {
 	stmt.TryBody = p.parseControlFlowBody()
 
 	// Parse catch clauses
-	for p.peekToken.Type == lexer2.CATCH {
+	for p.peekToken.Type == lexer.CATCH {
 		p.nextToken() // consume CATCH
 		catchClause := p.parseCatchClause()
 		if catchClause != nil {
@@ -1185,9 +1185,9 @@ func (p *Parser) parseErrorHandlingStatement() *ast.TryStatement {
 	}
 
 	// Parse optional finally clause
-	if p.peekToken.Type == lexer2.FINALLY {
+	if p.peekToken.Type == lexer.FINALLY {
 		p.nextToken() // consume FINALLY
-		if !p.expectPeek(lexer2.COLON) {
+		if !p.expectPeek(lexer.COLON) {
 			return nil
 		}
 		stmt.FinallyBody = p.parseControlFlowBody()
@@ -1204,19 +1204,19 @@ func (p *Parser) parseCatchClause() *ast.CatchClause {
 
 	// Check for specific error type or "as" clause
 	switch p.peekToken.Type {
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		p.nextToken() // consume error type
 		clause.ErrorType = p.curToken.Literal
 
 		// Check for "as variable" clause
-		if p.peekToken.Type == lexer2.AS {
+		if p.peekToken.Type == lexer.AS {
 			p.nextToken() // consume AS
 			if !p.expectPeekVariableName() {
 				return nil
 			}
 			clause.ErrorVar = p.curToken.Literal
 		}
-	case lexer2.AS:
+	case lexer.AS:
 		p.nextToken() // consume AS
 		if !p.expectPeekVariableName() {
 			return nil
@@ -1224,7 +1224,7 @@ func (p *Parser) parseCatchClause() *ast.CatchClause {
 		clause.ErrorVar = p.curToken.Literal
 	}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -1244,7 +1244,7 @@ func (p *Parser) parseThrowStatement() *ast.ThrowStatement {
 	switch stmt.Action {
 	case "throw":
 		// Expect: throw "message"
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Message = p.curToken.Literal
@@ -1269,7 +1269,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	}
 
 	// Parse parameter name (expect $variable syntax)
-	if p.peekToken.Type != lexer2.VARIABLE {
+	if p.peekToken.Type != lexer.VARIABLE {
 		p.addError(fmt.Sprintf("expected parameter name ($variable), got %s instead", p.peekToken.Type))
 		return nil
 	}
@@ -1282,7 +1282,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	}
 
 	// Check for type declaration: "as type"
-	if p.peekToken.Type == lexer2.AS {
+	if p.peekToken.Type == lexer.AS {
 		p.nextToken() // consume AS
 		if p.isTypeToken(p.peekToken.Type) {
 			p.nextToken() // consume type token
@@ -1290,11 +1290,11 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 
 			// Check for advanced constraints after type
 			p.parseAdvancedConstraints(stmt)
-		} else if p.peekToken.Type == lexer2.LIST {
+		} else if p.peekToken.Type == lexer.LIST {
 			p.nextToken() // consume LIST
 			stmt.DataType = "list"
 			stmt.Variadic = true // list parameters are variadic by default
-			if p.peekToken.Type == lexer2.OF {
+			if p.peekToken.Type == lexer.OF {
 				p.nextToken() // consume OF
 				if p.isTypeToken(p.peekToken.Type) {
 					p.nextToken() // consume element type
@@ -1312,9 +1312,9 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	case "requires":
 		stmt.Required = true
 		// Check for constraints: requires env from ["dev", "staging"]
-		if p.peekToken.Type == lexer2.FROM {
+		if p.peekToken.Type == lexer.FROM {
 			p.nextToken() // consume FROM
-			if p.peekToken.Type == lexer2.LBRACKET {
+			if p.peekToken.Type == lexer.LBRACKET {
 				p.nextToken() // consume LBRACKET
 				stmt.Constraints = p.parseStringList()
 			}
@@ -1323,24 +1323,24 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	case "given":
 		stmt.Required = false
 		// Expect: given name defaults to "value"
-		if !p.expectPeek(lexer2.DEFAULTS) {
+		if !p.expectPeek(lexer.DEFAULTS) {
 			return nil
 		}
-		if !p.expectPeek(lexer2.TO) {
+		if !p.expectPeek(lexer.TO) {
 			return nil
 		}
 
 		// Parse default value - can be string, number, boolean, or built-in function
 		switch p.peekToken.Type {
-		case lexer2.STRING, lexer2.NUMBER, lexer2.BOOLEAN:
+		case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
 			p.nextToken()
 			stmt.DefaultValue = p.curToken.Literal
-		case lexer2.CURRENT:
+		case lexer.CURRENT:
 			// Handle "current git commit" built-in function
 			p.nextToken() // consume CURRENT
-			if p.peekToken.Type == lexer2.GIT {
+			if p.peekToken.Type == lexer.GIT {
 				p.nextToken() // consume GIT
-				if p.peekToken.Type == lexer2.COMMIT {
+				if p.peekToken.Type == lexer.COMMIT {
 					p.nextToken() // consume COMMIT
 					stmt.DefaultValue = "current git commit"
 				}
@@ -1351,9 +1351,9 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		}
 
 		// Check for constraints after default value: given name defaults to "value" from ["list"]
-		if p.peekToken.Type == lexer2.FROM {
+		if p.peekToken.Type == lexer.FROM {
 			p.nextToken() // consume FROM
-			if p.peekToken.Type == lexer2.LBRACKET {
+			if p.peekToken.Type == lexer.LBRACKET {
 				p.nextToken() // consume LBRACKET
 				stmt.Constraints = p.parseStringList()
 			}
@@ -1362,9 +1362,9 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	case "accepts":
 		stmt.Required = false
 		// accepts can have constraints too
-		if p.peekToken.Type == lexer2.FROM {
+		if p.peekToken.Type == lexer.FROM {
 			p.nextToken() // consume FROM
-			if p.peekToken.Type == lexer2.LBRACKET {
+			if p.peekToken.Type == lexer.LBRACKET {
 				p.nextToken() // consume LBRACKET
 				stmt.Constraints = p.parseStringList()
 			}
@@ -1378,9 +1378,9 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 func (p *Parser) parseAdvancedConstraints(stmt *ast.ParameterStatement) {
 	for {
 		switch p.peekToken.Type {
-		case lexer2.BETWEEN:
+		case lexer.BETWEEN:
 			p.parseRangeConstraint(stmt)
-		case lexer2.MATCHING:
+		case lexer.MATCHING:
 			p.parsePatternConstraint(stmt)
 		default:
 			return // No more constraints
@@ -1393,7 +1393,7 @@ func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
 	p.nextToken() // consume BETWEEN
 
 	// Expect a number for minimum value
-	if !p.expectPeek(lexer2.NUMBER) {
+	if !p.expectPeek(lexer.NUMBER) {
 		return
 	}
 
@@ -1405,12 +1405,12 @@ func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
 	stmt.MinValue = &minVal
 
 	// Expect AND
-	if !p.expectPeek(lexer2.AND) {
+	if !p.expectPeek(lexer.AND) {
 		return
 	}
 
 	// Expect a number for maximum value
-	if !p.expectPeek(lexer2.NUMBER) {
+	if !p.expectPeek(lexer.NUMBER) {
 		return
 	}
 
@@ -1427,21 +1427,21 @@ func (p *Parser) parsePatternConstraint(stmt *ast.ParameterStatement) {
 	p.nextToken() // consume MATCHING
 
 	switch p.peekToken.Type {
-	case lexer2.PATTERN:
+	case lexer.PATTERN:
 		p.nextToken() // consume PATTERN
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return
 		}
 		stmt.Pattern = p.curToken.Literal
 
-	case lexer2.EMAIL:
+	case lexer.EMAIL:
 		p.nextToken() // consume EMAIL
-		if p.peekToken.Type == lexer2.FORMAT {
+		if p.peekToken.Type == lexer.FORMAT {
 			p.nextToken() // consume FORMAT
 		}
 		stmt.EmailFormat = true
 
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		// Check if it's a pattern macro (e.g., "matching semver")
 		p.nextToken() // consume IDENT
 		stmt.PatternMacro = p.curToken.Literal
@@ -1458,9 +1458,9 @@ func (p *Parser) parsePatternConstraint(stmt *ast.ParameterStatement) {
 }
 
 // getPatternMacroName returns the pattern macro name for keyword tokens that can be used as macros
-func (p *Parser) getPatternMacroName(tokenType lexer2.TokenType) string {
+func (p *Parser) getPatternMacroName(tokenType lexer.TokenType) string {
 	switch tokenType {
-	case lexer2.URL:
+	case lexer.URL:
 		return "url"
 	default:
 		return ""
@@ -1476,7 +1476,7 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 	}
 
 	// Expect "on"
-	if !p.expectPeek(lexer2.ON) {
+	if !p.expectPeek(lexer.ON) {
 		return nil
 	}
 
@@ -1484,11 +1484,11 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 	for {
 		// Expect task name (identifier or Docker keyword)
 		switch p.peekToken.Type {
-		case lexer2.IDENT:
+		case lexer.IDENT:
 			p.nextToken()
-		case lexer2.BUILD, lexer2.PUSH, lexer2.PULL, lexer2.TAG, lexer2.REMOVE, lexer2.START, lexer2.STOP, lexer2.RUN,
-			lexer2.CLONE, lexer2.INIT, lexer2.BRANCH, lexer2.SWITCH, lexer2.MERGE, lexer2.ADD, lexer2.COMMIT, lexer2.FETCH, lexer2.STATUS, lexer2.LOG, lexer2.SHOW,
-			lexer2.GET, lexer2.POST, lexer2.PUT, lexer2.DELETE, lexer2.PATCH, lexer2.HEAD, lexer2.OPTIONS, lexer2.HTTP, lexer2.HTTPS:
+		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN,
+			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW,
+			lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS:
 			p.nextToken()
 		default:
 			p.addError(fmt.Sprintf("expected task name, got %s instead", p.peekToken.Type))
@@ -1501,9 +1501,9 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 		}
 
 		// Check for "in parallel" modifier
-		if p.peekToken.Type == lexer2.IN {
+		if p.peekToken.Type == lexer.IN {
 			p.nextToken() // consume IN
-			if p.peekToken.Type == lexer2.PARALLEL {
+			if p.peekToken.Type == lexer.PARALLEL {
 				p.nextToken() // consume PARALLEL
 				dep.Parallel = true
 			} else {
@@ -1517,13 +1517,13 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 
 		// Check what comes next
 		switch p.peekToken.Type {
-		case lexer2.AND:
+		case lexer.AND:
 			p.nextToken() // consume AND
 			group.Sequential = true
-		case lexer2.COMMA:
+		case lexer.COMMA:
 			p.nextToken() // consume COMMA
 			// Keep Sequential as false (parallel)
-		case lexer2.THEN:
+		case lexer.THEN:
 			// Handle "then" - this creates a new dependency group
 			// For now, we'll treat it as sequential
 			p.nextToken() // consume THEN
@@ -1544,41 +1544,41 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 
 	// Parse operation (build, push, pull, run, etc.)
 	switch p.peekToken.Type {
-	case lexer2.BUILD, lexer2.PUSH, lexer2.PULL, lexer2.TAG, lexer2.REMOVE, lexer2.START, lexer2.STOP, lexer2.RUN:
+	case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN:
 		p.nextToken()
 		stmt.Operation = p.curToken.Literal
-	case lexer2.COMPOSE:
+	case lexer.COMPOSE:
 		p.nextToken()
 		stmt.Operation = "compose"
 		stmt.Resource = "compose"
 
 		// Parse compose command (up, down, build, etc.)
-		if p.peekToken.Type == lexer2.UP || p.peekToken.Type == lexer2.DOWN || p.peekToken.Type == lexer2.BUILD {
+		if p.peekToken.Type == lexer.UP || p.peekToken.Type == lexer.DOWN || p.peekToken.Type == lexer.BUILD {
 			p.nextToken()
 			stmt.Options["command"] = p.curToken.Literal
 		}
 		return stmt
-	case lexer2.SCALE:
+	case lexer.SCALE:
 		// Handle "docker compose scale service "name" to 3"
 		p.nextToken() // consume SCALE
 		stmt.Operation = "scale"
 
-		if p.peekToken.Type == lexer2.COMPOSE {
+		if p.peekToken.Type == lexer.COMPOSE {
 			p.nextToken() // consume COMPOSE
 			stmt.Resource = "compose"
 
-			if p.peekToken.Type == lexer2.IDENT && p.peekToken.Literal == "service" {
+			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "service" {
 				p.nextToken() // consume IDENT (service)
 				stmt.Options["resource"] = "service"
 
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Name = p.curToken.Literal
 				}
 
-				if p.peekToken.Type == lexer2.TO {
+				if p.peekToken.Type == lexer.TO {
 					p.nextToken() // consume TO
-					if p.peekToken.Type == lexer2.NUMBER {
+					if p.peekToken.Type == lexer.NUMBER {
 						p.nextToken()
 						stmt.Options["replicas"] = p.curToken.Literal
 					}
@@ -1586,7 +1586,7 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 			}
 		}
 		return stmt
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		p.nextToken()
 		stmt.Operation = p.curToken.Literal
 	default:
@@ -1595,10 +1595,10 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 
 	// Parse resource type (image, container)
 	switch p.peekToken.Type {
-	case lexer2.IMAGE, lexer2.CONTAINER:
+	case lexer.IMAGE, lexer.CONTAINER:
 		p.nextToken()
 		stmt.Resource = p.curToken.Literal
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		p.nextToken()
 		stmt.Resource = p.curToken.Literal
 	default:
@@ -1606,22 +1606,22 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 	}
 
 	// Parse name (optional for some operations)
-	if p.peekToken.Type == lexer2.STRING {
+	if p.peekToken.Type == lexer.STRING {
 		p.nextToken()
 		stmt.Name = p.curToken.Literal
 	}
 
 	// Parse additional options (from, to, as, on, etc.)
-	for p.peekToken.Type == lexer2.FROM || p.peekToken.Type == lexer2.TO || p.peekToken.Type == lexer2.AS || p.peekToken.Type == lexer2.ON || p.peekToken.Type == lexer2.PORT || p.peekToken.Type == lexer2.IDENT {
+	for p.peekToken.Type == lexer.FROM || p.peekToken.Type == lexer.TO || p.peekToken.Type == lexer.AS || p.peekToken.Type == lexer.ON || p.peekToken.Type == lexer.PORT || p.peekToken.Type == lexer.IDENT {
 		p.nextToken()
 		optionKey := p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+		if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER {
 			p.nextToken()
 			stmt.Options[optionKey] = p.curToken.Literal
-		} else if optionKey == "on" && p.peekToken.Type == lexer2.PORT {
+		} else if optionKey == "on" && p.peekToken.Type == lexer.PORT {
 			p.nextToken() // consume PORT
-			if p.peekToken.Type == lexer2.NUMBER {
+			if p.peekToken.Type == lexer.NUMBER {
 				p.nextToken()
 				stmt.Options["port"] = p.curToken.Literal
 			}
@@ -1640,140 +1640,140 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 
 	// Parse Git operation
 	switch p.peekToken.Type {
-	case lexer2.CREATE:
+	case lexer.CREATE:
 		// git create branch "name"
 		// git create tag "v1.0.0"
 		p.nextToken() // consume CREATE
 		stmt.Operation = p.curToken.Literal
 
 		switch p.peekToken.Type {
-		case lexer2.BRANCH:
+		case lexer.BRANCH:
 			p.nextToken() // consume BRANCH
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
-		case lexer2.TAG:
+		case lexer.TAG:
 			p.nextToken() // consume TAG
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
 		}
 
-	case lexer2.CHECKOUT:
+	case lexer.CHECKOUT:
 		// git checkout branch "name"
 		p.nextToken() // consume CHECKOUT
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.BRANCH {
+		if p.peekToken.Type == lexer.BRANCH {
 			p.nextToken() // consume BRANCH
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
 		}
 
-	case lexer2.MERGE:
+	case lexer.MERGE:
 		// git merge branch "name"
 		p.nextToken() // consume MERGE
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.BRANCH {
+		if p.peekToken.Type == lexer.BRANCH {
 			p.nextToken() // consume BRANCH
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
 		}
 
-	case lexer2.CLONE:
+	case lexer.CLONE:
 		// git clone repository "url" to "dir"
 		p.nextToken() // consume CLONE
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.REPOSITORY {
+		if p.peekToken.Type == lexer.REPOSITORY {
 			p.nextToken() // consume REPOSITORY
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
 		}
 
-	case lexer2.INIT:
+	case lexer.INIT:
 		// git init repository in "dir"
 		p.nextToken() // consume INIT
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.REPOSITORY {
+		if p.peekToken.Type == lexer.REPOSITORY {
 			p.nextToken() // consume REPOSITORY
 			stmt.Resource = p.curToken.Literal
 		}
 
-	case lexer2.ADD:
+	case lexer.ADD:
 		// git add files "pattern"
 		p.nextToken() // consume ADD
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.FILES {
+		if p.peekToken.Type == lexer.FILES {
 			p.nextToken() // consume FILES
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
 		}
 
-	case lexer2.COMMIT:
+	case lexer.COMMIT:
 		// git commit changes with message "msg"
 		// git commit all changes with message "msg"
 		p.nextToken() // consume COMMIT
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.ALL {
+		if p.peekToken.Type == lexer.ALL {
 			p.nextToken() // consume ALL
 			stmt.Options["all"] = "true"
 		}
 
-		if p.peekToken.Type == lexer2.CHANGES {
+		if p.peekToken.Type == lexer.CHANGES {
 			p.nextToken() // consume CHANGES
 			stmt.Resource = p.curToken.Literal
 		}
 
 		// Parse "with message 'text'"
-		if p.peekToken.Type == lexer2.WITH {
+		if p.peekToken.Type == lexer.WITH {
 			p.nextToken() // consume WITH
-			if p.peekToken.Type == lexer2.MESSAGE {
+			if p.peekToken.Type == lexer.MESSAGE {
 				p.nextToken() // consume MESSAGE
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Options["message"] = p.curToken.Literal
 				}
 			}
 		}
 
-	case lexer2.PUSH:
+	case lexer.PUSH:
 		// git push to remote "origin" branch "main"
 		// git push tag "v1.0.0" to remote "origin"
 		p.nextToken() // consume PUSH
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.TAG {
+		if p.peekToken.Type == lexer.TAG {
 			p.nextToken() // consume TAG
 			stmt.Resource = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Name = p.curToken.Literal
 			}
@@ -1781,17 +1781,17 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 
 		// Handle "to remote 'origin' branch 'main'" - this will be handled in options parsing
 
-	case lexer2.PULL:
+	case lexer.PULL:
 		// git pull from remote "origin" branch "main"
 		p.nextToken() // consume PULL
 		stmt.Operation = p.curToken.Literal
 
-	case lexer2.FETCH:
+	case lexer.FETCH:
 		// git fetch from remote "origin"
 		p.nextToken() // consume FETCH
 		stmt.Operation = p.curToken.Literal
 
-	case lexer2.BRANCH:
+	case lexer.BRANCH:
 		// git create branch "name"
 		// git switch to branch "name"
 		// git delete branch "name"
@@ -1806,27 +1806,27 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 			stmt.Operation = "create"
 		}
 
-	case lexer2.STATUS:
+	case lexer.STATUS:
 		// git status
 		p.nextToken() // consume STATUS
 		stmt.Operation = p.curToken.Literal
 
-	case lexer2.LOG:
+	case lexer.LOG:
 		// git log --oneline
 		p.nextToken() // consume LOG
 		stmt.Operation = p.curToken.Literal
 
-	case lexer2.SHOW:
+	case lexer.SHOW:
 		// git show current branch
 		// git show current commit
 		p.nextToken() // consume SHOW
 		stmt.Operation = p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.CURRENT {
+		if p.peekToken.Type == lexer.CURRENT {
 			p.nextToken() // consume CURRENT
 			stmt.Options["current"] = "true"
 
-			if p.peekToken.Type == lexer2.BRANCH || p.peekToken.Type == lexer2.COMMIT {
+			if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.COMMIT {
 				p.nextToken()
 				stmt.Resource = p.curToken.Literal
 			}
@@ -1834,7 +1834,7 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 
 	default:
 		// Handle operations that come before git (create, switch, delete, merge)
-		if p.peekToken.Type == lexer2.IDENT {
+		if p.peekToken.Type == lexer.IDENT {
 			p.nextToken()
 			stmt.Operation = p.curToken.Literal
 		} else {
@@ -1843,35 +1843,35 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 	}
 
 	// Parse additional options (to, from, with, into, in, etc.)
-	for p.peekToken.Type == lexer2.TO || p.peekToken.Type == lexer2.FROM || p.peekToken.Type == lexer2.WITH ||
-		p.peekToken.Type == lexer2.INTO || p.peekToken.Type == lexer2.IN || p.peekToken.Type == lexer2.REMOTE ||
-		p.peekToken.Type == lexer2.BRANCH || p.peekToken.Type == lexer2.MESSAGE || p.peekToken.Type == lexer2.IDENT {
+	for p.peekToken.Type == lexer.TO || p.peekToken.Type == lexer.FROM || p.peekToken.Type == lexer.WITH ||
+		p.peekToken.Type == lexer.INTO || p.peekToken.Type == lexer.IN || p.peekToken.Type == lexer.REMOTE ||
+		p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.MESSAGE || p.peekToken.Type == lexer.IDENT {
 		p.nextToken()
 
 		switch p.curToken.Type {
-		case lexer2.TO, lexer2.FROM, lexer2.WITH, lexer2.INTO, lexer2.IN:
+		case lexer.TO, lexer.FROM, lexer.WITH, lexer.INTO, lexer.IN:
 			optionKey := p.curToken.Literal
 			switch p.peekToken.Type {
-			case lexer2.STRING:
+			case lexer.STRING:
 				p.nextToken()
 				stmt.Options[optionKey] = p.curToken.Literal
-			case lexer2.REMOTE, lexer2.BRANCH, lexer2.MESSAGE:
+			case lexer.REMOTE, lexer.BRANCH, lexer.MESSAGE:
 				p.nextToken()
 				keywordType := p.curToken.Literal
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Options[keywordType] = p.curToken.Literal
 				}
 			}
-		case lexer2.REMOTE, lexer2.BRANCH, lexer2.MESSAGE:
+		case lexer.REMOTE, lexer.BRANCH, lexer.MESSAGE:
 			keywordType := p.curToken.Literal
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Options[keywordType] = p.curToken.Literal
 			}
-		case lexer2.IDENT:
+		case lexer.IDENT:
 			optionKey := p.curToken.Literal
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Options[optionKey] = p.curToken.Literal
 			}
@@ -1892,23 +1892,23 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 
 	// Determine HTTP method
 	switch p.curToken.Type {
-	case lexer2.GET:
+	case lexer.GET:
 		stmt.Method = "GET"
-	case lexer2.POST:
+	case lexer.POST:
 		stmt.Method = "POST"
-	case lexer2.PUT:
+	case lexer.PUT:
 		stmt.Method = "PUT"
-	case lexer2.DELETE:
+	case lexer.DELETE:
 		stmt.Method = "DELETE"
-	case lexer2.PATCH:
+	case lexer.PATCH:
 		stmt.Method = "PATCH"
-	case lexer2.HEAD:
+	case lexer.HEAD:
 		stmt.Method = "HEAD"
-	case lexer2.OPTIONS:
+	case lexer.OPTIONS:
 		stmt.Method = "OPTIONS"
-	case lexer2.HTTP, lexer2.HTTPS:
+	case lexer.HTTP, lexer.HTTPS:
 		// For "http request" or "https request" syntax
-		if p.peekToken.Type == lexer2.REQUEST {
+		if p.peekToken.Type == lexer.REQUEST {
 			p.nextToken()       // consume REQUEST
 			stmt.Method = "GET" // default to GET
 		} else {
@@ -1920,41 +1920,41 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 
 	// Parse URL/endpoint
 	switch p.peekToken.Type {
-	case lexer2.REQUEST:
+	case lexer.REQUEST:
 		p.nextToken() // consume REQUEST
-		if p.peekToken.Type == lexer2.TO {
+		if p.peekToken.Type == lexer.TO {
 			p.nextToken() // consume TO
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.URL = p.curToken.Literal
 			}
 		}
-	case lexer2.TO, lexer2.STRING:
-		if p.peekToken.Type == lexer2.TO {
+	case lexer.TO, lexer.STRING:
+		if p.peekToken.Type == lexer.TO {
 			p.nextToken() // consume TO
 		}
-		if p.peekToken.Type == lexer2.STRING {
+		if p.peekToken.Type == lexer.STRING {
 			p.nextToken()
 			stmt.URL = p.curToken.Literal
 		}
 	}
 
 	// Parse additional options (headers, body, auth, etc.)
-	for p.peekToken.Type == lexer2.WITH || p.peekToken.Type == lexer2.HEADER || p.peekToken.Type == lexer2.HEADERS ||
-		p.peekToken.Type == lexer2.BODY || p.peekToken.Type == lexer2.DATA || p.peekToken.Type == lexer2.AUTH ||
-		p.peekToken.Type == lexer2.BEARER || p.peekToken.Type == lexer2.BASIC || p.peekToken.Type == lexer2.TOKEN ||
-		p.peekToken.Type == lexer2.TIMEOUT || p.peekToken.Type == lexer2.RETRY || p.peekToken.Type == lexer2.ACCEPT ||
-		p.peekToken.Type == lexer2.CONTENT || p.peekToken.Type == lexer2.TYPE {
+	for p.peekToken.Type == lexer.WITH || p.peekToken.Type == lexer.HEADER || p.peekToken.Type == lexer.HEADERS ||
+		p.peekToken.Type == lexer.BODY || p.peekToken.Type == lexer.DATA || p.peekToken.Type == lexer.AUTH ||
+		p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC || p.peekToken.Type == lexer.TOKEN ||
+		p.peekToken.Type == lexer.TIMEOUT || p.peekToken.Type == lexer.RETRY || p.peekToken.Type == lexer.ACCEPT ||
+		p.peekToken.Type == lexer.CONTENT || p.peekToken.Type == lexer.TYPE {
 
 		p.nextToken()
 
 		switch p.curToken.Type {
-		case lexer2.WITH:
+		case lexer.WITH:
 			// Parse "with header", "with body", "with auth", etc.
 			switch p.peekToken.Type {
-			case lexer2.HEADER:
+			case lexer.HEADER:
 				p.nextToken() // consume HEADER
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					headerValue := p.curToken.Literal
 					// Parse "key: value" format
@@ -1964,32 +1964,32 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 						stmt.Headers[key] = value
 					}
 				}
-			case lexer2.BODY, lexer2.DATA:
+			case lexer.BODY, lexer.DATA:
 				p.nextToken() // consume BODY/DATA
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Body = p.curToken.Literal
 				}
-			case lexer2.AUTH:
+			case lexer.AUTH:
 				p.nextToken() // consume AUTH
-				if p.peekToken.Type == lexer2.BEARER || p.peekToken.Type == lexer2.BASIC {
+				if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
 					p.nextToken()
 					authType := p.curToken.Literal
-					if p.peekToken.Type == lexer2.STRING {
+					if p.peekToken.Type == lexer.STRING {
 						p.nextToken()
 						stmt.Auth[authType] = p.curToken.Literal
 					}
 				}
-			case lexer2.TOKEN:
+			case lexer.TOKEN:
 				p.nextToken() // consume TOKEN
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Auth["bearer"] = p.curToken.Literal
 				}
 			}
 
-		case lexer2.HEADER, lexer2.HEADERS:
-			if p.peekToken.Type == lexer2.STRING {
+		case lexer.HEADER, lexer.HEADERS:
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				headerValue := p.curToken.Literal
 				// Parse "key: value" format
@@ -2000,60 +2000,60 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 				}
 			}
 
-		case lexer2.BODY, lexer2.DATA:
-			if p.peekToken.Type == lexer2.STRING {
+		case lexer.BODY, lexer.DATA:
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Body = p.curToken.Literal
 			}
 
-		case lexer2.AUTH:
-			if p.peekToken.Type == lexer2.BEARER || p.peekToken.Type == lexer2.BASIC {
+		case lexer.AUTH:
+			if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
 				p.nextToken()
 				authType := p.curToken.Literal
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Auth[authType] = p.curToken.Literal
 				}
 			}
 
-		case lexer2.BEARER, lexer2.BASIC:
+		case lexer.BEARER, lexer.BASIC:
 			authType := p.curToken.Literal
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Auth[authType] = p.curToken.Literal
 			}
 
-		case lexer2.TOKEN:
-			if p.peekToken.Type == lexer2.STRING {
+		case lexer.TOKEN:
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Auth["bearer"] = p.curToken.Literal
 			}
 
-		case lexer2.TIMEOUT, lexer2.RETRY:
+		case lexer.TIMEOUT, lexer.RETRY:
 			optionKey := p.curToken.Literal
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Options[optionKey] = p.curToken.Literal
 			}
 
-		case lexer2.ACCEPT:
+		case lexer.ACCEPT:
 			switch p.peekToken.Type {
-			case lexer2.JSON, lexer2.XML:
+			case lexer.JSON, lexer.XML:
 				p.nextToken()
 				stmt.Headers["Accept"] = "application/" + p.curToken.Literal
-			case lexer2.STRING:
+			case lexer.STRING:
 				p.nextToken()
 				stmt.Headers["Accept"] = p.curToken.Literal
 			}
 
-		case lexer2.CONTENT:
-			if p.peekToken.Type == lexer2.TYPE {
+		case lexer.CONTENT:
+			if p.peekToken.Type == lexer.TYPE {
 				p.nextToken() // consume TYPE
 				switch p.peekToken.Type {
-				case lexer2.JSON, lexer2.XML:
+				case lexer.JSON, lexer.XML:
 					p.nextToken()
 					stmt.Headers["Content-Type"] = "application/" + p.curToken.Literal
-				case lexer2.STRING:
+				case lexer.STRING:
 					p.nextToken()
 					stmt.Headers["Content-Type"] = p.curToken.Literal
 				}
@@ -2071,21 +2071,21 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	}
 
 	switch p.curToken.Type {
-	case lexer2.DETECT:
+	case lexer.DETECT:
 		// detect project type
 		// detect docker
 		// detect node version
 		// detect available "docker compose" or "docker-compose" as $compose_cmd
 		stmt.Type = "detect"
 
-		if p.peekToken.Type == lexer2.AVAILABLE {
+		if p.peekToken.Type == lexer.AVAILABLE {
 			// detect available "tool1" or "tool2" as $var
 			p.nextToken() // consume AVAILABLE
 			stmt.Type = "detect_available"
 			stmt.Condition = "available"
 
 			// Parse first tool (required)
-			if p.peekToken.Type == lexer2.STRING || p.isToolToken(p.peekToken.Type) {
+			if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) {
 				p.nextToken()
 				stmt.Target = p.curToken.Literal
 			} else {
@@ -2094,9 +2094,9 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			}
 
 			// Parse alternatives (optional "or" clauses)
-			for p.peekToken.Type == lexer2.OR {
+			for p.peekToken.Type == lexer.OR {
 				p.nextToken() // consume OR
-				if p.peekToken.Type == lexer2.STRING || p.isToolToken(p.peekToken.Type) {
+				if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) {
 					p.nextToken()
 					stmt.Alternatives = append(stmt.Alternatives, p.curToken.Literal)
 				} else {
@@ -2106,9 +2106,9 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			}
 
 			// Parse capture variable (optional "as $var")
-			if p.peekToken.Type == lexer2.AS {
+			if p.peekToken.Type == lexer.AS {
 				p.nextToken() // consume AS
-				if p.peekToken.Type == lexer2.VARIABLE {
+				if p.peekToken.Type == lexer.VARIABLE {
 					p.nextToken()
 					stmt.CaptureVar = p.getVariableName()
 				} else {
@@ -2117,10 +2117,10 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 				}
 			}
 
-		} else if p.peekToken.Type == lexer2.PROJECT {
+		} else if p.peekToken.Type == lexer.PROJECT {
 			p.nextToken() // consume PROJECT
 			stmt.Target = "project"
-			if p.peekToken.Type == lexer2.TYPE {
+			if p.peekToken.Type == lexer.TYPE {
 				p.nextToken() // consume TYPE
 				stmt.Condition = "type"
 			}
@@ -2128,41 +2128,41 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
-			if p.peekToken.Type == lexer2.VERSION {
+			if p.peekToken.Type == lexer.VERSION {
 				p.nextToken() // consume VERSION
 				stmt.Condition = "version"
 			}
 		}
 
-	case lexer2.IF:
+	case lexer.IF:
 		// if docker is available:
 		// if "docker buildx" is available:
 		// if node version >= "16":
 		stmt.Type = "if_available"
 
-		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer2.STRING {
+		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
 			switch p.peekToken.Type {
-			case lexer2.IS:
+			case lexer.IS:
 				p.nextToken() // consume IS
-				if p.peekToken.Type == lexer2.AVAILABLE {
+				if p.peekToken.Type == lexer.AVAILABLE {
 					p.nextToken() // consume AVAILABLE
 					stmt.Condition = "available"
 				}
-			case lexer2.VERSION:
+			case lexer.VERSION:
 				p.nextToken() // consume VERSION
 				stmt.Type = "if_version"
 
 				// Parse comparison operator
-				if p.peekToken.Type == lexer2.GTE || p.peekToken.Type == lexer2.GT ||
-					p.peekToken.Type == lexer2.LTE || p.peekToken.Type == lexer2.LT ||
-					p.peekToken.Type == lexer2.EQ || p.peekToken.Type == lexer2.NE {
+				if p.peekToken.Type == lexer.GTE || p.peekToken.Type == lexer.GT ||
+					p.peekToken.Type == lexer.LTE || p.peekToken.Type == lexer.LT ||
+					p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE {
 					p.nextToken()
 					stmt.Condition = p.curToken.Literal
 
-					if p.peekToken.Type == lexer2.STRING {
+					if p.peekToken.Type == lexer.STRING {
 						p.nextToken()
 						stmt.Value = p.curToken.Literal
 					}
@@ -2170,19 +2170,19 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			}
 		}
 
-	case lexer2.WHEN:
+	case lexer.WHEN:
 		// when in ci environment:
 		// when in production environment:
 		stmt.Type = "when_environment"
 
-		if p.peekToken.Type == lexer2.IN {
+		if p.peekToken.Type == lexer.IN {
 			p.nextToken() // consume IN
 
 			if p.isEnvironmentToken(p.peekToken.Type) {
 				p.nextToken()
 				stmt.Target = p.curToken.Literal
 
-				if p.peekToken.Type == lexer2.ENVIRONMENT {
+				if p.peekToken.Type == lexer.ENVIRONMENT {
 					p.nextToken() // consume ENVIRONMENT
 					stmt.Condition = "environment"
 				}
@@ -2191,14 +2191,14 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	}
 
 	// Parse body if there's a colon
-	if p.peekToken.Type == lexer2.COLON {
+	if p.peekToken.Type == lexer.COLON {
 		p.nextToken() // consume COLON
 		stmt.Body = p.parseControlFlowBody()
 
 		// Check for else clause (similar to parseIfStatement)
-		if p.peekToken.Type == lexer2.ELSE {
+		if p.peekToken.Type == lexer.ELSE {
 			p.nextToken() // consume ELSE
-			if !p.expectPeek(lexer2.COLON) {
+			if !p.expectPeek(lexer.COLON) {
 				return stmt
 			}
 			stmt.ElseBody = p.parseControlFlowBody()
@@ -2209,11 +2209,11 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 }
 
 // isToolToken checks if a token represents a tool name
-func (p *Parser) isToolToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isToolToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.DOCKER, lexer2.GIT, lexer2.NODE, lexer2.NPM, lexer2.YARN, lexer2.PYTHON, lexer2.PIP,
-		lexer2.GO, lexer2.GOLANG, lexer2.JAVA, lexer2.RUBY, lexer2.PHP, lexer2.RUST, lexer2.KUBECTL, lexer2.HELM,
-		lexer2.TERRAFORM, lexer2.AWS, lexer2.GCP, lexer2.AZURE:
+	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PYTHON, lexer.PIP,
+		lexer.GO, lexer.GOLANG, lexer.JAVA, lexer.RUBY, lexer.PHP, lexer.RUST, lexer.KUBECTL, lexer.HELM,
+		lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
 		return true
 	default:
 		return false
@@ -2221,9 +2221,9 @@ func (p *Parser) isToolToken(tokenType lexer2.TokenType) bool {
 }
 
 // isEnvironmentToken checks if a token represents an environment name
-func (p *Parser) isEnvironmentToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isEnvironmentToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.CI, lexer2.LOCAL, lexer2.PRODUCTION, lexer2.STAGING, lexer2.DEVELOPMENT:
+	case lexer.CI, lexer.LOCAL, lexer.PRODUCTION, lexer.STAGING, lexer.DEVELOPMENT:
 		return true
 	default:
 		return false
@@ -2233,14 +2233,14 @@ func (p *Parser) isEnvironmentToken(tokenType lexer2.TokenType) bool {
 // isDetectionContext checks if the current context suggests a detection statement
 func (p *Parser) isDetectionContext() bool {
 	switch p.curToken.Type {
-	case lexer2.DETECT:
+	case lexer.DETECT:
 		return true
-	case lexer2.IF:
+	case lexer.IF:
 		// Check if this is "if <tool> is available" or "if <tool> version ..."
-		return p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer2.STRING
-	case lexer2.WHEN:
+		return p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING
+	case lexer.WHEN:
 		// Check if this is "when in <environment> environment"
-		return p.peekToken.Type == lexer2.IN
+		return p.peekToken.Type == lexer.IN
 	default:
 		return false
 	}
@@ -2255,27 +2255,27 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 
 	// Determine network action based on current token and context
 	switch p.curToken.Type {
-	case lexer2.WAIT:
+	case lexer.WAIT:
 		// "wait for service at URL to be ready"
 		stmt.Action = "wait_for_service"
 
 		// Expect "for service at"
-		if p.peekToken.Type == lexer2.FOR {
+		if p.peekToken.Type == lexer.FOR {
 			p.nextToken() // consume FOR
-			if p.peekToken.Type == lexer2.SERVICE {
+			if p.peekToken.Type == lexer.SERVICE {
 				p.nextToken() // consume SERVICE
-				if p.peekToken.Type == lexer2.AT {
+				if p.peekToken.Type == lexer.AT {
 					p.nextToken() // consume AT
-					if p.peekToken.Type == lexer2.STRING {
+					if p.peekToken.Type == lexer.STRING {
 						p.nextToken()
 						stmt.Target = p.curToken.Literal
 
 						// Expect "to be ready"
-						if p.peekToken.Type == lexer2.TO {
+						if p.peekToken.Type == lexer.TO {
 							p.nextToken() // consume TO
-							if p.peekToken.Type == lexer2.BE {
+							if p.peekToken.Type == lexer.BE {
 								p.nextToken() // consume BE
-								if p.peekToken.Type == lexer2.READY {
+								if p.peekToken.Type == lexer.READY {
 									p.nextToken() // consume READY
 								}
 							}
@@ -2285,38 +2285,38 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 			}
 		}
 
-	case lexer2.PING:
+	case lexer.PING:
 		// "ping host hostname"
 		stmt.Action = "ping"
 
 		// Expect "host"
-		if p.peekToken.Type == lexer2.HOST {
+		if p.peekToken.Type == lexer.HOST {
 			p.nextToken() // consume HOST
-			if p.peekToken.Type == lexer2.STRING {
+			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Target = p.curToken.Literal
 			}
 		}
 
-	case lexer2.TEST:
+	case lexer.TEST:
 		// "test connection to host on port X"
 		stmt.Action = "port_check"
 
 		// Expect "connection to"
-		if p.peekToken.Type == lexer2.CONNECTION {
+		if p.peekToken.Type == lexer.CONNECTION {
 			p.nextToken() // consume CONNECTION
-			if p.peekToken.Type == lexer2.TO {
+			if p.peekToken.Type == lexer.TO {
 				p.nextToken() // consume TO
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Target = p.curToken.Literal
 
 					// Expect "on port X"
-					if p.peekToken.Type == lexer2.ON {
+					if p.peekToken.Type == lexer.ON {
 						p.nextToken() // consume ON
-						if p.peekToken.Type == lexer2.PORT {
+						if p.peekToken.Type == lexer.PORT {
 							p.nextToken() // consume PORT
-							if p.peekToken.Type == lexer2.NUMBER {
+							if p.peekToken.Type == lexer.NUMBER {
 								p.nextToken()
 								stmt.Port = p.curToken.Literal
 							}
@@ -2326,45 +2326,45 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 			}
 		}
 
-	case lexer2.CHECK:
+	case lexer.CHECK:
 		// "check health of service at URL" or "check if port X is open on host"
-		if p.peekToken.Type == lexer2.HEALTH {
+		if p.peekToken.Type == lexer.HEALTH {
 			p.nextToken() // consume HEALTH
 			stmt.Action = "health_check"
 
 			// Expect "of service at"
-			if p.peekToken.Type == lexer2.OF {
+			if p.peekToken.Type == lexer.OF {
 				p.nextToken() // consume OF
-				if p.peekToken.Type == lexer2.SERVICE {
+				if p.peekToken.Type == lexer.SERVICE {
 					p.nextToken() // consume SERVICE
-					if p.peekToken.Type == lexer2.AT {
+					if p.peekToken.Type == lexer.AT {
 						p.nextToken() // consume AT
-						if p.peekToken.Type == lexer2.STRING {
+						if p.peekToken.Type == lexer.STRING {
 							p.nextToken()
 							stmt.Target = p.curToken.Literal
 						}
 					}
 				}
 			}
-		} else if p.peekToken.Type == lexer2.IF {
+		} else if p.peekToken.Type == lexer.IF {
 			p.nextToken() // consume IF
-			if p.peekToken.Type == lexer2.PORT {
+			if p.peekToken.Type == lexer.PORT {
 				p.nextToken() // consume PORT
 				stmt.Action = "port_check"
 
 				// Expect port number
-				if p.peekToken.Type == lexer2.NUMBER {
+				if p.peekToken.Type == lexer.NUMBER {
 					p.nextToken()
 					stmt.Port = p.curToken.Literal
 
 					// Expect "is open on"
-					if p.peekToken.Type == lexer2.IS {
+					if p.peekToken.Type == lexer.IS {
 						p.nextToken() // consume IS
-						if p.peekToken.Type == lexer2.OPEN {
+						if p.peekToken.Type == lexer.OPEN {
 							p.nextToken() // consume OPEN
-							if p.peekToken.Type == lexer2.ON {
+							if p.peekToken.Type == lexer.ON {
 								p.nextToken() // consume ON
-								if p.peekToken.Type == lexer2.STRING {
+								if p.peekToken.Type == lexer.STRING {
 									p.nextToken()
 									stmt.Target = p.curToken.Literal
 								}
@@ -2377,32 +2377,32 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 	}
 
 	// Parse additional options (timeout, retry, expect, etc.)
-	for p.peekToken.Type == lexer2.TIMEOUT || p.peekToken.Type == lexer2.RETRY ||
-		p.peekToken.Type == lexer2.EXPECT || p.peekToken.Type == lexer2.WITH {
+	for p.peekToken.Type == lexer.TIMEOUT || p.peekToken.Type == lexer.RETRY ||
+		p.peekToken.Type == lexer.EXPECT || p.peekToken.Type == lexer.WITH {
 		p.nextToken()
 
 		switch p.curToken.Type {
-		case lexer2.TIMEOUT:
-			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+		case lexer.TIMEOUT:
+			if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER {
 				p.nextToken()
 				stmt.Options["timeout"] = p.curToken.Literal
 			}
-		case lexer2.RETRY:
-			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+		case lexer.RETRY:
+			if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER {
 				p.nextToken()
 				stmt.Options["retry"] = p.curToken.Literal
 			}
-		case lexer2.EXPECT:
-			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+		case lexer.EXPECT:
+			if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER {
 				p.nextToken()
 				stmt.Condition = p.curToken.Literal
 			}
-		case lexer2.WITH:
+		case lexer.WITH:
 			// Handle "with" options
-			if p.peekToken.Type == lexer2.IDENT {
+			if p.peekToken.Type == lexer.IDENT {
 				p.nextToken()
 				optionKey := p.curToken.Literal
-				if p.peekToken.Type == lexer2.STRING {
+				if p.peekToken.Type == lexer.STRING {
 					p.nextToken()
 					stmt.Options[optionKey] = p.curToken.Literal
 				}
@@ -2417,20 +2417,20 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 func (p *Parser) parseStringList() []string {
 	var items []string
 
-	for p.peekToken.Type != lexer2.RBRACKET && p.peekToken.Type != lexer2.EOF {
-		if !p.expectPeek(lexer2.STRING) {
+	for p.peekToken.Type != lexer.RBRACKET && p.peekToken.Type != lexer.EOF {
+		if !p.expectPeek(lexer.STRING) {
 			break
 		}
 		items = append(items, p.curToken.Literal)
 
 		// Check for comma
-		if p.peekToken.Type == lexer2.COMMA {
+		if p.peekToken.Type == lexer.COMMA {
 			p.nextToken() // consume comma
 		}
 	}
 
 	// Consume RBRACKET
-	if p.peekToken.Type == lexer2.RBRACKET {
+	if p.peekToken.Type == lexer.RBRACKET {
 		p.nextToken()
 	}
 
@@ -2438,14 +2438,14 @@ func (p *Parser) parseStringList() []string {
 }
 
 // isDependencyToken checks if a token type represents a dependency declaration
-func (p *Parser) isDependencyToken(tokenType lexer2.TokenType) bool {
-	return tokenType == lexer2.DEPENDS
+func (p *Parser) isDependencyToken(tokenType lexer.TokenType) bool {
+	return tokenType == lexer.DEPENDS
 }
 
 // isDockerToken checks if a token type represents a Docker statement
-func (p *Parser) isDockerToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isDockerToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.DOCKER, lexer2.BUILD, lexer2.TAG, lexer2.PUSH, lexer2.PULL, lexer2.RUN, lexer2.STOP, lexer2.START, lexer2.SCALE:
+	case lexer.DOCKER, lexer.BUILD, lexer.TAG, lexer.PUSH, lexer.PULL, lexer.RUN, lexer.STOP, lexer.START, lexer.SCALE:
 		return true
 	default:
 		return false
@@ -2453,9 +2453,9 @@ func (p *Parser) isDockerToken(tokenType lexer2.TokenType) bool {
 }
 
 // isGitToken checks if a token type represents a Git statement
-func (p *Parser) isGitToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.GIT, lexer2.CREATE, lexer2.CHECKOUT, lexer2.MERGE:
+	case lexer.GIT, lexer.CREATE, lexer.CHECKOUT, lexer.MERGE:
 		return true
 	default:
 		return false
@@ -2463,9 +2463,9 @@ func (p *Parser) isGitToken(tokenType lexer2.TokenType) bool {
 }
 
 // isHTTPToken checks if a token type represents an HTTP statement
-func (p *Parser) isHTTPToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.HTTP, lexer2.HTTPS, lexer2.GET, lexer2.POST, lexer2.PUT, lexer2.DELETE, lexer2.PATCH, lexer2.HEAD, lexer2.OPTIONS:
+	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS:
 		return true
 	default:
 		return false
@@ -2473,9 +2473,9 @@ func (p *Parser) isHTTPToken(tokenType lexer2.TokenType) bool {
 }
 
 // isNetworkToken checks if a token type represents a network statement
-func (p *Parser) isNetworkToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isNetworkToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.WAIT, lexer2.PING, lexer2.TEST:
+	case lexer.WAIT, lexer.PING, lexer.TEST:
 		return true
 	default:
 		return false
@@ -2483,9 +2483,9 @@ func (p *Parser) isNetworkToken(tokenType lexer2.TokenType) bool {
 }
 
 // isDetectionToken checks if a token type represents a detection statement
-func (p *Parser) isDetectionToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isDetectionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.DETECT, lexer2.IF, lexer2.WHEN:
+	case lexer.DETECT, lexer.IF, lexer.WHEN:
 		return true
 	default:
 		return false
@@ -2493,9 +2493,9 @@ func (p *Parser) isDetectionToken(tokenType lexer2.TokenType) bool {
 }
 
 // isParameterToken checks if a token type represents a parameter declaration
-func (p *Parser) isParameterToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isParameterToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.REQUIRES, lexer2.GIVEN, lexer2.ACCEPTS:
+	case lexer.REQUIRES, lexer.GIVEN, lexer.ACCEPTS:
 		return true
 	default:
 		return false
@@ -2503,9 +2503,9 @@ func (p *Parser) isParameterToken(tokenType lexer2.TokenType) bool {
 }
 
 // isControlFlowToken checks if a token type represents a control flow statement
-func (p *Parser) isControlFlowToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isControlFlowToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.WHEN, lexer2.IF, lexer2.FOR:
+	case lexer.WHEN, lexer.IF, lexer.FOR:
 		return true
 	default:
 		return false
@@ -2513,11 +2513,11 @@ func (p *Parser) isControlFlowToken(tokenType lexer2.TokenType) bool {
 }
 
 // isActionToken checks if a token type represents an action
-func (p *Parser) isActionToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.INFO, lexer2.STEP, lexer2.WARN, lexer2.ERROR, lexer2.SUCCESS, lexer2.FAIL,
-		lexer2.RUN, lexer2.EXEC, lexer2.SHELL, lexer2.CAPTURE,
-		lexer2.CREATE, lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND, lexer2.BACKUP, lexer2.CHECK:
+	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL,
+		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
+		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
 		return true
 	default:
 		return false
@@ -2525,9 +2525,9 @@ func (p *Parser) isActionToken(tokenType lexer2.TokenType) bool {
 }
 
 // isShellActionToken checks if a token type represents a shell action
-func (p *Parser) isShellActionToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isShellActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.RUN, lexer2.EXEC, lexer2.SHELL, lexer2.CAPTURE:
+	case lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE:
 		return true
 	default:
 		return false
@@ -2535,9 +2535,9 @@ func (p *Parser) isShellActionToken(tokenType lexer2.TokenType) bool {
 }
 
 // isTypeToken checks if a token type represents a data type
-func (p *Parser) isTypeToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isTypeToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.STRING_TYPE, lexer2.NUMBER_TYPE, lexer2.BOOLEAN_TYPE, lexer2.LIST_TYPE, lexer2.IDENT:
+	case lexer.STRING_TYPE, lexer.NUMBER_TYPE, lexer.BOOLEAN_TYPE, lexer.LIST_TYPE, lexer.IDENT:
 		return true
 	default:
 		return false
@@ -2545,9 +2545,9 @@ func (p *Parser) isTypeToken(tokenType lexer2.TokenType) bool {
 }
 
 // isFileActionToken checks if a token type represents a file action
-func (p *Parser) isFileActionToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isFileActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND, lexer2.BACKUP, lexer2.CHECK:
+	case lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
 		return true
 	default:
 		return false
@@ -2555,9 +2555,9 @@ func (p *Parser) isFileActionToken(tokenType lexer2.TokenType) bool {
 }
 
 // isErrorHandlingToken checks if a token type represents error handling
-func (p *Parser) isErrorHandlingToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isErrorHandlingToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.TRY:
+	case lexer.TRY:
 		return true
 	default:
 		return false
@@ -2565,9 +2565,9 @@ func (p *Parser) isErrorHandlingToken(tokenType lexer2.TokenType) bool {
 }
 
 // isThrowActionToken checks if a token type represents a throw action
-func (p *Parser) isThrowActionToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isThrowActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.THROW, lexer2.RETHROW, lexer2.IGNORE:
+	case lexer.THROW, lexer.RETHROW, lexer.IGNORE:
 		return true
 	default:
 		return false
@@ -2575,7 +2575,7 @@ func (p *Parser) isThrowActionToken(tokenType lexer2.TokenType) bool {
 }
 
 // expectPeek checks the peek token type and advances if it matches
-func (p *Parser) expectPeek(t lexer2.TokenType) bool {
+func (p *Parser) expectPeek(t lexer.TokenType) bool {
 	if p.peekToken.Type == t {
 		p.nextToken()
 		return true
@@ -2586,7 +2586,7 @@ func (p *Parser) expectPeek(t lexer2.TokenType) bool {
 }
 
 // peekError adds an error for unexpected peek token
-func (p *Parser) peekError(t lexer2.TokenType) {
+func (p *Parser) peekError(t lexer.TokenType) {
 	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
 	p.errors = append(p.errors, msg)
 
@@ -2608,7 +2608,7 @@ func (p *Parser) addError(msg string) {
 
 // skipComments skips over comment tokens
 func (p *Parser) skipComments() {
-	for p.curToken.Type == lexer2.COMMENT {
+	for p.curToken.Type == lexer.COMMENT {
 		p.nextToken()
 	}
 }
@@ -2626,11 +2626,11 @@ func (p *Parser) ErrorList() *errors.ParseErrorList {
 // parseControlFlowStatement parses control flow statements (when, if, for)
 func (p *Parser) parseControlFlowStatement() ast.Statement {
 	switch p.curToken.Type {
-	case lexer2.WHEN:
+	case lexer.WHEN:
 		return p.parseWhenStatement()
-	case lexer2.IF:
+	case lexer.IF:
 		return p.parseIfStatement()
-	case lexer2.FOR:
+	case lexer.FOR:
 		return p.parseForStatement()
 	default:
 		p.addError(fmt.Sprintf("unexpected control flow token: %s", p.curToken.Type))
@@ -2652,7 +2652,7 @@ func (p *Parser) parseWhenStatement() *ast.ConditionalStatement {
 	}
 	stmt.Condition = condition
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -2676,7 +2676,7 @@ func (p *Parser) parseIfStatement() *ast.ConditionalStatement {
 	}
 	stmt.Condition = condition
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -2684,9 +2684,9 @@ func (p *Parser) parseIfStatement() *ast.ConditionalStatement {
 	stmt.Body = p.parseControlFlowBody()
 
 	// Check for else clause
-	if p.peekToken.Type == lexer2.ELSE {
+	if p.peekToken.Type == lexer.ELSE {
 		p.nextToken() // consume ELSE
-		if !p.expectPeek(lexer2.COLON) {
+		if !p.expectPeek(lexer.COLON) {
 			return nil
 		}
 		stmt.ElseBody = p.parseControlFlowBody()
@@ -2703,9 +2703,9 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 
 	// Check what type of for loop this is
 	switch p.peekToken.Type {
-	case lexer2.EACH:
+	case lexer.EACH:
 		return p.parseForEachStatement(stmt)
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		// This could be "for i in range" or "for variable in iterable"
 		return p.parseForVariableStatement(stmt)
 	default:
@@ -2718,22 +2718,22 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
 	stmt.Type = "each"
 
-	if !p.expectPeek(lexer2.EACH) {
+	if !p.expectPeek(lexer.EACH) {
 		return nil
 	}
 
 	// Check for special each types: "line" or "match"
 	switch p.peekToken.Type {
-	case lexer2.LINE:
+	case lexer.LINE:
 		p.nextToken() // consume LINE
 		stmt.Type = "line"
 
-		if !p.expectPeek(lexer2.IDENT) {
+		if !p.expectPeek(lexer.IDENT) {
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
 
-		if !p.expectPeek(lexer2.IN) {
+		if !p.expectPeek(lexer.IN) {
 			return nil
 		}
 
@@ -2741,29 +2741,29 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Iterable = p.curToken.Literal
 
-	case lexer2.MATCH:
+	case lexer.MATCH:
 		p.nextToken() // consume MATCH
 		stmt.Type = "match"
 
-		if !p.expectPeek(lexer2.IDENT) {
+		if !p.expectPeek(lexer.IDENT) {
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
 
-		if !p.expectPeek(lexer2.IN) {
+		if !p.expectPeek(lexer.IN) {
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.PATTERN) {
+		if !p.expectPeek(lexer.PATTERN) {
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.STRING) {
+		if !p.expectPeek(lexer.STRING) {
 			return nil
 		}
 		stmt.Iterable = p.curToken.Literal
@@ -2775,13 +2775,13 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 		}
 		stmt.Variable = p.curToken.Literal
 
-		if !p.expectPeek(lexer2.IN) {
+		if !p.expectPeek(lexer.IN) {
 			return nil
 		}
 
 		// Accept both IDENT and VARIABLE for iterable
 		switch p.peekToken.Type {
-		case lexer2.IDENT, lexer2.VARIABLE:
+		case lexer.IDENT, lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
 		default:
@@ -2791,20 +2791,20 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 	}
 
 	// Check for filter: "where variable operator value"
-	if p.peekToken.Type == lexer2.WHERE {
+	if p.peekToken.Type == lexer.WHERE {
 		stmt.Filter = p.parseFilterExpression()
 	}
 
 	// Check for "in parallel"
-	if p.peekToken.Type == lexer2.IN && p.peekToken.Literal == "in" {
+	if p.peekToken.Type == lexer.IN && p.peekToken.Literal == "in" {
 		p.nextToken() // consume IN
-		if p.peekToken.Type == lexer2.PARALLEL {
+		if p.peekToken.Type == lexer.PARALLEL {
 			p.nextToken() // consume PARALLEL
 			stmt.Parallel = true
 		}
 	}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -2816,39 +2816,39 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 
 // parseForVariableStatement parses "for variable in range" or "for variable in iterable"
 func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
-	if !p.expectPeek(lexer2.IDENT) {
+	if !p.expectPeek(lexer.IDENT) {
 		return nil
 	}
 	stmt.Variable = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.IN) {
+	if !p.expectPeek(lexer.IN) {
 		return nil
 	}
 
 	// Check if this is a range loop
-	if p.peekToken.Type == lexer2.RANGE {
+	if p.peekToken.Type == lexer.RANGE {
 		p.nextToken() // consume RANGE
 		stmt.Type = "range"
 
 		// Parse range: start to end [step step_value]
-		if !p.expectPeek(lexer2.NUMBER) && !p.expectPeek(lexer2.IDENT) {
+		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
 			return nil
 		}
 		stmt.RangeStart = p.curToken.Literal
 
-		if !p.expectPeek(lexer2.TO) {
+		if !p.expectPeek(lexer.TO) {
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.NUMBER) && !p.expectPeek(lexer2.IDENT) {
+		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
 			return nil
 		}
 		stmt.RangeEnd = p.curToken.Literal
 
 		// Optional step
-		if p.peekToken.Type == lexer2.STEP {
+		if p.peekToken.Type == lexer.STEP {
 			p.nextToken() // consume STEP
-			if !p.expectPeek(lexer2.NUMBER) && !p.expectPeek(lexer2.IDENT) {
+			if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
 				return nil
 			}
 			stmt.RangeStep = p.curToken.Literal
@@ -2859,7 +2859,7 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 		stmt.Type = "each"
 		// Accept both IDENT and VARIABLE for iterable
 		switch p.peekToken.Type {
-		case lexer2.IDENT, lexer2.VARIABLE:
+		case lexer.IDENT, lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
 		default:
@@ -2869,20 +2869,20 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 	}
 
 	// Check for filter: "where variable operator value"
-	if p.peekToken.Type == lexer2.WHERE {
+	if p.peekToken.Type == lexer.WHERE {
 		stmt.Filter = p.parseFilterExpression()
 	}
 
 	// Check for "in parallel"
-	if p.peekToken.Type == lexer2.IN && p.peekToken.Literal == "in" {
+	if p.peekToken.Type == lexer.IN && p.peekToken.Literal == "in" {
 		p.nextToken() // consume IN
-		if p.peekToken.Type == lexer2.PARALLEL {
+		if p.peekToken.Type == lexer.PARALLEL {
 			p.nextToken() // consume PARALLEL
 			stmt.Parallel = true
 		}
 	}
 
-	if !p.expectPeek(lexer2.COLON) {
+	if !p.expectPeek(lexer.COLON) {
 		return nil
 	}
 
@@ -2894,13 +2894,13 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 
 // parseFilterExpression parses filter conditions like "where item contains 'test'"
 func (p *Parser) parseFilterExpression() *ast.FilterExpression {
-	if !p.expectPeek(lexer2.WHERE) {
+	if !p.expectPeek(lexer.WHERE) {
 		return nil
 	}
 
 	filter := &ast.FilterExpression{}
 
-	if !p.expectPeek(lexer2.IDENT) {
+	if !p.expectPeek(lexer.IDENT) {
 		return nil
 	}
 	filter.Variable = p.curToken.Literal
@@ -2909,25 +2909,25 @@ func (p *Parser) parseFilterExpression() *ast.FilterExpression {
 	p.nextToken()
 
 	switch p.curToken.Type {
-	case lexer2.CONTAINS:
+	case lexer.CONTAINS:
 		filter.Operator = p.curToken.Literal
-	case lexer2.STARTS:
+	case lexer.STARTS:
 		filter.Operator = p.curToken.Literal
 		// Check for "starts with"
-		if p.peekToken.Type == lexer2.WITH {
+		if p.peekToken.Type == lexer.WITH {
 			p.nextToken() // consume WITH
 			filter.Operator = "starts with"
 		}
-	case lexer2.ENDS:
+	case lexer.ENDS:
 		filter.Operator = p.curToken.Literal
 		// Check for "ends with"
-		if p.peekToken.Type == lexer2.WITH {
+		if p.peekToken.Type == lexer.WITH {
 			p.nextToken() // consume WITH
 			filter.Operator = "ends with"
 		}
-	case lexer2.MATCHES:
+	case lexer.MATCHES:
 		filter.Operator = p.curToken.Literal
-	case lexer2.EQ, lexer2.NE, lexer2.GT, lexer2.GTE, lexer2.LT, lexer2.LTE:
+	case lexer.EQ, lexer.NE, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE:
 		filter.Operator = p.curToken.Literal
 	default:
 		p.addError(fmt.Sprintf("unexpected filter operator: %s", p.curToken.Type))
@@ -2935,7 +2935,7 @@ func (p *Parser) parseFilterExpression() *ast.FilterExpression {
 	}
 
 	// Parse value
-	if !p.expectPeek(lexer2.STRING) && !p.expectPeek(lexer2.IDENT) && !p.expectPeek(lexer2.NUMBER) {
+	if !p.expectPeek(lexer.STRING) && !p.expectPeek(lexer.IDENT) && !p.expectPeek(lexer.NUMBER) {
 		return nil
 	}
 	filter.Value = p.curToken.Literal
@@ -2944,9 +2944,9 @@ func (p *Parser) parseFilterExpression() *ast.FilterExpression {
 }
 
 // isBreakContinueToken checks if a token represents break or continue
-func (p *Parser) isBreakContinueToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isBreakContinueToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.BREAK, lexer2.CONTINUE:
+	case lexer.BREAK, lexer.CONTINUE:
 		return true
 	default:
 		return false
@@ -2956,9 +2956,9 @@ func (p *Parser) isBreakContinueToken(tokenType lexer2.TokenType) bool {
 // parseBreakContinueStatement parses break and continue statements
 func (p *Parser) parseBreakContinueStatement() ast.Statement {
 	switch p.curToken.Type {
-	case lexer2.BREAK:
+	case lexer.BREAK:
 		return p.parseBreakStatement()
-	case lexer2.CONTINUE:
+	case lexer.CONTINUE:
 		return p.parseContinueStatement()
 	default:
 		p.addError(fmt.Sprintf("unexpected break/continue token: %s", p.curToken.Type))
@@ -2973,7 +2973,7 @@ func (p *Parser) parseBreakStatement() *ast.BreakStatement {
 	}
 
 	// Check for conditional break: "break when condition"
-	if p.peekToken.Type == lexer2.WHEN {
+	if p.peekToken.Type == lexer.WHEN {
 		p.nextToken() // consume WHEN
 		stmt.Condition = p.parseSimpleCondition()
 	}
@@ -2988,7 +2988,7 @@ func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
 	}
 
 	// Check for conditional continue: "continue if condition"
-	if p.peekToken.Type == lexer2.IF {
+	if p.peekToken.Type == lexer.IF {
 		p.nextToken() // consume IF
 		stmt.Condition = p.parseSimpleCondition()
 	}
@@ -2997,9 +2997,9 @@ func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
 }
 
 // isVariableOperationToken checks if a token represents variable operations
-func (p *Parser) isVariableOperationToken(tokenType lexer2.TokenType) bool {
+func (p *Parser) isVariableOperationToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer2.LET, lexer2.SET, lexer2.TRANSFORM:
+	case lexer.LET, lexer.SET, lexer.TRANSFORM:
 		return true
 	default:
 		return false
@@ -3013,11 +3013,11 @@ func (p *Parser) parseVariableStatement() *ast.VariableStatement {
 	}
 
 	switch p.curToken.Type {
-	case lexer2.LET:
+	case lexer.LET:
 		return p.parseLetStatement(stmt)
-	case lexer2.SET:
+	case lexer.SET:
 		return p.parseSetVariableStatement(stmt)
-	case lexer2.TRANSFORM:
+	case lexer.TRANSFORM:
 		return p.parseTransformStatement(stmt)
 	default:
 		p.addError(fmt.Sprintf("unexpected variable operation token: %s", p.curToken.Type))
@@ -3034,7 +3034,7 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 	}
 	stmt.Variable = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.EQUALS) {
+	if !p.expectPeek(lexer.EQUALS) {
 		return nil
 	}
 
@@ -3054,7 +3054,7 @@ func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.Var
 	}
 	stmt.Variable = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.TO) {
+	if !p.expectPeek(lexer.TO) {
 		return nil
 	}
 
@@ -3074,7 +3074,7 @@ func (p *Parser) parseTransformStatement(stmt *ast.VariableStatement) *ast.Varia
 	}
 	stmt.Variable = p.curToken.Literal
 
-	if !p.expectPeek(lexer2.WITH) {
+	if !p.expectPeek(lexer.WITH) {
 		return nil
 	}
 
@@ -3085,13 +3085,13 @@ func (p *Parser) parseTransformStatement(stmt *ast.VariableStatement) *ast.Varia
 	stmt.Function = p.curToken.Literal
 
 	// Parse optional arguments
-	for p.peekToken.Type != lexer2.NEWLINE && p.peekToken.Type != lexer2.DEDENT && p.peekToken.Type != lexer2.EOF && p.peekToken.Type != lexer2.COMMENT {
+	for p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF && p.peekToken.Type != lexer.COMMENT {
 		// Check if the next token looks like an argument
-		if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.IDENT || p.peekToken.Type == lexer2.NUMBER {
+		if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.IDENT || p.peekToken.Type == lexer.NUMBER {
 			p.nextToken()
 			argValue := p.curToken.Literal
 			// For identifiers, mark them for interpolation
-			if p.curToken.Type == lexer2.IDENT {
+			if p.curToken.Type == lexer.IDENT {
 				argValue = "{" + p.curToken.Literal + "}"
 			}
 			stmt.Arguments = append(stmt.Arguments, argValue)
@@ -3107,11 +3107,11 @@ func (p *Parser) parseTransformStatement(stmt *ast.VariableStatement) *ast.Varia
 // parseVariableValue parses variable values (strings, numbers, expressions)
 func (p *Parser) parseVariableValue() string {
 	switch p.curToken.Type {
-	case lexer2.STRING:
+	case lexer.STRING:
 		return p.curToken.Literal
-	case lexer2.NUMBER:
+	case lexer.NUMBER:
 		return p.curToken.Literal
-	case lexer2.IDENT:
+	case lexer.IDENT:
 		// For identifiers, we need to mark them for interpolation
 		return "{" + p.curToken.Literal + "}"
 	default:
@@ -3122,7 +3122,7 @@ func (p *Parser) parseVariableValue() string {
 
 // expectPeekVariableName checks for variable names using $variable syntax
 func (p *Parser) expectPeekVariableName() bool {
-	if p.peekToken.Type != lexer2.VARIABLE {
+	if p.peekToken.Type != lexer.VARIABLE {
 		p.addError(fmt.Sprintf("expected variable name ($variable), got %s instead", p.peekToken.Type))
 		return false
 	}
@@ -3133,7 +3133,7 @@ func (p *Parser) expectPeekVariableName() bool {
 
 // expectPeekFileKeyword checks for the "file" keyword (as IDENT)
 func (p *Parser) expectPeekFileKeyword() bool {
-	if p.peekToken.Type != lexer2.IDENT || p.peekToken.Literal != "file" {
+	if p.peekToken.Type != lexer.IDENT || p.peekToken.Literal != "file" {
 		p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Type))
 		return false
 	}
@@ -3144,7 +3144,7 @@ func (p *Parser) expectPeekFileKeyword() bool {
 
 // getVariableName returns the variable name without the $ prefix
 func (p *Parser) getVariableName() string {
-	if p.curToken.Type == lexer2.VARIABLE && len(p.curToken.Literal) > 1 {
+	if p.curToken.Type == lexer.VARIABLE && len(p.curToken.Literal) > 1 {
 		return p.curToken.Literal[1:] // Remove the $ prefix
 	}
 	return p.curToken.Literal
@@ -3153,7 +3153,7 @@ func (p *Parser) getVariableName() string {
 // expectPeekIdentifierLike checks for identifier-like tokens (IDENT or keywords that can be used as identifiers)
 func (p *Parser) expectPeekIdentifierLike() bool {
 	switch p.peekToken.Type {
-	case lexer2.IDENT, lexer2.SERVICE, lexer2.ENVIRONMENT, lexer2.HOST, lexer2.PORT:
+	case lexer.IDENT, lexer.SERVICE, lexer.ENVIRONMENT, lexer.HOST, lexer.PORT:
 		p.nextToken()
 		return true
 	default:
@@ -3201,24 +3201,24 @@ func (p *Parser) isPortCheckPattern() bool {
 // expectPeekFunctionName checks for function names (can be IDENT or reserved keywords)
 func (p *Parser) expectPeekFunctionName() bool {
 	// Function names can be regular identifiers or reserved keywords used as function names
-	validFunctionTokens := map[lexer2.TokenType]bool{
-		lexer2.IDENT:     true,
-		lexer2.CONCAT:    true,
-		lexer2.SPLIT:     true,
-		lexer2.REPLACE:   true,
-		lexer2.TRIM:      true,
-		lexer2.UPPERCASE: true,
-		lexer2.LOWERCASE: true,
-		lexer2.PREPEND:   true,
-		lexer2.JOIN:      true,
-		lexer2.SLICE:     true,
-		lexer2.LENGTH:    true,
-		lexer2.KEYS:      true,
-		lexer2.VALUES:    true,
-		lexer2.SUBTRACT:  true,
-		lexer2.MULTIPLY:  true,
-		lexer2.DIVIDE:    true,
-		lexer2.MODULO:    true,
+	validFunctionTokens := map[lexer.TokenType]bool{
+		lexer.IDENT:     true,
+		lexer.CONCAT:    true,
+		lexer.SPLIT:     true,
+		lexer.REPLACE:   true,
+		lexer.TRIM:      true,
+		lexer.UPPERCASE: true,
+		lexer.LOWERCASE: true,
+		lexer.PREPEND:   true,
+		lexer.JOIN:      true,
+		lexer.SLICE:     true,
+		lexer.LENGTH:    true,
+		lexer.KEYS:      true,
+		lexer.VALUES:    true,
+		lexer.SUBTRACT:  true,
+		lexer.MULTIPLY:  true,
+		lexer.DIVIDE:    true,
+		lexer.MODULO:    true,
 	}
 
 	if !validFunctionTokens[p.peekToken.Type] {
@@ -3234,7 +3234,7 @@ func (p *Parser) parseConditionExpression() string {
 	var parts []string
 
 	// Read tokens until we hit a colon
-	for p.peekToken.Type != lexer2.COLON && p.peekToken.Type != lexer2.EOF {
+	for p.peekToken.Type != lexer.COLON && p.peekToken.Type != lexer.EOF {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 	}
@@ -3250,29 +3250,29 @@ func (p *Parser) parseSimpleCondition() string {
 	// This should be something like "item == 'stop'" or "count > 10"
 
 	// Get the variable
-	if p.peekToken.Type == lexer2.IDENT {
+	if p.peekToken.Type == lexer.IDENT {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 	}
 
 	// Get the operator
-	if p.peekToken.Type == lexer2.EQ || p.peekToken.Type == lexer2.NE ||
-		p.peekToken.Type == lexer2.GT || p.peekToken.Type == lexer2.GTE ||
-		p.peekToken.Type == lexer2.LT || p.peekToken.Type == lexer2.LTE ||
-		p.peekToken.Type == lexer2.CONTAINS || p.peekToken.Type == lexer2.STARTS ||
-		p.peekToken.Type == lexer2.ENDS || p.peekToken.Type == lexer2.MATCHES {
+	if p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE ||
+		p.peekToken.Type == lexer.GT || p.peekToken.Type == lexer.GTE ||
+		p.peekToken.Type == lexer.LT || p.peekToken.Type == lexer.LTE ||
+		p.peekToken.Type == lexer.CONTAINS || p.peekToken.Type == lexer.STARTS ||
+		p.peekToken.Type == lexer.ENDS || p.peekToken.Type == lexer.MATCHES {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 
 		// Handle "starts with" and "ends with"
-		if (p.curToken.Type == lexer2.STARTS || p.curToken.Type == lexer2.ENDS) && p.peekToken.Type == lexer2.WITH {
+		if (p.curToken.Type == lexer.STARTS || p.curToken.Type == lexer.ENDS) && p.peekToken.Type == lexer.WITH {
 			p.nextToken() // consume WITH
 			parts = append(parts, p.curToken.Literal)
 		}
 	}
 
 	// Get the value
-	if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER || p.peekToken.Type == lexer2.IDENT {
+	if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.NUMBER || p.peekToken.Type == lexer.IDENT {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 	}
@@ -3285,12 +3285,12 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 	var body []ast.Statement
 
 	// Expect INDENT
-	if !p.expectPeek(lexer2.INDENT) {
+	if !p.expectPeek(lexer.INDENT) {
 		return body
 	}
 
 	// Parse statements until DEDENT
-	for p.peekToken.Type != lexer2.DEDENT && p.peekToken.Type != lexer2.EOF {
+	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken()
 
 		if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
@@ -3305,9 +3305,9 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			}
 		} else if p.isDockerToken(p.curToken.Type) {
 			// Special handling for RUN token - check context
-			if p.curToken.Type == lexer2.RUN {
+			if p.curToken.Type == lexer.RUN {
 				// Look ahead to determine if this is shell or docker command
-				if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.COLON {
+				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
 					// This is "run 'command'" or "run:" - shell command
 					shell := p.parseShellStatement()
 					if shell != nil {
@@ -3359,14 +3359,14 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 				}
 			} else if p.isFileActionToken(p.curToken.Type) {
 				// Special handling for CHECK token
-				if p.curToken.Type == lexer2.CHECK {
-					if p.peekToken.Type == lexer2.HEALTH {
+				if p.curToken.Type == lexer.CHECK {
+					if p.peekToken.Type == lexer.HEALTH {
 						// Definitely a network health check
 						network := p.parseNetworkStatement()
 						if network != nil {
 							body = append(body, network)
 						}
-					} else if p.peekToken.Type == lexer2.IF {
+					} else if p.peekToken.Type == lexer.IF {
 						// This is "check if X" - determine if it's a port check
 						if p.isPortCheckPattern() {
 							// This is "check if port" - network operation
@@ -3416,10 +3416,10 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if errorHandling != nil {
 				body = append(body, errorHandling)
 			}
-		} else if p.curToken.Type == lexer2.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT {
 			// Skip comments
 			continue
-		} else if p.curToken.Type == lexer2.NEWLINE {
+		} else if p.curToken.Type == lexer.NEWLINE {
 			// Skip newlines
 			continue
 		} else {
@@ -3429,7 +3429,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 	}
 
 	// Consume DEDENT
-	if p.peekToken.Type == lexer2.DEDENT {
+	if p.peekToken.Type == lexer.DEDENT {
 		p.nextToken()
 	}
 
