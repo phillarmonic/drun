@@ -1732,10 +1732,11 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 
 	case lexer2.IF:
 		// if docker is available:
+		// if "docker buildx" is available:
 		// if node version >= "16":
 		stmt.Type = "if_available"
 
-		if p.isToolToken(p.peekToken.Type) {
+		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer2.STRING {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
@@ -1832,7 +1833,7 @@ func (p *Parser) isDetectionContext() bool {
 		return true
 	case lexer2.IF:
 		// Check if this is "if <tool> is available" or "if <tool> version ..."
-		return p.isToolToken(p.peekToken.Type)
+		return p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer2.STRING
 	case lexer2.WHEN:
 		// Check if this is "when in <environment> environment"
 		return p.peekToken.Type == lexer2.IN

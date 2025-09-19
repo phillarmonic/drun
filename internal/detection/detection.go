@@ -40,6 +40,10 @@ func (d *Detector) IsToolAvailable(tool string) bool {
 	switch strings.ToLower(tool) {
 	case "docker":
 		available = d.isCommandAvailable("docker")
+	case "docker-buildx", "docker buildx":
+		available = d.isDockerBuildxAvailable()
+	case "docker-compose", "docker compose":
+		available = d.isDockerComposeAvailable()
 	case "git":
 		available = d.isCommandAvailable("git")
 	case "node", "nodejs":
@@ -89,6 +93,10 @@ func (d *Detector) GetToolVersion(tool string) string {
 	switch strings.ToLower(tool) {
 	case "docker":
 		version = d.getCommandVersion("docker", "--version", `Docker version (\d+\.\d+\.\d+)`)
+	case "docker-buildx", "docker buildx":
+		version = d.getDockerBuildxVersion()
+	case "docker-compose", "docker compose":
+		version = d.getDockerComposeVersion()
 	case "git":
 		version = d.getCommandVersion("git", "--version", `git version (\d+\.\d+\.\d+)`)
 	case "node", "nodejs":
@@ -273,6 +281,21 @@ func (d *Detector) getCommandVersion(command, flag, pattern string) string {
 	return ""
 }
 
+func (d *Detector) getCommandVersionWithArgs(command string, args []string, pattern string) string {
+	cmd := exec.Command(command, args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	re := regexp.MustCompile(pattern)
+	matches := re.FindStringSubmatch(string(output))
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
 func (d *Detector) isCIEnvironment() bool {
 	ciVars := []string{"CI", "CONTINUOUS_INTEGRATION", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "TRAVIS", "CIRCLECI"}
 	for _, env := range ciVars {
@@ -366,4 +389,78 @@ func (d *Detector) compareVersions(v1, v2 []int) int {
 		}
 	}
 	return 0
+}
+
+// isDockerBuildxAvailable checks for Docker Buildx availability
+// Supports both "docker buildx" and "docker-buildx" commands
+func (d *Detector) isDockerBuildxAvailable() bool {
+	// First try "docker buildx" (modern Docker installations)
+	if d.isCommandAvailable("docker") {
+		cmd := exec.Command("docker", "buildx", "version")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+
+	// Fallback to standalone "docker-buildx" command
+	return d.isCommandAvailable("docker-buildx")
+}
+
+// isDockerComposeAvailable checks for Docker Compose availability
+// Supports both "docker compose" and "docker-compose" commands
+func (d *Detector) isDockerComposeAvailable() bool {
+	// First try "docker compose" (Docker Compose V2)
+	if d.isCommandAvailable("docker") {
+		cmd := exec.Command("docker", "compose", "version")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+
+	// Fallback to standalone "docker-compose" command (V1)
+	return d.isCommandAvailable("docker-compose")
+}
+
+// getDockerBuildxVersion gets the Docker Buildx version
+func (d *Detector) getDockerBuildxVersion() string {
+	// Try "docker buildx version" first
+	if d.isCommandAvailable("docker") {
+		version := d.getCommandVersionWithArgs("docker", []string{"buildx", "version"}, `buildx v(\d+\.\d+\.\d+)`)
+		if version != "" {
+			return version
+		}
+		// Alternative pattern for different output formats
+		version = d.getCommandVersionWithArgs("docker", []string{"buildx", "version"}, `github.com/docker/buildx v(\d+\.\d+\.\d+)`)
+		if version != "" {
+			return version
+		}
+	}
+
+	// Fallback to standalone docker-buildx
+	return d.getCommandVersion("docker-buildx", "version", `buildx v(\d+\.\d+\.\d+)`)
+}
+
+// getDockerComposeVersion gets the Docker Compose version
+func (d *Detector) getDockerComposeVersion() string {
+	// Try "docker compose version" first (V2)
+	if d.isCommandAvailable("docker") {
+		version := d.getCommandVersionWithArgs("docker", []string{"compose", "version"}, `Docker Compose version (\d+\.\d+\.\d+)`)
+		if version != "" {
+			return version
+		}
+		// Alternative pattern for different output formats
+		version = d.getCommandVersionWithArgs("docker", []string{"compose", "version"}, `version v?(\d+\.\d+\.\d+)`)
+		if version != "" {
+			return version
+		}
+	}
+
+	// Fallback to standalone docker-compose (V1)
+	version := d.getCommandVersion("docker-compose", "version", `docker-compose version (\d+\.\d+\.\d+)`)
+	if version != "" {
+		return version
+	}
+
+	// Alternative pattern for V1
+	return d.getCommandVersion("docker-compose", "version", `version (\d+\.\d+\.\d+)`)
 }
