@@ -604,6 +604,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if http != nil {
 				stmt.Body = append(stmt.Body, http)
 			}
+		} else if p.isNetworkToken(p.curToken.Type) {
+			network := p.parseNetworkStatement()
+			if network != nil {
+				stmt.Body = append(stmt.Body, network)
+			}
 		} else if p.isBreakContinueToken(p.curToken.Type) {
 			breakContinue := p.parseBreakContinueStatement()
 			if breakContinue != nil {
@@ -2208,6 +2213,124 @@ func (p *Parser) isDetectionContext() bool {
 	}
 }
 
+// parseNetworkStatement parses network operations (health checks, port testing, ping)
+func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
+	stmt := &ast.NetworkStatement{
+		Token:   p.curToken,
+		Options: make(map[string]string),
+	}
+
+	// Determine network action based on current token and context
+	switch p.curToken.Type {
+	case lexer2.WAIT:
+		// "wait for service at URL to be ready"
+		stmt.Action = "wait_for_service"
+
+		// Expect "for service at"
+		if p.peekToken.Type == lexer2.FOR {
+			p.nextToken() // consume FOR
+			if p.peekToken.Type == lexer2.SERVICE {
+				p.nextToken() // consume SERVICE
+				if p.peekToken.Type == lexer2.AT {
+					p.nextToken() // consume AT
+					if p.peekToken.Type == lexer2.STRING {
+						p.nextToken()
+						stmt.Target = p.curToken.Literal
+
+						// Expect "to be ready"
+						if p.peekToken.Type == lexer2.TO {
+							p.nextToken() // consume TO
+							if p.peekToken.Type == lexer2.BE {
+								p.nextToken() // consume BE
+								if p.peekToken.Type == lexer2.READY {
+									p.nextToken() // consume READY
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+	case lexer2.PING:
+		// "ping host hostname"
+		stmt.Action = "ping"
+
+		// Expect "host"
+		if p.peekToken.Type == lexer2.HOST {
+			p.nextToken() // consume HOST
+			if p.peekToken.Type == lexer2.STRING {
+				p.nextToken()
+				stmt.Target = p.curToken.Literal
+			}
+		}
+
+	case lexer2.TEST:
+		// "test connection to host on port X"
+		stmt.Action = "port_check"
+
+		// Expect "connection to"
+		if p.peekToken.Type == lexer2.CONNECTION {
+			p.nextToken() // consume CONNECTION
+			if p.peekToken.Type == lexer2.TO {
+				p.nextToken() // consume TO
+				if p.peekToken.Type == lexer2.STRING {
+					p.nextToken()
+					stmt.Target = p.curToken.Literal
+
+					// Expect "on port X"
+					if p.peekToken.Type == lexer2.ON {
+						p.nextToken() // consume ON
+						if p.peekToken.Type == lexer2.PORT {
+							p.nextToken() // consume PORT
+							if p.peekToken.Type == lexer2.NUMBER {
+								p.nextToken()
+								stmt.Port = p.curToken.Literal
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Parse additional options (timeout, retry, expect, etc.)
+	for p.peekToken.Type == lexer2.TIMEOUT || p.peekToken.Type == lexer2.RETRY ||
+		p.peekToken.Type == lexer2.EXPECT || p.peekToken.Type == lexer2.WITH {
+		p.nextToken()
+
+		switch p.curToken.Type {
+		case lexer2.TIMEOUT:
+			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+				p.nextToken()
+				stmt.Options["timeout"] = p.curToken.Literal
+			}
+		case lexer2.RETRY:
+			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+				p.nextToken()
+				stmt.Options["retry"] = p.curToken.Literal
+			}
+		case lexer2.EXPECT:
+			if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
+				p.nextToken()
+				stmt.Condition = p.curToken.Literal
+			}
+		case lexer2.WITH:
+			// Handle "with" options
+			if p.peekToken.Type == lexer2.IDENT {
+				p.nextToken()
+				optionKey := p.curToken.Literal
+				if p.peekToken.Type == lexer2.STRING {
+					p.nextToken()
+					stmt.Options[optionKey] = p.curToken.Literal
+				}
+			}
+		}
+	}
+
+	return stmt
+}
+
 // parseStringList parses a list of strings like ["dev", "staging", "production"]
 func (p *Parser) parseStringList() []string {
 	var items []string
@@ -2261,6 +2384,16 @@ func (p *Parser) isGitToken(tokenType lexer2.TokenType) bool {
 func (p *Parser) isHTTPToken(tokenType lexer2.TokenType) bool {
 	switch tokenType {
 	case lexer2.HTTP, lexer2.HTTPS, lexer2.GET, lexer2.POST, lexer2.PUT, lexer2.DELETE, lexer2.PATCH, lexer2.HEAD, lexer2.OPTIONS:
+		return true
+	default:
+		return false
+	}
+}
+
+// isNetworkToken checks if a token type represents a network statement
+func (p *Parser) isNetworkToken(tokenType lexer2.TokenType) bool {
+	switch tokenType {
+	case lexer2.WAIT, lexer2.PING, lexer2.TEST:
 		return true
 	default:
 		return false

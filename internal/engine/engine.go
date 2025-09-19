@@ -329,6 +329,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeGit(s, ctx)
 	case *ast.HTTPStatement:
 		return e.executeHTTP(s, ctx)
+	case *ast.NetworkStatement:
+		return e.executeNetwork(s, ctx)
 	case *ast.DetectionStatement:
 		return e.executeDetection(s, ctx)
 	case *ast.BreakStatement:
@@ -1322,6 +1324,152 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 	// In a real implementation, you would use exec.Command to run the curl command
 	// or use Go's http.Client for more advanced features
 	// cmd := exec.Command(httpCmd[0], httpCmd[1:]...)
+	// return cmd.Run()
+
+	return nil
+}
+
+// executeNetwork executes network operations (health checks, port testing, ping)
+func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in network statement
+	target := e.interpolateVariables(networkStmt.Target, ctx)
+	port := e.interpolateVariables(networkStmt.Port, ctx)
+	condition := e.interpolateVariables(networkStmt.Condition, ctx)
+
+	// Interpolate options
+	options := make(map[string]string)
+	for key, value := range networkStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	if e.dryRun {
+		return e.buildNetworkCommand(networkStmt.Action, target, port, condition, options, true)
+	}
+
+	// Show what we're about to do with appropriate emoji
+	switch networkStmt.Action {
+	case "health_check":
+		_, _ = fmt.Fprintf(e.output, "🏥 Health check: %s\n", target)
+	case "wait_for_service":
+		_, _ = fmt.Fprintf(e.output, "⏳ Waiting for service: %s\n", target)
+	case "port_check":
+		if port != "" {
+			_, _ = fmt.Fprintf(e.output, "🔌 Port check: %s:%s\n", target, port)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "🔌 Connection test: %s\n", target)
+		}
+	case "ping":
+		_, _ = fmt.Fprintf(e.output, "🏓 Ping: %s\n", target)
+	default:
+		_, _ = fmt.Fprintf(e.output, "🌐 Network operation: %s on %s\n", networkStmt.Action, target)
+	}
+
+	// Build and execute the actual network command
+	return e.buildNetworkCommand(networkStmt.Action, target, port, condition, options, false)
+}
+
+// buildNetworkCommand builds and executes network commands
+func (e *Engine) buildNetworkCommand(action, target, port, condition string, options map[string]string, dryRun bool) error {
+	var networkCmd []string
+
+	switch action {
+	case "health_check":
+		// Use curl for health checks with status code validation
+		networkCmd = append(networkCmd, "curl", "-f", "-s", "-S")
+
+		// Add timeout if specified
+		if timeout, exists := options["timeout"]; exists {
+			networkCmd = append(networkCmd, "--max-time", timeout)
+		} else {
+			networkCmd = append(networkCmd, "--max-time", "10") // Default 10s timeout
+		}
+
+		// Add retry if specified
+		if retry, exists := options["retry"]; exists {
+			networkCmd = append(networkCmd, "--retry", retry)
+		}
+
+		// Add condition checking
+		if condition != "" {
+			if condition == "200" || strings.HasPrefix(condition, "20") {
+				networkCmd = append(networkCmd, "-w", "%{http_code}")
+			}
+		}
+
+		networkCmd = append(networkCmd, target)
+
+	case "wait_for_service":
+		// Create a retry loop for service waiting
+		timeout := "60" // Default 60s timeout
+		if t, exists := options["timeout"]; exists {
+			timeout = t
+		}
+
+		retryInterval := "2" // Default 2s retry interval
+		if r, exists := options["retry"]; exists {
+			retryInterval = r
+		}
+
+		// Build a shell script for waiting
+		script := fmt.Sprintf(`
+timeout=%s
+interval=%s
+elapsed=0
+while [ $elapsed -lt $timeout ]; do
+  if curl -f -s -S --max-time 5 "%s" > /dev/null 2>&1; then
+    echo "Service is ready"
+    exit 0
+  fi
+  sleep $interval
+  elapsed=$((elapsed + interval))
+  echo "Waiting for service... ($elapsed/${timeout}s)"
+done
+echo "Timeout waiting for service"
+exit 1`, timeout, retryInterval, target)
+
+		networkCmd = []string{"sh", "-c", script}
+
+	case "port_check":
+		// Use netcat for port checking
+		networkCmd = append(networkCmd, "nc", "-z")
+
+		// Add timeout if specified
+		if timeout, exists := options["timeout"]; exists {
+			networkCmd = append(networkCmd, "-w", timeout)
+		} else {
+			networkCmd = append(networkCmd, "-w", "5") // Default 5s timeout
+		}
+
+		networkCmd = append(networkCmd, target, port)
+
+	case "ping":
+		// Use ping command
+		networkCmd = append(networkCmd, "ping", "-c", "1")
+
+		// Add timeout if specified (ping uses different timeout format)
+		if timeout, exists := options["timeout"]; exists {
+			networkCmd = append(networkCmd, "-W", timeout)
+		}
+
+		networkCmd = append(networkCmd, target)
+
+	default:
+		return fmt.Errorf("unknown network action: %s", action)
+	}
+
+	if dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute network command: %s\n", strings.Join(networkCmd, " "))
+		return nil
+	}
+
+	// Show the actual command being executed
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Command: %s\n", strings.Join(networkCmd, " "))
+	}
+
+	// For now, we'll simulate the network command execution
+	// In a real implementation, you would use exec.Command to run the network command
+	// cmd := exec.Command(networkCmd[0], networkCmd[1:]...)
 	// return cmd.Run()
 
 	return nil

@@ -1666,22 +1666,79 @@ get modification time of file "config.json"
 
 ```
 # HTTP requests
-send GET request to "https://api.example.com/status"
-send POST request to "https://api.example.com/deploy" with data {version: "1.2.3"}
-download "https://example.com/file.zip" to "downloads/"
+get "https://api.example.com/status"
+post "https://api.example.com/deploy" content type json with body "version=1.2.3"
+put "https://api.example.com/users/1" content type json with body "name=John"
+delete "https://api.example.com/users/1"
+patch "https://api.example.com/users/1" content type json with body "email=john@example.com"
 
-# Health checks
-check health of service at "https://app.example.com/health"
-wait for service at "https://app.example.com" to be ready
+# HTTP with authentication
+get "https://api.example.com/secure" with auth bearer "token123"
+post "https://api.example.com/data" with auth basic "user:pass"
+
+# HTTP with headers and options
+get "https://api.example.com/data" with header "X-Custom: value" timeout "30s"
+post "https://api.example.com/upload" content type json with body "data" retry "3"
+
+# File operations
+get "https://example.com/file.zip" download "downloads/file.zip"
+post "https://api.example.com/upload" upload "local-file.txt"
+```
+
+#### Network Health Checks and Service Waiting
+
+```
+# Service waiting with timeout and retry
+wait for service at "https://app.example.com/health" to be ready
+wait for service at "https://app.example.com" to be ready timeout "60s"
+wait for service at "https://api.example.com" to be ready timeout "30s" retry "5s"
+
+# Health checks with status validation
+# Note: Health checks are implemented via HTTP GET requests with curl
+# They automatically validate HTTP status codes and provide retry logic
 ```
 
 #### Network Testing
 
 ```
-# Connectivity testing
-check if port 8080 is open on "localhost"
+# Port connectivity testing
 test connection to "database.example.com" on port 5432
+test connection to "localhost" on port 8080 timeout "10s"
+
+# Ping testing
 ping host "example.com"
+ping host "8.8.8.8" timeout "3s"
+```
+
+#### Advanced Network Operations
+
+```
+# Service waiting with detailed configuration
+wait for service at "https://microservice.local/health" to be ready timeout "120s" retry "10s"
+
+# Port testing with timeout
+test connection to "redis.local" on port 6379 timeout "5s"
+
+# Network diagnostics
+ping host "gateway.local" timeout "2s"
+
+# Combined network validation
+task "validate_infrastructure":
+  info "Validating network infrastructure"
+  
+  # Check external connectivity
+  ping host "8.8.8.8" timeout "3s"
+  ping host "1.1.1.1" timeout "3s"
+  
+  # Validate service dependencies
+  test connection to "database.local" on port 5432 timeout "10s"
+  test connection to "redis.local" on port 6379 timeout "5s"
+  
+  # Wait for application services
+  wait for service at "https://api.local/health" to be ready timeout "60s"
+  wait for service at "https://web.local/health" to be ready timeout "30s"
+  
+  success "Infrastructure validation completed!"
 ```
 
 ### Status and Logging Actions

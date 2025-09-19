@@ -186,14 +186,13 @@ This roadmap tracks the implementation progress of features documented in the [D
 - ✅ `check if file "path" exists` - File existence
 - ✅ `get size of file "path"` - File information
 
-### 📋 Network Actions
-- 📋 `send GET request to "url"` - HTTP GET
-- 📋 `send POST request to "url" with data {...}` - HTTP POST
-- 📋 `download "url" to "path"` - File downloads
-- 📋 `check health of service at "url"` - Health checks
-- 📋 `wait for service at "url" to be ready` - Service waiting
-- 📋 `check if port 8080 is open on "host"` - Port checking
-- 📋 `test connection to "host" on port 5432` - Connectivity testing
+### ✅ Network Actions
+- ✅ `get "url"` - HTTP GET requests
+- ✅ `post "url" content type json with body "..."` - HTTP POST requests
+- ✅ `get "url" download "path"` - File downloads
+- ✅ `wait for service at "url" to be ready` - Service waiting with timeout/retry
+- ✅ `test connection to "host" on port 5432` - Port connectivity testing
+- ✅ `ping host "hostname"` - Network ping functionality
 
 ### 📋 Progress & Timing Actions
 - 📋 `start progress "message"` - Progress indicators

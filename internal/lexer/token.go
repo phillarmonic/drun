@@ -115,6 +115,20 @@ const (
 	DOWNLOAD  // download
 	UPLOAD    // upload
 
+	// Network keywords
+	HEALTH     // health
+	SERVICE    // service
+	WAIT       // wait
+	READY      // ready
+	OPEN       // open
+	PING       // ping
+	HOST       // host
+	CONNECTION // connection
+	TEST       // test
+	AT         // at
+	BE         // be
+	EXPECT     // expect
+
 	// Smart Detection keywords
 	DETECT      // detect
 	AVAILABLE   // available
@@ -512,6 +526,30 @@ func (t TokenType) String() string {
 		return "DOWNLOAD"
 	case UPLOAD:
 		return "UPLOAD"
+	case HEALTH:
+		return "HEALTH"
+	case SERVICE:
+		return "SERVICE"
+	case WAIT:
+		return "WAIT"
+	case READY:
+		return "READY"
+	case OPEN:
+		return "OPEN"
+	case PING:
+		return "PING"
+	case HOST:
+		return "HOST"
+	case CONNECTION:
+		return "CONNECTION"
+	case TEST:
+		return "TEST"
+	case AT:
+		return "AT"
+	case BE:
+		return "BE"
+	case EXPECT:
+		return "EXPECT"
 	case DETECT:
 		return "DETECT"
 	case AVAILABLE:
@@ -928,6 +966,18 @@ var keywords = map[string]TokenType{
 	"receive":     RECEIVE,
 	"download":    DOWNLOAD,
 	"upload":      UPLOAD,
+	"health":      HEALTH,
+	"service":     SERVICE,
+	"wait":        WAIT,
+	"ready":       READY,
+	"open":        OPEN,
+	"ping":        PING,
+	"host":        HOST,
+	"connection":  CONNECTION,
+	"test":        TEST,
+	"at":          AT,
+	"be":          BE,
+	"expect":      EXPECT,
 	"detect":      DETECT,
 	"available":   AVAILABLE,
 	"installed":   INSTALLED,

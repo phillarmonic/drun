@@ -515,6 +515,47 @@ func (hs *HTTPStatement) String() string {
 	return out.String()
 }
 
+// NetworkStatement represents network operations (health checks, port testing, ping)
+type NetworkStatement struct {
+	Token     lexer.Token       // the NETWORK token or action token
+	Action    string            // "health_check", "wait_for_service", "port_check", "ping"
+	Target    string            // URL, host, or service endpoint
+	Port      string            // port number (for port checks)
+	Options   map[string]string // timeout, retry, expect, etc.
+	Condition string            // expected condition ("ready", "open", "200", etc.)
+}
+
+func (ns *NetworkStatement) statementNode() {}
+func (ns *NetworkStatement) String() string {
+	var out strings.Builder
+
+	switch ns.Action {
+	case "health_check":
+		out.WriteString(fmt.Sprintf("check health of service at \"%s\"", ns.Target))
+	case "wait_for_service":
+		out.WriteString(fmt.Sprintf("wait for service at \"%s\" to be ready", ns.Target))
+	case "port_check":
+		if ns.Port != "" {
+			out.WriteString(fmt.Sprintf("check if port %s is open on \"%s\"", ns.Port, ns.Target))
+		} else {
+			out.WriteString(fmt.Sprintf("test connection to \"%s\"", ns.Target))
+		}
+	case "ping":
+		out.WriteString(fmt.Sprintf("ping host \"%s\"", ns.Target))
+	}
+
+	// Add options
+	for key, value := range ns.Options {
+		out.WriteString(fmt.Sprintf(" %s %s", key, value))
+	}
+
+	if ns.Condition != "" {
+		out.WriteString(fmt.Sprintf(" expect %s", ns.Condition))
+	}
+
+	return out.String()
+}
+
 // DetectionStatement represents smart detection operations
 type DetectionStatement struct {
 	Token        lexer.Token // the DETECT token or condition token

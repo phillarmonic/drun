@@ -95,3 +95,123 @@ task "comprehensive_test" means "Comprehensive HTTP testing":
   patch "{$globals.api_base}/posts/1" content type json with body "title=Patched Post"
   delete "{$globals.api_base}/posts/1"
   success "Comprehensive HTTP testing completed!"
+
+# Network Actions Examples
+task "network_health_checks" means "Demonstrate network health checking":
+  info "🏥 Running network health checks"
+  
+  # Basic health check
+  check health of service at "{$globals.api_base}/posts/1"
+  
+  # Health check with timeout
+  check health of service at "https://httpbin.org/delay/2" timeout "5s"
+  
+  # Health check with retry
+  check health of service at "https://httpbin.org/status/503" retry "3"
+  
+  success "Health checks completed!"
+
+task "service_waiting" means "Demonstrate service waiting":
+  info "⏳ Testing service waiting functionality"
+  
+  # Wait for service to be ready
+  wait for service at "https://httpbin.org/get" to be ready
+  
+  # Wait with custom timeout
+  wait for service at "https://httpbin.org/delay/1" to be ready timeout "10s"
+  
+  # Wait with custom retry interval
+  wait for service at "https://httpbin.org/get" to be ready timeout "30s" retry "5s"
+  
+  success "Service waiting tests completed!"
+
+task "port_connectivity" means "Demonstrate port connectivity testing":
+  info "🔌 Testing port connectivity"
+  
+  # Check if port is open
+  check if port 80 is open on "google.com"
+  check if port 443 is open on "github.com"
+  
+  # Test connection with timeout
+  test connection to "google.com" on port 80 timeout "5s"
+  
+  # Check local ports
+  check if port 22 is open on "localhost"
+  
+  success "Port connectivity tests completed!"
+
+task "ping_tests" means "Demonstrate ping functionality":
+  info "🏓 Running ping tests"
+  
+  # Basic ping
+  ping host "google.com"
+  ping host "github.com"
+  
+  # Ping with timeout
+  ping host "8.8.8.8" timeout "3s"
+  
+  success "Ping tests completed!"
+
+task "advanced_network_demo" means "Advanced network operations showcase":
+  info "🌐 Running advanced network operations"
+  
+  # Health check with status code validation
+  check health of service at "https://httpbin.org/status/200" expect "200"
+  
+  # Complex service waiting scenario
+  info "Waiting for service with detailed monitoring..."
+  wait for service at "https://httpbin.org/delay/1" to be ready timeout "15s" retry "2s"
+  
+  # Port scanning scenario
+  info "Checking multiple ports..."
+  check if port 80 is open on "google.com"
+  check if port 443 is open on "google.com"
+  test connection to "github.com" on port 22 timeout "3s"
+  
+  # Network diagnostics
+  info "Running network diagnostics..."
+  ping host "1.1.1.1" timeout "2s"
+  
+  success "Advanced network operations completed!"
+
+task "real_world_deployment_check" means "Real-world deployment health checking":
+  info "🚀 Performing deployment health checks"
+  
+  # Check application health
+  check health of service at "https://httpbin.org/get" timeout "10s"
+  
+  # Wait for database to be ready
+  info "Checking database connectivity..."
+  test connection to "localhost" on port 5432 timeout "5s"
+  
+  # Check external dependencies
+  info "Verifying external service dependencies..."
+  check health of service at "https://api.github.com" timeout "5s"
+  ping host "8.8.8.8" timeout "3s"
+  
+  # Wait for all services to be ready
+  info "Waiting for all services to be operational..."
+  wait for service at "https://httpbin.org/get" to be ready timeout "30s"
+  
+  success "🎉 All deployment health checks passed!"
+
+task "network_troubleshooting" means "Network troubleshooting toolkit":
+  info "🔧 Running network troubleshooting checks"
+  
+  # Basic connectivity
+  ping host "google.com"
+  ping host "8.8.8.8"
+  
+  # DNS resolution check
+  ping host "dns.google"
+  
+  # Port accessibility
+  check if port 80 is open on "google.com"
+  check if port 443 is open on "google.com"
+  test connection to "github.com" on port 22
+  
+  # Service health
+  check health of service at "https://httpbin.org/get"
+  check health of service at "https://api.github.com"
+  
+  success "Network troubleshooting completed!"

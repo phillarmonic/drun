@@ -1,0 +1,222 @@
+version: 2.0
+
+project "network-operations" version "1.0.0":
+  set api_base to "https://httpbin.org"
+  set database_host to "localhost"
+  set redis_host to "localhost"
+  
+  before any task:
+    info "🌐 Starting network operations for {$globals.project}"
+  
+  after any task:
+    info "✅ Network operations completed"
+
+task "basic_connectivity" means "Test basic network connectivity":
+  info "🏓 Testing basic network connectivity"
+  
+  # Test external connectivity
+  ping host "google.com"
+  ping host "8.8.8.8"
+  ping host "1.1.1.1"
+  
+  # Test DNS resolution
+  ping host "dns.google"
+  
+  success "Basic connectivity tests passed!"
+
+task "port_testing" means "Test port connectivity":
+  info "🔌 Testing port connectivity"
+  
+  # Test common ports
+  test connection to "google.com" on port 80
+  test connection to "google.com" on port 443
+  test connection to "github.com" on port 22
+  
+  # Test with timeout
+  test connection to "google.com" on port 80 timeout "5s"
+  
+  # Test local services (these might fail if services aren't running)
+  info "Testing local service ports (may fail if services not running)..."
+  test connection to "{$globals.database_host}" on port 5432 timeout "3s"
+  test connection to "{$globals.redis_host}" on port 6379 timeout "3s"
+  
+  success "Port connectivity tests completed!"
+
+task "service_health_checks" means "Test service health checking":
+  info "🏥 Testing service health checks"
+  
+  # Basic HTTP health checks using httpbin.org
+  wait for service at "{$globals.api_base}/get" to be ready
+  wait for service at "{$globals.api_base}/status/200" to be ready
+  
+  # Health check with timeout
+  wait for service at "{$globals.api_base}/delay/1" to be ready timeout "10s"
+  
+  # Health check with custom retry interval
+  wait for service at "{$globals.api_base}/get" to be ready timeout "30s" retry "5s"
+  
+  success "Service health checks completed!"
+
+task "http_operations" means "Comprehensive HTTP operations":
+  info "📡 Testing HTTP operations"
+  
+  # Basic HTTP methods
+  get "{$globals.api_base}/get"
+  post "{$globals.api_base}/post" content type json with body "test=data"
+  put "{$globals.api_base}/put" content type json with body "updated=data"
+  patch "{$globals.api_base}/patch" content type json with body "patched=data"
+  delete "{$globals.api_base}/delete"
+  
+  # HTTP with headers
+  get "{$globals.api_base}/headers" with header "X-Custom-Header: test-value"
+  
+  # HTTP with authentication
+  get "{$globals.api_base}/bearer" with auth bearer "test-token"
+  
+  # HTTP with timeout
+  get "{$globals.api_base}/delay/2" timeout "5s"
+  
+  success "HTTP operations completed!"
+
+task "network_diagnostics" means "Comprehensive network diagnostics":
+  info "🔧 Running network diagnostics"
+  
+  # DNS and connectivity tests
+  ping host "google.com" timeout "3s"
+  ping host "github.com" timeout "3s"
+  ping host "cloudflare.com" timeout "3s"
+  
+  # Port accessibility tests
+  test connection to "google.com" on port 80 timeout "5s"
+  test connection to "google.com" on port 443 timeout "5s"
+  test connection to "github.com" on port 22 timeout "5s"
+  
+  # Service health validation
+  wait for service at "{$globals.api_base}/get" to be ready timeout "10s"
+  wait for service at "https://api.github.com" to be ready timeout "10s"
+  
+  success "Network diagnostics completed!"
+
+task "deployment_readiness" means "Check deployment readiness":
+  info "🚀 Checking deployment readiness"
+  
+  # External dependencies
+  info "Checking external service dependencies..."
+  ping host "8.8.8.8" timeout "3s"
+  wait for service at "https://api.github.com" to be ready timeout "15s"
+  
+  # Database connectivity (will fail if not running locally)
+  info "Checking database connectivity..."
+  test connection to "{$globals.database_host}" on port 5432 timeout "5s"
+  
+  # Cache connectivity (will fail if not running locally)  
+  info "Checking cache connectivity..."
+  test connection to "{$globals.redis_host}" on port 6379 timeout "5s"
+  
+  # Application health endpoints
+  info "Checking application health endpoints..."
+  wait for service at "{$globals.api_base}/get" to be ready timeout "30s"
+  
+  success "🎉 Deployment readiness check completed!"
+
+task "network_troubleshooting" means "Network troubleshooting toolkit":
+  info "🛠️ Running network troubleshooting"
+  
+  # Basic connectivity
+  info "Testing basic connectivity..."
+  ping host "google.com"
+  ping host "8.8.8.8"
+  ping host "1.1.1.1"
+  
+  # DNS resolution
+  info "Testing DNS resolution..."
+  ping host "dns.google"
+  ping host "cloudflare-dns.com"
+  
+  # Port accessibility
+  info "Testing port accessibility..."
+  test connection to "google.com" on port 80
+  test connection to "google.com" on port 443
+  test connection to "github.com" on port 22
+  
+  # Service health
+  info "Testing service health..."
+  wait for service at "{$globals.api_base}/get" to be ready
+  wait for service at "https://api.github.com" to be ready timeout "10s"
+  
+  success "Network troubleshooting completed!"
+
+task "performance_testing" means "Network performance testing":
+  info "⚡ Running network performance tests"
+  
+  # Quick response tests
+  wait for service at "{$globals.api_base}/get" to be ready timeout "5s"
+  
+  # Delayed response tests
+  info "Testing service with delay..."
+  wait for service at "{$globals.api_base}/delay/1" to be ready timeout "10s"
+  
+  # Multiple concurrent checks
+  info "Testing multiple services..."
+  wait for service at "{$globals.api_base}/get" to be ready timeout "5s"
+  wait for service at "https://api.github.com" to be ready timeout "10s"
+  
+  success "Performance testing completed!"
+
+task "infrastructure_validation" means "Complete infrastructure validation":
+  depends on basic_connectivity and port_testing
+  
+  info "🏗️ Running complete infrastructure validation"
+  
+  # Network layer validation
+  ping host "8.8.8.8" timeout "3s"
+  ping host "1.1.1.1" timeout "3s"
+  
+  # Transport layer validation
+  test connection to "google.com" on port 80 timeout "5s"
+  test connection to "google.com" on port 443 timeout "5s"
+  
+  # Application layer validation
+  wait for service at "{$globals.api_base}/get" to be ready timeout "15s"
+  wait for service at "https://api.github.com" to be ready timeout "15s"
+  
+  # HTTP operations validation
+  get "{$globals.api_base}/get"
+  post "{$globals.api_base}/post" content type json with body "validation=test"
+  
+  success "🎉 Complete infrastructure validation passed!"
+
+task "monitoring_checks" means "Monitoring and alerting checks":
+  info "📊 Running monitoring checks"
+  
+  # Critical service checks
+  wait for service at "{$globals.api_base}/get" to be ready timeout "30s"
+  
+  # Database connectivity monitoring
+  info "Monitoring database connectivity..."
+  test connection to "{$globals.database_host}" on port 5432 timeout "10s"
+  
+  # External dependency monitoring
+  info "Monitoring external dependencies..."
+  ping host "8.8.8.8" timeout "5s"
+  wait for service at "https://api.github.com" to be ready timeout "20s"
+  
+  # Performance monitoring
+  info "Performance monitoring..."
+  wait for service at "{$globals.api_base}/delay/1" to be ready timeout "15s"
+  
+  success "Monitoring checks completed!"
+
+task "comprehensive_demo" means "Comprehensive network operations demo":
+  depends on infrastructure_validation
+  
+  info "🎭 Running comprehensive network operations demo"
+  
+  # All network operation types
+  ping host "google.com"
+  test connection to "google.com" on port 80
+  wait for service at "{$globals.api_base}/get" to be ready
+  get "{$globals.api_base}/get"
+  post "{$globals.api_base}/post" content type json with body "demo=complete"
+  
+  success "🎉 Comprehensive network operations demo completed!"
