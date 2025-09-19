@@ -6,42 +6,42 @@ project "webapp" version "1.2.0":
   set container_name to "webapp-container"
   
   before any task:
-    info "🐳 Starting Docker operations for {$project} v{$version}"
+    info "🐳 Starting Docker operations for {$globals.project} v{$globals.version}"
   
   after any task:
     info "✅ Docker operations completed"
 
 task "build_image" means "Build Docker image":
-  docker build image "{$project}:{$version}" from "{$dockerfile}"
-  docker tag image "{$project}:{$version}" as "{$project}:latest"
+  docker build image "{$globals.project}:{$globals.version}" from "{$globals.dockerfile}"
+  docker tag image "{$globals.project}:{$globals.version}" as "{$globals.project}:latest"
   success "Docker image built and tagged successfully!"
 
 task "push_image" means "Push Docker image to registry":
   depends on build_image
   
-  docker push image "{$project}:{$version}" to "{$registry}"
-  docker push image "{$project}:latest" to "{$registry}"
+  docker push image "{$globals.project}:{$globals.version}" to "{$globals.registry}"
+  docker push image "{$globals.project}:latest" to "{$globals.registry}"
   success "Docker image pushed to registry!"
 
 task "run_container" means "Run Docker container":
   depends on build_image
   
-  docker run container "{$container_name}" from "{$project}:latest"
+  docker run container "{$globals.container_name}" from "{$globals.project}:latest"
   success "Docker container started successfully!"
 
 task "stop_container" means "Stop Docker container":
-  docker stop container "{$container_name}"
+  docker stop container "{$globals.container_name}"
   success "Docker container stopped successfully!"
 
 task "remove_container" means "Remove Docker container":
   depends on stop_container
   
-  docker remove container "{$container_name}"
+  docker remove container "{$globals.container_name}"
   success "Docker container removed successfully!"
 
 task "remove_image" means "Remove Docker image":
-  docker remove image "{$project}:{$version}"
-  docker remove image "{$project}:latest"
+  docker remove image "{$globals.project}:{$globals.version}"
+  docker remove image "{$globals.project}:latest"
   success "Docker images removed successfully!"
 
 task "start_services" means "Start services with Docker Compose":
@@ -60,17 +60,17 @@ task "full_deploy" means "Complete Docker deployment pipeline":
   depends on build_image
   
   info "🚀 Starting full deployment pipeline"
-  docker push image "{$project}:{$version}" to "{$registry}"
-  docker run container "{$container_name}" from "{$project}:{$version}"
+  docker push image "{$globals.project}:{$globals.version}" to "{$globals.registry}"
+  docker run container "{$globals.container_name}" from "{$globals.project}:{$globals.version}"
   success "Full deployment pipeline completed!"
 
 task "cleanup" means "Clean up all Docker resources":
   depends on stop_container
   
   info "🧹 Cleaning up Docker resources"
-  docker remove container "{$container_name}"
-  docker remove image "{$project}:{$version}"
-  docker remove image "{$project}:latest"
+  docker remove container "{$globals.container_name}"
+  docker remove image "{$globals.project}:{$globals.version}"
+  docker remove image "{$globals.project}:latest"
   success "Docker cleanup completed!"
 
 task "dev_environment" means "Set up development environment":

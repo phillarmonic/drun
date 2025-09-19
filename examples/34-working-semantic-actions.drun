@@ -1,0 +1,93 @@
+version: 2.0
+
+project "semantic-demo" version "1.0.0":
+  set api_url to "https://jsonplaceholder.typicode.com"
+  set docker_image to "nginx:latest"
+  
+  before any task:
+    info "Starting semantic actions demo for {$globals.project} v{$globals.version}"
+  
+  after any task:
+    info "Semantic actions demo completed"
+
+task "docker_demo" means "Demonstrate working Docker semantic actions":
+  step "Building and managing Docker containers"
+  
+  # Build a Docker image
+  docker build image "my-app:latest"
+  
+  # Pull an image from registry
+  docker pull image "{$docker_image}"
+  
+  # Run a container
+  docker run container "{$docker_image}"
+  
+  # Push image to registry
+  docker push image "my-app:latest" to "docker.io/myrepo"
+  
+  # Docker Compose operations
+  docker compose up
+  docker compose down
+  
+  success "Docker operations completed successfully!"
+
+task "git_demo" means "Demonstrate working Git semantic actions":
+  step "Managing Git repository operations"
+  
+  # Initialize repository
+  git init repository in "."
+  
+  # Stage and commit changes
+  git add files "."
+  git commit changes with message "Add new semantic actions"
+  
+  # Push changes
+  git push to remote "origin" branch "main"
+  
+  # Check status and show current branch
+  git status
+  git show current branch
+  
+  success "Git operations completed successfully!"
+
+task "file_demo" means "Demonstrate working file system actions":
+  step "Managing files and directories"
+  
+  # Create directories and files
+  create directory "./temp"
+  create file "demo.txt"
+  
+  # Copy and move files
+  copy "demo.txt" to "demo-copy.txt"
+  move "demo-copy.txt" to "./temp/demo-moved.txt"
+  
+  # Clean up
+  delete "demo.txt"
+  
+  success "File operations completed successfully!"
+
+task "http_demo" means "Demonstrate working HTTP actions":
+  step "Making HTTP requests with various methods"
+  
+  # Basic HTTP requests
+  get "{$globals.api_url}/posts/1" accept json
+  post "{$globals.api_url}/posts" content type json with body "title=Test&body=Content"
+  put "{$globals.api_url}/posts/1" content type json with body "title=Updated"
+  delete "{$globals.api_url}/posts/1"
+  
+  # HTTP with authentication
+  get "{$globals.api_url}/posts" with auth bearer "demo-token-123" accept json
+  
+  # HTTP with custom headers
+  get "{$globals.api_url}/posts" with header "X-Custom-Header: MyValue" accept json
+  
+  success "HTTP operations completed successfully!"
+
+task "comprehensive_demo" means "Run all working semantic actions":
+  depends on docker_demo
+  depends on git_demo
+  depends on file_demo
+  depends on http_demo
+  
+  step "All semantic actions have been demonstrated"
+  success "🎉 Comprehensive semantic actions demo completed!"

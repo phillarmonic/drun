@@ -319,8 +319,8 @@ func (l *Lexer) readVariable() string {
 		return "$"
 	}
 
-	// Read the rest of the variable name (letters, digits, underscores)
-	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+	// Read the rest of the variable name (letters, digits, underscores, dots for namespacing)
+	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || l.ch == '.' {
 		l.readChar()
 	}
 

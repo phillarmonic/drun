@@ -188,11 +188,12 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 func (p *Parser) parseSetStatement() *ast.SetStatement {
 	stmt := &ast.SetStatement{Token: p.curToken}
 
-	// Expect identifier (key) - allow Git and HTTP keywords as set keys
+	// Expect identifier (key) - allow Git, HTTP, Docker, and File keywords as set keys
 	switch p.peekToken.Type {
 	case lexer2.IDENT, lexer2.MESSAGE, lexer2.BRANCH, lexer2.REMOTE, lexer2.STATUS, lexer2.LOG, lexer2.COMMIT, lexer2.ADD, lexer2.PUSH, lexer2.PULL,
 		lexer2.GET, lexer2.POST, lexer2.PUT, lexer2.DELETE, lexer2.PATCH, lexer2.HEAD, lexer2.OPTIONS, lexer2.HTTP, lexer2.HTTPS, lexer2.URL, lexer2.API, lexer2.JSON, lexer2.XML,
-		lexer2.TIMEOUT, lexer2.RETRY, lexer2.AUTH, lexer2.BEARER, lexer2.BASIC, lexer2.TOKEN, lexer2.HEADER, lexer2.BODY, lexer2.DATA:
+		lexer2.TIMEOUT, lexer2.RETRY, lexer2.AUTH, lexer2.BEARER, lexer2.BASIC, lexer2.TOKEN, lexer2.HEADER, lexer2.BODY, lexer2.DATA,
+		lexer2.SCALE, lexer2.PORT, lexer2.REGISTRY, lexer2.CHECKOUT, lexer2.BACKUP, lexer2.CHECK, lexer2.SIZE, lexer2.DIRECTORY:
 		p.nextToken()
 	default:
 		p.addError(fmt.Sprintf("expected set key, got %s instead", p.peekToken.Type))
@@ -535,14 +536,50 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				stmt.Body = append(stmt.Body, throw)
 			}
 		} else if p.isDockerToken(p.curToken.Type) {
-			docker := p.parseDockerStatement()
-			if docker != nil {
-				stmt.Body = append(stmt.Body, docker)
+			// Special handling for RUN token - check context
+			if p.curToken.Type == lexer2.RUN {
+				// Look ahead to determine if this is shell or docker command
+				if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.COLON {
+					// This is "run 'command'" or "run:" - shell command
+					shell := p.parseShellStatement()
+					if shell != nil {
+						stmt.Body = append(stmt.Body, shell)
+					}
+				} else {
+					// This is "docker run container" - docker command
+					docker := p.parseDockerStatement()
+					if docker != nil {
+						stmt.Body = append(stmt.Body, docker)
+					}
+				}
+			} else {
+				docker := p.parseDockerStatement()
+				if docker != nil {
+					stmt.Body = append(stmt.Body, docker)
+				}
 			}
 		} else if p.isGitToken(p.curToken.Type) {
-			git := p.parseGitStatement()
-			if git != nil {
-				stmt.Body = append(stmt.Body, git)
+			// Special handling for CREATE token - check context
+			if p.curToken.Type == lexer2.CREATE {
+				// Look ahead to determine if this is git or file operation
+				if p.peekToken.Type == lexer2.BRANCH || p.peekToken.Type == lexer2.TAG {
+					git := p.parseGitStatement()
+					if git != nil {
+						stmt.Body = append(stmt.Body, git)
+					}
+				} else if p.peekToken.Type == lexer2.DIRECTORY || p.peekToken.Type == lexer2.DIR || (p.peekToken.Type == lexer2.IDENT && p.peekToken.Literal == "file") {
+					file := p.parseFileStatement()
+					if file != nil {
+						stmt.Body = append(stmt.Body, file)
+					}
+				} else {
+					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', or 'directory'")
+				}
+			} else {
+				git := p.parseGitStatement()
+				if git != nil {
+					stmt.Body = append(stmt.Body, git)
+				}
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()
@@ -799,6 +836,10 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 		return p.parseWriteStatement(stmt)
 	case "append":
 		return p.parseAppendStatement(stmt)
+	case "backup":
+		return p.parseBackupStatement(stmt)
+	case "check":
+		return p.parseCheckStatement(stmt)
 	default:
 		p.addError(fmt.Sprintf("unknown file operation: %s", stmt.Action))
 		return nil
@@ -807,16 +848,24 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 
 // parseCreateStatement parses "create file/dir" statements
 func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatement {
-	// Expect: create file "path" or create dir "path"
+	// Expect: create file "path" or create dir "path" or create directory "path"
 	switch p.peekToken.Type {
-	case lexer2.FILE:
-		p.nextToken() // consume FILE
-		stmt.IsDir = false
+	case lexer2.IDENT:
+		p.nextToken() // consume IDENT
+		if p.curToken.Literal == "file" {
+			stmt.IsDir = false
+		} else {
+			p.addError("expected 'file', 'dir', or 'directory' after 'create'")
+			return nil
+		}
 	case lexer2.DIR:
 		p.nextToken() // consume DIR
 		stmt.IsDir = true
+	case lexer2.DIRECTORY:
+		p.nextToken() // consume DIRECTORY
+		stmt.IsDir = true
 	default:
-		p.addError("expected 'file' or 'dir' after 'create'")
+		p.addError("expected 'file', 'dir', or 'directory' after 'create'")
 		return nil
 	}
 
@@ -897,9 +946,14 @@ func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement 
 func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: delete file "path" or delete dir "path"
 	switch p.peekToken.Type {
-	case lexer2.FILE:
-		p.nextToken() // consume FILE
-		stmt.IsDir = false
+	case lexer2.IDENT:
+		p.nextToken() // consume IDENT
+		if p.curToken.Literal == "file" {
+			stmt.IsDir = false
+		} else {
+			p.addError("expected 'file' or 'dir' after 'delete'")
+			return nil
+		}
 	case lexer2.DIR:
 		p.nextToken() // consume DIR
 		stmt.IsDir = true
@@ -919,7 +973,7 @@ func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatemen
 // parseReadStatement parses "read" statements
 func (p *Parser) parseReadStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: read file "path" [as variable]
-	if !p.expectPeek(lexer2.FILE) {
+	if !p.expectPeekFileKeyword() {
 		return nil
 	}
 
@@ -952,7 +1006,7 @@ func (p *Parser) parseWriteStatement(stmt *ast.FileStatement) *ast.FileStatement
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.FILE) {
+	if !p.expectPeekFileKeyword() {
 		return nil
 	}
 
@@ -976,7 +1030,7 @@ func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 
-	if !p.expectPeek(lexer2.FILE) {
+	if !p.expectPeekFileKeyword() {
 		return nil
 	}
 
@@ -984,6 +1038,64 @@ func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseBackupStatement parses "backup" statements
+func (p *Parser) parseBackupStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: backup "source" as "backup-name"
+	if !p.expectPeek(lexer2.STRING) {
+		return nil
+	}
+	stmt.Source = p.curToken.Literal
+
+	if p.peekToken.Type == lexer2.AS {
+		p.nextToken() // consume AS
+		if !p.expectPeek(lexer2.STRING) {
+			return nil
+		}
+		stmt.Target = p.curToken.Literal
+	} else {
+		// Generate default backup name with timestamp
+		stmt.Target = "" // Will be generated in execution
+	}
+
+	return stmt
+}
+
+// parseCheckStatement parses "check" statements
+func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	// Expect: check if file "path" exists
+	// Expect: get size of file "path"
+	if p.peekToken.Type == lexer2.IF {
+		p.nextToken() // consume IF
+		if !p.expectPeekFileKeyword() {
+			return nil
+		}
+		if !p.expectPeek(lexer2.STRING) {
+			return nil
+		}
+		stmt.Target = p.curToken.Literal
+
+		if p.peekToken.Type == lexer2.EXISTS {
+			p.nextToken() // consume EXISTS
+			stmt.Action = "check_exists"
+		}
+	} else if p.peekToken.Type == lexer2.SIZE {
+		p.nextToken() // consume SIZE
+		if p.peekToken.Type == lexer2.OF {
+			p.nextToken() // consume OF
+			if !p.expectPeekFileKeyword() {
+				return nil
+			}
+			if !p.expectPeek(lexer2.STRING) {
+				return nil
+			}
+			stmt.Target = p.curToken.Literal
+			stmt.Action = "get_size"
+		}
+	}
 
 	return stmt
 }
@@ -1283,6 +1395,34 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 			stmt.Options["command"] = p.curToken.Literal
 		}
 		return stmt
+	case lexer2.SCALE:
+		// Handle "docker compose scale service "name" to 3"
+		p.nextToken() // consume SCALE
+		stmt.Operation = "scale"
+
+		if p.peekToken.Type == lexer2.COMPOSE {
+			p.nextToken() // consume COMPOSE
+			stmt.Resource = "compose"
+
+			if p.peekToken.Type == lexer2.IDENT && p.peekToken.Literal == "service" {
+				p.nextToken() // consume IDENT (service)
+				stmt.Options["resource"] = "service"
+
+				if p.peekToken.Type == lexer2.STRING {
+					p.nextToken()
+					stmt.Name = p.curToken.Literal
+				}
+
+				if p.peekToken.Type == lexer2.TO {
+					p.nextToken() // consume TO
+					if p.peekToken.Type == lexer2.NUMBER {
+						p.nextToken()
+						stmt.Options["replicas"] = p.curToken.Literal
+					}
+				}
+			}
+		}
+		return stmt
 	case lexer2.IDENT:
 		p.nextToken()
 		stmt.Operation = p.curToken.Literal
@@ -1308,14 +1448,20 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 		stmt.Name = p.curToken.Literal
 	}
 
-	// Parse additional options (from, to, as, etc.)
-	for p.peekToken.Type == lexer2.FROM || p.peekToken.Type == lexer2.TO || p.peekToken.Type == lexer2.AS || p.peekToken.Type == lexer2.IDENT {
+	// Parse additional options (from, to, as, on, etc.)
+	for p.peekToken.Type == lexer2.FROM || p.peekToken.Type == lexer2.TO || p.peekToken.Type == lexer2.AS || p.peekToken.Type == lexer2.ON || p.peekToken.Type == lexer2.PORT || p.peekToken.Type == lexer2.IDENT {
 		p.nextToken()
 		optionKey := p.curToken.Literal
 
-		if p.peekToken.Type == lexer2.STRING {
+		if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.NUMBER {
 			p.nextToken()
 			stmt.Options[optionKey] = p.curToken.Literal
+		} else if optionKey == "on" && p.peekToken.Type == lexer2.PORT {
+			p.nextToken() // consume PORT
+			if p.peekToken.Type == lexer2.NUMBER {
+				p.nextToken()
+				stmt.Options["port"] = p.curToken.Literal
+			}
 		}
 	}
 
@@ -1331,6 +1477,60 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 
 	// Parse Git operation
 	switch p.peekToken.Type {
+	case lexer2.CREATE:
+		// git create branch "name"
+		// git create tag "v1.0.0"
+		p.nextToken() // consume CREATE
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer2.BRANCH {
+			p.nextToken() // consume BRANCH
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer2.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		} else if p.peekToken.Type == lexer2.TAG {
+			p.nextToken() // consume TAG
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer2.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
+	case lexer2.CHECKOUT:
+		// git checkout branch "name"
+		p.nextToken() // consume CHECKOUT
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer2.BRANCH {
+			p.nextToken() // consume BRANCH
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer2.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
+	case lexer2.MERGE:
+		// git merge branch "name"
+		p.nextToken() // consume MERGE
+		stmt.Operation = p.curToken.Literal
+
+		if p.peekToken.Type == lexer2.BRANCH {
+			p.nextToken() // consume BRANCH
+			stmt.Resource = p.curToken.Literal
+
+			if p.peekToken.Type == lexer2.STRING {
+				p.nextToken()
+				stmt.Name = p.curToken.Literal
+			}
+		}
+
 	case lexer2.CLONE:
 		// git clone repository "url" to "dir"
 		p.nextToken() // consume CLONE
@@ -1914,7 +2114,7 @@ func (p *Parser) isDependencyToken(tokenType lexer2.TokenType) bool {
 // isDockerToken checks if a token type represents a Docker statement
 func (p *Parser) isDockerToken(tokenType lexer2.TokenType) bool {
 	switch tokenType {
-	case lexer2.DOCKER, lexer2.BUILD, lexer2.TAG, lexer2.PUSH, lexer2.PULL:
+	case lexer2.DOCKER, lexer2.BUILD, lexer2.TAG, lexer2.PUSH, lexer2.PULL, lexer2.RUN, lexer2.STOP, lexer2.START, lexer2.SCALE:
 		return true
 	default:
 		return false
@@ -1923,7 +2123,12 @@ func (p *Parser) isDockerToken(tokenType lexer2.TokenType) bool {
 
 // isGitToken checks if a token type represents a Git statement
 func (p *Parser) isGitToken(tokenType lexer2.TokenType) bool {
-	return tokenType == lexer2.GIT
+	switch tokenType {
+	case lexer2.GIT, lexer2.CREATE, lexer2.CHECKOUT, lexer2.MERGE:
+		return true
+	default:
+		return false
+	}
 }
 
 // isHTTPToken checks if a token type represents an HTTP statement
@@ -1971,7 +2176,7 @@ func (p *Parser) isActionToken(tokenType lexer2.TokenType) bool {
 	switch tokenType {
 	case lexer2.INFO, lexer2.STEP, lexer2.WARN, lexer2.ERROR, lexer2.SUCCESS, lexer2.FAIL,
 		lexer2.RUN, lexer2.EXEC, lexer2.SHELL, lexer2.CAPTURE,
-		lexer2.CREATE, lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND:
+		lexer2.CREATE, lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND, lexer2.BACKUP, lexer2.CHECK:
 		return true
 	default:
 		return false
@@ -2001,7 +2206,7 @@ func (p *Parser) isTypeToken(tokenType lexer2.TokenType) bool {
 // isFileActionToken checks if a token type represents a file action
 func (p *Parser) isFileActionToken(tokenType lexer2.TokenType) bool {
 	switch tokenType {
-	case lexer2.CREATE, lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND:
+	case lexer2.COPY, lexer2.MOVE, lexer2.DELETE, lexer2.READ, lexer2.WRITE, lexer2.APPEND, lexer2.BACKUP, lexer2.CHECK:
 		return true
 	default:
 		return false
@@ -2176,7 +2381,7 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 			return nil
 		}
 
-		if !p.expectPeek(lexer2.FILE) {
+		if !p.expectPeekFileKeyword() {
 			return nil
 		}
 
@@ -2560,6 +2765,17 @@ func (p *Parser) expectPeekVariableName() bool {
 	return true
 }
 
+// expectPeekFileKeyword checks for the "file" keyword (as IDENT)
+func (p *Parser) expectPeekFileKeyword() bool {
+	if p.peekToken.Type != lexer2.IDENT || p.peekToken.Literal != "file" {
+		p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Type))
+		return false
+	}
+
+	p.nextToken()
+	return true
+}
+
 // getVariableName returns the variable name without the $ prefix
 func (p *Parser) getVariableName() string {
 	if p.curToken.Type == lexer2.VARIABLE && len(p.curToken.Literal) > 1 {
@@ -2674,9 +2890,27 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 				body = append(body, throw)
 			}
 		} else if p.isDockerToken(p.curToken.Type) {
-			docker := p.parseDockerStatement()
-			if docker != nil {
-				body = append(body, docker)
+			// Special handling for RUN token - check context
+			if p.curToken.Type == lexer2.RUN {
+				// Look ahead to determine if this is shell or docker command
+				if p.peekToken.Type == lexer2.STRING || p.peekToken.Type == lexer2.COLON {
+					// This is "run 'command'" or "run:" - shell command
+					shell := p.parseShellStatement()
+					if shell != nil {
+						body = append(body, shell)
+					}
+				} else {
+					// This is "docker run container" - docker command
+					docker := p.parseDockerStatement()
+					if docker != nil {
+						body = append(body, docker)
+					}
+				}
+			} else {
+				docker := p.parseDockerStatement()
+				if docker != nil {
+					body = append(body, docker)
+				}
 			}
 		} else if p.isGitToken(p.curToken.Type) {
 			git := p.parseGitStatement()

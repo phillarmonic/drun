@@ -5,7 +5,7 @@ project "smart-detection-demo" version "1.0.0":
   set min_go_version to "1.20"
   
   before any task:
-    info "Starting smart detection demo for {$project} v{$version}"
+    info "Starting smart detection demo for {$globals.project} v{$globals.version}"
   
   after any task:
     info "Smart detection demo completed"
@@ -29,8 +29,8 @@ task "check_node_setup" means "Check Node.js development setup":
   if node is available:
     detect node version
     
-    if node version >= "{$min_node_version}":
-      info "✅ Node.js version meets minimum requirement ({$min_node_version})"
+    if node version >= "{$globals.min_node_version}":
+      info "✅ Node.js version meets minimum requirement ({$globals.min_node_version})"
       
       if npm is available:
         info "✅ npm is available for package management"
@@ -38,7 +38,7 @@ task "check_node_setup" means "Check Node.js development setup":
       if yarn is available:
         info "✅ Yarn is available as alternative package manager"
     else:
-      warn "❌ Node.js version is below minimum requirement ({$min_node_version})"
+      warn "❌ Node.js version is below minimum requirement ({$globals.min_node_version})"
       error "Please upgrade Node.js to continue"
   else:
     warn "❌ Node.js is not available"
@@ -49,10 +49,10 @@ task "check_go_setup" means "Check Go development setup":
   if go is available:
     detect go version
     
-    if go version >= "{$min_go_version}":
-      info "✅ Go version meets minimum requirement ({$min_go_version})"
+    if go version >= "{$globals.min_go_version}":
+      info "✅ Go version meets minimum requirement ({$globals.min_go_version})"
     else:
-      warn "❌ Go version is below minimum requirement ({$min_go_version})"
+      warn "❌ Go version is below minimum requirement ({$globals.min_go_version})"
       error "Please upgrade Go to continue"
   else:
     warn "❌ Go is not available"

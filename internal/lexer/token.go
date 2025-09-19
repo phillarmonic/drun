@@ -46,6 +46,9 @@ const (
 	STOP      // stop
 	UP        // up
 	DOWN      // down
+	SCALE     // scale
+	PORT      // port
+	REGISTRY  // registry
 
 	// Git keywords
 	GIT        // git
@@ -69,6 +72,7 @@ const (
 	ALL        // all
 	WITH       // with
 	INTO       // into
+	CHECKOUT   // checkout
 
 	// HTTP keywords
 	HTTP      // http
@@ -221,7 +225,6 @@ const (
 	IS       // is
 
 	// Built-in functions/conditions
-	FILE   // file
 	EXISTS // exists
 
 	// Shell operations
@@ -239,14 +242,18 @@ const (
 	LIST_TYPE    // list
 
 	// File operations
-	CREATE // create
-	COPY   // copy
-	MOVE   // move
-	DELETE // delete
-	READ   // read
-	WRITE  // write
-	APPEND // append
-	DIR    // dir
+	CREATE    // create
+	COPY      // copy
+	MOVE      // move
+	DELETE    // delete
+	READ      // read
+	WRITE     // write
+	APPEND    // append
+	DIR       // dir
+	BACKUP    // backup
+	CHECK     // check
+	SIZE      // size
+	DIRECTORY // directory
 
 	// Error handling
 	TRY     // try
@@ -359,6 +366,12 @@ func (t TokenType) String() string {
 		return "UP"
 	case DOWN:
 		return "DOWN"
+	case SCALE:
+		return "SCALE"
+	case PORT:
+		return "PORT"
+	case REGISTRY:
+		return "REGISTRY"
 	case GIT:
 		return "GIT"
 	case CLONE:
@@ -401,6 +414,8 @@ func (t TokenType) String() string {
 		return "WITH"
 	case INTO:
 		return "INTO"
+	case CHECKOUT:
+		return "CHECKOUT"
 	case HTTP:
 		return "HTTP"
 	case HTTPS:
@@ -669,8 +684,6 @@ func (t TokenType) String() string {
 		return "PARALLEL"
 	case IS:
 		return "IS"
-	case FILE:
-		return "FILE"
 	case EXISTS:
 		return "EXISTS"
 	case RUN:
@@ -709,6 +722,14 @@ func (t TokenType) String() string {
 		return "APPEND"
 	case DIR:
 		return "DIR"
+	case BACKUP:
+		return "BACKUP"
+	case CHECK:
+		return "CHECK"
+	case SIZE:
+		return "SIZE"
+	case DIRECTORY:
+		return "DIRECTORY"
 	case TRY:
 		return "TRY"
 	case CATCH:
@@ -793,6 +814,9 @@ var keywords = map[string]TokenType{
 	"stop":        STOP,
 	"up":          UP,
 	"down":        DOWN,
+	"scale":       SCALE,
+	"port":        PORT,
+	"registry":    REGISTRY,
 	"git":         GIT,
 	"clone":       CLONE,
 	"init":        INIT,
@@ -814,6 +838,7 @@ var keywords = map[string]TokenType{
 	"all":         ALL,
 	"with":        WITH,
 	"into":        INTO,
+	"checkout":    CHECKOUT,
 	"http":        HTTP,
 	"https":       HTTPS,
 	"get":         GET,
@@ -948,7 +973,6 @@ var keywords = map[string]TokenType{
 	"in":          IN,
 	"parallel":    PARALLEL,
 	"is":          IS,
-	"file":        FILE,
 	"exists":      EXISTS,
 	"run":         RUN,
 	"exec":        EXEC,
@@ -967,6 +991,10 @@ var keywords = map[string]TokenType{
 	"write":       WRITE,
 	"append":      APPEND,
 	"dir":         DIR,
+	"backup":      BACKUP,
+	"check":       CHECK,
+	"size":        SIZE,
+	"directory":   DIRECTORY,
 	"try":         TRY,
 	"catch":       CATCH,
 	"finally":     FINALLY,

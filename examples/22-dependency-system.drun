@@ -5,7 +5,7 @@ project "microservice" version "1.0.0":
   set k8s_namespace to "production"
   
   before any task:
-    info "🚀 Starting {project} v{version} task execution"
+    info "🚀 Starting {$globals.project} v{$globals.version} task execution"
   
   after any task:
     info "✅ Task execution completed"
@@ -35,7 +35,7 @@ task "build" means "Build the application":
   info "🏗️  Building application"
   step "Compiling TypeScript"
   step "Bundling assets"
-  step "Building Docker image {registry}/{project}:{version}"
+  step "Building Docker image {$globals.registry}/{$globals.project}:{$globals.version}"
   success "Build completed successfully!"
 
 task "integration_tests" means "Run integration tests":
@@ -58,8 +58,8 @@ task "deploy_staging" means "Deploy to staging environment":
   depends on integration_tests, security_scan
   
   info "🚀 Deploying to staging environment"
-  step "Pushing image to {registry}"
-  step "Updating Kubernetes deployment in {k8s_namespace}-staging"
+  step "Pushing image to {$globals.registry}"
+  step "Updating Kubernetes deployment in {$globals.k8s_namespace}-staging"
   step "Running smoke tests"
   success "Staging deployment completed!"
 
@@ -67,8 +67,8 @@ task "deploy_production" means "Deploy to production environment":
   depends on deploy_staging
   
   info "🚀 Deploying to production environment"
-  step "Pushing image to {registry}"
-  step "Updating Kubernetes deployment in {k8s_namespace}"
+  step "Pushing image to {$globals.registry}"
+  step "Updating Kubernetes deployment in {$globals.k8s_namespace}"
   step "Running health checks"
   success "Production deployment completed!"
 
@@ -80,7 +80,7 @@ task "rollback" means "Rollback production deployment":
 
 task "status" means "Check deployment status":
   info "📊 Checking deployment status"
-  step "Verifying {k8s_namespace} namespace"
+  step "Verifying {$globals.k8s_namespace} namespace"
   step "Checking pod health"
   step "Validating service endpoints"
   success "All systems operational!"

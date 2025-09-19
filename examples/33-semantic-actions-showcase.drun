@@ -1,0 +1,139 @@
+version: 2.0
+
+project "semantic-actions-demo" version "1.0.0":
+  set api_url to "https://jsonplaceholder.typicode.com"
+  set backup_dir to "./backups"
+  set docker_image to "nginx:latest"
+  
+  before any task:
+    info "Starting semantic actions showcase for {$globals.project} v{$globals.version}"
+  
+  after any task:
+    info "Semantic actions showcase completed"
+
+task "docker_showcase" means "Demonstrate Docker semantic actions":
+  step "Building and managing Docker containers"
+  
+  # Build a Docker image
+  docker build image "my-app:latest"
+  
+  # Pull an image from registry
+  docker pull image "{$docker_image}"
+  
+  # Run a container on specific port
+  docker run container "{$docker_image}"
+  
+  # Push image to registry
+  docker push image "my-app:latest" to "docker.io/myrepo"
+  
+  # Docker Compose operations
+  docker compose up
+  docker compose down
+  
+  success "Docker operations completed successfully!"
+
+task "git_showcase" means "Demonstrate Git semantic actions":
+  step "Managing Git repository operations"
+  
+  # Initialize repository
+  git init repository in "."
+  
+  # Create and switch branches
+  git create branch "feature/new-feature"
+  git checkout branch "feature/new-feature"
+  
+  # Stage and commit changes
+  git add files "."
+  git commit changes with message "Add new semantic actions"
+  
+  # Push changes
+  git push to remote "origin" branch "feature/new-feature"
+  
+  # Create and push tags
+  git create tag "v1.0.0"
+  git push tag "v1.0.0"
+  
+  # Merge branches
+  git checkout branch "main"
+  git merge branch "feature/new-feature"
+  
+  # Check status and show current branch
+  git status
+  git show current branch
+  
+  success "Git operations completed successfully!"
+
+task "file_showcase" means "Demonstrate file system semantic actions":
+  step "Managing files and directories"
+  
+  # Create directories and files
+  create directory "{$backup_dir}"
+  create file "demo.txt"
+  
+  # Copy and move files
+  copy "demo.txt" to "demo-copy.txt"
+  move "demo-copy.txt" to "{$backup_dir}/demo-moved.txt"
+  
+  # Backup files with automatic timestamping
+  backup "demo.txt"
+  backup "demo.txt" as "demo-manual-backup.txt"
+  
+  # Check file existence and get information
+  check if file "demo.txt" exists
+  check size of file "demo.txt"
+  
+  # Clean up
+  delete "demo.txt"
+  
+  success "File operations completed successfully!"
+
+task "http_showcase" means "Demonstrate HTTP semantic actions":
+  step "Making HTTP requests with various methods"
+  
+  # Basic HTTP requests
+  get "{$globals.api_url}/posts/1" accept json
+  post "{$globals.api_url}/posts" content type json with body "title=Test&body=Content"
+  put "{$globals.api_url}/posts/1" content type json with body "title=Updated"
+  patch "{$globals.api_url}/posts/1" content type json with body "title=Patched"
+  delete "{$globals.api_url}/posts/1"
+  
+  # HTTP with authentication
+  get "{$globals.api_url}/posts" with auth bearer "demo-token-123" accept json
+  
+  # HTTP with custom headers
+  get "{$globals.api_url}/posts" with header "X-Custom-Header: MyValue" accept json
+  
+  # Advanced HTTP features (simulated)
+  # download "{$globals.api_url}/posts/1" to "post.json"
+  # upload "local-file.txt" to "{$globals.api_url}/upload"
+  
+  success "HTTP operations completed successfully!"
+
+task "comprehensive_demo" means "Run all semantic actions together":
+  depends on docker_showcase
+  depends on git_showcase
+  depends on file_showcase
+  depends on http_showcase
+  
+  step "All semantic actions have been demonstrated"
+  success "🎉 Comprehensive semantic actions showcase completed!"
+
+task "error_handling_demo" means "Demonstrate error handling with semantic actions":
+  step "Testing error handling capabilities"
+  
+  try:
+    # This might fail if Docker is not available
+    docker build image "test:latest"
+    success "Docker build succeeded"
+  catch:
+    warn "Docker build failed - Docker might not be available"
+  finally:
+    info "Docker build attempt completed"
+  
+  try:
+    # This might fail if file doesn't exist
+    check if file "non-existent-file.txt" exists
+  catch:
+    info "File check handled gracefully"
+  
+  success "Error handling demonstration completed!"

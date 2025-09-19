@@ -6,92 +6,92 @@ project "api-client" version "1.0.0":
   set timeout to "30s"
   
   before any task:
-    info "Starting HTTP operations for {$project} v{$version}"
+    info "Starting HTTP operations for {$globals.project} v{$globals.version}"
   
   after any task:
     info "HTTP operations completed"
 
 task "health_check" means "Check API health status":
-  get "{$api_base}/posts/1"
+  get "{$globals.api_base}/posts/1"
   success "API health check passed!"
 
 task "list_users" means "Get list of all users":
-  get "{$api_base}/users" accept json
+  get "{$globals.api_base}/users" accept json
   success "Users retrieved successfully!"
 
 task "get_user" means "Get specific user by ID":
   requires $user_id from ["1", "2", "3", "4", "5"]
   
-  get "{$api_base}/users/{$user_id}" accept json
+  get "{$globals.api_base}/users/{$user_id}" accept json
   success "User {$user_id} retrieved successfully!"
 
 task "create_user" means "Create a new user":
   requires $name from ["John Doe", "Jane Smith", "Bob Johnson"]
   requires $email from ["john@example.com", "jane@example.com", "bob@example.com"]
   
-  post "{$api_base}/users" content type json with body "name={name}&email={email}"
+  post "{$globals.api_base}/users" content type json with body "name={name}&email={email}"
   success "User {name} created successfully!"
 
 task "update_user" means "Update existing user":
   requires $user_id from ["1", "2", "3"]
   requires $name from ["Updated John", "Updated Jane", "Updated Bob"]
   
-  put "{$api_base}/users/{$user_id}" content type json with body "name={name}"
+  put "{$globals.api_base}/users/{$user_id}" content type json with body "name={name}"
   success "User {$user_id} updated successfully!"
 
 task "delete_user" means "Delete a user":
   requires $user_id from ["1", "2", "3"]
   
-  delete "{$api_base}/users/{$user_id}"
+  delete "{$globals.api_base}/users/{$user_id}"
   success "User {$user_id} deleted successfully!"
 
 task "authenticated_request" means "Make authenticated API request":
-  get "{$api_base}/posts" with auth bearer "{auth_token}" accept json
+  get "{$globals.api_base}/posts" with auth bearer "{auth_token}" accept json
   success "Authenticated request completed!"
 
 task "custom_headers" means "Request with custom headers":
-  get "{$api_base}/posts" with header "X-Custom-Header: MyValue" accept json
+  get "{$globals.api_base}/posts" with header "X-Custom-Header: MyValue" accept json
   success "Request with custom headers completed!"
 
 task "timeout_request" means "Request with timeout":
-  get "{$api_base}/posts" timeout "{timeout}" accept json
+  get "{$globals.api_base}/posts" timeout "{timeout}" accept json
   success "Request with timeout completed!"
 
 task "api_workflow" means "Complete API workflow":
   info "Starting comprehensive API workflow"
-  get "{$api_base}/users"
-  post "{$api_base}/users" content type json with body "name=Test User&email=test@example.com"
-  put "{$api_base}/users/1" content type json with body "name=Updated User"
-  delete "{$api_base}/users/1"
+  get "{$globals.api_base}/users"
+  post "{$globals.api_base}/users" content type json with body "name=Test User&email=test@example.com"
+  put "{$globals.api_base}/users/1" content type json with body "name=Updated User"
+  delete "{$globals.api_base}/users/1"
   success "API workflow completed successfully!"
 
 task "health_and_data" means "Health check followed by data retrieval":
   depends on health_check
   
   info "Health check passed, retrieving data"
-  get "{$api_base}/posts" accept json
-  get "{$api_base}/users" accept json
+  get "{$globals.api_base}/posts" accept json
+  get "{$globals.api_base}/users" accept json
   success "Health check and data retrieval completed!"
 
 task "batch_operations" means "Multiple API operations in sequence":
   info "Performing batch API operations"
-  get "{$api_base}/posts/1" accept json
-  get "{$api_base}/posts/2" accept json
-  get "{$api_base}/posts/3" accept json
+  get "{$globals.api_base}/posts/1" accept json
+  get "{$globals.api_base}/posts/2" accept json
+  get "{$globals.api_base}/posts/3" accept json
   success "Batch operations completed!"
 
 task "error_handling_demo" means "Demonstrate error handling with HTTP":
   info "Testing error handling"
-  get "{$api_base}/posts/999" accept json
+  get "{$globals.api_base}/posts/999" accept json
   success "Error handling demo completed!"
 
 task "comprehensive_test" means "Comprehensive HTTP testing":
   depends on health_check
   
   info "Running comprehensive HTTP tests"
-  get "{$api_base}/posts" accept json
-  post "{$api_base}/posts" content type json with body "title=Test Post&body=Test Content"
-  put "{$api_base}/posts/1" content type json with body "title=Updated Post"
-  patch "{$api_base}/posts/1" content type json with body "title=Patched Post"
-  delete "{$api_base}/posts/1"
+  get "{$globals.api_base}/posts" accept json
+  post "{$globals.api_base}/posts" content type json with body "title=Test Post&body=Test Content"
+  put "{$globals.api_base}/posts/1" content type json with body "title=Updated Post"
+  patch "{$globals.api_base}/posts/1" content type json with body "title=Patched Post"
+  delete "{$globals.api_base}/posts/1"
   success "Comprehensive HTTP testing completed!"

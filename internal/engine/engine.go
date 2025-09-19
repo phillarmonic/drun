@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
@@ -542,6 +543,35 @@ func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext)
 		return nil
 	}
 
+	// Handle special actions that need preprocessing
+	switch fileStmt.Action {
+	case "backup":
+		if target == "" {
+			// Generate default backup name with timestamp
+			timestamp := time.Now().Format("2006-01-02-15-04-05")
+			target = source + ".backup-" + timestamp
+		}
+		op.Target = target
+		op.Type = "copy" // Backup is essentially a copy operation
+	case "check_exists":
+		// Check if file exists
+		if e.fileExists(target) {
+			_, _ = fmt.Fprintf(e.output, "✅ File exists: %s\n", target)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "❌ File does not exist: %s\n", target)
+		}
+		return nil
+	case "get_size":
+		// Get file size
+		size, err := e.getFileSize(target)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "❌ Failed to get file size: %v\n", err)
+			return err
+		}
+		_, _ = fmt.Fprintf(e.output, "📏 File size: %s (%d bytes)\n", target, size)
+		return nil
+	}
+
 	// Show what we're about to do
 	switch fileStmt.Action {
 	case "create":
@@ -566,6 +596,8 @@ func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext)
 		_, _ = fmt.Fprintf(e.output, "✏️  Writing to file: %s\n", target)
 	case "append":
 		_, _ = fmt.Fprintf(e.output, "➕ Appending to file: %s\n", target)
+	case "backup":
+		_, _ = fmt.Fprintf(e.output, "💾 Backing up: %s → %s\n", source, target)
 	}
 
 	// Execute the file operation
@@ -734,18 +766,94 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command: docker %s %s", operation, resource)
+		return e.buildDockerCommand(operation, resource, name, options, true)
+	}
+
+	// Show what we're about to do with appropriate emoji
+	switch operation {
+	case "build":
+		_, _ = fmt.Fprintf(e.output, "🔨 Building Docker image")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "push":
+		_, _ = fmt.Fprintf(e.output, "📤 Pushing Docker image")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		if registry, exists := options["to"]; exists {
+			_, _ = fmt.Fprintf(e.output, " to %s", registry)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "pull":
+		_, _ = fmt.Fprintf(e.output, "📥 Pulling Docker image")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "run":
+		_, _ = fmt.Fprintf(e.output, "🚀 Running Docker container")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		if port, exists := options["port"]; exists {
+			_, _ = fmt.Fprintf(e.output, " on port %s", port)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "stop":
+		_, _ = fmt.Fprintf(e.output, "🛑 Stopping Docker container")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "remove":
+		_, _ = fmt.Fprintf(e.output, "🗑️  Removing Docker %s", resource)
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "compose":
+		command := options["command"]
+		switch command {
+		case "up":
+			_, _ = fmt.Fprintf(e.output, "🚀 Starting Docker Compose services\n")
+		case "down":
+			_, _ = fmt.Fprintf(e.output, "🛑 Stopping Docker Compose services\n")
+		case "build":
+			_, _ = fmt.Fprintf(e.output, "🔨 Building Docker Compose services\n")
+		default:
+			_, _ = fmt.Fprintf(e.output, "🐳 Running Docker Compose: %s\n", command)
+		}
+	case "scale":
+		if resource == "compose" {
+			replicas := options["replicas"]
+			_, _ = fmt.Fprintf(e.output, "📊 Scaling Docker Compose service")
+			if name != "" {
+				_, _ = fmt.Fprintf(e.output, " %s", name)
+			}
+			if replicas != "" {
+				_, _ = fmt.Fprintf(e.output, " to %s replicas", replicas)
+			}
+			_, _ = fmt.Fprintf(e.output, "\n")
+		}
+	default:
+		_, _ = fmt.Fprintf(e.output, "🐳 Running Docker %s", operation)
+		if resource != "" {
+			_, _ = fmt.Fprintf(e.output, " %s", resource)
+		}
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, " %s", name)
 		}
-		for key, value := range options {
-			_, _ = fmt.Fprintf(e.output, " %s %s", key, value)
-		}
 		_, _ = fmt.Fprintf(e.output, "\n")
-		return nil
 	}
 
-	// Build Docker command
+	// Build and execute the actual command
+	return e.buildDockerCommand(operation, resource, name, options, false)
+}
+
+// buildDockerCommand builds and optionally executes the Docker command
+func (e *Engine) buildDockerCommand(operation, resource, name string, options map[string]string, dryRun bool) error {
 	var dockerCmd []string
 	dockerCmd = append(dockerCmd, "docker")
 
@@ -754,6 +862,14 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 		dockerCmd = append(dockerCmd, "compose")
 		if command, exists := options["command"]; exists {
 			dockerCmd = append(dockerCmd, command)
+		}
+	} else if operation == "scale" && resource == "compose" {
+		// Handle "docker compose scale service_name replicas"
+		dockerCmd = append(dockerCmd, "compose", "scale")
+		if name != "" {
+			if replicas, exists := options["replicas"]; exists {
+				dockerCmd = append(dockerCmd, fmt.Sprintf("%s=%s", name, replicas))
+			}
 		}
 	} else {
 		// Regular Docker commands
@@ -779,10 +895,22 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 		if as, exists := options["as"]; exists {
 			dockerCmd = append(dockerCmd, as)
 		}
+		if port, exists := options["port"]; exists {
+			if operation == "run" {
+				dockerCmd = append(dockerCmd, "-p", fmt.Sprintf("%s:%s", port, port))
+			}
+		}
 	}
 
-	// Execute Docker command
-	_, _ = fmt.Fprintf(e.output, "🐳 Running Docker: %s\n", strings.Join(dockerCmd, " "))
+	if dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command: %s\n", strings.Join(dockerCmd, " "))
+		return nil
+	}
+
+	// Show the actual command being executed
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Command: %s\n", strings.Join(dockerCmd, " "))
+	}
 
 	// For now, we'll simulate the command execution
 	// In a real implementation, you would use exec.Command to run the Docker command
@@ -806,29 +934,130 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Git command: ")
-		e.buildGitCommand(operation, resource, name, options, true)
-		return nil
+		return e.buildGitCommand(operation, resource, name, options, true)
 	}
 
-	// Build and execute Git command
-	_, _ = fmt.Fprintf(e.output, "🔗 Running Git: ")
-	e.buildGitCommand(operation, resource, name, options, false)
+	// Show what we're about to do with appropriate emoji
+	switch operation {
+	case "create":
+		if resource == "branch" {
+			_, _ = fmt.Fprintf(e.output, "🌿 Creating Git branch")
+			if name != "" {
+				_, _ = fmt.Fprintf(e.output, ": %s", name)
+			}
+		} else if resource == "tag" {
+			_, _ = fmt.Fprintf(e.output, "🏷️  Creating Git tag")
+			if name != "" {
+				_, _ = fmt.Fprintf(e.output, ": %s", name)
+			}
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "checkout":
+		_, _ = fmt.Fprintf(e.output, "🔀 Checking out Git branch")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "merge":
+		_, _ = fmt.Fprintf(e.output, "🔀 Merging Git branch")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "commit":
+		_, _ = fmt.Fprintf(e.output, "💾 Committing Git changes")
+		if message, exists := options["message"]; exists {
+			_, _ = fmt.Fprintf(e.output, ": %s", message)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "push":
+		if resource == "tag" {
+			_, _ = fmt.Fprintf(e.output, "📤 Pushing Git tag")
+			if name != "" {
+				_, _ = fmt.Fprintf(e.output, ": %s", name)
+			}
+		} else {
+			_, _ = fmt.Fprintf(e.output, "📤 Pushing Git changes")
+			if remote, exists := options["remote"]; exists {
+				_, _ = fmt.Fprintf(e.output, " to %s", remote)
+			}
+			if branch, exists := options["branch"]; exists {
+				_, _ = fmt.Fprintf(e.output, "/%s", branch)
+			}
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "clone":
+		_, _ = fmt.Fprintf(e.output, "📥 Cloning Git repository")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "init":
+		_, _ = fmt.Fprintf(e.output, "🆕 Initializing Git repository\n")
+	case "add":
+		_, _ = fmt.Fprintf(e.output, "➕ Adding files to Git")
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, ": %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	case "status":
+		_, _ = fmt.Fprintf(e.output, "📊 Checking Git status\n")
+	case "show":
+		if resource == "branch" {
+			_, _ = fmt.Fprintf(e.output, "🌿 Showing current Git branch\n")
+		} else {
+			_, _ = fmt.Fprintf(e.output, "📖 Showing Git information\n")
+		}
+	default:
+		_, _ = fmt.Fprintf(e.output, "🔗 Running Git %s", operation)
+		if resource != "" {
+			_, _ = fmt.Fprintf(e.output, " %s", resource)
+		}
+		if name != "" {
+			_, _ = fmt.Fprintf(e.output, " %s", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	}
 
-	// For now, we'll simulate the command execution
-	// In a real implementation, you would use exec.Command to run the git command
-	// cmd := exec.Command("git", args...)
-	// return cmd.Run()
-
-	return nil
+	// Build and execute the actual command
+	return e.buildGitCommand(operation, resource, name, options, false)
 }
 
 // buildGitCommand builds and displays the git command
-func (e *Engine) buildGitCommand(operation, resource, name string, options map[string]string, dryRun bool) {
+func (e *Engine) buildGitCommand(operation, resource, name string, options map[string]string, dryRun bool) error {
 	var gitCmd []string
 	gitCmd = append(gitCmd, "git")
 
 	switch operation {
+	case "create":
+		if resource == "branch" {
+			// git checkout -b branch_name
+			gitCmd = append(gitCmd, "checkout", "-b")
+			if name != "" {
+				gitCmd = append(gitCmd, name)
+			}
+		} else if resource == "tag" {
+			// git tag tag_name
+			gitCmd = append(gitCmd, "tag")
+			if name != "" {
+				gitCmd = append(gitCmd, name)
+			}
+		}
+
+	case "checkout":
+		// git checkout branch_name
+		gitCmd = append(gitCmd, "checkout")
+		if name != "" {
+			gitCmd = append(gitCmd, name)
+		}
+
+	case "merge":
+		// git merge branch_name
+		gitCmd = append(gitCmd, "merge")
+		if name != "" {
+			gitCmd = append(gitCmd, name)
+		}
+
 	case "clone":
 		// git clone repository "url" to "dir"
 		gitCmd = append(gitCmd, "clone")
@@ -924,37 +1153,32 @@ func (e *Engine) buildGitCommand(operation, resource, name string, options map[s
 			gitCmd = append(gitCmd, "show")
 		}
 
-	case "create":
-		// git create branch "name"
-		if resource == "branch" && name != "" {
-			gitCmd = append(gitCmd, "checkout", "-b", name)
+	default:
+		gitCmd = append(gitCmd, operation)
+		if resource != "" {
+			gitCmd = append(gitCmd, resource)
 		}
-
-	case "switch":
-		// git switch to branch "name"
-		if resource == "branch" && name != "" {
-			gitCmd = append(gitCmd, "checkout", name)
-		}
-
-	case "delete":
-		// git delete branch "name"
-		if resource == "branch" && name != "" {
-			gitCmd = append(gitCmd, "branch", "-d", name)
-		}
-
-	case "merge":
-		// git merge branch "name" into "target"
-		gitCmd = append(gitCmd, "merge")
 		if name != "" {
 			gitCmd = append(gitCmd, name)
 		}
 	}
 
 	if dryRun {
-		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
-	} else {
-		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(gitCmd, " "))
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Git command: %s\n", strings.Join(gitCmd, " "))
+		return nil
 	}
+
+	// Show the actual command being executed
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Command: %s\n", strings.Join(gitCmd, " "))
+	}
+
+	// For now, we'll simulate the command execution
+	// In a real implementation, you would use exec.Command to run the git command
+	// cmd := exec.Command(gitCmd[0], gitCmd[1:]...)
+	// return cmd.Run()
+
+	return nil
 }
 
 // executeHTTP executes HTTP operations
@@ -983,29 +1207,42 @@ func (e *Engine) executeHTTP(httpStmt *ast.HTTPStatement, ctx *ExecutionContext)
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute HTTP request: ")
-		e.buildHTTPCommand(method, url, body, headers, auth, options, true)
-		return nil
+		return e.buildHTTPCommand(method, url, body, headers, auth, options, true)
 	}
 
-	// Build and execute HTTP request
-	_, _ = fmt.Fprintf(e.output, "🌐 Making HTTP request: ")
-	e.buildHTTPCommand(method, url, body, headers, auth, options, false)
+	// Show what we're about to do with appropriate emoji
+	switch method {
+	case "GET":
+		_, _ = fmt.Fprintf(e.output, "📥 GET request to: %s\n", url)
+	case "POST":
+		_, _ = fmt.Fprintf(e.output, "📤 POST request to: %s\n", url)
+	case "PUT":
+		_, _ = fmt.Fprintf(e.output, "🔄 PUT request to: %s\n", url)
+	case "PATCH":
+		_, _ = fmt.Fprintf(e.output, "🔧 PATCH request to: %s\n", url)
+	case "DELETE":
+		_, _ = fmt.Fprintf(e.output, "🗑️  DELETE request to: %s\n", url)
+	case "HEAD":
+		_, _ = fmt.Fprintf(e.output, "🔍 HEAD request to: %s\n", url)
+	default:
+		_, _ = fmt.Fprintf(e.output, "🌐 %s request to: %s\n", method, url)
+	}
 
-	// For now, we'll simulate the HTTP request execution
-	// In a real implementation, you would use http.Client to make the actual request
-	// client := &http.Client{Timeout: timeout}
-	// req, err := http.NewRequest(method, url, strings.NewReader(body))
-	// if err != nil { return err }
-	// for key, value := range headers { req.Header.Set(key, value) }
-	// resp, err := client.Do(req)
-	// return err
+	// Handle special HTTP operations
+	if downloadPath, exists := options["download"]; exists {
+		_, _ = fmt.Fprintf(e.output, "💾 Downloading to: %s\n", downloadPath)
+	}
 
-	return nil
+	if uploadPath, exists := options["upload"]; exists {
+		_, _ = fmt.Fprintf(e.output, "📤 Uploading from: %s\n", uploadPath)
+	}
+
+	// Build and execute the actual HTTP request
+	return e.buildHTTPCommand(method, url, body, headers, auth, options, false)
 }
 
 // buildHTTPCommand builds and displays the HTTP request details
-func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, options map[string]string, dryRun bool) {
+func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, options map[string]string, dryRun bool) error {
 	var httpCmd []string
 	httpCmd = append(httpCmd, "curl", "-X", method)
 
@@ -1021,7 +1258,18 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 			httpCmd = append(httpCmd, "-H", fmt.Sprintf("\"Authorization: Bearer %s\"", value))
 		case "basic":
 			httpCmd = append(httpCmd, "--user", value)
+		case "token":
+			httpCmd = append(httpCmd, "-H", fmt.Sprintf("\"Authorization: Token %s\"", value))
 		}
+	}
+
+	// Handle special operations
+	if downloadPath, exists := options["download"]; exists {
+		httpCmd = append(httpCmd, "-o", downloadPath)
+	}
+
+	if uploadPath, exists := options["upload"]; exists {
+		httpCmd = append(httpCmd, "-T", uploadPath)
 	}
 
 	// Add body
@@ -1029,22 +1277,46 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 		httpCmd = append(httpCmd, "-d", body)
 	}
 
-	// Add options
+	// Add advanced options
 	if timeout, exists := options["timeout"]; exists {
 		httpCmd = append(httpCmd, "--max-time", timeout)
 	}
 	if retry, exists := options["retry"]; exists {
 		httpCmd = append(httpCmd, "--retry", retry)
 	}
+	if followRedirects, exists := options["follow_redirects"]; exists && followRedirects == "true" {
+		httpCmd = append(httpCmd, "-L")
+	}
+	if insecure, exists := options["insecure"]; exists && insecure == "true" {
+		httpCmd = append(httpCmd, "-k")
+	}
+	if verbose, exists := options["verbose"]; exists && verbose == "true" {
+		httpCmd = append(httpCmd, "-v")
+	}
+	if silent, exists := options["silent"]; exists && silent == "true" {
+		httpCmd = append(httpCmd, "-s")
+	}
 
 	// Add URL last
 	httpCmd = append(httpCmd, url)
 
 	if dryRun {
-		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(httpCmd, " "))
-	} else {
-		_, _ = fmt.Fprintf(e.output, "%s\n", strings.Join(httpCmd, " "))
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute HTTP command: %s\n", strings.Join(httpCmd, " "))
+		return nil
 	}
+
+	// Show the actual command being executed
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Command: %s\n", strings.Join(httpCmd, " "))
+	}
+
+	// For now, we'll simulate the HTTP request execution
+	// In a real implementation, you would use exec.Command to run the curl command
+	// or use Go's http.Client for more advanced features
+	// cmd := exec.Command(httpCmd[0], httpCmd[1:]...)
+	// return cmd.Run()
+
+	return nil
 }
 
 // executeDetection executes smart detection operations
@@ -1638,7 +1910,25 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 4. Check for simple parameter lookup
+	// 4. Check for $globals.key syntax for project settings
+	if strings.HasPrefix(expr, "$globals.") {
+		if ctx != nil && ctx.Project != nil {
+			key := expr[9:] // Remove "$globals." prefix
+			if value, exists := ctx.Project.Settings[key]; exists {
+				return value
+			}
+			// Check special project variables
+			if key == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version
+			}
+			if key == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name
+			}
+		}
+		return ""
+	}
+
+	// 5. Check for simple parameter lookup
 	if ctx != nil {
 		if value, exists := ctx.Parameters[expr]; exists {
 			return value.AsString()
@@ -1647,24 +1937,11 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		if value, exists := ctx.Variables[expr]; exists {
 			return value
 		}
-		// Check for variables with $ prefix
+		// Check for variables with $ prefix (task-scoped variables)
 		if strings.HasPrefix(expr, "$") {
 			varName := expr[1:] // Remove the $ prefix
 			if value, exists := ctx.Variables[varName]; exists {
 				return value
-			}
-		}
-		// Check project settings
-		if ctx.Project != nil {
-			if value, exists := ctx.Project.Settings[expr]; exists {
-				return value
-			}
-			// Check special project variables
-			if expr == "version" && ctx.Project.Version != "" {
-				return ctx.Project.Version
-			}
-			if expr == "project" && ctx.Project.Name != "" {
-				return ctx.Project.Name
 			}
 		}
 	}
@@ -2069,4 +2346,19 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 	// Default: treat non-empty strings as true
 	return strings.TrimSpace(interpolatedCondition) != ""
+}
+
+// fileExists checks if a file exists
+func (e *Engine) fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// getFileSize returns the size of a file in bytes
+func (e *Engine) getFileSize(path string) (int64, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
 }

@@ -31,8 +31,8 @@ task "commit_changes" means "Commit staged changes":
 task "push_changes" means "Push changes to remote repository":
   depends on commit_changes
   
-  git push to remote "{$remote}" branch "{$main_branch}"
-  success "Changes pushed to {$remote}/{$main_branch}!"
+  git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
+  success "Changes pushed to {$globals.remote}/{$globals.main_branch}!"
 
 task "check_status" means "Check repository status and current branch":
   git status
@@ -45,5 +45,5 @@ task "quick_commit" means "Quick add, commit, and push":
   info "Quick commit and push"
   git add files "."
   git commit changes with message "{$message}"
-  git push to remote "{$remote}" branch "{$main_branch}"
+  git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
   success "Quick commit and push completed!"
