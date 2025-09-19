@@ -1,0 +1,101 @@
+version: 2.0
+
+project "dry-tool-detection" version "1.0":
+
+task "dry-compose-workflow" means "DRY approach for Docker Compose workflows":
+  info "🐙 DRY Docker Compose Workflow"
+  
+  # Detect which Docker Compose variant is available and capture it
+  # This handles both V2 (docker compose) and V1 (docker-compose) automatically
+  detect available "docker compose" or "docker-compose" as $compose_cmd
+  
+  info "✅ Using: {$compose_cmd}"
+  
+  # Now use the captured variable consistently throughout the task
+  info "📋 Available compose commands:"
+  run "{$compose_cmd} --help | head -20"
+  
+  info "🔍 Compose version:"
+  run "{$compose_cmd} version"
+  
+  info "💡 You can now use {$compose_cmd} consistently:"
+  info "   {$compose_cmd} up -d"
+  info "   {$compose_cmd} down"
+  info "   {$compose_cmd} ps"
+  info "   {$compose_cmd} logs"
+  
+  success "DRY Compose workflow ready!"
+
+task "dry-buildx-workflow" means "DRY approach for Docker Buildx workflows":
+  info "🔨 DRY Docker Buildx Workflow"
+  
+  # Detect which Docker Buildx variant is available and capture it
+  detect available "docker buildx" or "docker-buildx" as $buildx_cmd
+  
+  info "✅ Using: {$buildx_cmd}"
+  
+  # Use the captured variable for all buildx operations
+  info "🔍 Buildx version:"
+  run "{$buildx_cmd} version"
+  
+  info "📋 Available builders:"
+  run "{$buildx_cmd} ls"
+  
+  info "💡 You can now use {$buildx_cmd} consistently:"
+  info "   {$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
+  info "   {$buildx_cmd} create --name multiarch --use"
+  info "   {$buildx_cmd} inspect multiarch"
+  
+  success "DRY Buildx workflow ready!"
+
+task "comprehensive-docker-setup" means "Comprehensive Docker toolchain setup with DRY approach":
+  info "🚀 Comprehensive Docker Toolchain Setup"
+  
+  # Detect all Docker tool variants upfront - no repetition!
+  detect available "docker compose" or "docker-compose" as $compose_cmd
+  detect available "docker buildx" or "docker-buildx" as $buildx_cmd
+  
+  info "🔧 Detected Docker toolchain:"
+  info "  📦 Compose: {$compose_cmd}"
+  info "  🔨 Buildx: {$buildx_cmd}"
+  
+  info "🧪 Testing toolchain:"
+  run "{$compose_cmd} version"
+  run "{$buildx_cmd} version"
+  
+  info "🎯 Setting up multi-platform builder:"
+  run "{$buildx_cmd} create --name multiarch --use --bootstrap || echo 'Builder already exists'"
+  
+  info "📋 Builder info:"
+  run "{$buildx_cmd} inspect multiarch"
+  
+  info "✨ Your Docker toolchain is ready!"
+  info "🐙 Compose: {$compose_cmd}"
+  info "🔨 Buildx: {$buildx_cmd}"
+  
+  success "Comprehensive Docker setup completed!"
+
+task "conditional-docker-workflow" means "Conditional workflow based on available tools":
+  info "🔀 Conditional Docker Workflow"
+  
+  # Try to detect Docker Compose variants
+  detect available "docker compose" or "docker-compose" as $compose_cmd
+  
+  # Use conditional logic based on what was found
+  if "docker compose" is available:
+    info "🆕 Modern Docker Compose V2 detected: {$compose_cmd}"
+    info "   - Supports new features like profiles"
+    info "   - Better performance and UX"
+    run "{$compose_cmd} version"
+  else:
+    if "docker-compose" is available:
+      info "📜 Legacy Docker Compose V1 detected: {$compose_cmd}"
+      info "   - Classic standalone version"
+      run "{$compose_cmd} --version"
+    else:
+      warn "❌ No Docker Compose variant found"
+      info "Please install either:"
+      info "  - Docker Desktop (includes docker compose)"
+      info "  - docker-compose standalone"
+  
+  success "Conditional workflow completed!"

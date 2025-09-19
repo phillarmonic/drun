@@ -1054,6 +1054,8 @@ func (e *Engine) executeDetection(detectionStmt *ast.DetectionStatement, ctx *Ex
 	switch detectionStmt.Type {
 	case "detect":
 		return e.executeDetectOperation(detector, detectionStmt, ctx)
+	case "detect_available":
+		return e.executeDetectAvailable(detector, detectionStmt, ctx)
 	case "if_available":
 		return e.executeIfAvailable(detector, detectionStmt, ctx)
 	case "if_version":
@@ -1218,6 +1220,60 @@ func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+// executeDetectAvailable executes "detect available" operations with tool alternatives
+func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+	// Build list of tools to try (primary + alternatives)
+	toolsToTry := []string{stmt.Target}
+	toolsToTry = append(toolsToTry, stmt.Alternatives...)
+
+	var workingTool string
+	var found bool
+
+	// Try each tool variant until we find one that works
+	for _, tool := range toolsToTry {
+		if detector.IsToolAvailable(tool) {
+			workingTool = tool
+			found = true
+			break
+		}
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would detect available tool from: %v\n", toolsToTry)
+		if found {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: %s\n", workingTool)
+			if stmt.CaptureVar != "" {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture as %s: %s\n", stmt.CaptureVar, workingTool)
+			}
+		} else {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: none available\n")
+		}
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Detecting available tool from: %v\n", toolsToTry)
+	}
+
+	if found {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "✅ Found: %s\n", workingTool)
+		}
+
+		// Capture the working tool variant in a variable if specified
+		if stmt.CaptureVar != "" {
+			ctx.Variables[stmt.CaptureVar] = workingTool
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "📝 Captured as %s: %s\n", stmt.CaptureVar, workingTool)
+			}
+		}
+	} else {
+		_, _ = fmt.Fprintf(e.output, "❌ None of the tools are available: %v\n", toolsToTry)
 	}
 
 	return nil

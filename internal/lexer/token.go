@@ -30,6 +30,7 @@ const (
 	ON      // on
 	THEN    // then
 	AND     // and
+	OR      // or
 
 	// Docker keywords
 	DOCKER    // docker
@@ -330,6 +331,8 @@ func (t TokenType) String() string {
 		return "THEN"
 	case AND:
 		return "AND"
+	case OR:
+		return "OR"
 	case DOCKER:
 		return "DOCKER"
 	case IMAGE:
@@ -776,6 +779,7 @@ var keywords = map[string]TokenType{
 	"on":          ON,
 	"then":        THEN,
 	"and":         AND,
+	"or":          OR,
 	"docker":      DOCKER,
 	"image":       IMAGE,
 	"container":   CONTAINER,

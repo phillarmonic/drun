@@ -173,7 +173,8 @@ declaration_statement = variable_declaration
                       | constant_declaration ;
 
 action_statement = built_in_action
-                 | shell_command ;
+                 | shell_command
+                 | detection_statement ;
 
 (* Control flow *)
 if_statement = "if" condition ":" statement_block
@@ -277,6 +278,24 @@ shell_command = shell_action ( string_literal | ":" statement_block )
               | "capture" ( string_literal | ":" statement_block ) "as" identifier ;
 
 shell_action = "run" | "exec" | "shell" ;
+
+(* Detection statements *)
+detection_statement = "detect" detection_target
+                    | "detect" "available" tool_alternatives [ "as" variable_name ]
+                    | "if" ( tool_name | string_literal ) "is" "available" ":" statement_block [ "else" ":" statement_block ]
+                    | "if" ( tool_name | string_literal ) "version" comparison_operator string_literal ":" statement_block [ "else" ":" statement_block ]
+                    | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
+
+detection_target = "project" "type"
+                 | tool_name [ "version" ] ;
+
+tool_alternatives = ( tool_name | string_literal ) { "or" ( tool_name | string_literal ) } ;
+
+tool_name = identifier ;
+
+environment_name = "ci" | "local" | "production" | "staging" | "development" | identifier ;
+
+variable_name = "$" identifier ;
 
 (* Shell configuration *)
 shell_config = "shell" "config" ":" { platform_config } ;
@@ -1545,6 +1564,36 @@ build multi-platform docker image
 deploy to kubernetes
 install helm chart "nginx-ingress"
 ```
+
+### DRY Tool Detection
+
+For maximum flexibility and maintainability, drun supports detecting tool variants and capturing the working one in a variable:
+
+```
+# Detect which Docker Compose variant is available and capture it
+detect available "docker compose" or "docker-compose" as $compose_cmd
+
+# Use the captured variable consistently throughout the task
+run "{$compose_cmd} up -d"
+run "{$compose_cmd} ps"
+run "{$compose_cmd} logs"
+
+# Multiple tool alternatives
+detect available "npm" or "yarn" or "pnpm" as $package_manager
+run "{$package_manager} install"
+run "{$package_manager} run build"
+
+# Docker Buildx variants
+detect available "docker buildx" or "docker-buildx" as $buildx_cmd
+run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
+```
+
+#### Benefits
+
+- **DRY Principle**: No repetitive conditional logic
+- **Cross-Platform**: Works across different tool installations
+- **Maintainable**: Single detection point, consistent usage
+- **Flexible**: Supports any number of tool alternatives
 
 ### Project Detection
 

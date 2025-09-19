@@ -1711,9 +1711,49 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 		// detect project type
 		// detect docker
 		// detect node version
+		// detect available "docker compose" or "docker-compose" as $compose_cmd
 		stmt.Type = "detect"
 
-		if p.peekToken.Type == lexer2.PROJECT {
+		if p.peekToken.Type == lexer2.AVAILABLE {
+			// detect available "tool1" or "tool2" as $var
+			p.nextToken() // consume AVAILABLE
+			stmt.Type = "detect_available"
+			stmt.Condition = "available"
+
+			// Parse first tool (required)
+			if p.peekToken.Type == lexer2.STRING || p.isToolToken(p.peekToken.Type) {
+				p.nextToken()
+				stmt.Target = p.curToken.Literal
+			} else {
+				p.errors = append(p.errors, fmt.Sprintf("expected tool name after 'detect available', got %s", p.peekToken.Type))
+				return stmt
+			}
+
+			// Parse alternatives (optional "or" clauses)
+			for p.peekToken.Type == lexer2.OR {
+				p.nextToken() // consume OR
+				if p.peekToken.Type == lexer2.STRING || p.isToolToken(p.peekToken.Type) {
+					p.nextToken()
+					stmt.Alternatives = append(stmt.Alternatives, p.curToken.Literal)
+				} else {
+					p.errors = append(p.errors, fmt.Sprintf("expected tool name after 'or', got %s", p.peekToken.Type))
+					return stmt
+				}
+			}
+
+			// Parse capture variable (optional "as $var")
+			if p.peekToken.Type == lexer2.AS {
+				p.nextToken() // consume AS
+				if p.peekToken.Type == lexer2.VARIABLE {
+					p.nextToken()
+					stmt.CaptureVar = p.getVariableName()
+				} else {
+					p.errors = append(p.errors, fmt.Sprintf("expected variable name after 'as', got %s", p.peekToken.Type))
+					return stmt
+				}
+			}
+
+		} else if p.peekToken.Type == lexer2.PROJECT {
 			p.nextToken() // consume PROJECT
 			stmt.Target = "project"
 			if p.peekToken.Type == lexer2.TYPE {

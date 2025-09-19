@@ -27,6 +27,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
 - **🎯 Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
+- **🔧 DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **📁 File Operations**: Built-in file system operations with path interpolation
 
 ### 🛠️ **Developer Experience**
@@ -556,6 +557,63 @@ recipes:
 - **Project**: `packageManager`, `hasFile`, `isCI`
 - **Status**: `step`, `info`, `warn`, `error`, `success`
 - **Secrets**: `secret`, `hasSecret`
+
+### 🔧 DRY Tool Detection
+
+Eliminate repetitive conditional logic with intelligent tool variant detection:
+
+```drun
+project "cross-platform-app" version "1.0":
+
+task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
+  info "🐳 Setting up Docker toolchain"
+  
+  # Detect which Docker Compose variant is available and capture it
+  detect available "docker compose" or "docker-compose" as $compose_cmd
+  
+  # Detect which Docker Buildx variant is available and capture it
+  detect available "docker buildx" or "docker-buildx" as $buildx_cmd
+  
+  info "✅ Detected tools:"
+  info "  📦 Compose: {$compose_cmd}"
+  info "  🔨 Buildx: {$buildx_cmd}"
+  
+  # Now use the captured variables consistently throughout the task
+  run "{$compose_cmd} version"
+  run "{$buildx_cmd} version"
+  
+  success "Docker toolchain ready!"
+
+task "deploy-app" means "Deploy using detected tools":
+  # Reuse the same detection pattern
+  detect available "docker compose" or "docker-compose" as $compose_cmd
+  
+  info "🚀 Deploying with {$compose_cmd}"
+  run "{$compose_cmd} up -d"
+  run "{$compose_cmd} ps"
+  
+  success "Application deployed!"
+
+task "multi-tool-example" means "Multiple tool alternatives":
+  # Package managers
+  detect available "npm" or "yarn" or "pnpm" as $package_manager
+  run "{$package_manager} install"
+  run "{$package_manager} run build"
+  
+  # Container runtimes
+  detect available "docker" or "podman" as $container_runtime
+  run "{$container_runtime} build -t myapp ."
+  
+  success "Built with {$package_manager} and {$container_runtime}!"
+```
+
+**Benefits:**
+
+- **🎯 DRY Principle**: No repetitive `if/else` conditional logic
+- **🌐 Cross-Platform**: Works across different tool installations automatically
+- **🔧 Maintainable**: Single detection point, consistent usage throughout tasks
+- **⚡ Flexible**: Supports any number of tool alternatives with `or` syntax
+- **📝 Clear Intent**: Makes tool compatibility explicit and documented
 
 ### 📊 Advanced Logging & Metrics
 

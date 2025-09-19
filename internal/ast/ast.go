@@ -517,13 +517,15 @@ func (hs *HTTPStatement) String() string {
 
 // DetectionStatement represents smart detection operations
 type DetectionStatement struct {
-	Token     lexer.Token // the DETECT token or condition token
-	Type      string      // "detect", "if_available", "when_environment", etc.
-	Target    string      // what to detect: "docker", "node", "ci", etc.
-	Condition string      // condition type: "available", "version", ">=", etc.
-	Value     string      // expected value for comparisons
-	Body      []Statement // statements to execute if condition is true
-	ElseBody  []Statement // statements to execute if condition is false (optional)
+	Token        lexer.Token // the DETECT token or condition token
+	Type         string      // "detect", "if_available", "when_environment", etc.
+	Target       string      // what to detect: "docker", "node", "ci", etc.
+	Alternatives []string    // alternative tool names to try (for "detect available")
+	Condition    string      // condition type: "available", "version", ">=", etc.
+	Value        string      // expected value for comparisons
+	CaptureVar   string      // variable name to capture the working tool variant
+	Body         []Statement // statements to execute if condition is true
+	ElseBody     []Statement // statements to execute if condition is false (optional)
 }
 
 func (ds *DetectionStatement) statementNode() {}
@@ -538,6 +540,14 @@ func (ds *DetectionStatement) String() string {
 		}
 		if ds.Value != "" {
 			out.WriteString(" " + ds.Value)
+		}
+	case "detect_available":
+		out.WriteString("detect available " + ds.Target)
+		for _, alt := range ds.Alternatives {
+			out.WriteString(" or \"" + alt + "\"")
+		}
+		if ds.CaptureVar != "" {
+			out.WriteString(" as " + ds.CaptureVar)
 		}
 	case "if_available":
 		out.WriteString("if " + ds.Target + " is available")
