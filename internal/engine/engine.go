@@ -189,7 +189,7 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 			}
 
 			// Validate advanced constraints
-			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.EmailFormat); err != nil {
+			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.PatternMacro, param.EmailFormat); err != nil {
 				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
 			}
 

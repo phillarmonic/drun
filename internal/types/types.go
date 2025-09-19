@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/phillarmonic/drun/internal/patterns"
 )
 
 // ParameterType represents the type of a parameter
@@ -248,7 +250,7 @@ func (v *Value) ValidateConstraints(constraints []string) error {
 }
 
 // ValidateAdvancedConstraints validates a value against advanced constraints
-func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern string, emailFormat bool) error {
+func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern, patternMacro string, emailFormat bool) error {
 	// Validate range constraints for numbers
 	if minValue != nil || maxValue != nil {
 		if v.Type != NumberType {
@@ -269,7 +271,7 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 		}
 	}
 
-	// Validate pattern constraints
+	// Validate pattern constraints (raw regex)
 	if pattern != "" {
 		if v.Type != StringType {
 			return fmt.Errorf("pattern constraints can only be applied to string types")
@@ -282,6 +284,17 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 
 		if !matched {
 			return fmt.Errorf("value '%s' does not match pattern '%s'", v.AsString(), pattern)
+		}
+	}
+
+	// Validate pattern macro constraints
+	if patternMacro != "" {
+		if v.Type != StringType {
+			return fmt.Errorf("pattern constraints can only be applied to string types")
+		}
+
+		if err := patterns.ValidatePattern(v.AsString(), patternMacro); err != nil {
+			return err
 		}
 	}
 

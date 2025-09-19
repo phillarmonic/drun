@@ -1384,7 +1384,7 @@ func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
 	stmt.MaxValue = &maxVal
 }
 
-// parsePatternConstraint parses "matching pattern" or "matching email format" constraints
+// parsePatternConstraint parses "matching pattern", "matching email format", or "matching macro" constraints
 func (p *Parser) parsePatternConstraint(stmt *ast.ParameterStatement) {
 	p.nextToken() // consume MATCHING
 
@@ -1403,8 +1403,29 @@ func (p *Parser) parsePatternConstraint(stmt *ast.ParameterStatement) {
 		}
 		stmt.EmailFormat = true
 
+	case lexer2.IDENT:
+		// Check if it's a pattern macro (e.g., "matching semver")
+		p.nextToken() // consume IDENT
+		stmt.PatternMacro = p.curToken.Literal
+
 	default:
-		p.addError("expected 'pattern' or 'email' after 'matching'")
+		// Check if it's a keyword token that can be used as a pattern macro
+		if macroName := p.getPatternMacroName(p.peekToken.Type); macroName != "" {
+			p.nextToken() // consume the token
+			stmt.PatternMacro = macroName
+		} else {
+			p.addError("expected 'pattern', 'email', or pattern macro name after 'matching'")
+		}
+	}
+}
+
+// getPatternMacroName returns the pattern macro name for keyword tokens that can be used as macros
+func (p *Parser) getPatternMacroName(tokenType lexer2.TokenType) string {
+	switch tokenType {
+	case lexer2.URL:
+		return "url"
+	default:
+		return ""
 	}
 }
 

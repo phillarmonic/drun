@@ -58,7 +58,7 @@ func TestValue_ValidateAdvancedConstraints_RangeValidation(t *testing.T) {
 				t.Fatalf("Failed to create value: %v", err)
 			}
 
-			err = v.ValidateAdvancedConstraints(tt.minValue, tt.maxValue, "", false)
+			err = v.ValidateAdvancedConstraints(tt.minValue, tt.maxValue, "", "", false)
 
 			if tt.wantError {
 				if err == nil {
@@ -124,7 +124,7 @@ func TestValue_ValidateAdvancedConstraints_PatternValidation(t *testing.T) {
 				t.Fatalf("Failed to create value: %v", err)
 			}
 
-			err = v.ValidateAdvancedConstraints(nil, nil, tt.pattern, false)
+			err = v.ValidateAdvancedConstraints(nil, nil, tt.pattern, "", false)
 
 			if tt.wantError {
 				if err == nil {
@@ -197,7 +197,7 @@ func TestValue_ValidateAdvancedConstraints_EmailValidation(t *testing.T) {
 				t.Fatalf("Failed to create value: %v", err)
 			}
 
-			err = v.ValidateAdvancedConstraints(nil, nil, "", tt.emailFormat)
+			err = v.ValidateAdvancedConstraints(nil, nil, "", "", tt.emailFormat)
 
 			if tt.wantError {
 				if err == nil {

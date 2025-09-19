@@ -663,10 +663,11 @@ type ParameterStatement struct {
 	Variadic     bool        // true for variadic parameters (accepts $flags as list)
 
 	// Advanced constraints
-	MinValue    *float64 // minimum value for numbers (between constraint)
-	MaxValue    *float64 // maximum value for numbers (between constraint)
-	Pattern     string   // regex pattern for string validation
-	EmailFormat bool     // true if parameter should validate as email
+	MinValue     *float64 // minimum value for numbers (between constraint)
+	MaxValue     *float64 // maximum value for numbers (between constraint)
+	Pattern      string   // regex pattern for string validation
+	PatternMacro string   // pattern macro name (e.g., "semver", "uuid")
+	EmailFormat  bool     // true if parameter should validate as email
 }
 
 func (ps *ParameterStatement) statementNode() {}
