@@ -23,7 +23,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
 - **🌐 HTTP Actions**: Built-in HTTP requests with authentication and response handling
 - **🐳 Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
-- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management
+- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
 - **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
 - **📊 Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
