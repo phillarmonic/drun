@@ -184,13 +184,28 @@ func (as *ActionStatement) String() string {
 type ShellStatement struct {
 	Token        lexer.Token // the shell token (RUN, EXEC, SHELL, CAPTURE)
 	Action       string      // "run", "exec", "shell", "capture"
-	Command      string      // the shell command to execute
+	Command      string      // the shell command to execute (single-line)
+	Commands     []string    // multiple shell commands (multiline)
 	CaptureVar   string      // variable name to capture output (for capture action)
 	StreamOutput bool        // whether to stream output in real-time
+	IsMultiline  bool        // whether this is a multiline command block
 }
 
 func (ss *ShellStatement) statementNode() {}
 func (ss *ShellStatement) String() string {
+	if ss.IsMultiline {
+		var out strings.Builder
+		if ss.CaptureVar != "" {
+			out.WriteString(fmt.Sprintf("%s as %s:", ss.Action, ss.CaptureVar))
+		} else {
+			out.WriteString(fmt.Sprintf("%s:", ss.Action))
+		}
+		for _, cmd := range ss.Commands {
+			out.WriteString(fmt.Sprintf("\n  %s", cmd))
+		}
+		return out.String()
+	}
+
 	if ss.CaptureVar != "" {
 		return fmt.Sprintf("%s \"%s\" as %s", ss.Action, ss.Command, ss.CaptureVar)
 	}

@@ -316,6 +316,14 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 
 // executeShell executes a shell command statement
 func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+	if shellStmt.IsMultiline {
+		return e.executeMultilineShell(shellStmt, ctx)
+	}
+	return e.executeSingleLineShell(shellStmt, ctx)
+}
+
+// executeSingleLineShell executes a single-line shell command
+func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the command
 	interpolatedCommand := e.interpolateVariables(shellStmt.Command, ctx)
 
@@ -364,6 +372,77 @@ func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionConte
 			result.ExitCode, result.Duration)
 	} else {
 		_, _ = fmt.Fprintf(e.output, "⚠️  Command completed with exit code: %d (duration: %v)\n",
+			result.ExitCode, result.Duration)
+	}
+
+	return nil
+}
+
+// executeMultilineShell executes multiline shell commands as a single shell session
+func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in all commands
+	var interpolatedCommands []string
+	for _, cmd := range shellStmt.Commands {
+		interpolatedCmd := e.interpolateVariables(cmd, ctx)
+		interpolatedCommands = append(interpolatedCommands, interpolatedCmd)
+	}
+
+	// Join commands with newlines to create a single script
+	script := strings.Join(interpolatedCommands, "\n")
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands:\n")
+		for i, cmd := range interpolatedCommands {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN]   %d: %s\n", i+1, cmd)
+		}
+		if shellStmt.CaptureVar != "" {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+		}
+		return nil
+	}
+
+	// Configure shell options based on the action type
+	opts := shell.DefaultOptions()
+	opts.CaptureOutput = true
+	opts.StreamOutput = shellStmt.StreamOutput
+	opts.Output = e.output
+
+	// Show what we're about to execute
+	switch shellStmt.Action {
+	case "run":
+		_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+	case "exec":
+		_, _ = fmt.Fprintf(e.output, "⚡ Executing multiline commands (%d lines):\n", len(interpolatedCommands))
+	case "shell":
+		_, _ = fmt.Fprintf(e.output, "🐚 Shell multiline commands (%d lines):\n", len(interpolatedCommands))
+	case "capture":
+		_, _ = fmt.Fprintf(e.output, "📥 Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
+	}
+
+	// Show each command with line numbers
+	for i, cmd := range interpolatedCommands {
+		_, _ = fmt.Fprintf(e.output, "  %d: %s\n", i+1, cmd)
+	}
+
+	// Execute the script as a single shell session
+	result, err := shell.Execute(script, opts)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌ Multiline command failed: %v\n", err)
+		return err
+	}
+
+	// Handle capture
+	if shellStmt.CaptureVar != "" && shellStmt.Action == "capture" {
+		ctx.Variables[shellStmt.CaptureVar] = result.Stdout
+		_, _ = fmt.Fprintf(e.output, "📦 Captured output in variable '%s'\n", shellStmt.CaptureVar)
+	}
+
+	// Show execution summary
+	if result.Success {
+		_, _ = fmt.Fprintf(e.output, "✅ Multiline commands completed successfully (exit code: %d, duration: %v)\n",
+			result.ExitCode, result.Duration)
+	} else {
+		_, _ = fmt.Fprintf(e.output, "⚠️  Multiline commands completed with exit code: %d (duration: %v)\n",
 			result.ExitCode, result.Duration)
 	}
 
@@ -1447,6 +1526,13 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		// Also check captured variables
 		if value, exists := ctx.Variables[expr]; exists {
 			return value
+		}
+		// Check for variables with $ prefix
+		if strings.HasPrefix(expr, "$") {
+			varName := expr[1:] // Remove the $ prefix
+			if value, exists := ctx.Variables[varName]; exists {
+				return value
+			}
 		}
 		// Check project settings
 		if ctx.Project != nil {

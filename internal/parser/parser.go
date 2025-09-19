@@ -434,20 +434,27 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 		Action: p.curToken.Literal,
 	}
 
+	// Check if this is multiline syntax (action followed by colon or capture with "as")
+	if p.peekToken.Type == lexer2.COLON {
+		return p.parseMultilineShellStatement(stmt)
+	}
+
+	// Special case for "capture as $var:" syntax
+	if stmt.Action == "capture" && p.peekToken.Type == lexer2.AS {
+		return p.parseMultilineShellStatement(stmt)
+	}
+
+	// Handle single-line syntax
+	if stmt.Action == "capture" {
+		return p.parseCaptureStatement(stmt)
+	}
+
+	// Regular shell command with string
 	if !p.expectPeek(lexer2.STRING) {
 		return nil
 	}
 
 	stmt.Command = p.curToken.Literal
-
-	// Check for capture syntax: capture "command" as variable_name
-	if stmt.Action == "capture" && p.peekToken.Type == lexer2.AS {
-		p.nextToken() // consume AS
-		if !p.expectPeekVariableName() {
-			return nil
-		}
-		stmt.CaptureVar = p.curToken.Literal
-	}
 
 	// Set streaming behavior based on action type
 	switch stmt.Action {
@@ -460,6 +467,123 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 	}
 
 	return stmt
+}
+
+// parseMultilineShellStatement parses multiline shell commands (run:, exec:, shell:, capture as $var:)
+func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.ShellStatement {
+	// Handle capture with "as variable" syntax
+	if stmt.Action == "capture" {
+		if !p.expectPeek(lexer2.AS) {
+			return nil
+		}
+		if !p.expectPeekVariableName() {
+			return nil
+		}
+		stmt.CaptureVar = p.getVariableName()
+	}
+
+	// Expect colon
+	if !p.expectPeek(lexer2.COLON) {
+		return nil
+	}
+
+	// Expect INDENT
+	if !p.expectPeek(lexer2.INDENT) {
+		return nil
+	}
+
+	// Parse command tokens until DEDENT
+	p.nextToken() // Move to first token inside the block
+
+	// Read all commands in the block
+	commands := p.readCommandTokens()
+
+	// Don't consume DEDENT here - let the task parsing loop handle it
+
+	stmt.Commands = commands
+	stmt.IsMultiline = true
+
+	// Set streaming behavior based on action type
+	switch stmt.Action {
+	case "run", "exec":
+		stmt.StreamOutput = true
+	case "shell":
+		stmt.StreamOutput = true
+	case "capture":
+		stmt.StreamOutput = false
+	}
+
+	return stmt
+}
+
+// parseCaptureStatement parses single-line capture statements
+func (p *Parser) parseCaptureStatement(stmt *ast.ShellStatement) *ast.ShellStatement {
+	if !p.expectPeek(lexer2.STRING) {
+		return nil
+	}
+
+	stmt.Command = p.curToken.Literal
+
+	// Check for capture syntax: capture "command" as variable_name
+	if p.peekToken.Type == lexer2.AS {
+		p.nextToken() // consume AS
+		if !p.expectPeekVariableName() {
+			return nil
+		}
+		stmt.CaptureVar = p.getVariableName()
+	}
+
+	stmt.StreamOutput = false
+	return stmt
+}
+
+// readCommandTokens reads tokens and groups them into individual commands
+func (p *Parser) readCommandTokens() []string {
+	var commands []string
+	var currentCommand []string
+
+	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		if p.curToken.Type == lexer2.COMMENT {
+			// Skip comments
+			p.nextToken()
+			continue
+		}
+
+		// If we encounter an IDENT token and we already have tokens in currentCommand,
+		// it might be a new command, but we need to be smart about it
+		if p.curToken.Type == lexer2.IDENT && len(currentCommand) > 0 {
+			// Check if the previous token suggests this IDENT is part of the same command
+			// For example, if previous token was ILLEGAL (like "-"), this IDENT is likely part of the same command
+			prevTokenWasFlag := len(currentCommand) > 0 &&
+				(strings.HasPrefix(currentCommand[len(currentCommand)-1], "-") ||
+					currentCommand[len(currentCommand)-1] == "-")
+
+			if !prevTokenWasFlag {
+				// This looks like a new command, save the previous one
+				commands = append(commands, strings.Join(currentCommand, " "))
+				currentCommand = []string{}
+			}
+		}
+
+		// Handle different token types appropriately for shell commands
+		switch p.curToken.Type {
+		case lexer2.STRING:
+			// For STRING tokens, add quotes back to preserve shell semantics
+			currentCommand = append(currentCommand, fmt.Sprintf("\"%s\"", p.curToken.Literal))
+		default:
+			// For other tokens, add them as-is
+			currentCommand = append(currentCommand, p.curToken.Literal)
+		}
+
+		p.nextToken()
+	}
+
+	// Add the last command if there is one
+	if len(currentCommand) > 0 {
+		commands = append(commands, strings.Join(currentCommand, " "))
+	}
+
+	return commands
 }
 
 // parseFileStatement parses file operation statements (create, copy, move, delete, read, write, append)
@@ -619,7 +743,7 @@ func (p *Parser) parseReadStatement(stmt *ast.FileStatement) *ast.FileStatement 
 		if !p.expectPeekVariableName() {
 			return nil
 		}
-		stmt.CaptureVar = p.curToken.Literal
+		stmt.CaptureVar = p.getVariableName()
 	}
 
 	return stmt
@@ -2202,6 +2326,14 @@ func (p *Parser) expectPeekVariableName() bool {
 
 	p.nextToken()
 	return true
+}
+
+// getVariableName returns the variable name without the $ prefix
+func (p *Parser) getVariableName() string {
+	if p.curToken.Type == lexer2.VARIABLE && len(p.curToken.Literal) > 1 {
+		return p.curToken.Literal[1:] // Remove the $ prefix
+	}
+	return p.curToken.Literal
 }
 
 // expectPeekFunctionName checks for function names (can be IDENT or reserved keywords)

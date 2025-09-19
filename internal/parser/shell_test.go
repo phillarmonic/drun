@@ -15,7 +15,7 @@ task "shell test":
   run "echo 'hello'"
   exec "date"
   shell "pwd"
-  capture "whoami" as user
+  capture "whoami" as $user
   success "Done"`
 
 	l := lexer.NewLexer(input)
@@ -97,7 +97,7 @@ func TestParser_ShellStatementTypes(t *testing.T) {
 		{`run "echo hello"`, "run", "echo hello", "", true},
 		{`exec "date"`, "exec", "date", "", true},
 		{`shell "pwd"`, "shell", "pwd", "", true},
-		{`capture "whoami" as user`, "capture", "whoami", "user", false},
+		{`capture "whoami" as $user`, "capture", "whoami", "user", false},
 	}
 
 	for _, test := range tests {

@@ -1,0 +1,18 @@
+version: 2.0
+
+task "multiline demo" means "Simple multiline shell demo":
+  info "Starting multiline demo"
+  
+  run "echo 'Single line command'"
+  
+  run:
+    echo "First multiline command"
+    echo "Second multiline command"
+  
+  capture as $result:
+    echo "Captured output"
+    whoami
+  
+  info "Result: {$result}"
+  
+  success "Demo completed!"
