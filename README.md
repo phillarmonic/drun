@@ -10,7 +10,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **Smart Parameters**: Type-safe parameters with constraints and defaults (`requires $env from ["dev", "prod"]`)
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
-- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands
+- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands (soon)
 - **Smart Detection**: Auto-detect project types, tools, and environments
 - **Shell Integration**: Seamless shell command execution with output capture
 - **Cross-Platform**: Works on Linux, macOS, and Windows with intelligent shell selection
@@ -23,7 +23,7 @@ A **semantic, English-like** task automation language with intelligent execution
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
 - **🌐 HTTP Actions**: Built-in HTTP requests with authentication and response handling
 - **🐳 Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
-- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management
+- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
 - **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
 - **📊 Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
