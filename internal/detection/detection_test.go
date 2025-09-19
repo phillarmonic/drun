@@ -43,6 +43,14 @@ func TestDetector_DetectEnvironment(t *testing.T) {
 	_ = os.Unsetenv("CI")
 
 	// Test production environment detection
+	// First unset any CI variables that might interfere
+	ciVars := []string{"CI", "CONTINUOUS_INTEGRATION", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL", "TRAVIS", "CIRCLECI"}
+	originalCIValues := make(map[string]string)
+	for _, ciVar := range ciVars {
+		originalCIValues[ciVar] = os.Getenv(ciVar)
+		_ = os.Unsetenv(ciVar)
+	}
+
 	_ = os.Setenv("NODE_ENV", "production")
 	detector = NewDetector() // Reset cache
 	env = detector.DetectEnvironment()
@@ -50,6 +58,13 @@ func TestDetector_DetectEnvironment(t *testing.T) {
 		t.Errorf("Expected 'production' environment, got %q", env)
 	}
 	_ = os.Unsetenv("NODE_ENV")
+
+	// Restore original CI environment variables
+	for ciVar, originalValue := range originalCIValues {
+		if originalValue != "" {
+			_ = os.Setenv(ciVar, originalValue)
+		}
+	}
 }
 
 func TestDetector_CompareVersion(t *testing.T) {
