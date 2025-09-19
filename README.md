@@ -74,8 +74,8 @@ drun includes powerful built-in functions for common operations:
 
 #### **Usage Examples**
 
-```yaml
-version: 2.0
+```drun
+project "my-app" version "1.0"
 
 task "system info":
   info "🖥️  Running on: {hostname}"
@@ -132,7 +132,7 @@ drun uses a simple, predictable file discovery system:
 
 - **`.drun/spec.drun`** - Default task file location
 - **Custom locations** - Use `--file` to specify any other location
-- **Workspace configuration** - `.drun/.drun_workspace.yml` for custom defaults
+- **Workspace configuration** - `.drun/.drun_workspace` for custom defaults
 
 **Moving your spec file:**
 ```bash
@@ -235,30 +235,9 @@ task "test":
 
 drun uses a simple file discovery system:
 
-1. **Workspace default** (if configured in `.drun/.drun_workspace.yml`)
+1. **Workspace default** (if configured in `.drun/.drun_workspace`)
 2. **Default location**: `.drun/spec.drun`
 3. **Explicit specification**: Use `--file` for any other location
-
-### 🔧 **Workspace Configuration**
-
-Create a workspace configuration file at `.drun/.drun_workspace.yml`:
-
-```yaml
-# Workspace settings
-default_task_file: "custom-tasks.drun"
-parallel_jobs: 4
-shell: "/bin/bash"
-
-# Global variables
-variables:
-  project_name: "my-app"
-  environment: "development"
-
-# Default parameters
-defaults:
-  environment: "dev"
-  verbose: true
-```
 
 ### Getting Started
 
@@ -283,7 +262,7 @@ See the included examples for comprehensive task configurations.
 ### Basic Task
 
 ```drun
-version: 2.0
+project "my-app" version "1.0"
 
 task "hello" means "Say hello":
   info "Hello, World! 👋"
@@ -353,96 +332,8 @@ task "build" means "Build the project":
   run "go build ./..."
 ```
 
-### Prerun Snippets - DRY Common Setup
-
-Define snippets that automatically run before every recipe - perfect for colors, helper functions, and common setup:
-
-```yaml
-version: 1.0
-
-# Snippets that run before EVERY recipe
-recipe-prerun:
-  - |
-    # ANSI color codes - available in all recipes
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[1;33m'
-    BLUE='\033[0;34m'
-    NC='\033[0m' # No Color
-  - |
-    # Helper functions available everywhere
-    log_info() {
-      echo -e "${BLUE}ℹ️  $1${NC}"
-    }
-    log_success() {
-      echo -e "${GREEN}✅ $1${NC}"
-    }
-    log_error() {
-      echo -e "${RED}❌ $1${NC}"
-    }
-
-recipes:
-  setup:
-    help: "Set up the project"
-    run: |
-      # Colors and functions automatically available!
-      log_info "Setting up project..."
-      echo -e "${GREEN}🚀 Initializing...${NC}"
-      log_success "Setup completed!"
-
-  test:
-    help: "Run tests"  
-    run: |
-      # Same colors and functions available here too!
-      log_info "Running test suite..."
-      echo -e "${YELLOW}🧪 Testing...${NC}"
-      log_success "All tests passed!"
-```
-
-**Benefits:**
-- **DRY**: Define once, use everywhere
-- **Automatic**: No need to manually include in each recipe
-- **Templated**: Full template support with variables
-- **Snippet Calls**: Can call existing snippets with `{{ snippet "name" }}`
 
 ## 🌟 Advanced Features Examples
-
-### 🔗 Remote Includes
-
-Share and reuse recipes across projects and teams:
-
-```yaml
-version: 1.0
-
-# Include recipes from various sources
-include:
-  # Local files
-  - "shared/docker-common.yml"
-
-  # HTTP/HTTPS includes
-  - "https://raw.githubusercontent.com/company/drun-recipes/main/docker/common.yml"
-  - "https://raw.githubusercontent.com/company/drun-recipes/main/ci/github-actions.yml"
-
-  # Git repositories with branch/tag references
-  - "git+https://github.com/company/drun-recipes.git@main:docker/production.yml"
-  - "git+https://github.com/company/drun-recipes.git@v1.0.0:ci/common.yml"
-  - "git+https://github.com/company/base-recipes.git@stable"  # Uses default drun.yml
-
-recipes:
-  deploy:
-    help: "Deploy using shared recipes"
-    deps: [docker-build]  # From remote include
-    run: |
-      {{ step "Deploying with shared configuration" }}
-      echo "Using recipes from remote sources!"
-```
-
-**Benefits:**
-
-- 🏢 **Enterprise**: Centralized governance and compliance
-- 🌐 **Community**: Share recipes across open source projects  
-- 🔄 **Versioning**: Pin to specific tags/commits for stability
-- ⚡ **Performance**: Intelligent caching for fast execution
 
 ### 🌐 HTTP Integration
 
@@ -465,7 +356,6 @@ task "check api" means "Check API status":
     success "API is healthy"
   else:
     fail "API is down"
-
 ```
 
 **Key HTTP features:**
@@ -475,191 +365,6 @@ task "check api" means "Check API status":
 - 📊 **JSON Support**: Automatic JSON parsing and response handling
 - 🔄 **Error Handling**: Intelligent retry and error management
 - ⚡ **Response Capture**: Store responses in variables for processing
-
-### 🔄 Matrix Execution
-
-Run recipes across multiple configurations automatically:
-
-```yaml
-recipes:
-  test-matrix:
-    help: "Test across multiple environments"
-    matrix:
-      os: ["ubuntu", "macos", "windows"]
-      node_version: ["16", "18", "20"]
-      arch: ["amd64", "arm64"]
-    run: |
-      {{ step "Testing on {{ .matrix_os }}/{{ .matrix_node_version }}/{{ .matrix_arch }}" }}
-
-      # OS-specific behavior
-      {{ if eq .matrix_os "windows" }}
-      echo "Running Windows-specific tests"
-      {{ else if eq .matrix_os "macos" }}
-      echo "Running macOS-specific tests"
-      {{ else }}
-      echo "Running Linux-specific tests"
-      {{ end }}
-
-      # Version-specific behavior
-      {{ if eq .matrix_node_version "16" }}
-      echo "Using legacy Node.js features"
-      {{ else if eq .matrix_node_version "20" }}
-      echo "Using latest Node.js features"
-      {{ end }}
-
-      {{ success "Test completed for {{ .matrix_os }}/{{ .matrix_node_version }}" }}
-
-  build-matrix:
-    help: "Build for multiple architectures"
-    matrix:
-      arch: ["amd64", "arm64"]
-      variant: ["alpine", "debian"]
-    deps: [setup]  # Runs once before all matrix jobs
-    run: |
-      {{ step "Building for {{ .matrix_arch }}/{{ .matrix_variant }}" }}
-
-      IMAGE_TAG="myapp:{{ .matrix_arch }}-{{ .matrix_variant }}"
-      docker build --platform linux/{{ .matrix_arch }} \
-        -f Dockerfile.{{ .matrix_variant }} \
-        -t $IMAGE_TAG .
-
-      {{ success "Built: $IMAGE_TAG" }}
-```
-
-**Matrix expands to multiple jobs:**
-
-- `test-matrix` → 18 jobs (3 OS × 3 versions × 2 arch)
-- `build-matrix` → 4 jobs (2 arch × 2 variants)
-- All jobs run in parallel with intelligent dependency management
-
-### 🔐 Secrets Management
-
-Handle sensitive data securely:
-
-```yaml
-# Define secrets with their sources
-secrets:
-  api_key:
-    source: "env://API_KEY"
-    required: true
-    description: "API key for external service"
-
-  db_password:
-    source: "env://DATABASE_PASSWORD" 
-    required: false
-    description: "Database password"
-
-  deploy_token:
-    source: "file://~/.secrets/deploy-token"
-    required: true
-    description: "Deployment token"
-
-recipes:
-  deploy:
-    help: "Secure deployment with secrets"
-    run: |
-      {{ step "Starting secure deployment" }}
-
-      # Check required secrets
-      {{ if not (hasSecret "api_key") }}
-      {{ error "API_KEY environment variable is required" }}
-      exit 1
-      {{ end }}
-
-      {{ info "All required secrets available" }}
-
-      # Use secrets securely (not logged in plain text)
-      curl -H "Authorization: Bearer {{ secret "api_key" }}" \
-        -d '{"version": "{{ gitShortCommit }}"}' \
-        https://api.company.com/deploy
-
-      {{ if hasSecret "db_password" }}
-      echo "Database configured with provided password"
-      {{ else }}
-      {{ warn "Using default database configuration" }}
-      {{ end }}
-
-      {{ success "Deployment completed securely" }}
-```
-
-**Supported sources:**
-
-- `env://VAR_NAME` - Environment variables
-- `file://path/to/secret` - File-based secrets
-- `vault://path/to/secret` - HashiCorp Vault (planned)
-
-### 🎯 Smart Template Functions
-
-drun includes 15+ intelligent template functions:
-
-```yaml
-env:
-  # Auto-detect commands and tools
-  DOCKER_COMPOSE: "{{ dockerCompose }}"    # "docker compose" or "docker-compose"
-  DOCKER_BUILDX: "{{ dockerBuildx }}"      # "docker buildx" or "docker-buildx"
-
-  # Git information
-  GIT_BRANCH: "{{ gitBranch }}"             # Current branch
-  GIT_COMMIT: "{{ gitShortCommit }}"        # Short commit hash
-  IS_DIRTY: "{{ isDirty }}"                 # Working directory dirty
-
-  # Project detection
-  PROJECT_TYPE: "{{ packageManager }}"      # npm, yarn, go, pip, etc.
-  BUILD_ENV: "{{ if isCI }}ci{{ else }}local{{ end }}"
-
-recipes:
-  smart-build:
-    help: "Intelligent build using auto-detection"
-    run: |
-      {{ step "Building {{ packageManager }} project" }}
-
-      echo "🔍 Project Analysis:"
-      echo "  Type: {{ packageManager }}"
-      echo "  Git: {{ gitBranch }}@{{ gitShortCommit }}"
-      echo "  Environment: {{ if isCI }}CI{{ else }}Local{{ end }}"
-
-      # Docker integration
-      {{ if hasFile "Dockerfile" }}
-      {{ info "Docker configuration detected" }}
-      $DOCKER_BUILDX build -t myapp:{{ gitShortCommit }} .
-      {{ end }}
-
-      # Package manager specific builds
-      {{ if eq (packageManager) "npm" }}
-      npm ci && npm run build
-      {{ else if eq (packageManager) "go" }}
-      go build ./...
-      {{ else if eq (packageManager) "pip" }}
-      pip install -r requirements.txt
-      {{ end }}
-
-      {{ success "Smart build completed!" }}
-
-  status-demo:
-    help: "Demonstrate status messages"
-    run: |
-      {{ step "Processing with status updates" }}
-
-      {{ info "This is an informational message" }}
-      {{ warn "This is a warning message" }}
-      {{ error "This is an error message (non-fatal)" }}
-      {{ success "This is a success message" }}
-
-      # Conditional status based on detection
-      {{ if hasFile "go.mod" }}
-      {{ success "Go project detected" }}
-      {{ else }}
-      {{ warn "No Go project found" }}
-      {{ end }}
-```
-
-**Available template functions:**
-
-- **Docker**: `dockerCompose`, `dockerBuildx`, `hasCommand`
-- **Git**: `gitBranch`, `gitCommit`, `gitShortCommit`, `isDirty`
-- **Project**: `packageManager`, `hasFile`, `isCI`
-- **Status**: `step`, `info`, `warn`, `error`, `success`
-- **Secrets**: `secret`, `hasSecret`
 
 ### 🔧 DRY Tool Detection
 
@@ -897,86 +602,11 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - **🔄 Loop Integration**: Perfect integration with `for each` loops
 - **📊 Performance**: Efficient operations with minimal overhead
 
-### 📊 Advanced Logging & Metrics
-
-Beautiful, structured logging with performance tracking:
-
-```yaml
-recipes:
-  performance-demo:
-    help: "Demonstrate advanced logging and metrics"
-    run: |
-      {{ step "Starting performance monitoring" }}
-
-      START_TIME=$(date +%s)
-
-      {{ info "Running performance tests" }}
-      for i in {1..5}; do
-        {{ info "Test $i/5 - Load testing..." }}
-        # Simulate work
-        sleep 0.5
-      done
-
-      {{ info "Running stress tests" }}
-      for i in {1..3}; do
-        {{ info "Stress test $i/3 - Memory testing..." }}
-        sleep 0.3
-      done
-
-      END_TIME=$(date +%s)
-      DURATION=$((END_TIME - START_TIME))
-
-      {{ success "Performance tests completed in ${DURATION}s" }}
-
-      echo "📊 Metrics Summary:"
-      echo "  Duration: ${DURATION}s"
-      echo "  Tests: 8"
-      echo "  Success Rate: 100%"
-      echo "  Throughput: $(echo "scale=2; 8 / $DURATION" | bc) tests/sec"
-
-  comprehensive-workflow:
-    help: "Comprehensive workflow with all features"
-    matrix:
-      environment: ["dev", "staging", "prod"]
-    deps: [setup]
-    run: |
-      {{ step "Deploying to {{ .matrix_environment }}" }}
-
-      # Smart detection
-      {{ info "Project: {{ packageManager }} on {{ gitBranch }}" }}
-      {{ info "Environment: {{ .matrix_environment }}" }}
-      {{ info "CI Mode: {{ isCI }}" }}
-
-      # Conditional logic
-      {{ if eq .matrix_environment "prod" }}
-      {{ warn "Production deployment - extra validation" }}
-      {{ if isDirty }}
-      {{ error "Cannot deploy dirty working directory to production" }}
-      exit 1
-      {{ end }}
-      {{ end }}
-
-      # Use auto-detected commands
-      {{ if hasFile "docker-compose.yml" }}
-      {{ info "Using Docker Compose: {{ dockerCompose }}" }}
-      {{ dockerCompose }} -f docker-compose.{{ .matrix_environment }}.yml up -d
-      {{ end }}
-
-      # Secrets integration
-      {{ if hasSecret "deploy_token" }}
-      {{ info "Authenticating with deployment token" }}
-      # Use secret securely
-      {{ else }}
-      {{ warn "No deployment token - using default auth" }}
-      {{ end }}
-
-      {{ success "Deployment to {{ .matrix_environment }} completed!" }}
-```
 
 ## Command Line Options
 
 - `--init`: Initialize a new .drun task file
-- `--list, -l`: List available recipes
+- `--list, -l`: List available tasks
 - `--dry-run`: Show what would be executed without running
 - `--explain`: Show rendered scripts and environment variables
 - `--update`: Update drun to the latest version from GitHub releases
@@ -1183,57 +813,6 @@ The cleanup command provides:
 - ✅ **Platform detection** (correct binary for your system)
 - ✅ **Version validation** (only update when newer version available)
 
-## Template Functions
-
-drun includes 20+ powerful built-in template functions plus all [Sprig](https://masterminds.github.io/sprig/) functions:
-
-### 🐳 **Docker Integration**
-
-- `{{ dockerCompose }}`: Auto-detect "docker compose" or "docker-compose"
-- `{{ dockerBuildx }}`: Auto-detect "docker buildx" or "docker-buildx"
-- `{{ hasCommand "kubectl" }}`: Check if command exists in PATH
-
-### 🔗 **Git Integration**
-
-- `{{ gitBranch }}`: Current Git branch name
-- `{{ gitCommit }}`: Full commit hash (40 chars)
-- `{{ gitShortCommit }}`: Short commit hash (7 chars)
-- `{{ isDirty }}`: True if working directory has uncommitted changes
-
-### 🌐 **HTTP Actions**
-
-- `get "url"`: HTTP GET request with response capture
-- `post "url" with body "data"`: HTTP POST with JSON body
-- `put "url" with header "key: value"`: HTTP PUT with custom headers
-- `delete "url" with auth bearer "token"`: HTTP DELETE with authentication
-
-### 📦 **Project Detection**
-
-- `{{ packageManager }}`: Auto-detect npm, yarn, pnpm, go, pip, etc.
-- `{{ hasFile "go.mod" }}`: Check if file exists
-- `{{ isCI }}`: Detect CI environment (GitHub Actions, GitLab CI, etc.)
-
-### 📊 **Status Messages**
-
-- `{{ step "message" }}`: 🚀 Step indicator
-- `{{ info "message" }}`: ℹ️ Information message
-- `{{ warn "message" }}`: ⚠️ Warning message
-- `{{ error "message" }}`: ❌ Error message (non-fatal)
-- `{{ success "message" }}`: ✅ Success message
-
-### 🔐 **Secrets Management**
-
-- `{{ secret "name" }}`: Access secret value securely
-- `{{ hasSecret "name" }}`: Check if secret is available
-
-### 🛠️ **Standard Functions**
-
-- `{{ now "2006-01-02" }}`: Current time formatting
-- `{{ .version }}`: Access positional arguments and variables
-- `{{ env "HOME" }}`: Environment variables
-- `{{ snippet "name" }}`: Include reusable snippets
-- `{{ shellquote .arg }}`: Shell-safe quoting
-- Plus all [Sprig](https://masterminds.github.io/sprig/) functions (150+ additional functions)
 
 ## Examples
 
@@ -1293,13 +872,13 @@ drun is **production-ready** with enterprise-grade features:
 - **📁 File Watching**: Auto-execution on file changes
 - **🔌 Plugin System**: Extensible architecture for custom functionality
 - **🎮 Interactive TUI**: Beautiful terminal interface
-- **🌐 Web UI**: Browser-based recipe management
-- **🤖 AI Integration**: Natural language recipe generation
+- **🌐 Web UI**: Browser-based task management
+- **🤖 AI Integration**: Natural language task generation
 
 ### 🎯 **Enterprise Ready**
 
 - **High Performance**: Microsecond-level operations
-- **Scalability**: Handles 100+ recipes efficiently  
+- **Scalability**: Handles 100+ tasks efficiently  
 - **Security**: Secure secrets management
 - **Reliability**: Comprehensive error handling
 - **Maintainability**: Clean architecture with extensive tests
@@ -1374,8 +953,8 @@ Performance benchmarks on Apple M4 (your results may vary):
 
 | Component              | Operation                | Time  | Memory  | Allocations |
 | ---------------------- | ------------------------ | ----- | ------- | ----------- |
-| **YAML Loading**       | Simple spec              | 2.5μs | 704 B   | 5 allocs    |
-| **YAML Loading**       | Large spec (100 recipes) | 8.6μs | 756 B   | 5 allocs    |
+| **Spec Loading**       | Simple spec              | 2.5μs | 704 B   | 5 allocs    |
+| **Spec Loading**       | Large spec (100 tasks) | 8.6μs | 756 B   | 5 allocs    |
 | **Template Rendering** | Basic template           | 29μs  | 3.9 KB  | 113 allocs  |
 | **Template Rendering** | Complex template         | 51μs  | 7.0 KB  | 93 allocs   |
 | **DAG Building**       | Simple dependency graph  | 3.1μs | 10.7 KB | 109 allocs  |
@@ -1389,7 +968,7 @@ Our performance optimizations deliver significant improvements:
 | Component              | Before       | After           | **Improvement**                   |
 | ---------------------- | ------------ | --------------- | --------------------------------- |
 | **Template Rendering** | 40μs, 60KB   | **29μs, 4KB**   | **1.4x faster, 15x less memory**  |
-| **YAML Loading**       | 361μs, 42KB  | **2.5μs, 704B** | **144x faster, 59x less memory**  |
+| **Spec Loading**       | 361μs, 42KB  | **2.5μs, 704B** | **144x faster, 59x less memory**  |
 | **Large Spec Loading** | 3.4ms, 657KB | **8.6μs, 756B** | **396x faster, 869x less memory** |
 | **DAG Building**       | 4.4μs, 14KB  | **3.1μs, 11KB** | **1.4x faster, 22% less memory**  |
 | **Topological Sort**   | 4.7μs, 10KB  | **2.5μs, 8KB**  | **1.9x faster, 20% less memory**  |
@@ -1398,7 +977,7 @@ Our performance optimizations deliver significant improvements:
 
 - **⚡ Template Caching**: Compiled templates cached by hash for instant reuse
 - **🧠 Smart Pre-allocation**: Memory pools and capacity-aware data structures
-- **📊 Spec Caching**: YAML specs cached with file modification tracking
+- **📊 Spec Caching**: Task specs cached with file modification tracking
 - **🔄 Optimized DAG**: Highly efficient dependency graph construction
 - **💾 Memory Pools**: Reusable objects reduce GC pressure
 - **🎯 Lazy Evaluation**: Only compute what's needed when needed
@@ -1406,7 +985,7 @@ Our performance optimizations deliver significant improvements:
 #### Real-World Performance
 
 - **Startup time**: Sub-millisecond for cached specs
-- **Large projects**: 100+ recipes process in microseconds
+- **Large projects**: 100+ tasks process in microseconds
 - **Memory usage**: Minimal footprint with intelligent caching
 - **Parallel execution**: Efficient DAG-based task scheduling
 - **Template rendering**: Up to 20x faster than naive implementations
@@ -1419,7 +998,5 @@ Run benchmarks yourself:
 
 ## 📚 Documentation
 
-- **[Template Functions Reference](TEMPLATE_FUNCTIONS.md)** - Complete guide to all built-in template functions
 - **[drun v2 Specification](DRUN_V2_SPECIFICATION.md)** - Complete v2 language specification with HTTP actions
-- **[YAML Specification](YAML_SPEC.md)** - Legacy v1 YAML reference (deprecated)
 - **[Examples Directory](examples/)** - Real-world usage examples and patterns
