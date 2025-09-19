@@ -229,6 +229,7 @@ const (
 	SHELL   // shell
 	CAPTURE // capture
 	OUTPUT  // output
+	CONFIG  // config
 
 	// Type keywords
 	STRING_TYPE  // string
@@ -257,6 +258,7 @@ const (
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
+	MINUS  // -
 	EQUALS // =
 
 	// Punctuation
@@ -678,6 +680,8 @@ func (t TokenType) String() string {
 		return "CAPTURE"
 	case OUTPUT:
 		return "OUTPUT"
+	case CONFIG:
+		return "CONFIG"
 	case STRING_TYPE:
 		return "STRING_TYPE"
 	case NUMBER_TYPE:
@@ -718,6 +722,8 @@ func (t TokenType) String() string {
 		return "IDENT"
 	case ASSIGN:
 		return "ASSIGN"
+	case MINUS:
+		return "MINUS"
 	case EQUALS:
 		return "EQUALS"
 	case COLON:
@@ -945,6 +951,7 @@ var keywords = map[string]TokenType{
 	"shell":       SHELL,
 	"capture":     CAPTURE,
 	"output":      OUTPUT,
+	"config":      CONFIG,
 	"string":      STRING_TYPE,
 	"number":      NUMBER_TYPE,
 	"boolean":     BOOLEAN_TYPE,

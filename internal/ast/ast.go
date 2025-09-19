@@ -109,6 +109,43 @@ func (is *IncludeStatement) String() string {
 	return fmt.Sprintf("include %s", is.Path)
 }
 
+// ShellConfigStatement represents shell configuration for different platforms
+type ShellConfigStatement struct {
+	Token     lexer.Token                     // the SHELL token
+	Platforms map[string]*PlatformShellConfig // platform-specific configurations
+}
+
+func (scs *ShellConfigStatement) statementNode()      {}
+func (scs *ShellConfigStatement) projectSettingNode() {}
+func (scs *ShellConfigStatement) String() string {
+	var out strings.Builder
+	out.WriteString("shell config:")
+	for platform, config := range scs.Platforms {
+		out.WriteString(fmt.Sprintf("\n  %s:", platform))
+		out.WriteString(fmt.Sprintf("\n    executable: \"%s\"", config.Executable))
+		if len(config.Args) > 0 {
+			out.WriteString("\n    args:")
+			for _, arg := range config.Args {
+				out.WriteString(fmt.Sprintf("\n      - \"%s\"", arg))
+			}
+		}
+		if len(config.Environment) > 0 {
+			out.WriteString("\n    environment:")
+			for key, value := range config.Environment {
+				out.WriteString(fmt.Sprintf("\n      %s: \"%s\"", key, value))
+			}
+		}
+	}
+	return out.String()
+}
+
+// PlatformShellConfig represents shell configuration for a specific platform
+type PlatformShellConfig struct {
+	Executable  string            // shell executable path
+	Args        []string          // startup arguments
+	Environment map[string]string // environment variables
+}
+
 // LifecycleHook represents before/after hooks
 type LifecycleHook struct {
 	Token lexer.Token // the BEFORE or AFTER token

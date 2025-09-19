@@ -157,6 +157,14 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
+			case lexer2.SHELL:
+				shellConfig := p.parseShellConfigStatement()
+				if shellConfig != nil {
+					stmt.Settings = append(stmt.Settings, shellConfig)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
+				}
 			case lexer2.COMMENT:
 				p.nextToken() // Skip comments
 			default:
@@ -219,6 +227,187 @@ func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 
 	p.nextToken()
 	return stmt
+}
+
+// parseShellConfigStatement parses shell configuration for different platforms
+func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
+	stmt := &ast.ShellConfigStatement{
+		Token:     p.curToken,
+		Platforms: make(map[string]*ast.PlatformShellConfig),
+	}
+
+	// Expect "config"
+	if !p.expectPeek(lexer2.CONFIG) {
+		return nil
+	}
+
+	// Expect colon
+	if !p.expectPeek(lexer2.COLON) {
+		return nil
+	}
+
+	// Expect indented block with platform configurations
+	if !p.expectPeek(lexer2.INDENT) {
+		return nil
+	}
+
+	p.nextToken() // move to first token inside the block
+
+	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		if p.curToken.Type == lexer2.IDENT {
+			platform := p.curToken.Literal
+
+			// Expect colon after platform name
+			if !p.expectPeek(lexer2.COLON) {
+				return nil
+			}
+
+			// Parse platform configuration
+			config := p.parsePlatformShellConfig()
+			if config != nil {
+				stmt.Platforms[platform] = config
+			}
+		} else if p.curToken.Type == lexer2.COMMENT {
+			p.nextToken() // Skip comments
+		} else {
+			p.addError(fmt.Sprintf("unexpected token in shell config: %s", p.curToken.Type))
+			p.nextToken()
+		}
+	}
+
+	p.nextToken() // consume DEDENT
+	return stmt
+}
+
+// parsePlatformShellConfig parses configuration for a specific platform
+func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
+	config := &ast.PlatformShellConfig{
+		Environment: make(map[string]string),
+	}
+
+	// Expect indented block
+	if !p.expectPeek(lexer2.INDENT) {
+		return nil
+	}
+
+	p.nextToken() // move to first token inside the block
+
+	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		if p.curToken.Type == lexer2.IDENT || p.curToken.Type == lexer2.ENVIRONMENT {
+			key := p.curToken.Literal
+
+			// Expect colon
+			if !p.expectPeek(lexer2.COLON) {
+				return nil
+			}
+
+			switch key {
+			case "executable":
+				// Expect string value
+				if !p.expectPeek(lexer2.STRING) {
+					return nil
+				}
+				config.Executable = p.curToken.Literal
+				p.nextToken()
+
+			case "args":
+				// Parse array of strings
+				config.Args = p.parseStringArray()
+
+			case "environment":
+				// Parse key-value pairs
+				envVars := p.parseKeyValuePairs()
+				for k, v := range envVars {
+					config.Environment[k] = v
+				}
+
+			default:
+				p.addError(fmt.Sprintf("unknown shell config key: %s", key))
+				p.nextToken()
+			}
+		} else if p.curToken.Type == lexer2.COMMENT {
+			p.nextToken() // Skip comments
+		} else {
+			p.addError(fmt.Sprintf("unexpected token in platform config: %s", p.curToken.Type))
+			p.nextToken()
+		}
+	}
+
+	p.nextToken() // consume DEDENT
+	return config
+}
+
+// parseStringArray parses an array of strings in YAML-like format
+func (p *Parser) parseStringArray() []string {
+	var result []string
+
+	// Expect indented block
+	if !p.expectPeek(lexer2.INDENT) {
+		return result
+	}
+
+	p.nextToken() // move to first token inside the block
+
+	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		if p.curToken.Type == lexer2.MINUS {
+			// Expect string after dash
+			if !p.expectPeek(lexer2.STRING) {
+				p.nextToken()
+				continue
+			}
+			result = append(result, p.curToken.Literal)
+			p.nextToken()
+		} else if p.curToken.Type == lexer2.COMMENT {
+			p.nextToken() // Skip comments
+		} else {
+			p.addError(fmt.Sprintf("expected array item (- \"value\"), got %s", p.curToken.Type))
+			p.nextToken()
+		}
+	}
+
+	p.nextToken() // consume DEDENT
+	return result
+}
+
+// parseKeyValuePairs parses key-value pairs in YAML-like format
+func (p *Parser) parseKeyValuePairs() map[string]string {
+	result := make(map[string]string)
+
+	// Expect indented block
+	if !p.expectPeek(lexer2.INDENT) {
+		return result
+	}
+
+	p.nextToken() // move to first token inside the block
+
+	for p.curToken.Type != lexer2.DEDENT && p.curToken.Type != lexer2.EOF {
+		if p.curToken.Type == lexer2.IDENT {
+			key := p.curToken.Literal
+
+			// Expect colon
+			if !p.expectPeek(lexer2.COLON) {
+				p.nextToken()
+				continue
+			}
+
+			// Expect string value
+			if !p.expectPeek(lexer2.STRING) {
+				p.nextToken()
+				continue
+			}
+
+			result[key] = p.curToken.Literal
+			p.nextToken()
+		} else if p.curToken.Type == lexer2.COMMENT {
+			p.nextToken() // Skip comments
+		} else {
+			p.addError(fmt.Sprintf("expected key-value pair (key: \"value\"), got %s", p.curToken.Type))
+			p.nextToken()
+		}
+	}
+
+	p.nextToken() // consume DEDENT
+	return result
 }
 
 // parseLifecycleHook parses before/after hooks

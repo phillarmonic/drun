@@ -113,7 +113,8 @@ project_declaration = "project" string_literal [ "version" string_literal ] ":"
 project_setting = "set" identifier "to" expression
                 | "include" string_literal
                 | "before" "any" "task" ":" statement_block
-                | "after" "any" "task" ":" statement_block ;
+                | "after" "any" "task" ":" statement_block
+                | shell_config ;
 
 (* Task definition *)
 task_definition = "task" string_literal [ "means" string_literal ] ":"
@@ -277,6 +278,21 @@ shell_command = shell_action ( string_literal | ":" statement_block )
 
 shell_action = "run" | "exec" | "shell" ;
 
+(* Shell configuration *)
+shell_config = "shell" "config" ":" { platform_config } ;
+
+platform_config = identifier ":" platform_settings ;
+
+platform_settings = { platform_setting } ;
+
+platform_setting = "executable" ":" string_literal
+                  | "args" ":" string_array
+                  | "environment" ":" key_value_pairs ;
+
+string_array = { "-" string_literal } ;
+
+key_value_pairs = { identifier ":" string_literal } ;
+
 (* Literals *)
 literal = string_literal
         | number_literal
@@ -401,6 +417,74 @@ project "microservices":
   set registry to "ghcr.io/company"
   set default_timeout to "5m"
   include "shared/common.drun"
+```
+
+### Shell Configuration
+
+drun v2 supports cross-platform shell configuration with sensible defaults for each operating system. This allows you to specify different shell executables, startup arguments, and environment variables for different platforms.
+
+```
+project "my-app":
+  shell config:
+    darwin:
+      executable: "/bin/zsh"
+      args:
+        - "-l"
+        - "-i"
+      environment:
+        TERM: "xterm-256color"
+        SHELL_SESSION_HISTORY: "0"
+    
+    linux:
+      executable: "/bin/bash"
+      args:
+        - "--login"
+        - "--interactive"
+      environment:
+        TERM: "xterm-256color"
+        HISTCONTROL: "ignoredups"
+    
+    windows:
+      executable: "powershell.exe"
+      args:
+        - "-NoProfile"
+        - "-ExecutionPolicy"
+        - "Bypass"
+      environment:
+        PSModulePath: ""
+```
+
+#### Platform Detection
+
+drun automatically detects the current platform using Go's `runtime.GOOS`:
+- **darwin**: macOS
+- **linux**: Linux distributions
+- **windows**: Windows
+
+#### Configuration Options
+
+Each platform configuration supports:
+
+- **executable**: Path to the shell executable (e.g., `/bin/zsh`, `/bin/bash`, `powershell.exe`)
+- **args**: Array of startup arguments passed to the shell
+- **environment**: Key-value pairs of environment variables set for all shell commands
+
+#### Default Behavior
+
+If no shell configuration is provided, drun uses sensible defaults:
+- **Shell**: `/bin/sh` on Unix-like systems, system default on Windows
+- **Args**: Basic shell invocation (`-c` for command execution)
+- **Environment**: Inherits from parent process
+
+#### Usage in Tasks
+
+All shell commands (`run`, `exec`, `shell`, `capture`) automatically use the platform-specific configuration:
+
+```
+task "example":
+  run "echo $SHELL"        # Uses configured shell
+  run "echo $TERM"         # Uses configured environment
+  capture "whoami" as $user # Uses configured shell and environment
 ```
 
 ### Task Definition

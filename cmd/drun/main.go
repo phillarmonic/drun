@@ -420,6 +420,34 @@ func generateStarterConfig() string {
 	return `version: 2.0
 
 project "my-app" version "1.0":
+  # Cross-platform shell configuration with sensible defaults
+  shell config:
+    darwin:
+      executable: "/bin/zsh"
+      args:
+        - "-l"
+        - "-i"
+      environment:
+        TERM: "xterm-256color"
+        SHELL_SESSION_HISTORY: "0"
+    
+    linux:
+      executable: "/bin/bash"
+      args:
+        - "--login"
+        - "--interactive"
+      environment:
+        TERM: "xterm-256color"
+        HISTCONTROL: "ignoredups"
+    
+    windows:
+      executable: "powershell.exe"
+      args:
+        - "-NoProfile"
+        - "-ExecutionPolicy"
+        - "Bypass"
+      environment:
+        PSModulePath: ""
 
 task "default" means "Welcome to drun v2":
   info "Welcome to drun v2! 🚀"

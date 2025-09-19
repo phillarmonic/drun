@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -34,11 +35,12 @@ type ExecutionContext struct {
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name        string            // project name
-	Version     string            // project version
-	Settings    map[string]string // project settings (set key to value)
-	BeforeHooks []ast.Statement   // before any task hooks
-	AfterHooks  []ast.Statement   // after any task hooks
+	Name         string                              // project name
+	Version      string                              // project version
+	Settings     map[string]string                   // project settings (set key to value)
+	BeforeHooks  []ast.Statement                     // before any task hooks
+	AfterHooks   []ast.Statement                     // after any task hooks
+	ShellConfigs map[string]*ast.PlatformShellConfig // platform-specific shell configurations
 }
 
 // NewEngine creates a new v2 execution engine
@@ -192,11 +194,12 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	}
 
 	ctx := &ProjectContext{
-		Name:        project.Name,
-		Version:     project.Version,
-		Settings:    make(map[string]string),
-		BeforeHooks: []ast.Statement{},
-		AfterHooks:  []ast.Statement{},
+		Name:         project.Name,
+		Version:      project.Version,
+		Settings:     make(map[string]string),
+		BeforeHooks:  []ast.Statement{},
+		AfterHooks:   []ast.Statement{},
+		ShellConfigs: make(map[string]*ast.PlatformShellConfig),
 	}
 
 	// Process project settings
@@ -211,10 +214,61 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 			case "after":
 				ctx.AfterHooks = append(ctx.AfterHooks, s.Body...)
 			}
+		case *ast.ShellConfigStatement:
+			// Store shell configurations for each platform
+			for platform, config := range s.Platforms {
+				ctx.ShellConfigs[platform] = config
+			}
 		}
 	}
 
 	return ctx
+}
+
+// getPlatformShellConfig returns the shell configuration for the current platform
+func (e *Engine) getPlatformShellConfig(ctx *ExecutionContext) *shell.Options {
+	opts := shell.DefaultOptions()
+
+	if ctx.Project == nil || len(ctx.Project.ShellConfigs) == 0 {
+		return opts
+	}
+
+	// Determine current platform
+	platform := runtime.GOOS
+
+	// Get platform-specific configuration
+	config, exists := ctx.Project.ShellConfigs[platform]
+	if !exists {
+		return opts
+	}
+
+	// Apply platform configuration
+	if config.Executable != "" {
+		opts.Shell = config.Executable
+	}
+
+	// Add startup arguments to environment or handle them appropriately
+	// Note: The shell package currently doesn't support startup args directly,
+	// so we'll store them in environment for now
+	if len(config.Args) > 0 {
+		if opts.Environment == nil {
+			opts.Environment = make(map[string]string)
+		}
+		// Store args as a space-separated string for now
+		opts.Environment["DRUN_SHELL_ARGS"] = strings.Join(config.Args, " ")
+	}
+
+	// Apply environment variables
+	if len(config.Environment) > 0 {
+		if opts.Environment == nil {
+			opts.Environment = make(map[string]string)
+		}
+		for key, value := range config.Environment {
+			opts.Environment[key] = value
+		}
+	}
+
+	return opts
 }
 
 // executeTask executes a single task with the given context
@@ -335,8 +389,8 @@ func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *Exec
 		return nil
 	}
 
-	// Configure shell options based on the action type
-	opts := shell.DefaultOptions()
+	// Configure shell options based on the action type and platform configuration
+	opts := e.getPlatformShellConfig(ctx)
 	opts.CaptureOutput = true
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output
@@ -401,8 +455,8 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 		return nil
 	}
 
-	// Configure shell options based on the action type
-	opts := shell.DefaultOptions()
+	// Configure shell options based on the action type and platform configuration
+	opts := e.getPlatformShellConfig(ctx)
 	opts.CaptureOutput = true
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output

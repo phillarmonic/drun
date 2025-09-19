@@ -112,6 +112,9 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok.Type = RBRACKET
 		tok.Literal = string(l.ch)
+	case '-':
+		tok.Type = MINUS
+		tok.Literal = string(l.ch)
 	case '>':
 		if l.peekChar() == '=' {
 			ch := l.ch
