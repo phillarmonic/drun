@@ -628,13 +628,14 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			} else if p.isFileActionToken(p.curToken.Type) {
 				// Special handling for CHECK token
 				if p.curToken.Type == lexer.CHECK {
-					if p.peekToken.Type == lexer.HEALTH {
+					switch p.peekToken.Type {
+					case lexer.HEALTH:
 						// Definitely a network health check
 						network := p.parseNetworkStatement()
 						if network != nil {
 							stmt.Body = append(stmt.Body, network)
 						}
-					} else if p.peekToken.Type == lexer.IF {
+					case lexer.IF:
 						// This is "check if X" - determine if it's a port check
 						if p.isPortCheckPattern() {
 							// This is "check if port" - network operation
@@ -649,7 +650,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 								stmt.Body = append(stmt.Body, file)
 							}
 						}
-					} else {
+					default:
 						// Other check operations (check size, etc.) - file operations
 						file := p.parseFileStatement()
 						if file != nil {
@@ -2328,7 +2329,8 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 
 	case lexer.CHECK:
 		// "check health of service at URL" or "check if port X is open on host"
-		if p.peekToken.Type == lexer.HEALTH {
+		switch p.peekToken.Type {
+		case lexer.HEALTH:
 			p.nextToken() // consume HEALTH
 			stmt.Action = "health_check"
 
@@ -2346,7 +2348,7 @@ func (p *Parser) parseNetworkStatement() *ast.NetworkStatement {
 					}
 				}
 			}
-		} else if p.peekToken.Type == lexer.IF {
+		case lexer.IF:
 			p.nextToken() // consume IF
 			if p.peekToken.Type == lexer.PORT {
 				p.nextToken() // consume PORT
@@ -3360,13 +3362,14 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			} else if p.isFileActionToken(p.curToken.Type) {
 				// Special handling for CHECK token
 				if p.curToken.Type == lexer.CHECK {
-					if p.peekToken.Type == lexer.HEALTH {
+					switch p.peekToken.Type {
+					case lexer.HEALTH:
 						// Definitely a network health check
 						network := p.parseNetworkStatement()
 						if network != nil {
 							body = append(body, network)
 						}
-					} else if p.peekToken.Type == lexer.IF {
+					case lexer.IF:
 						// This is "check if X" - determine if it's a port check
 						if p.isPortCheckPattern() {
 							// This is "check if port" - network operation
@@ -3381,7 +3384,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 								body = append(body, file)
 							}
 						}
-					} else {
+					default:
 						// Other check operations (check size, etc.) - file operations
 						file := p.parseFileStatement()
 						if file != nil {
