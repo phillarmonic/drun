@@ -160,7 +160,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 		if providedValue, exists := params[param.Name]; exists {
 			rawValue = providedValue
 			hasValue = true
-		} else if param.DefaultValue != "" {
+		} else if !param.Required {
+			// For optional parameters (given/accepts), use default value (including empty string)
 			rawValue = param.DefaultValue
 			hasValue = true
 		} else if param.Required {
@@ -2022,7 +2023,12 @@ func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) str
 		// Extract content (remove { and })
 		content := match[1 : len(match)-1]
 
-		// Try to resolve the content
+		// Try to resolve simple variables first (most common case)
+		if result, found := e.resolveSimpleVariableDirectly(content, ctx); found {
+			return result
+		}
+
+		// Fall back to complex expression resolution
 		if result := e.resolveExpression(content, ctx); result != "" {
 			return result
 		}
@@ -2030,6 +2036,39 @@ func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) str
 		// If nothing worked, return the original placeholder
 		return match
 	})
+}
+
+// resolveSimpleVariableDirectly handles simple variable resolution with proper empty string support
+func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionContext) (string, bool) {
+	if ctx == nil {
+		return "", false
+	}
+
+	// Handle variables with $ prefix (most common case for interpolation)
+	if strings.HasPrefix(variable, "$") {
+		varName := variable[1:] // Remove the $ prefix
+
+		// Check parameters (stored without $ prefix)
+		if value, exists := ctx.Parameters[varName]; exists {
+			return value.AsString(), true
+		}
+
+		// Check captured variables (stored without $ prefix)
+		if value, exists := ctx.Variables[varName]; exists {
+			return value, true
+		}
+	} else {
+		// Check parameters (bare identifiers)
+		if value, exists := ctx.Parameters[variable]; exists {
+			return value.AsString(), true
+		}
+		// Check captured variables (bare identifiers)
+		if value, exists := ctx.Variables[variable]; exists {
+			return value, true
+		}
+	}
+
+	return "", false
 }
 
 // resolveExpression resolves various types of expressions
@@ -2107,19 +2146,28 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		return ""
 	}
 
-	// 6. Check for simple parameter lookup
+	// 6. Check for simple parameter lookup (fallback for complex expressions)
 	if ctx != nil {
-		if value, exists := ctx.Parameters[expr]; exists {
-			return value.AsString()
-		}
-		// Also check captured variables
-		if value, exists := ctx.Variables[expr]; exists {
-			return value
-		}
-		// Check for variables with $ prefix (task-scoped variables)
+		// Check for variables with $ prefix first (parameters and task-scoped variables)
 		if strings.HasPrefix(expr, "$") {
 			varName := expr[1:] // Remove the $ prefix
+
+			// Check parameters (stored without $ prefix)
+			if value, exists := ctx.Parameters[varName]; exists {
+				return value.AsString()
+			}
+
+			// Check captured variables (stored without $ prefix)
 			if value, exists := ctx.Variables[varName]; exists {
+				return value
+			}
+		} else {
+			// Check parameters (bare identifiers)
+			if value, exists := ctx.Parameters[expr]; exists {
+				return value.AsString()
+			}
+			// Check captured variables (bare identifiers)
+			if value, exists := ctx.Variables[expr]; exists {
 				return value
 			}
 		}
@@ -2150,23 +2198,25 @@ func (e *Engine) resolveSimpleVariable(variable string, ctx *ExecutionContext) s
 
 	// Handle regular variables
 	if ctx != nil {
-		// Check parameters
-		if value, exists := ctx.Parameters[variable]; exists {
-			return value.AsString()
-		}
-		// Check captured variables
-		if value, exists := ctx.Variables[variable]; exists {
-			return value
-		}
-		// Check for variables with $ prefix (task-scoped variables)
+		// Check for variables with $ prefix first (parameters and task-scoped variables)
 		if strings.HasPrefix(variable, "$") {
 			varName := variable[1:] // Remove the $ prefix
+
+			// Check parameters (stored without $ prefix)
+			if value, exists := ctx.Parameters[varName]; exists {
+				return value.AsString()
+			}
+
+			// Check captured variables (stored without $ prefix)
 			if value, exists := ctx.Variables[varName]; exists {
 				return value
 			}
-		}
-		// Check loop variables (bare identifiers)
-		if !strings.HasPrefix(variable, "$") {
+		} else {
+			// Check parameters (bare identifiers)
+			if value, exists := ctx.Parameters[variable]; exists {
+				return value.AsString()
+			}
+			// Check captured variables (bare identifiers)
 			if value, exists := ctx.Variables[variable]; exists {
 				return value
 			}

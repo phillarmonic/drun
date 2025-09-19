@@ -1,0 +1,360 @@
+package engine
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+
+	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/internal/types"
+)
+
+func TestVariableInterpolation(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		taskName       string
+		params         map[string]string
+		expectedOutput []string // strings that should be present in output
+		shouldFail     bool
+	}{
+		{
+			name: "basic parameter interpolation with $ prefix",
+			input: `version: 2.0
+
+task "greet":
+  requires $name
+  given $title defaults to "friend"
+  
+  info "Hello, {$title} {$name}! Nice to meet you."
+  step "Processing greeting for {$name}"
+  success "Greeting completed for {$title} {$name}!"`,
+			taskName: "greet",
+			params:   map[string]string{"name": "Andy"},
+			expectedOutput: []string{
+				"Hello, friend Andy! Nice to meet you.",
+				"Processing greeting for Andy",
+				"Greeting completed for friend Andy!",
+			},
+		},
+		{
+			name: "parameter interpolation with custom values",
+			input: `version: 2.0
+
+task "greet":
+  requires $name
+  given $title defaults to "friend"
+  
+  info "Hello, {$title} {$name}! Nice to meet you."
+  step "Processing greeting for {$name}"
+  success "Greeting completed for {$title} {$name}!"`,
+			taskName: "greet",
+			params:   map[string]string{"name": "Bob", "title": "buddy"},
+			expectedOutput: []string{
+				"Hello, buddy Bob! Nice to meet you.",
+				"Processing greeting for Bob",
+				"Greeting completed for buddy Bob!",
+			},
+		},
+		{
+			name: "multiple parameter types interpolation",
+			input: `version: 2.0
+
+task "deploy":
+  requires $environment from ["dev", "staging", "production"]
+  given $app_version defaults to "latest"
+  
+  step "Deploying version {$app_version} to {$environment}"
+  info "Environment: {$environment}"
+  info "Version: {$app_version}"
+  success "Deployment to {$environment} completed!"`,
+			taskName: "deploy",
+			params:   map[string]string{"environment": "staging", "app_version": "v1.2.3"},
+			expectedOutput: []string{
+				"Deploying version v1.2.3 to staging",
+				"Environment: staging",
+				"Version: v1.2.3",
+				"Deployment to staging completed!",
+			},
+		},
+		{
+			name: "interpolation with default values only",
+			input: `version: 2.0
+
+task "backup":
+  requires $source_path
+  given $backup_name defaults to "backup-2024-01-01"
+  
+  step "Creating backup: {$backup_name}"
+  info "Source: {$source_path}"
+  info "Backup: {$backup_name}"
+  success "Backup created: {$backup_name}"`,
+			taskName: "backup",
+			params:   map[string]string{"source_path": "/home/user/data"},
+			expectedOutput: []string{
+				"Creating backup: backup-2024-01-01",
+				"Source: /home/user/data",
+				"Backup: backup-2024-01-01",
+				"Backup created: backup-2024-01-01",
+			},
+		},
+		{
+			name: "mixed interpolation patterns",
+			input: `version: 2.0
+
+task "mixed":
+  requires $name
+  given $prefix defaults to "Mr."
+  given $suffix defaults to "Jr."
+  
+  info "Full name: {$prefix} {$name} {$suffix}"
+  step "Processing {$name} with prefix {$prefix}"
+  success "Done with {$prefix} {$name} {$suffix}!"`,
+			taskName: "mixed",
+			params:   map[string]string{"name": "Smith", "suffix": "Sr."},
+			expectedOutput: []string{
+				"Full name: Mr. Smith Sr.",
+				"Processing Smith with prefix Mr.",
+				"Done with Mr. Smith Sr.!",
+			},
+		},
+		{
+			name: "no interpolation needed",
+			input: `version: 2.0
+
+task "simple":
+  info "This is a simple message"
+  step "No variables here"
+  success "All done!"`,
+			taskName: "simple",
+			params:   map[string]string{},
+			expectedOutput: []string{
+				"This is a simple message",
+				"No variables here",
+				"All done!",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse the input
+			lexer := lexer.NewLexer(tt.input)
+			parser := parser.NewParser(lexer)
+			program := parser.ParseProgram()
+
+			if len(parser.Errors()) > 0 {
+				t.Fatalf("Parser errors: %v", parser.Errors())
+			}
+
+			if program == nil {
+				t.Fatalf("ParseProgram() returned nil")
+			}
+
+			// Create engine with buffer to capture output
+			var output bytes.Buffer
+			engine := NewEngine(&output)
+
+			// Execute the task
+			err := engine.ExecuteWithParams(program, tt.taskName, tt.params)
+
+			if tt.shouldFail && err == nil {
+				t.Fatalf("Expected execution to fail, but it succeeded")
+			}
+
+			if !tt.shouldFail && err != nil {
+				t.Fatalf("Execution failed: %v", err)
+			}
+
+			// Check output contains expected strings
+			outputStr := output.String()
+			for _, expected := range tt.expectedOutput {
+				if !strings.Contains(outputStr, expected) {
+					t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestVariableInterpolationEdgeCases(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		taskName         string
+		params           map[string]string
+		expectedOutput   []string
+		unexpectedOutput []string // strings that should NOT be present in output
+	}{
+		{
+			name: "undefined variable should remain as placeholder",
+			input: `version: 2.0
+
+task "undefined":
+  requires $name
+  
+  info "Hello {$name}, undefined: {$undefined_var}"`,
+			taskName: "undefined",
+			params:   map[string]string{"name": "Alice"},
+			expectedOutput: []string{
+				"Hello Alice, undefined: {$undefined_var}",
+			},
+		},
+		{
+			name: "empty parameter value",
+			input: `version: 2.0
+
+task "empty":
+  requires $name
+  given $title defaults to ""
+  
+  info "Name: '{$name}', Title: '{$title}'"`,
+			taskName: "empty",
+			params:   map[string]string{"name": ""},
+			expectedOutput: []string{
+				"Name: '', Title: ''",
+			},
+		},
+		{
+			name: "special characters in parameter values",
+			input: `version: 2.0
+
+task "special":
+  requires $message
+  
+  info "Message: {$message}"`,
+			taskName: "special",
+			params:   map[string]string{"message": "Hello! @#$%^&*(){}[]|\\:;\"'<>,.?/~`"},
+			expectedOutput: []string{
+				"Message: Hello! @#$%^&*(){}[]|\\:;\"'<>,.?/~`",
+			},
+		},
+		{
+			name: "multiple same variable in one string",
+			input: `version: 2.0
+
+task "repeat":
+  requires $word
+  
+  info "{$word} {$word} {$word}!"`,
+			taskName: "repeat",
+			params:   map[string]string{"word": "echo"},
+			expectedOutput: []string{
+				"echo echo echo!",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse the input
+			lexer := lexer.NewLexer(tt.input)
+			parser := parser.NewParser(lexer)
+			program := parser.ParseProgram()
+
+			if len(parser.Errors()) > 0 {
+				t.Fatalf("Parser errors: %v", parser.Errors())
+			}
+
+			// Create engine with buffer to capture output
+			var output bytes.Buffer
+			engine := NewEngine(&output)
+
+			// Execute the task
+			err := engine.ExecuteWithParams(program, tt.taskName, tt.params)
+			if err != nil {
+				t.Fatalf("Execution failed: %v", err)
+			}
+
+			// Check output contains expected strings
+			outputStr := output.String()
+			for _, expected := range tt.expectedOutput {
+				if !strings.Contains(outputStr, expected) {
+					t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
+				}
+			}
+
+			// Check output does NOT contain unexpected strings
+			for _, unexpected := range tt.unexpectedOutput {
+				if strings.Contains(outputStr, unexpected) {
+					t.Errorf("Expected output to NOT contain %q, but got:\n%s", unexpected, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestInterpolateVariablesFunction(t *testing.T) {
+	// Test the interpolateVariables function directly
+	engine := NewEngine(nil)
+
+	tests := []struct {
+		name     string
+		message  string
+		params   map[string]string
+		vars     map[string]string
+		expected string
+	}{
+		{
+			name:     "simple parameter interpolation",
+			message:  "Hello {$name}!",
+			params:   map[string]string{"name": "World"},
+			expected: "Hello World!",
+		},
+		{
+			name:     "multiple parameters",
+			message:  "{$greeting} {$name}, how are you?",
+			params:   map[string]string{"greeting": "Hi", "name": "Alice"},
+			expected: "Hi Alice, how are you?",
+		},
+		{
+			name:     "no interpolation needed",
+			message:  "Static message",
+			params:   map[string]string{},
+			expected: "Static message",
+		},
+		{
+			name:     "undefined variable",
+			message:  "Hello {$undefined}!",
+			params:   map[string]string{},
+			expected: "Hello {$undefined}!",
+		},
+		{
+			name:     "mixed defined and undefined",
+			message:  "Hello {$name}, {$undefined} variable",
+			params:   map[string]string{"name": "Bob"},
+			expected: "Hello Bob, {$undefined} variable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create execution context
+			ctx := &ExecutionContext{
+				Parameters: make(map[string]*types.Value),
+				Variables:  make(map[string]string),
+			}
+
+			// Add parameters to context
+			for name, value := range tt.params {
+				typedValue, err := types.NewValue(types.StringType, value)
+				if err != nil {
+					t.Fatalf("Failed to create typed value: %v", err)
+				}
+				ctx.Parameters[name] = typedValue
+			}
+
+			// Add variables to context
+			for name, value := range tt.vars {
+				ctx.Variables[name] = value
+			}
+
+			// Test interpolation
+			result := engine.interpolateVariables(tt.message, ctx)
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
