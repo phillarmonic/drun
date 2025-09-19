@@ -43,6 +43,100 @@ var (
 // Default filename for v2 drun files
 var DefaultFilename = ".drun/spec.drun"
 
+// completeTaskNames provides autocompletion for task names
+func completeTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Try to find and parse the drun file
+	actualConfigFile, err := findConfigFile(configFile)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	content, err := os.ReadFile(actualConfigFile)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	program, err := engine.ParseStringWithFilename(string(content), actualConfigFile)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Create engine to get task list
+	eng := engine.NewEngine(os.Stdout)
+	tasks := eng.ListTasks(program)
+
+	var completions []string
+	for _, task := range tasks {
+		completions = append(completions, task.Name+"\t[task] "+task.Description)
+	}
+
+	return completions, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completionCmd represents the completion command
+var completionCmd = &cobra.Command{
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "[drun CLI cmd] Generate completion script",
+	Long: `To load completions:
+
+Bash:
+
+  $ source <(drun completion bash)
+
+  # To load completions for each session, execute once:
+  # Linux:
+  $ drun completion bash > /etc/bash_completion.d/drun
+  # macOS:
+  $ drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+
+Zsh:
+
+  # If shell completion is not already enabled in your environment,
+  # you will need to enable it.  You can execute the following once:
+
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+  # To load completions for each session, execute once:
+  $ drun completion zsh > "${fpath[1]}/_drun"
+
+  # You will need to start a new shell for this setup to take effect.
+
+Fish:
+
+  $ drun completion fish | source
+
+  # To load completions for each session, execute once:
+  $ drun completion fish > ~/.config/fish/completions/drun.fish
+
+PowerShell:
+
+  PS> drun completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for every new session, run:
+  PS> drun completion powershell > drun.ps1
+  # and source this file from your PowerShell profile.
+`,
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	Run: func(cmd *cobra.Command, args []string) {
+		switch args[0] {
+		case "bash":
+			cmd.Root().GenBashCompletion(os.Stdout)
+		case "zsh":
+			cmd.Root().GenZshCompletion(os.Stdout)
+		case "fish":
+			cmd.Root().GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+	},
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -52,7 +146,7 @@ func main() {
 
 var rootCmd = &cobra.Command{
 	Use:   "drun [task] [args...]",
-	Short: "A semantic task runner with natural language syntax",
+	Short: "[drun CLI cmd] A semantic task runner with natural language syntax",
 	Long: `drun v2 is a task runner that uses semantic, English-like syntax to define automation tasks.
 It supports natural language commands, smart detection, and direct execution without compilation.
 
@@ -63,18 +157,22 @@ Examples:
   drun --init                   # Create a new drun file`,
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
-	Args: cobra.ArbitraryArgs,
+	Args:              cobra.ArbitraryArgs,
+	ValidArgsFunction: completeTaskNames,
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "Task file (default: .drun/spec.drun or workspace configured file)")
-	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "List available tasks")
-	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be executed without running")
-	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed execution information")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
-	rootCmd.Flags().BoolVar(&initConfig, "init", false, "Initialize a new .drun task file")
-	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "Save custom file name as workspace default (use with --init)")
-	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "Set workspace default task file location")
+	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "[drun CLI cmd] Task file (default: .drun/spec.drun or workspace configured file)")
+	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "[drun CLI cmd] List available tasks")
+	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "[drun CLI cmd] Show what would be executed without running")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "[drun CLI cmd] Show detailed execution information")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "[drun CLI cmd] Show version information")
+	rootCmd.Flags().BoolVar(&initConfig, "init", false, "[drun CLI cmd] Initialize a new .drun task file")
+	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[drun CLI cmd] Save custom file name as workspace default (use with --init)")
+	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[drun CLI cmd] Set workspace default task file location")
+
+	// Add completion commands
+	rootCmd.AddCommand(completionCmd)
 }
 
 func runDrun(cmd *cobra.Command, args []string) error {
