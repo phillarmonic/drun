@@ -905,18 +905,25 @@ All variables in drun v2 must be prefixed with `$` to distinguish them from keyw
    - Used in: `for each item in items`, `for i in range 1 to 10`
 
 3. **Interpolation Syntax**:
-   - Declared variables: `{$variable_name}`
+   - Task variables: `{$variable_name}`
+   - Project settings: `{$globals.setting_name}`
+   - Built-in project vars: `{$globals.project}`, `{$globals.version}`
    - Loop variables: `{variable_name}`
    - Built-in functions: `{now.format()}`, `{pwd}`
 
 #### Examples
 
 ```
+# Project settings (no $ prefix in declaration)
+project "myapp" version "1.0.0":
+  set registry to "ghcr.io/company"
+  set api_url to "https://api.example.com"
+
 # Parameter declarations
 requires $environment from ["dev", "staging", "production"]
 given $tag defaults to "latest"
 
-# Variable declarations
+# Task variable declarations
 let $commit = current git commit
 set $counter to 0
 
@@ -927,8 +934,10 @@ for each item in items:
 for i in range 1 to 5:
   info "Attempt {i} of 5"   # Loop variable interpolation
 
-# Mixed interpolation
-info "Deploying {$tag} to {$environment} - item {item}"
+# Mixed interpolation with different scopes
+info "Deploying {$tag} to {$environment} from {$globals.registry}"
+info "Project: {$globals.project} v{$globals.version}"
+info "API: {$globals.api_url} - Processing item {item}"
 ```
 
 #### Let Bindings (Immutable)
@@ -969,27 +978,81 @@ catch command_error:
 
 ### Variable Scoping
 
-#### Global Scope
+drun v2 uses a clear scoping system with explicit namespaces to avoid naming conflicts and improve code clarity.
+
+#### Project Scope (Global Variables)
+
+Project-level settings are declared without the `$` prefix and accessed via the `$globals` namespace:
 
 ```
-project "myapp":
-  set registry to "ghcr.io/company"  # Available to all tasks
-  set version to "1.0.0"
+project "myapp" version "1.0.0":
+  set registry to "ghcr.io/company"    # Project setting
+  set api_url to "https://api.example.com"
+  set timeout to "30s"
 ```
 
-#### Task Scope
+**Accessing Project Settings:**
+```
+task "deploy":
+  info "Project: {$globals.project}"        # → "myapp"
+  info "Version: {$globals.version}"        # → "1.0.0"
+  info "Registry: {$globals.registry}"      # → "ghcr.io/company"
+  info "API URL: {$globals.api_url}"        # → "https://api.example.com"
+  info "Timeout: {$globals.timeout}"        # → "30s"
+```
+
+#### Task Scope (Local Variables)
+
+Task-level variables are declared with the `$` prefix and accessed directly:
 
 ```
 task "deploy":
-  let image_tag be "{registry}/myapp:{version}"  # Task-local
+  set $image_tag to "{$globals.registry}/myapp:{$globals.version}"  # Task-local
+  set $replicas to 3
   
-  # Nested scope in control structures
+  info "Deploying {$image_tag} with {$replicas} replicas"
+```
+
+#### Scoping Rules and Precedence
+
+1. **Project Settings**: Declared without `$`, accessed via `$globals.key`
+2. **Task Variables**: Declared with `$`, accessed with `$variable`
+3. **Loop Variables**: Bare identifiers, accessed with `{variable}`
+4. **Built-in Variables**: Special project variables via `$globals.project` and `$globals.version`
+
+**Variable Resolution Order:**
+1. Parameters (`$param`)
+2. Task variables (`$variable`)
+3. Loop variables (`variable`)
+4. Project settings (`$globals.key`)
+5. Built-in functions
+
+#### Avoiding Naming Conflicts
+
+The `$globals` namespace prevents conflicts between project settings and task variables:
+
+```
+project "myapp":
+  set api_url to "https://project-level.com"
+
+task "test":
+  set $api_url to "https://task-level.com"    # Different variable
+  
+  info "Global API: {$globals.api_url}"       # → "https://project-level.com"
+  info "Task API: {$api_url}"                 # → "https://task-level.com"
+```
+
+#### Nested Scope in Control Structures
+
+```
+task "deploy":
+  set $base_replicas to 3
+  
   if environment is "production":
-    let replicas be 5  # Block-local
+    set $replicas to {$base_replicas} * 2     # Block-local, shadows outer scope
+    info "Production replicas: {$replicas}"   # → 6
   else:
-    let replicas be 2
-  
-  deploy with {replicas} replicas
+    info "Default replicas: {$base_replicas}" # → 3
 ```
 
 #### Parameter Scope

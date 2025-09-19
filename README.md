@@ -8,7 +8,7 @@ A **semantic, English-like** task automation language with intelligent execution
 
 - **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
 - **Smart Parameters**: Type-safe parameters with constraints and defaults (`requires $env from ["dev", "prod"]`)
-- **Variable System**: Powerful variable interpolation with `$variable` syntax and built-in functions
+- **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
 - **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands
 - **Smart Detection**: Auto-detect project types, tools, and environments
@@ -127,6 +127,50 @@ drun --list
    ```bash
    drun build --dry-run
    ```
+
+### 🔧 **Variable Scoping**
+
+drun v2 uses a clear scoping system with explicit namespaces to prevent naming conflicts:
+
+#### **Project Settings (Global)**
+Declared without `$` prefix, accessed via `$globals` namespace:
+
+```drun
+project "myapp" version "1.0.0":
+  set registry to "ghcr.io/company"
+  set api_url to "https://api.example.com"
+
+task "deploy":
+  info "Project: {$globals.project}"        # → "myapp"
+  info "Version: {$globals.version}"        # → "1.0.0" 
+  info "Registry: {$globals.registry}"      # → "ghcr.io/company"
+  info "API: {$globals.api_url}"           # → "https://api.example.com"
+```
+
+#### **Task Variables (Local)**
+Declared with `$` prefix, accessed directly:
+
+```drun
+task "deploy":
+  set $image_tag to "{$globals.registry}/myapp:{$globals.version}"
+  set $replicas to 3
+  
+  info "Deploying {$image_tag} with {$replicas} replicas"
+```
+
+#### **Avoiding Conflicts**
+The `$globals` namespace prevents naming conflicts:
+
+```drun
+project "myapp":
+  set api_url to "https://project-level.com"
+
+task "test":
+  set $api_url to "https://task-level.com"    # Different variable!
+  
+  info "Global API: {$globals.api_url}"       # → "https://project-level.com"
+  info "Task API: {$api_url}"                 # → "https://task-level.com"
+```
 
 ## Configuration
 
