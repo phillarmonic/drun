@@ -271,6 +271,12 @@ status_action = "step" string_literal
               | "success" string_literal
               | "fail" [ "with" string_literal ] ;
 
+(* Shell commands *)
+shell_command = shell_action ( string_literal | ":" statement_block )
+              | "capture" ( string_literal | ":" statement_block ) "as" identifier ;
+
+shell_action = "run" | "exec" | "shell" ;
+
 (* Literals *)
 literal = string_literal
         | number_literal
@@ -1071,6 +1077,159 @@ task "build":
 ---
 
 ## Built-in Actions
+
+### Shell Commands
+
+drun v2 supports both single-line and multiline shell command execution with consistent syntax patterns.
+
+#### Single-Line Commands (Current)
+
+```
+# Execute and stream output
+run "echo 'Hello World'"
+exec "date +%Y-%m-%d"
+shell "pwd"
+
+# Capture output to variable
+capture "git rev-parse --short HEAD" as $commit_hash
+capture "whoami" as $username
+```
+
+#### Multiline Commands (Block Syntax)
+
+For complex shell operations, use the block syntax with natural indentation:
+
+```
+# Multiline execution with streaming
+run:
+  echo "Starting deployment process..."
+  git pull origin main
+  npm install
+  npm run build
+
+# Multiline with output capture
+capture as $build_info:
+  echo "Build Information:"
+  echo "Commit: $(git rev-parse --short HEAD)"
+  echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "User: $(whoami)"
+
+# Complex shell operations
+shell:
+  for file in *.log; do
+    if [ -f "$file" ]; then
+      echo "Processing $file"
+      gzip "$file"
+      mv "$file.gz" archive/
+    fi
+  done
+
+# Multiline with different shell actions
+exec:
+  # Database backup
+  pg_dump myapp_production > backup_$(date +%Y%m%d).sql
+  
+  # Compress backup
+  gzip backup_$(date +%Y%m%d).sql
+  
+  # Upload to storage
+  aws s3 cp backup_$(date +%Y%m%d).sql.gz s3://backups/
+```
+
+#### Execution Behavior
+
+**Single-line commands**: Execute as individual shell commands
+```
+run "echo hello"  # Executes: /bin/sh -c "echo hello"
+```
+
+**Multiline commands**: Execute as a single shell session
+```
+run:
+  export VAR=value
+  echo $VAR        # VAR is available from previous line
+  cd /tmp
+  pwd              # Shows /tmp (working directory persists)
+```
+
+#### Variable Interpolation in Multiline Commands
+
+Variables work seamlessly in multiline blocks:
+
+```
+let $environment = "production"
+let $version = "v1.2.3"
+
+run:
+  echo "Deploying {$version} to {$environment}"
+  docker build -t myapp:{$version} .
+  docker tag myapp:{$version} myapp:latest
+  docker push myapp:{$version}
+  docker push myapp:latest
+```
+
+#### Error Handling in Multiline Commands
+
+Multiline commands support the same error handling as single-line commands:
+
+```
+try:
+  run:
+    echo "Starting risky operation..."
+    some_command_that_might_fail
+    echo "Operation completed"
+catch command_error:
+  error "Multiline command failed: {command_error}"
+  
+  # Cleanup on failure
+  shell:
+    echo "Cleaning up..."
+    rm -f temp_files/*
+```
+
+#### Best Practices
+
+1. **Use multiline for related operations**: Group logically connected commands
+2. **Preserve environment**: Variables and working directory persist across lines
+3. **Error propagation**: Any failing command stops execution (unless using `|| true`)
+4. **Readability**: Use multiline for complex operations, single-line for simple ones
+
+#### Examples
+
+```
+task "deploy application":
+  info "Starting deployment process"
+  
+  # Single-line for simple operations
+  run "echo 'Deployment started at $(date)'"
+  
+  # Multiline for complex build process
+  run:
+    echo "Building application..."
+    npm ci
+    npm run build
+    npm run test
+  
+  # Capture complex information
+  capture as $deployment_info:
+    echo "=== Deployment Information ==="
+    echo "Version: $(git describe --tags --always)"
+    echo "Branch: $(git branch --show-current)"
+    echo "Commit: $(git rev-parse HEAD)"
+    echo "Built by: $(whoami) on $(hostname)"
+    echo "Build time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  
+  info "Build information: {$deployment_info}"
+  
+  # Multiline deployment commands
+  shell:
+    echo "Deploying to Kubernetes..."
+    kubectl apply -f k8s/
+    kubectl set image deployment/myapp app=myapp:latest
+    kubectl rollout status deployment/myapp --timeout=300s
+  
+  success "Deployment completed successfully"
+```
 
 ### Docker Actions
 
