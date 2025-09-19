@@ -111,7 +111,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		// Check if it's an enhanced error list
 		if errorList, ok := err.(*errors.ParseErrorList); ok {
 			fmt.Fprint(os.Stderr, errorList.FormatErrors())
-			return fmt.Errorf("failed to parse drun file '%s'", actualConfigFile)
+			os.Exit(1)
 		}
 		// Fallback to regular error
 		return fmt.Errorf("failed to parse drun file '%s': %w", actualConfigFile, err)
