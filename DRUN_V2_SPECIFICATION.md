@@ -552,7 +552,38 @@ given replicas defaults to 3
 given timeout defaults to "5m"
 given force defaults to false
 given tags defaults to [] as list of strings
+given features defaults to empty  # equivalent to ""
 ```
+
+#### The `empty` Keyword
+
+The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
+
+```
+# Default value usage
+given $name defaults to empty
+given $features as list defaults to empty
+given $config defaults to ""  # equivalent to empty
+
+# Condition usage
+if $features is empty:
+  info "No features specified"
+
+if $features is not empty:
+  info "Features: {$features}"
+
+# The empty keyword works with all parameter types
+given $message defaults to empty     # string parameter
+given $items as list defaults to empty  # list parameter (empty list)
+given $enabled defaults to false    # boolean parameter (use false, not empty)
+```
+
+**Key Features:**
+- `empty` is semantically equivalent to `""` (empty string)
+- Works as default values for any parameter type
+- Works in conditional expressions (`is empty`, `is not empty`)
+- For list parameters, `empty` creates an empty list `[]`
+- More readable than empty quotes in semantic contexts
 
 #### Variadic Parameters
 
@@ -774,6 +805,16 @@ if replicas > 0:
 
 if version >= "2.0.0":
   use new features
+
+# Empty/non-empty conditions
+if $features is empty:
+  info "No features specified"
+
+if $features is not empty:
+  info "Features: {$features}"
+
+if $name is "":
+  warn "Name is required"
 ```
 
 #### Smart Detection Conditions

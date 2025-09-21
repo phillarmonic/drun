@@ -258,6 +258,7 @@ const (
 
 	// Built-in functions/conditions
 	EXISTS // exists
+	EMPTY  // empty
 
 	// Shell operations
 	RUN     // run
@@ -1090,6 +1091,7 @@ var keywords = map[string]TokenType{
 	"parallel":    PARALLEL,
 	"is":          IS,
 	"exists":      EXISTS,
+	"empty":       EMPTY,
 	"run":         RUN,
 	"exec":        EXEC,
 	"shell":       SHELL,

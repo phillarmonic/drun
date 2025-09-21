@@ -1331,11 +1331,15 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			return nil
 		}
 
-		// Parse default value - can be string, number, boolean, or built-in function
+		// Parse default value - can be string, number, boolean, empty, or built-in function
 		switch p.peekToken.Type {
 		case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
 			p.nextToken()
 			stmt.DefaultValue = p.curToken.Literal
+		case lexer.EMPTY:
+			// Handle "empty" keyword - treat as empty string
+			p.nextToken()
+			stmt.DefaultValue = ""
 		case lexer.CURRENT:
 			// Handle "current git commit" built-in function
 			p.nextToken() // consume CURRENT
@@ -1347,7 +1351,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 				}
 			}
 		default:
-			p.addError(fmt.Sprintf("expected default value (string, number, boolean, or built-in function), got %s", p.peekToken.Type))
+			p.addError(fmt.Sprintf("expected default value (string, number, boolean, empty, or built-in function), got %s", p.peekToken.Type))
 			return nil
 		}
 

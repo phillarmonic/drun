@@ -9,7 +9,7 @@ A **semantic, English-like** task automation language with intelligent execution
 ### 🚀 **Core Features**
 
 - **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
-- **Smart Parameters**: Type-safe parameters with constraints and defaults (`requires $env from ["dev", "prod"]`)
+- **Smart Parameters**: Type-safe parameters with constraints, defaults, and semantic `empty` keyword (`requires $env from ["dev", "prod"]`, `given $features defaults to empty`)
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
 - **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands (soon)
@@ -297,12 +297,12 @@ drun greet name=Alice title=Ms.
 task "deploy" means "Deploy to environment with version":
   requires $environment from ["dev", "staging", "prod"]
   given $version defaults to "latest"
-  given $features as list defaults to ""
+  given $features as list defaults to empty  # 🆕 empty keyword
   given $force as boolean defaults to false
   
   info "Deploying {$version} to {$environment}"
   
-  if $features is not "":
+  if $features is not empty:  # 🆕 semantic empty conditions
     info "Features: {$features}"
   
   if $force is true:
@@ -321,6 +321,35 @@ drun deploy environment=staging version=v1.1.0 features=auth,ui
 # Force deployment
 drun deploy environment=prod version=v1.2.0 force=true
 ```
+
+### The `empty` Keyword ⭐ *New*
+
+The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
+
+```drun
+task "example" means "Demonstrate empty keyword usage":
+  # Default values - both are equivalent
+  given $name defaults to empty      # semantic empty
+  given $title defaults to ""        # traditional empty string
+  given $features as list defaults to empty  # empty list
+  
+  # Conditions - semantic and readable
+  if $name is empty:
+    warn "Name is required"
+  
+  if $features is not empty:
+    info "Enabled features: {$features}"
+  
+  # Works with all parameter types
+  if $title is empty:
+    info "Using default title"
+```
+
+**Key Benefits:**
+- **Semantic**: More readable than empty quotes in automation contexts
+- **Equivalent**: `empty` is exactly the same as `""` 
+- **Flexible**: Works as default values and in conditions
+- **Type-aware**: Creates appropriate empty values (empty string, empty list, etc.)
 
 ### Task with Dependencies
 

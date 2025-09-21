@@ -2602,7 +2602,70 @@ func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string
 // evaluateCondition evaluates condition expressions
 func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool {
 	// Simple condition evaluation
-	// For now, we'll handle basic patterns like "variable is value"
+	// Handle various patterns like "variable is value", "variable is not empty", etc.
+
+	// Handle "variable is not empty" pattern
+	if strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
+			// Try to get the value of the left side from parameters
+			if value, exists := ctx.Parameters[paramName]; exists {
+				valueStr := value.AsString()
+				// For lists, check if the list is empty
+				if value.Type == types.ListType {
+					if list, err := value.AsList(); err == nil {
+						return len(list) > 0
+					}
+				}
+				// For other types, check if string representation is not empty
+				return strings.TrimSpace(valueStr) != ""
+			}
+
+			// Try interpolating the variable
+			interpolated := e.interpolateVariables("{"+left+"}", ctx)
+			// If interpolation didn't change it, the variable doesn't exist (treat as empty)
+			if interpolated == "{"+left+"}" {
+				return false
+			}
+			return strings.TrimSpace(interpolated) != ""
+		}
+	}
+
+	// Handle "variable is not value" pattern
+	if strings.Contains(condition, " is not ") && !strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not ", 2)
+		if len(parts) == 2 {
+			left := strings.TrimSpace(parts[0])
+			right := strings.TrimSpace(parts[1])
+
+			// Handle "empty" keyword - treat as empty string
+			if right == "empty" {
+				right = ""
+			}
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
+			// Try to get the value of the left side from parameters
+			if value, exists := ctx.Parameters[paramName]; exists {
+				return value.AsString() != right
+			}
+
+			// If not found in parameters, compare as strings
+			return left != right
+		}
+	}
 
 	// Handle "variable is value" pattern
 	if strings.Contains(condition, " is ") {
@@ -2611,8 +2674,19 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			left := strings.TrimSpace(parts[0])
 			right := strings.TrimSpace(parts[1])
 
+			// Handle "empty" keyword - treat as empty string
+			if right == "empty" {
+				right = ""
+			}
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
 			// Try to get the value of the left side from parameters
-			if value, exists := ctx.Parameters[left]; exists {
+			if value, exists := ctx.Parameters[paramName]; exists {
 				return value.AsString() == right
 			}
 

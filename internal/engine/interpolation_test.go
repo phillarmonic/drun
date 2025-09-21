@@ -358,3 +358,150 @@ func TestInterpolateVariablesFunction(t *testing.T) {
 		})
 	}
 }
+
+func TestEngine_EmptyKeywordConditions(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		taskName    string
+		params      map[string]string
+		expected    []string // Expected output messages
+		notExpected []string // Messages that should NOT appear
+	}{
+		{
+			name: "empty list parameter with 'is empty' condition",
+			input: `version: 2.0
+
+task "test":
+  given $features as list defaults to empty
+  
+  if $features is empty:
+    info "Features list is empty"
+  
+  if $features is not empty:
+    info "Features list has items"`,
+			taskName:    "test",
+			params:      map[string]string{},
+			expected:    []string{"Features list is empty"},
+			notExpected: []string{"Features list has items"},
+		},
+		{
+			name: "non-empty list parameter with 'is not empty' condition",
+			input: `version: 2.0
+
+task "test":
+  given $features as list defaults to empty
+  
+  if $features is empty:
+    info "Features list is empty"
+  
+  if $features is not empty:
+    info "Features list has items: {$features}"`,
+			taskName:    "test",
+			params:      map[string]string{"features": "auth,payments"},
+			expected:    []string{"Features list has items: auth,payments"},
+			notExpected: []string{"Features list is empty"},
+		},
+		{
+			name: "empty string parameter with 'is empty' condition",
+			input: `version: 2.0
+
+task "test":
+  given $name defaults to empty
+  
+  if $name is empty:
+    info "Name is empty"
+  
+  if $name is not empty:
+    info "Name is: {$name}"`,
+			taskName:    "test",
+			params:      map[string]string{},
+			expected:    []string{"Name is empty"},
+			notExpected: []string{"Name is:"},
+		},
+		{
+			name: "non-empty string parameter with 'is not empty' condition",
+			input: `version: 2.0
+
+task "test":
+  given $name defaults to empty
+  
+  if $name is empty:
+    info "Name is empty"
+  
+  if $name is not empty:
+    info "Name is: {$name}"`,
+			taskName:    "test",
+			params:      map[string]string{"name": "Alice"},
+			expected:    []string{"Name is: Alice"},
+			notExpected: []string{"Name is empty"},
+		},
+		{
+			name: "empty keyword equivalent to empty string",
+			input: `version: 2.0
+
+task "test":
+  given $value1 defaults to empty
+  given $value2 defaults to ""
+  
+  if $value1 is empty:
+    info "Value1 is empty using empty keyword"
+  
+  if $value2 is empty:
+    info "Value2 is empty using empty string"
+    
+  if $value1 is "":
+    info "Value1 equals empty string"
+    
+  if $value2 is "":
+    info "Value2 equals empty string"`,
+			taskName: "test",
+			params:   map[string]string{},
+			expected: []string{
+				"Value1 is empty using empty keyword",
+				"Value2 is empty using empty string",
+				"Value1 equals empty string",
+				"Value2 equals empty string",
+			},
+			notExpected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture output
+			var output strings.Builder
+			engine := NewEngine(&output)
+
+			// Parse and execute
+			lexer := lexer.NewLexer(tt.input)
+			parser := parser.NewParser(lexer)
+			program := parser.ParseProgram()
+
+			if len(parser.Errors()) > 0 {
+				t.Fatalf("Parser errors: %v", parser.Errors())
+			}
+
+			err := engine.ExecuteWithParams(program, tt.taskName, tt.params)
+			if err != nil {
+				t.Fatalf("Execution error: %v", err)
+			}
+
+			outputStr := output.String()
+
+			// Check expected messages are present
+			for _, expected := range tt.expected {
+				if !strings.Contains(outputStr, expected) {
+					t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
+				}
+			}
+
+			// Check that unexpected messages are not present
+			for _, notExpected := range tt.notExpected {
+				if strings.Contains(outputStr, notExpected) {
+					t.Errorf("Expected output to NOT contain %q, but got:\n%s", notExpected, outputStr)
+				}
+			}
+		})
+	}
+}

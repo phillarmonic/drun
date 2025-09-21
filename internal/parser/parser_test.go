@@ -230,3 +230,108 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestParser_EmptyKeyword(t *testing.T) {
+	input := `version: 2.0
+
+task "test":
+  given $features as list defaults to empty
+  given $name defaults to ""
+  
+  if $features is empty:
+    info "Features is empty"
+    
+  if $features is not empty:
+    info "Features: {$features}"`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if program == nil {
+		t.Fatalf("ParseProgram() returned nil")
+	}
+
+	// Check version
+	if program.Version == nil {
+		t.Fatalf("program.Version is nil")
+	}
+
+	if program.Version.Value != "2.0" {
+		t.Errorf("program.Version.Value wrong. expected=2.0, got=%s", program.Version.Value)
+	}
+
+	// Check tasks
+	if len(program.Tasks) != 1 {
+		t.Fatalf("program.Tasks does not contain 1 task. got=%d", len(program.Tasks))
+	}
+
+	// Check task
+	task := program.Tasks[0]
+	if task.Name != "test" {
+		t.Errorf("task.Name wrong. expected=test, got=%s", task.Name)
+	}
+
+	// Check parameters
+	if len(task.Parameters) != 2 {
+		t.Fatalf("task.Parameters does not contain 2 parameters. got=%d", len(task.Parameters))
+	}
+
+	// Check first parameter (features with empty default)
+	featuresParam := task.Parameters[0]
+	if featuresParam.Name != "features" {
+		t.Errorf("featuresParam.Name wrong. expected=features, got=%s", featuresParam.Name)
+	}
+	if featuresParam.DataType != "list" {
+		t.Errorf("featuresParam.DataType wrong. expected=list, got=%s", featuresParam.DataType)
+	}
+	if featuresParam.DefaultValue != "" {
+		t.Errorf("featuresParam.DefaultValue wrong. expected=empty string, got=%s", featuresParam.DefaultValue)
+	}
+	if featuresParam.Required {
+		t.Errorf("featuresParam.Required wrong. expected=false, got=%t", featuresParam.Required)
+	}
+
+	// Check second parameter (name with empty string default)
+	nameParam := task.Parameters[1]
+	if nameParam.Name != "name" {
+		t.Errorf("nameParam.Name wrong. expected=name, got=%s", nameParam.Name)
+	}
+	if nameParam.DefaultValue != "" {
+		t.Errorf("nameParam.DefaultValue wrong. expected=empty string, got=%s", nameParam.DefaultValue)
+	}
+	if nameParam.Required {
+		t.Errorf("nameParam.Required wrong. expected=false, got=%t", nameParam.Required)
+	}
+
+	// Check task body - should have 2 if statements
+	if len(task.Body) != 2 {
+		t.Fatalf("task.Body does not contain 2 statements. got=%d", len(task.Body))
+	}
+
+	// Check first if statement (is empty)
+	firstIf, ok := task.Body[0].(*ast.ConditionalStatement)
+	if !ok {
+		t.Fatalf("task.Body[0] is not a ConditionalStatement")
+	}
+	if firstIf.Type != "if" {
+		t.Errorf("firstIf.Type wrong. expected=if, got=%s", firstIf.Type)
+	}
+	if firstIf.Condition != "$features is empty" {
+		t.Errorf("firstIf.Condition wrong. expected='$features is empty', got=%s", firstIf.Condition)
+	}
+
+	// Check second if statement (is not empty)
+	secondIf, ok := task.Body[1].(*ast.ConditionalStatement)
+	if !ok {
+		t.Fatalf("task.Body[1] is not a ConditionalStatement")
+	}
+	if secondIf.Type != "if" {
+		t.Errorf("secondIf.Type wrong. expected=if, got=%s", secondIf.Type)
+	}
+	if secondIf.Condition != "$features is not empty" {
+		t.Errorf("secondIf.Condition wrong. expected='$features is not empty', got=%s", secondIf.Condition)
+	}
+}
