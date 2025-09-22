@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -35,6 +36,17 @@ type Options struct {
 
 // DefaultOptions returns sensible default options
 func DefaultOptions() *Options {
+	// Use platform-appropriate shell defaults
+	defaultShell := "/bin/sh"
+	switch runtime.GOOS {
+	case "darwin":
+		defaultShell = "/bin/zsh"
+	case "linux":
+		defaultShell = "/bin/bash"
+	case "windows":
+		defaultShell = "powershell.exe"
+	}
+
 	return &Options{
 		WorkingDir:    "",
 		Environment:   make(map[string]string),
@@ -42,7 +54,7 @@ func DefaultOptions() *Options {
 		CaptureOutput: true,
 		StreamOutput:  false,
 		Output:        os.Stdout,
-		Shell:         "/bin/sh",
+		Shell:         defaultShell,
 		IgnoreErrors:  false,
 	}
 }

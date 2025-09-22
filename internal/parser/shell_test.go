@@ -15,7 +15,7 @@ task "shell test":
   run "echo 'hello'"
   exec "date"
   shell "pwd"
-  capture "whoami" as $user
+  capture from shell "whoami" as $user
   success "Done"`
 
 	l := lexer.NewLexer(input)
@@ -55,7 +55,17 @@ task "shell test":
 	}
 
 	for _, stmt := range statements {
-		if stmt.isShell {
+		if stmt.expected == "capture" {
+			// Capture is now a variable statement
+			varStmt, ok := task.Body[stmt.index].(*ast.VariableStatement)
+			if !ok {
+				t.Errorf("Expected statement %d to be VariableStatement for capture, got %T", stmt.index, task.Body[stmt.index])
+				continue
+			}
+			if varStmt.Operation != "capture_shell" {
+				t.Errorf("Expected operation 'capture_shell', got %s", varStmt.Operation)
+			}
+		} else if stmt.isShell {
 			shellStmt, ok := task.Body[stmt.index].(*ast.ShellStatement)
 			if !ok {
 				t.Errorf("Expected statement %d to be ShellStatement, got %T", stmt.index, task.Body[stmt.index])
@@ -77,12 +87,12 @@ task "shell test":
 	}
 
 	// Check capture statement specifically
-	captureStmt, ok := task.Body[4].(*ast.ShellStatement)
+	captureStmt, ok := task.Body[4].(*ast.VariableStatement)
 	if !ok {
-		t.Fatalf("Expected capture statement to be ShellStatement")
+		t.Fatalf("Expected capture statement to be VariableStatement")
 	}
-	if captureStmt.CaptureVar != "user" {
-		t.Errorf("Expected capture variable 'user', got %s", captureStmt.CaptureVar)
+	if captureStmt.Variable != "$user" {
+		t.Errorf("Expected capture variable '$user', got %s", captureStmt.Variable)
 	}
 }
 
@@ -97,7 +107,7 @@ func TestParser_ShellStatementTypes(t *testing.T) {
 		{`run "echo hello"`, "run", "echo hello", "", true},
 		{`exec "date"`, "exec", "date", "", true},
 		{`shell "pwd"`, "shell", "pwd", "", true},
-		{`capture "whoami" as $user`, "capture", "whoami", "user", false},
+		{`capture from shell "whoami" as $user`, "capture", "whoami", "user", false},
 	}
 
 	for _, test := range tests {
@@ -119,25 +129,47 @@ task "test":
 			t.Fatalf("Expected 1 statement, got %d", len(task.Body))
 		}
 
-		shellStmt, ok := task.Body[0].(*ast.ShellStatement)
-		if !ok {
-			t.Fatalf("Expected ShellStatement, got %T", task.Body[0])
-		}
+		if test.expectedAction == "capture" {
+			// Capture is now a variable statement
+			varStmt, ok := task.Body[0].(*ast.VariableStatement)
+			if !ok {
+				t.Fatalf("Expected VariableStatement for capture, got %T", task.Body[0])
+			}
 
-		if shellStmt.Action != test.expectedAction {
-			t.Errorf("Expected action %s, got %s", test.expectedAction, shellStmt.Action)
-		}
+			if varStmt.Operation != "capture_shell" {
+				t.Errorf("Expected operation 'capture_shell', got %s", varStmt.Operation)
+			}
 
-		if shellStmt.Command != test.expectedCmd {
-			t.Errorf("Expected command %s, got %s", test.expectedCmd, shellStmt.Command)
-		}
+			if varStmt.Variable != "$"+test.expectedVar {
+				t.Errorf("Expected capture var $%s, got %s", test.expectedVar, varStmt.Variable)
+			}
 
-		if shellStmt.CaptureVar != test.expectedVar {
-			t.Errorf("Expected capture var %s, got %s", test.expectedVar, shellStmt.CaptureVar)
-		}
+			literalExpr, ok := varStmt.Value.(*ast.LiteralExpression)
+			if !ok {
+				t.Fatalf("Expected LiteralExpression for capture value, got %T", varStmt.Value)
+			}
 
-		if shellStmt.StreamOutput != test.streamOutput {
-			t.Errorf("Expected stream output %v, got %v", test.streamOutput, shellStmt.StreamOutput)
+			if literalExpr.Value != test.expectedCmd {
+				t.Errorf("Expected command %s, got %s", test.expectedCmd, literalExpr.Value)
+			}
+		} else {
+			// Regular shell statement
+			shellStmt, ok := task.Body[0].(*ast.ShellStatement)
+			if !ok {
+				t.Fatalf("Expected ShellStatement, got %T", task.Body[0])
+			}
+
+			if shellStmt.Action != test.expectedAction {
+				t.Errorf("Expected action %s, got %s", test.expectedAction, shellStmt.Action)
+			}
+
+			if shellStmt.Command != test.expectedCmd {
+				t.Errorf("Expected command %s, got %s", test.expectedCmd, shellStmt.Command)
+			}
+
+			if shellStmt.StreamOutput != test.streamOutput {
+				t.Errorf("Expected stream output %v, got %v", test.streamOutput, shellStmt.StreamOutput)
+			}
 		}
 	}
 }

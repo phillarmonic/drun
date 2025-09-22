@@ -12,11 +12,33 @@ task "shell demo" means "Demonstrate shell command execution":
 task "capture demo" means "Demonstrate command output capture":
 	info "Testing command capture functionality"
 
+	# Single-line capture
 	capture from shell "echo 'This will be captured'" as $result
 	capture from shell "date +%Y" as $year
 
 	info "Captured message: {$result}"
 	info "Current year: {$year}"
+
+	# Multiline capture - multiple commands executed as one script
+	capture from shell as $system_info:
+		echo "System Information:"
+		echo "User: $(whoami)"
+		echo "Date: $(date)"
+		echo "Hostname: $(hostname)"
+		echo "Working Directory: $(pwd)"
+
+	info "System info captured:"
+	info "{$system_info}"
+
+	# Multiline capture - complex shell operations
+	capture from shell as $process_summary:
+		echo "=== Process Summary ==="
+		echo "Total processes: $(ps aux | wc -l)"
+		echo "Running processes: $(ps aux | grep -v grep | wc -l)"
+		echo "Current user processes: $(ps aux | grep $(whoami) | wc -l)"
+
+	info "Process summary:"
+	info "{$process_summary}"
 
 	success "Capture demonstration completed!"
 
@@ -50,4 +72,40 @@ task "system check" means "Perform system checks using shell commands":
 	shell "ps aux | head -5"
 
 	success "System check completed!"
+
+task "advanced multiline capture" means "Advanced multiline shell capture examples":
+	info "Demonstrating advanced multiline capture patterns"
+
+	# Capture with multiple simple commands
+	capture from shell as $environment_info:
+		echo "Environment Information:"
+		echo "========================"
+		whoami
+		hostname
+		pwd
+		date
+
+	info "Environment info: {$environment_info}"
+
+	# Capture with basic file listing
+	capture from shell as $file_listing:
+		echo "Current Directory Contents:"
+		echo "=========================="
+		ls
+		echo "File count:"
+		ls | wc
+
+	info "File listing: {$file_listing}"
+
+	# Capture with system information
+	capture from shell as $system_summary:
+		echo "System Summary:"
+		echo "==============="
+		uname
+		echo "Disk usage:"
+		df .
+
+	info "System summary: {$system_summary}"
+
+	success "Advanced multiline capture examples completed!"
 

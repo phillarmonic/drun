@@ -784,11 +784,57 @@ capture from shell "df -h /" as $disk_usage
 capture from shell "whoami" as $current_user
 ```
 
+#### Multiline Shell Command Capture
+
+For complex shell operations that span multiple commands, use the multiline syntax:
+
+```
+capture from shell as $<variable>:
+  <command1>
+  <command2>
+  <command3>
+```
+
+**Examples:**
+
+```
+# Capture system information
+capture from shell as $system_info:
+  echo "System Information:"
+  echo "User: $(whoami)"
+  echo "Date: $(date)"
+  echo "Hostname: $(hostname)"
+  echo "Working Directory: $(pwd)"
+
+# Capture build information
+capture from shell as $build_details:
+  echo "Build Details:"
+  echo "Commit: $(git rev-parse --short HEAD)"
+  echo "Branch: $(git branch --show-current)"
+  echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Built by: $(whoami)"
+
+# Capture file analysis
+capture from shell as $file_report:
+  echo "File Analysis Report:"
+  echo "Text files: $(find . -name '*.txt' | wc -l)"
+  echo "Markdown files: $(find . -name '*.md' | wc -l)"
+  echo "Total files: $(find . -type f | wc -l)"
+```
+
+**Key Features:**
+- All commands are executed as a single shell script
+- Output from all commands is captured together
+- Commands can use shell features like pipes, redirections, and command substitution
+- Variable interpolation works within the commands: `echo "Hello {$username}"`
+- Each command runs in the same shell session, so environment variables persist
+
 **Key Differences:**
 - **Expression capture** uses plain identifiers and supports complex expressions with arithmetic operations
 - **Shell capture** uses `$variable` syntax and executes commands in the system shell
 - **Expression capture** can reference other variables: `capture result from {a} - {b}`
 - **Shell capture** supports variable interpolation in commands: `capture from shell "echo 'Hello {name}'" as $greeting`
+- **Multiline shell capture** executes multiple commands as a single script and captures all output
 
 #### Conditional Assignment
 
@@ -1581,8 +1627,8 @@ exec "date +%Y-%m-%d"
 shell "pwd"
 
 # Capture output to variable
-capture "git rev-parse --short HEAD" as $commit_hash
-capture "whoami" as $username
+capture from shell "git rev-parse --short HEAD" as $commit_hash
+capture from shell "whoami" as $username
 ```
 
 #### Multiline Commands (Block Syntax)
@@ -1598,7 +1644,7 @@ run:
   npm run build
 
 # Multiline with output capture
-capture as $build_info:
+capture from shell as $build_info:
   echo "Build Information:"
   echo "Commit: $(git rev-parse --short HEAD)"
   echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -1701,7 +1747,7 @@ task "deploy application":
     npm run test
   
   # Capture complex information
-  capture as $deployment_info:
+  capture from shell as $deployment_info:
     echo "=== Deployment Information ==="
     echo "Version: $(git describe --tags --always)"
     echo "Branch: $(git branch --show-current)"

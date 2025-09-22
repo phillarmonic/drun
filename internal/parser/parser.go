@@ -856,7 +856,8 @@ func (p *Parser) parseCaptureStatement(stmt *ast.ShellStatement) *ast.ShellState
 // readCommandTokens reads tokens and groups them into individual commands
 func (p *Parser) readCommandTokens() []string {
 	var commands []string
-	var currentCommand []string
+	var lines []string
+	var currentLine strings.Builder
 
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		if p.curToken.Type == lexer.COMMENT {
@@ -865,39 +866,42 @@ func (p *Parser) readCommandTokens() []string {
 			continue
 		}
 
-		// If we encounter an IDENT token or a command keyword and we already have tokens in currentCommand,
-		// it might be a new command, but we need to be smart about it
-		isCommandStart := (p.curToken.Type == lexer.IDENT || p.isCommandKeyword(p.curToken.Type)) && len(currentCommand) > 0
-		if isCommandStart {
-			// Check if the previous token suggests this token is part of the same command
-			// For example, if previous token was ILLEGAL (like "-"), this token is likely part of the same command
-			prevTokenWasFlag := len(currentCommand) > 0 &&
-				(strings.HasPrefix(currentCommand[len(currentCommand)-1], "-") ||
-					currentCommand[len(currentCommand)-1] == "-")
-
-			if !prevTokenWasFlag {
-				// This looks like a new command, save the previous one
-				commands = append(commands, strings.Join(currentCommand, " "))
-				currentCommand = []string{}
-			}
+		// Reconstruct the original text by looking at token positions and literals
+		// This is a simplified approach that works for basic shell commands
+		if p.curToken.Type == lexer.STRING {
+			currentLine.WriteString(fmt.Sprintf("\"%s\"", p.curToken.Literal))
+		} else {
+			currentLine.WriteString(p.curToken.Literal)
 		}
 
-		// Handle different token types appropriately for shell commands
-		switch p.curToken.Type {
-		case lexer.STRING:
-			// For STRING tokens, add quotes back to preserve shell semantics
-			currentCommand = append(currentCommand, fmt.Sprintf("\"%s\"", p.curToken.Literal))
-		default:
-			// For other tokens, add them as-is
-			currentCommand = append(currentCommand, p.curToken.Literal)
+		// Check if we need to add a space before the next token
+		nextToken := p.peekToken
+		if nextToken.Type != lexer.DEDENT && nextToken.Type != lexer.EOF && nextToken.Type != lexer.COMMENT {
+			// Add space if the next token is on the same line
+			if nextToken.Line == p.curToken.Line {
+				currentLine.WriteString(" ")
+			} else {
+				// New line detected, save current command and start new one
+				if currentLine.Len() > 0 {
+					lines = append(lines, strings.TrimSpace(currentLine.String()))
+					currentLine.Reset()
+				}
+			}
 		}
 
 		p.nextToken()
 	}
 
-	// Add the last command if there is one
-	if len(currentCommand) > 0 {
-		commands = append(commands, strings.Join(currentCommand, " "))
+	// Add the last line if there is one
+	if currentLine.Len() > 0 {
+		lines = append(lines, strings.TrimSpace(currentLine.String()))
+	}
+
+	// Filter out empty lines
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			commands = append(commands, strings.TrimSpace(line))
+		}
 	}
 
 	return commands
@@ -3184,7 +3188,7 @@ func (p *Parser) parseCaptureVariableStatement(stmt *ast.VariableStatement) *ast
 	// Check if next token is "from" (shell syntax) or identifier (expression syntax)
 	switch p.peekToken.Type {
 	case lexer.FROM:
-		// Shell syntax: "capture from shell "command" as $variable"
+		// Shell syntax: "capture from shell "command" as $variable" or "capture from shell as $variable:"
 		if !p.expectPeek(lexer.FROM) {
 			return nil
 		}
@@ -3193,29 +3197,50 @@ func (p *Parser) parseCaptureVariableStatement(stmt *ast.VariableStatement) *ast
 			return nil
 		}
 
-		if !p.expectPeek(lexer.STRING) {
-			return nil
-		}
-		command := p.curToken.Literal
+		// Check if this is multiline syntax (as $var:) or single-line syntax ("command" as $var)
+		if p.peekToken.Type == lexer.AS {
+			// Multiline syntax: "capture from shell as $variable:"
+			if !p.expectPeek(lexer.AS) {
+				return nil
+			}
 
-		if !p.expectPeek(lexer.AS) {
-			return nil
-		}
+			if !p.expectPeekVariableName() {
+				return nil
+			}
+			stmt.Variable = p.curToken.Literal
 
-		if !p.expectPeekVariableName() {
-			return nil
-		}
-		stmt.Variable = p.curToken.Literal
+			if !p.expectPeek(lexer.COLON) {
+				return nil
+			}
 
-		// Mark this as a shell capture by setting a special operation
-		stmt.Operation = "capture_shell"
+			// Parse multiline commands
+			return p.parseMultilineShellCapture(stmt)
+		} else {
+			// Single-line syntax: "capture from shell "command" as $variable"
+			if !p.expectPeek(lexer.STRING) {
+				return nil
+			}
+			command := p.curToken.Literal
 
-		// Create a literal expression for the command
-		stmt.Value = &ast.LiteralExpression{
-			Token: p.curToken,
-			Value: command,
+			if !p.expectPeek(lexer.AS) {
+				return nil
+			}
+
+			if !p.expectPeekVariableName() {
+				return nil
+			}
+			stmt.Variable = p.curToken.Literal
+
+			// Mark this as a shell capture by setting a special operation
+			stmt.Operation = "capture_shell"
+
+			// Create a literal expression for the command
+			stmt.Value = &ast.LiteralExpression{
+				Token: p.curToken,
+				Value: command,
+			}
+			return stmt
 		}
-		return stmt
 	case lexer.IDENT:
 		// Expression syntax: "capture variable from expression"
 		if !p.expectPeek(lexer.IDENT) {
@@ -3235,6 +3260,34 @@ func (p *Parser) parseCaptureVariableStatement(stmt *ast.VariableStatement) *ast
 		p.addError("expected 'from shell' or variable name after 'capture'")
 		return nil
 	}
+}
+
+// parseMultilineShellCapture parses multiline shell capture commands
+func (p *Parser) parseMultilineShellCapture(stmt *ast.VariableStatement) *ast.VariableStatement {
+	// Mark this as a shell capture by setting a special operation
+	stmt.Operation = "capture_shell"
+
+	// Expect INDENT
+	if !p.expectPeek(lexer.INDENT) {
+		return nil
+	}
+
+	// Parse command tokens until DEDENT
+	p.nextToken() // Move to first token inside the block
+
+	// Read all commands in the block
+	commands := p.readCommandTokens()
+
+	// Join commands with newlines to create a single script
+	script := strings.Join(commands, "\n")
+
+	// Create a literal expression for the combined script
+	stmt.Value = &ast.LiteralExpression{
+		Token: p.curToken,
+		Value: script,
+	}
+
+	return stmt
 }
 
 // parseExpression parses expressions with proper precedence
