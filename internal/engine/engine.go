@@ -27,6 +27,11 @@ type Engine struct {
 	output  io.Writer
 	dryRun  bool
 	verbose bool
+
+	// Cached regex patterns for performance
+	interpolationRegex *regexp.Regexp
+	quotedArgRegex     *regexp.Regexp
+	paramArgRegex      *regexp.Regexp
 }
 
 // ExecutionContext holds parameter values and other runtime context
@@ -58,6 +63,11 @@ func NewEngine(output io.Writer) *Engine {
 	return &Engine{
 		output: output,
 		dryRun: false,
+
+		// Pre-compile regex patterns for performance
+		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
+		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
+		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
 }
 
@@ -107,8 +117,8 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
-		Parameters:  make(map[string]*types.Value),
-		Variables:   make(map[string]string),
+		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
+		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
 		Project:     e.createProjectContext(program.Project),
 		CurrentFile: currentFile,
 	}
@@ -241,12 +251,12 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	ctx := &ProjectContext{
 		Name:          project.Name,
 		Version:       project.Version,
-		Settings:      make(map[string]string),
-		BeforeHooks:   []ast.Statement{},
-		AfterHooks:    []ast.Statement{},
-		SetupHooks:    []ast.Statement{},
-		TeardownHooks: []ast.Statement{},
-		ShellConfigs:  make(map[string]*ast.PlatformShellConfig),
+		Settings:      make(map[string]string, 8),                   // Pre-allocate for typical settings count
+		BeforeHooks:   make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
+		AfterHooks:    make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
+		SetupHooks:    make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
+		TeardownHooks: make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
+		ShellConfigs:  make(map[string]*ast.PlatformShellConfig, 4), // Pre-allocate for typical platform count
 	}
 
 	// Process project settings
@@ -810,7 +820,7 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 	name := e.interpolateVariables(dockerStmt.Name, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(dockerStmt.Options))
 	for key, value := range dockerStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -978,7 +988,7 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 	name := e.interpolateVariables(gitStmt.Name, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(gitStmt.Options))
 	for key, value := range gitStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -1241,19 +1251,19 @@ func (e *Engine) executeHTTP(httpStmt *ast.HTTPStatement, ctx *ExecutionContext)
 	body := e.interpolateVariables(httpStmt.Body, ctx)
 
 	// Interpolate headers
-	headers := make(map[string]string)
+	headers := make(map[string]string, len(httpStmt.Headers))
 	for key, value := range httpStmt.Headers {
 		headers[key] = e.interpolateVariables(value, ctx)
 	}
 
 	// Interpolate auth
-	auth := make(map[string]string)
+	auth := make(map[string]string, len(httpStmt.Auth))
 	for key, value := range httpStmt.Auth {
 		auth[key] = e.interpolateVariables(value, ctx)
 	}
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(httpStmt.Options))
 	for key, value := range httpStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -1379,7 +1389,7 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 	condition := e.interpolateVariables(networkStmt.Condition, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(networkStmt.Options))
 	for key, value := range networkStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -2130,10 +2140,8 @@ func ParseStringWithFilename(input, filename string) (*ast.Program, error) {
 
 // interpolateVariables replaces {variable} placeholders with actual values
 func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
-	// Use regex to find {variable} patterns
-	re := regexp.MustCompile(`\{([^}]+)\}`)
-
-	return re.ReplaceAllStringFunc(message, func(match string) string {
+	// Use cached regex for better performance
+	return e.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
 		// Extract content (remove { and })
 		content := match[1 : len(match)-1]
 
@@ -2222,8 +2230,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 
 	// 4. Check for function calls with quoted string arguments
 	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
-	quotedArgRe := regexp.MustCompile(`^([^(]+)\((.+)\)$`)
-	if matches := quotedArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+	if matches := e.quotedArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
 		funcName := strings.TrimSpace(matches[1])
 		argsStr := matches[2]
 
@@ -2239,8 +2246,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 
 	// 5. Check for function calls with parameter arguments
 	// Pattern: "function(param)" where param is a parameter name
-	paramArgRe := regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`)
-	if matches := paramArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+	if matches := e.paramArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
 		funcName := strings.TrimSpace(matches[1])
 		paramName := strings.TrimSpace(matches[2])
 
@@ -2471,9 +2477,9 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 	executeItem := func(body []ast.Statement, variables map[string]string) error {
 		// Create a new context for this parallel execution
 		loopCtx := &ExecutionContext{
-			Parameters: make(map[string]*types.Value),
-			Variables:  make(map[string]string),
-			Project:    ctx.Project, // inherit project context
+			Parameters: make(map[string]*types.Value, len(ctx.Parameters)+len(variables)), // Pre-allocate for parent + new variables
+			Variables:  make(map[string]string, len(ctx.Variables)+len(variables)),        // Pre-allocate for parent + new variables
+			Project:    ctx.Project,                                                       // inherit project context
 		}
 
 		// Copy existing parameters and variables
@@ -2714,9 +2720,9 @@ func (e *Engine) applyFilter(items []string, filter *ast.FilterExpression, ctx *
 // createLoopContext creates a new execution context for a loop iteration
 func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string) *ExecutionContext {
 	loopCtx := &ExecutionContext{
-		Parameters: make(map[string]*types.Value),
-		Variables:  make(map[string]string),
-		Project:    ctx.Project, // inherit project context
+		Parameters: make(map[string]*types.Value, len(ctx.Parameters)+1), // Pre-allocate for parent + loop variable
+		Variables:  make(map[string]string, len(ctx.Variables)+1),        // Pre-allocate for parent + loop variable
+		Project:    ctx.Project,                                          // inherit project context
 	}
 
 	// Copy existing parameters and variables

@@ -49,7 +49,7 @@ func DefaultOptions() *Options {
 
 	return &Options{
 		WorkingDir:    "",
-		Environment:   make(map[string]string),
+		Environment:   make(map[string]string, 8), // Pre-allocate for typical env var count
 		Timeout:       30 * time.Second,
 		CaptureOutput: true,
 		StreamOutput:  false,
@@ -102,6 +102,9 @@ func Execute(command string, opts *Options) (*Result, error) {
 	// Handle output capture and streaming
 	if opts.CaptureOutput {
 		var stdoutBuf, stderrBuf strings.Builder
+		// Pre-allocate buffers with reasonable capacity to reduce allocations
+		stdoutBuf.Grow(1024)
+		stderrBuf.Grow(512)
 
 		if opts.StreamOutput && opts.Output != nil {
 			// Stream and capture simultaneously
@@ -125,7 +128,9 @@ func Execute(command string, opts *Options) (*Result, error) {
 				scanner := bufio.NewScanner(stdoutPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
-					stdoutBuf.WriteString(line + "\n")
+					// More efficient string building
+					stdoutBuf.WriteString(line)
+					stdoutBuf.WriteByte('\n')
 					_, _ = fmt.Fprintln(opts.Output, line)
 				}
 			}()
@@ -135,7 +140,9 @@ func Execute(command string, opts *Options) (*Result, error) {
 				scanner := bufio.NewScanner(stderrPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
-					stderrBuf.WriteString(line + "\n")
+					// More efficient string building
+					stderrBuf.WriteString(line)
+					stderrBuf.WriteByte('\n')
 					_, _ = fmt.Fprintln(opts.Output, line)
 				}
 			}()
