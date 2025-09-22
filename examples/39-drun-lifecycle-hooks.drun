@@ -1,0 +1,52 @@
+# Drun Lifecycle Hooks Example
+# This example demonstrates the new tool-level lifecycle hooks
+# that run once at drun startup and shutdown
+
+version: 2.0
+
+project "lifecycle-demo" version "1.0":
+	# Tool-level lifecycle hooks (run once per drun execution)
+	on drun setup:
+		info "🚀 Starting drun execution pipeline"
+		info "📊 Tool version: v2.0"
+		info "🏗️  Project: {$globals.project} v{$globals.version}"
+	
+	# Task-level lifecycle hooks (run around each task)
+	before any task:
+		info "🎯 Starting task: {$globals.current_task}"
+	
+	after any task:
+		info "✅ Task '{$globals.current_task}' completed successfully"
+	
+	# Tool-level teardown (runs once at the end)
+	on drun teardown:
+		info "🏁 Drun execution pipeline completed"
+		info "📊 Thanks for using drun!"
+
+task "prepare" means "Prepare the environment":
+	info "Setting up environment variables"
+	info "Checking dependencies"
+	success "Environment prepared successfully"
+
+task "build" means "Build the application":
+	depends on prepare
+	info "Compiling source code"
+	info "Running build optimizations"
+	success "Build completed successfully"
+
+task "test" means "Run test suite":
+	depends on build
+	info "Running unit tests"
+	info "Running integration tests"
+	success "All tests passed"
+
+task "deploy" means "Deploy to production":
+	depends on test
+	info "Deploying to production environment"
+	info "Running health checks"
+	success "Deployment completed successfully"
+
+task "full_pipeline" means "Run the complete CI/CD pipeline":
+	depends on deploy
+	info "Pipeline execution completed"
+	success "Full pipeline finished successfully"

@@ -39,12 +39,14 @@ type ExecutionContext struct {
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name         string                              // project name
-	Version      string                              // project version
-	Settings     map[string]string                   // project settings (set key to value)
-	BeforeHooks  []ast.Statement                     // before any task hooks
-	AfterHooks   []ast.Statement                     // after any task hooks
-	ShellConfigs map[string]*ast.PlatformShellConfig // platform-specific shell configurations
+	Name          string                              // project name
+	Version       string                              // project version
+	Settings      map[string]string                   // project settings (set key to value)
+	BeforeHooks   []ast.Statement                     // before any task hooks
+	AfterHooks    []ast.Statement                     // after any task hooks
+	SetupHooks    []ast.Statement                     // on drun setup hooks
+	TeardownHooks []ast.Statement                     // on drun teardown hooks
+	ShellConfigs  map[string]*ast.PlatformShellConfig // platform-specific shell configurations
 }
 
 // NewEngine creates a new v2 execution engine
@@ -110,6 +112,15 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		CurrentFile: currentFile,
 	}
 
+	// Execute drun setup hooks
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.SetupHooks {
+			if err := e.executeStatement(hook, ctx); err != nil {
+				return fmt.Errorf("drun setup hook failed: %v", err)
+			}
+		}
+	}
+
 	// Execute all tasks in dependency order
 	for _, currentTaskName := range executionOrder {
 		// Find the task
@@ -150,6 +161,15 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 				if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
 					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
 				}
+			}
+		}
+	}
+
+	// Execute drun teardown hooks
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.TeardownHooks {
+			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
 			}
 		}
 	}
@@ -215,12 +235,14 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	}
 
 	ctx := &ProjectContext{
-		Name:         project.Name,
-		Version:      project.Version,
-		Settings:     make(map[string]string),
-		BeforeHooks:  []ast.Statement{},
-		AfterHooks:   []ast.Statement{},
-		ShellConfigs: make(map[string]*ast.PlatformShellConfig),
+		Name:          project.Name,
+		Version:       project.Version,
+		Settings:      make(map[string]string),
+		BeforeHooks:   []ast.Statement{},
+		AfterHooks:    []ast.Statement{},
+		SetupHooks:    []ast.Statement{},
+		TeardownHooks: []ast.Statement{},
+		ShellConfigs:  make(map[string]*ast.PlatformShellConfig),
 	}
 
 	// Process project settings
@@ -234,6 +256,10 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 				ctx.BeforeHooks = append(ctx.BeforeHooks, s.Body...)
 			case "after":
 				ctx.AfterHooks = append(ctx.AfterHooks, s.Body...)
+			case "setup":
+				ctx.SetupHooks = append(ctx.SetupHooks, s.Body...)
+			case "teardown":
+				ctx.TeardownHooks = append(ctx.TeardownHooks, s.Body...)
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform

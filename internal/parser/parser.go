@@ -167,7 +167,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer.BEFORE, lexer.AFTER:
+			case lexer.BEFORE, lexer.AFTER, lexer.ON:
 				hook := p.parseLifecycleHook()
 				if hook != nil {
 					stmt.Settings = append(stmt.Settings, hook)
@@ -431,25 +431,50 @@ func (p *Parser) parseKeyValuePairs() map[string]string {
 	return result
 }
 
-// parseLifecycleHook parses before/after hooks
+// parseLifecycleHook parses lifecycle hooks (both old and new syntax)
 func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 	hook := &ast.LifecycleHook{Token: p.curToken}
-	hook.Type = p.curToken.Literal // "before" or "after"
 
-	// Expect "any"
-	if !p.expectPeek(lexer.ANY) {
-		return nil
-	}
-	hook.Scope = p.curToken.Literal
+	if p.curToken.Type == lexer.ON {
+		// New syntax: "on drun setup:" or "on drun teardown:"
 
-	// Expect "task"
-	if !p.expectPeek(lexer.TASK) {
-		return nil
-	}
+		// Expect "drun"
+		if !p.expectPeek(lexer.DRUN) {
+			return nil
+		}
+		hook.Scope = p.curToken.Literal
 
-	// Expect colon
-	if !p.expectPeek(lexer.COLON) {
-		return nil
+		// Expect "setup" or "teardown"
+		p.nextToken()
+		if p.curToken.Type != lexer.SETUP && p.curToken.Type != lexer.TEARDOWN {
+			p.addError("expected 'setup' or 'teardown' after 'on drun'")
+			return nil
+		}
+		hook.Type = p.curToken.Literal
+
+		// Expect colon
+		if !p.expectPeek(lexer.COLON) {
+			return nil
+		}
+	} else {
+		// Old syntax: "before any task:" or "after any task:"
+		hook.Type = p.curToken.Literal // "before" or "after"
+
+		// Expect "any"
+		if !p.expectPeek(lexer.ANY) {
+			return nil
+		}
+		hook.Scope = p.curToken.Literal
+
+		// Expect "task"
+		if !p.expectPeek(lexer.TASK) {
+			return nil
+		}
+
+		// Expect colon
+		if !p.expectPeek(lexer.COLON) {
+			return nil
+		}
 	}
 
 	// Parse hook body - expect INDENT and parse statements
@@ -1494,7 +1519,7 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 			p.nextToken()
 		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN,
 			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW,
-			lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS:
+			lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS, lexer.TEST:
 			p.nextToken()
 		default:
 			p.addError(fmt.Sprintf("expected task name, got %s instead", p.peekToken.Type))

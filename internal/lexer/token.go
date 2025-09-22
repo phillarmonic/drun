@@ -17,20 +17,23 @@ const (
 	VARIABLE // $variable
 
 	// Keywords
-	VERSION // version
-	TASK    // task
-	MEANS   // means
-	PROJECT // project
-	SET     // set
-	INCLUDE // include
-	BEFORE  // before
-	AFTER   // after
-	ANY     // any
-	DEPENDS // depends
-	ON      // on
-	THEN    // then
-	AND     // and
-	OR      // or
+	VERSION  // version
+	TASK     // task
+	MEANS    // means
+	PROJECT  // project
+	SET      // set
+	INCLUDE  // include
+	BEFORE   // before
+	AFTER    // after
+	ANY      // any
+	DRUN     // drun
+	SETUP    // setup
+	TEARDOWN // teardown
+	DEPENDS  // depends
+	ON       // on
+	THEN     // then
+	AND      // and
+	OR       // or
 
 	// Docker keywords
 	DOCKER    // docker
@@ -364,6 +367,12 @@ func (t TokenType) String() string {
 		return "AFTER"
 	case ANY:
 		return "ANY"
+	case DRUN:
+		return "DRUN"
+	case SETUP:
+		return "SETUP"
+	case TEARDOWN:
+		return "TEARDOWN"
 	case DEPENDS:
 		return "DEPENDS"
 	case ON:
@@ -886,6 +895,9 @@ var keywords = map[string]TokenType{
 	"before":      BEFORE,
 	"after":       AFTER,
 	"any":         ANY,
+	"drun":        DRUN,
+	"setup":       SETUP,
+	"teardown":    TEARDOWN,
 	"depends":     DEPENDS,
 	"on":          ON,
 	"then":        THEN,

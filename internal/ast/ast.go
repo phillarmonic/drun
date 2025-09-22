@@ -147,11 +147,11 @@ type PlatformShellConfig struct {
 	Environment map[string]string // environment variables
 }
 
-// LifecycleHook represents before/after hooks
+// LifecycleHook represents lifecycle hooks
 type LifecycleHook struct {
-	Token lexer.Token // the BEFORE or AFTER token
-	Type  string      // "before" or "after"
-	Scope string      // "any" for global hooks
+	Token lexer.Token // the ON, BEFORE, or AFTER token
+	Type  string      // "before", "after", "setup", or "teardown"
+	Scope string      // "any" for task hooks, "drun" for tool hooks
 	Body  []Statement // hook body statements
 }
 
@@ -159,10 +159,23 @@ func (lh *LifecycleHook) statementNode()      {}
 func (lh *LifecycleHook) projectSettingNode() {}
 func (lh *LifecycleHook) String() string {
 	var out strings.Builder
-	out.WriteString(lh.Type)
-	out.WriteString(" ")
-	out.WriteString(lh.Scope)
-	out.WriteString(" task:")
+
+	// Handle different syntax formats
+	if lh.Scope == "drun" {
+		// New syntax: "on drun setup:" or "on drun teardown:"
+		out.WriteString("on ")
+		out.WriteString(lh.Scope)
+		out.WriteString(" ")
+		out.WriteString(lh.Type)
+		out.WriteString(":")
+	} else {
+		// Old syntax: "before any task:" or "after any task:"
+		out.WriteString(lh.Type)
+		out.WriteString(" ")
+		out.WriteString(lh.Scope)
+		out.WriteString(" task:")
+	}
+
 	for _, stmt := range lh.Body {
 		out.WriteString("\n    ")
 		out.WriteString(stmt.String())

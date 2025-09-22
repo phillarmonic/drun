@@ -151,8 +151,10 @@ dependency_list = dependency_item { ( "," | "and" ) dependency_item } [ "then" d
 dependency_item = identifier [ "in" "parallel" ] ;
 
 (* Lifecycle hooks *)
-lifecycle_hook = "before" "running" ":" statement_block
-               | "after" "running" ":" statement_block ;
+lifecycle_hook = "before" "any" "task" ":" statement_block
+               | "after" "any" "task" ":" statement_block
+               | "on" "drun" "setup" ":" statement_block
+               | "on" "drun" "teardown" ":" statement_block ;
 
 (* Statements *)
 statement_block = { statement } ;
@@ -369,7 +371,7 @@ if, else, when, for, each, in, try, catch, finally, break, continue
 task, project, let, set, capture, define, given, requires, accepts
 
 # Dependencies and lifecycle
-depends, on, before, after, running, then, parallel
+depends, on, before, after, running, then, parallel, drun, setup, teardown
 
 # Types and constraints
 from, matching, pattern, format, as, list, of, between, and, defaults, to
@@ -566,6 +568,73 @@ task "example":
   run "echo $TERM"         # Uses configured environment
   capture "whoami" as $user # Uses configured shell and environment
 ```
+
+### Lifecycle Hooks
+
+drun v2 supports two types of lifecycle hooks that allow you to execute code at different points in the execution pipeline:
+
+#### Task-Level Lifecycle Hooks
+
+These hooks run around individual task execution:
+
+```
+project "myapp":
+  before any task:
+    info "🚀 Starting task: {$globals.current_task}"
+    capture task_start_time from now
+  
+  after any task:
+    capture task_end_time from now
+    let task_duration be {task_end_time} - {task_start_time}
+    info "✅ Task completed in {task_duration}"
+```
+
+- **`before any task`**: Executes before each individual task runs
+- **`after any task`**: Executes after each individual task completes
+
+#### Tool-Level Lifecycle Hooks
+
+These hooks run once per drun execution, providing tool-level startup and shutdown capabilities:
+
+```
+project "myapp":
+  on drun setup:
+    info "🚀 Starting drun execution pipeline"
+    info "📊 Tool version: {$globals.drun_version}"
+    capture pipeline_start_time from now
+  
+  on drun teardown:
+    capture pipeline_end_time from now
+    let total_time be {pipeline_end_time} - {pipeline_start_time}
+    info "🏁 Drun execution pipeline completed"
+    info "📊 Total execution time: {total_time}"
+```
+
+- **`on drun setup`**: Executes once at the very beginning of drun execution (before any tasks)
+- **`on drun teardown`**: Executes once at the very end of drun execution (after all tasks complete)
+
+#### Execution Order
+
+When both types of lifecycle hooks are present, they execute in this order:
+
+1. **`on drun setup`** - Tool startup (once)
+2. **`before any task`** - Before target task (once per task)
+3. **Task execution** - The actual task(s)
+4. **`after any task`** - After target task (once per task)
+5. **`on drun teardown`** - Tool shutdown (once)
+
+#### Use Cases
+
+**Task-Level Hooks** are ideal for:
+- Task-specific logging and timing
+- Setting up task-specific environment
+- Task cleanup operations
+
+**Tool-Level Hooks** are ideal for:
+- Global initialization and cleanup
+- Pipeline-wide logging and metrics
+- Tool version reporting
+- Overall execution timing
 
 ### Task Definition
 
@@ -2426,6 +2495,18 @@ project "advanced-example":
     capture end_time from now
     let duration be {end_time} - {start_time}
     info "Task completed in {duration}"
+  
+  # Tool-level lifecycle hooks (run once per drun execution)
+  on drun setup:
+    info "🚀 Starting drun execution pipeline"
+    info "📊 Tool version: {$globals.drun_version}"
+    capture pipeline_start_time from now
+  
+  on drun teardown:
+    capture pipeline_end_time from now
+    let total_time be {pipeline_end_time} - {pipeline_start_time}
+    info "🏁 Drun execution pipeline completed"
+    info "📊 Total execution time: {total_time}"
 
 task "smart deployment" means "Intelligent deployment with auto-detection":
   requires environment from ["dev", "staging", "production"]
