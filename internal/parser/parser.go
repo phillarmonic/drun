@@ -480,16 +480,16 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 	// Parse hook body - expect INDENT and parse statements
 	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
-		p.nextToken() // move to first statement
 
-		// Parse statements until DEDENT
-		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		// Parse statements until DEDENT (using same pattern as parseControlFlowBody)
+		for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+			p.nextToken() // Move to the next token
+
 			if p.isVariableOperationToken(p.curToken.Type) {
 				variable := p.parseVariableStatement()
 				if variable != nil {
 					hook.Body = append(hook.Body, variable)
 				}
-				p.nextToken() // advance to next token after parsing
 			} else if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
 				detection := p.parseDetectionStatement()
 				if detection != nil {
@@ -586,18 +586,22 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 						hook.Body = append(hook.Body, action)
 					}
 				}
-				p.nextToken() // advance to next token after parsing
 			} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
-				p.nextToken() // Skip comments
+				// Skip comments
+				continue
+			} else if p.curToken.Type == lexer.NEWLINE {
+				// Skip newlines
 				continue
 			} else {
 				p.addError(fmt.Sprintf("unexpected token in lifecycle hook body: %s", p.curToken.Type))
-				p.nextToken()
+				break // Stop parsing on unexpected token
 			}
 		}
 
-		if p.curToken.Type == lexer.DEDENT {
+		// Consume DEDENT for hook body and advance to next token for project parser
+		if p.peekToken.Type == lexer.DEDENT {
 			p.nextToken() // consume DEDENT for hook body
+			p.nextToken() // advance to next token for project parser to continue
 		}
 	}
 
