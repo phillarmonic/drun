@@ -8,7 +8,8 @@ set -euo pipefail
 # Configuration
 REPO="phillarmonic/drun"
 BINARY_NAME="drun"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+# Default install directory will be set after platform detection
+INSTALL_DIR="${INSTALL_DIR:-}"
 GITHUB_API="https://api.github.com/repos/${REPO}"
 GITHUB_RELEASES="https://github.com/${REPO}/releases"
 
@@ -83,6 +84,17 @@ check_platform() {
     
     PLATFORM_OS="$os"
     PLATFORM_ARCH="$arch"
+    
+    # Set default install directory if not already set
+    if [[ -z "$INSTALL_DIR" ]]; then
+        if [[ "$os" == "windows" ]]; then
+            # Use a common Windows directory that's likely to be in PATH
+            INSTALL_DIR="$HOME/bin"
+        else
+            # Use standard Unix directory
+            INSTALL_DIR="/usr/local/bin"
+        fi
+    fi
     
     # Set binary name with extension for Windows
     if [[ "$os" == "windows" ]]; then
@@ -197,11 +209,20 @@ install_binary() {
         exit 1
     fi
     
-    # Check if install directory exists and is writable
+    # Check if install directory exists and create it if needed (especially for Windows)
     if [[ ! -d "$INSTALL_DIR" ]]; then
-        log_error "Install directory does not exist: $INSTALL_DIR"
-        log_error "Please create it or set INSTALL_DIR environment variable"
-        exit 1
+        if [[ "$PLATFORM_OS" == "windows" ]]; then
+            log_info "Creating install directory: $INSTALL_DIR"
+            if ! mkdir -p "$INSTALL_DIR"; then
+                log_error "Failed to create install directory: $INSTALL_DIR"
+                log_error "Please create it manually or set INSTALL_DIR environment variable"
+                exit 1
+            fi
+        else
+            log_error "Install directory does not exist: $INSTALL_DIR"
+            log_error "Please create it or set INSTALL_DIR environment variable"
+            exit 1
+        fi
     fi
     
     if [[ ! -w "$INSTALL_DIR" ]]; then
@@ -253,11 +274,22 @@ verify_installation() {
 check_path() {
     if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
         log_warn "$INSTALL_DIR is not in your PATH"
-        log_info "Add the following to your shell profile (.bashrc, .zshrc, etc.):"
-        log_info "export PATH=\"\$PATH:$INSTALL_DIR\""
-        log_info ""
-        log_info "Or run: echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc"
-        log_info "Then restart your shell or run: source ~/.bashrc"
+        
+        if [[ "$PLATFORM_OS" == "windows" ]]; then
+            log_info "To add $INSTALL_DIR to your PATH on Windows:"
+            log_info "1. Open System Properties > Advanced > Environment Variables"
+            log_info "2. Edit the PATH variable and add: $INSTALL_DIR"
+            log_info "3. Restart your terminal/shell"
+            log_info ""
+            log_info "Or for Git Bash/MSYS2, add to your shell profile:"
+            log_info "echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc"
+        else
+            log_info "Add the following to your shell profile (.bashrc, .zshrc, etc.):"
+            log_info "export PATH=\"\$PATH:$INSTALL_DIR\""
+            log_info ""
+            log_info "Or run: echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc"
+            log_info "Then restart your shell or run: source ~/.bashrc"
+        fi
     else
         log_success "$INSTALL_DIR is in your PATH"
     fi
@@ -280,7 +312,8 @@ EXAMPLES:
     curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v1.0.0
 
 ENVIRONMENT VARIABLES:
-    INSTALL_DIR    Installation directory (default: /usr/local/bin)
+    INSTALL_DIR    Installation directory 
+                   (default: /usr/local/bin on Unix, $HOME/bin on Windows)
 
 REQUIREMENTS:
     - curl
