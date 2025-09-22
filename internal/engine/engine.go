@@ -35,6 +35,7 @@ type ExecutionContext struct {
 	Variables   map[string]string       // captured variables from shell commands
 	Project     *ProjectContext         // project-level settings and hooks
 	CurrentFile string                  // path to the current drun file being executed
+	CurrentTask string                  // name of the currently executing task
 }
 
 // ProjectContext holds project-level configuration
@@ -140,6 +141,9 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		if err := e.setupTaskParameters(currentTask, params, ctx); err != nil {
 			return err
 		}
+
+		// Set current task name for globals access
+		ctx.CurrentTask = currentTaskName
 
 		// Execute before hooks only for the target task
 		if currentTaskName == taskName && ctx.Project != nil {
@@ -1840,6 +1844,10 @@ func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionC
 		return e.executeSetStatement(varStmt, ctx)
 	case "transform":
 		return e.executeTransformStatement(varStmt, ctx)
+	case "capture":
+		return e.executeCaptureStatement(varStmt, ctx)
+	case "capture_shell":
+		return e.executeCaptureShellStatement(varStmt, ctx)
 	default:
 		return fmt.Errorf("unknown variable operation: %s", varStmt.Operation)
 	}
@@ -1847,7 +1855,10 @@ func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionC
 
 // executeLetStatement executes "let variable = value" statements
 func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value := e.interpolateVariables(varStmt.Value, ctx)
+	value, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
 
 	// Store the variable in the context even in dry run for interpolation
 	ctx.Variables[varStmt.Variable] = value
@@ -1864,7 +1875,10 @@ func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *Execut
 
 // executeSetStatement executes "set variable to value" statements
 func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value := e.interpolateVariables(varStmt.Value, ctx)
+	value, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
 
 	// Store the variable in the context even in dry run for interpolation
 	ctx.Variables[varStmt.Variable] = value
@@ -1903,6 +1917,69 @@ func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *
 	}
 	_, _ = fmt.Fprintf(e.output, "🔄 Transformed variable %s with %s: %s -> %s\n",
 		varStmt.Variable, varStmt.Function, currentValue, newValue)
+
+	return nil
+}
+
+// executeCaptureStatement executes "capture variable_name from expression" statements
+func (e *Engine) executeCaptureStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	expression, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
+
+	// The expression is already evaluated, so we can use it directly as the value
+	value := expression
+
+	// Store the captured value in the context
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s: %s\n",
+			varStmt.Variable, value)
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📥 Captured %s: %s\n",
+			varStmt.Variable, value)
+	}
+
+	return nil
+}
+
+// executeCaptureShellStatement executes "capture from shell command as $variable" statements
+func (e *Engine) executeCaptureShellStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	// Extract the command from the literal expression
+	literalExpr, ok := varStmt.Value.(*ast.LiteralExpression)
+	if !ok {
+		return fmt.Errorf("expected literal expression for shell capture command")
+	}
+
+	// Interpolate variables in the command
+	command := e.interpolateVariables(literalExpr.Value, ctx)
+
+	// Execute the shell command
+	shellOpts := e.getPlatformShellConfig(ctx)
+	result, err := shell.Execute(command, shellOpts)
+	if err != nil {
+		return fmt.Errorf("failed to capture from shell command '%s': %v", command, err)
+	}
+
+	// Store the captured output (trimmed)
+	value := strings.TrimSpace(result.Stdout)
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s from shell: %s\n",
+			varStmt.Variable, value)
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📥 Captured %s from shell: %s\n",
+			varStmt.Variable, value)
+	}
 
 	return nil
 }
@@ -2083,6 +2160,12 @@ func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionCo
 
 	// Handle variables with $ prefix (most common case for interpolation)
 	if strings.HasPrefix(variable, "$") {
+		// First try to find the variable with the $ prefix (shell captures)
+		if value, exists := ctx.Variables[variable]; exists {
+			return value, true
+		}
+
+		// Then try without the $ prefix (legacy variables)
 		varName := variable[1:] // Remove the $ prefix
 
 		// Check parameters (stored without $ prefix)
@@ -2187,6 +2270,10 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 			if key == "project" && ctx.Project.Name != "" {
 				return ctx.Project.Name
 			}
+			// Check current task
+			if key == "current_task" && ctx.CurrentTask != "" {
+				return ctx.CurrentTask
+			}
 		}
 		return ""
 	}
@@ -2236,6 +2323,10 @@ func (e *Engine) resolveSimpleVariable(variable string, ctx *ExecutionContext) s
 			}
 			if key == "project" && ctx.Project.Name != "" {
 				return ctx.Project.Name
+			}
+			// Check current task
+			if key == "current_task" && ctx.CurrentTask != "" {
+				return ctx.CurrentTask
 			}
 		}
 		return ""
@@ -2857,4 +2948,227 @@ func (e *Engine) isDirEmpty(path string) (bool, error) {
 		return false, err
 	}
 	return len(entries) == 0, nil
+}
+
+// evaluateExpression evaluates an AST expression and returns its string value
+func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) (string, error) {
+	if expr == nil {
+		return "", nil
+	}
+
+	switch ex := expr.(type) {
+	case *ast.LiteralExpression:
+		return ex.Value, nil
+
+	case *ast.IdentifierExpression:
+		// Look up variable value
+		varName := ex.Value
+		if strings.HasPrefix(varName, "$") {
+			// Direct $variable reference
+			if value, exists := ctx.Variables[varName]; exists {
+				return value, nil
+			}
+			return "", fmt.Errorf("undefined variable: %s", varName)
+		} else {
+			// {variable} reference - look up without braces
+			if value, exists := ctx.Variables[varName]; exists {
+				return value, nil
+			}
+			return "", fmt.Errorf("undefined variable: %s", varName)
+		}
+
+	case *ast.BinaryExpression:
+		return e.evaluateBinaryExpression(ex, ctx)
+
+	case *ast.FunctionCallExpression:
+		return e.evaluateFunctionCall(ex, ctx)
+
+	default:
+		return "", fmt.Errorf("unsupported expression type: %T", expr)
+	}
+}
+
+// evaluateBinaryExpression evaluates binary operations like {a} - {b}
+func (e *Engine) evaluateBinaryExpression(expr *ast.BinaryExpression, ctx *ExecutionContext) (string, error) {
+	leftVal, err := e.evaluateExpression(expr.Left, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	rightVal, err := e.evaluateExpression(expr.Right, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	switch expr.Operator {
+	case "-":
+		// Try to parse as numbers for arithmetic
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum - rightNum
+			// Return as integer if it's a whole number
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot subtract non-numeric values: %s - %s", leftVal, rightVal)
+
+	case "+":
+		// Try to parse as numbers for arithmetic
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum + rightNum
+			// Return as integer if it's a whole number
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		// If not numbers, concatenate as strings
+		return leftVal + rightVal, nil
+
+	case "*":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum * rightNum
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot multiply non-numeric values: %s * %s", leftVal, rightVal)
+
+	case "/":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if rightNum == 0 {
+				return "", fmt.Errorf("division by zero")
+			}
+			result := leftNum / rightNum
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot divide non-numeric values: %s / %s", leftVal, rightVal)
+
+	case "==":
+		if leftVal == rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "!=":
+		if leftVal != rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "<":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum < rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal < rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case ">":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum > rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal > rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "<=":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum <= rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal <= rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case ">=":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum >= rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal >= rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	default:
+		return "", fmt.Errorf("unsupported binary operator: %s", expr.Operator)
+	}
+}
+
+// evaluateFunctionCall evaluates function calls like now(), current git branch
+func (e *Engine) evaluateFunctionCall(expr *ast.FunctionCallExpression, ctx *ExecutionContext) (string, error) {
+	switch expr.Function {
+	case "now":
+		return fmt.Sprintf("%d", time.Now().Unix()), nil
+
+	default:
+		// For other functions, treat them as shell commands or interpolation
+		functionStr := expr.Function
+		if len(expr.Arguments) > 0 {
+			var args []string
+			for _, arg := range expr.Arguments {
+				argVal, err := e.evaluateExpression(arg, ctx)
+				if err != nil {
+					return "", err
+				}
+				args = append(args, argVal)
+			}
+			functionStr += "(" + strings.Join(args, ", ") + ")"
+		}
+
+		// Try to execute as shell command
+		shellOpts := e.getPlatformShellConfig(ctx)
+		result, err := shell.Execute(functionStr, shellOpts)
+		if err != nil {
+			return "", fmt.Errorf("failed to execute function '%s': %v", functionStr, err)
+		}
+		return strings.TrimSpace(result.Stdout), nil
+	}
 }

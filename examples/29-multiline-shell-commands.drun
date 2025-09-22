@@ -9,9 +9,7 @@ task "multiline demo" means "Simple multiline shell demo":
 		echo "First multiline command"
 		echo "Second multiline command"
 
-	capture as $result:
-		echo "Captured output"
-		whoami
+	capture from shell "echo 'Captured output'; whoami" as $result
 
 	info "Result: {$result}"
 

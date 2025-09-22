@@ -303,7 +303,10 @@ const (
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
+	PLUS   // +
 	MINUS  // -
+	STAR   // *
+	SLASH  // /
 	EQUALS // =
 
 	// Punctuation
@@ -845,8 +848,14 @@ func (t TokenType) String() string {
 		return "IDENT"
 	case ASSIGN:
 		return "ASSIGN"
+	case PLUS:
+		return "PLUS"
 	case MINUS:
 		return "MINUS"
+	case STAR:
+		return "STAR"
+	case SLASH:
+		return "SLASH"
 	case EQUALS:
 		return "EQUALS"
 	case COLON:

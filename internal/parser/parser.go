@@ -484,7 +484,13 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 
 		// Parse statements until DEDENT
 		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
-			if p.isActionToken(p.curToken.Type) {
+			if p.isVariableOperationToken(p.curToken.Type) {
+				variable := p.parseVariableStatement()
+				if variable != nil {
+					hook.Body = append(hook.Body, variable)
+				}
+				p.nextToken() // advance to next token after parsing
+			} else if p.isActionToken(p.curToken.Type) {
 				if p.isShellActionToken(p.curToken.Type) {
 					shell := p.parseShellStatement()
 					if shell != nil {
@@ -3041,7 +3047,7 @@ func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
 // isVariableOperationToken checks if a token represents variable operations
 func (p *Parser) isVariableOperationToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.LET, lexer.SET, lexer.TRANSFORM:
+	case lexer.LET, lexer.SET, lexer.TRANSFORM, lexer.CAPTURE:
 		return true
 	default:
 		return false
@@ -3061,30 +3067,55 @@ func (p *Parser) parseVariableStatement() *ast.VariableStatement {
 		return p.parseSetVariableStatement(stmt)
 	case lexer.TRANSFORM:
 		return p.parseTransformStatement(stmt)
+	case lexer.CAPTURE:
+		return p.parseCaptureVariableStatement(stmt)
 	default:
 		p.addError(fmt.Sprintf("unexpected variable operation token: %s", p.curToken.Type))
 		return nil
 	}
 }
 
-// parseLetStatement parses "let variable = value" statements
+// parseLetStatement parses "let variable = value" or "let variable be expression" statements
 func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableStatement {
 	stmt.Operation = "let"
 
-	if !p.expectPeekVariableName() {
+	// Check if next token is $variable (old syntax) or identifier (new syntax)
+	switch p.peekToken.Type {
+	case lexer.VARIABLE:
+		// Old syntax: "let $variable = value"
+		if !p.expectPeekVariableName() {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.EQUALS) {
+			return nil
+		}
+
+		// Parse the value (could be string, number, or expression)
+		p.nextToken()
+
+		stmt.Value = p.parseExpression()
+		return stmt
+	case lexer.IDENT:
+		// New syntax: "let variable be expression"
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.BE) {
+			return nil
+		}
+
+		// Parse the expression after "be"
+		p.nextToken()
+		stmt.Value = p.parseExpression()
+		return stmt
+	default:
+		p.addError("expected variable name or identifier after 'let'")
 		return nil
 	}
-	stmt.Variable = p.curToken.Literal
-
-	if !p.expectPeek(lexer.EQUALS) {
-		return nil
-	}
-
-	// Parse the value (could be string, number, or expression)
-	p.nextToken()
-
-	stmt.Value = p.parseVariableValue()
-	return stmt
 }
 
 // parseSetVariableStatement parses "set variable to value" statements
@@ -3103,7 +3134,7 @@ func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.Var
 	// Parse the value
 	p.nextToken()
 
-	stmt.Value = p.parseVariableValue()
+	stmt.Value = p.parseExpression()
 	return stmt
 }
 
@@ -3146,19 +3177,190 @@ func (p *Parser) parseTransformStatement(stmt *ast.VariableStatement) *ast.Varia
 	return stmt
 }
 
-// parseVariableValue parses variable values (strings, numbers, expressions)
-func (p *Parser) parseVariableValue() string {
+// parseCaptureVariableStatement parses "capture variable from expression" and "capture from shell command as $variable" statements
+func (p *Parser) parseCaptureVariableStatement(stmt *ast.VariableStatement) *ast.VariableStatement {
+	stmt.Operation = "capture"
+
+	// Check if next token is "from" (shell syntax) or identifier (expression syntax)
+	switch p.peekToken.Type {
+	case lexer.FROM:
+		// Shell syntax: "capture from shell "command" as $variable"
+		if !p.expectPeek(lexer.FROM) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.SHELL) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		command := p.curToken.Literal
+
+		if !p.expectPeek(lexer.AS) {
+			return nil
+		}
+
+		if !p.expectPeekVariableName() {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		// Mark this as a shell capture by setting a special operation
+		stmt.Operation = "capture_shell"
+
+		// Create a literal expression for the command
+		stmt.Value = &ast.LiteralExpression{
+			Token: p.curToken,
+			Value: command,
+		}
+		return stmt
+	case lexer.IDENT:
+		// Expression syntax: "capture variable from expression"
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		stmt.Variable = p.curToken.Literal
+
+		if !p.expectPeek(lexer.FROM) {
+			return nil
+		}
+
+		// Parse the expression after "from"
+		p.nextToken()
+		stmt.Value = p.parseExpression()
+		return stmt
+	default:
+		p.addError("expected 'from shell' or variable name after 'capture'")
+		return nil
+	}
+}
+
+// parseExpression parses expressions with proper precedence
+func (p *Parser) parseExpression() ast.Expression {
+	return p.parseInfixExpression()
+}
+
+// parseInfixExpression parses binary expressions with operator precedence
+func (p *Parser) parseInfixExpression() ast.Expression {
+	left := p.parsePrimaryExpression()
+	if left == nil {
+		return nil
+	}
+
+	// Check for binary operators
+	for p.peekToken.Type == lexer.PLUS || p.peekToken.Type == lexer.MINUS ||
+		p.peekToken.Type == lexer.STAR || p.peekToken.Type == lexer.SLASH ||
+		p.peekToken.Type == lexer.EQUALS ||
+		p.peekToken.Type == lexer.GT || p.peekToken.Type == lexer.LT ||
+		p.peekToken.Type == lexer.GTE || p.peekToken.Type == lexer.LTE ||
+		p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE {
+
+		operator := p.peekToken.Literal
+		p.nextToken() // consume operator
+		p.nextToken() // move to right operand
+
+		right := p.parsePrimaryExpression()
+		if right == nil {
+			return nil
+		}
+
+		left = &ast.BinaryExpression{
+			Token:    p.curToken,
+			Left:     left,
+			Operator: operator,
+			Right:    right,
+		}
+	}
+
+	return left
+}
+
+// parsePrimaryExpression parses primary expressions (literals, identifiers, function calls)
+func (p *Parser) parsePrimaryExpression() ast.Expression {
 	switch p.curToken.Type {
 	case lexer.STRING:
-		return p.curToken.Literal
+		return &ast.LiteralExpression{
+			Token: p.curToken,
+			Value: p.curToken.Literal,
+		}
 	case lexer.NUMBER:
-		return p.curToken.Literal
+		return &ast.LiteralExpression{
+			Token: p.curToken,
+			Value: p.curToken.Literal,
+		}
+	case lexer.BOOLEAN:
+		return &ast.LiteralExpression{
+			Token: p.curToken,
+			Value: p.curToken.Literal,
+		}
+	case lexer.LBRACE:
+		// Parse {identifier} expressions
+		if !p.expectPeek(lexer.IDENT) {
+			return nil
+		}
+		identifier := p.curToken.Literal
+		if !p.expectPeek(lexer.RBRACE) {
+			return nil
+		}
+		return &ast.IdentifierExpression{
+			Token: p.curToken,
+			Value: identifier,
+		}
 	case lexer.IDENT:
-		// For identifiers, we need to mark them for interpolation
-		return "{" + p.curToken.Literal + "}"
+		// Handle function calls like "now" or simple identifiers
+		if p.peekToken.Type == lexer.LPAREN {
+			// Function call with parentheses
+			return p.parseFunctionCall()
+		} else {
+			// Simple function call or identifier
+			return &ast.FunctionCallExpression{
+				Token:     p.curToken,
+				Function:  p.curToken.Literal,
+				Arguments: []ast.Expression{},
+			}
+		}
+	case lexer.VARIABLE:
+		// Handle $variable references
+		return &ast.IdentifierExpression{
+			Token: p.curToken,
+			Value: p.curToken.Literal, // This includes the $ prefix
+		}
 	default:
-		// For complex expressions, just return the literal for now
-		return p.curToken.Literal
+		p.addError(fmt.Sprintf("unexpected token in expression: %s", p.curToken.Type))
+		return nil
+	}
+}
+
+// parseFunctionCall parses function calls with arguments
+func (p *Parser) parseFunctionCall() ast.Expression {
+	function := p.curToken.Literal
+
+	if !p.expectPeek(lexer.LPAREN) {
+		return nil
+	}
+
+	var args []ast.Expression
+	if p.peekToken.Type != lexer.RPAREN {
+		p.nextToken()
+		args = append(args, p.parseExpression())
+
+		for p.peekToken.Type == lexer.COMMA {
+			p.nextToken() // consume comma
+			p.nextToken() // move to next argument
+			args = append(args, p.parseExpression())
+		}
+	}
+
+	if !p.expectPeek(lexer.RPAREN) {
+		return nil
+	}
+
+	return &ast.FunctionCallExpression{
+		Token:     p.curToken,
+		Function:  function,
+		Arguments: args,
 	}
 }
 

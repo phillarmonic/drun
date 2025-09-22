@@ -664,7 +664,7 @@ type VariableStatement struct {
 	Token     lexer.Token // the LET, SET, or TRANSFORM token
 	Operation string      // "let", "set", "transform"
 	Variable  string      // variable name
-	Value     string      // value or expression
+	Value     Expression  // value or expression
 	Function  string      // function name for operations (concat, split, etc.)
 	Arguments []string    // function arguments
 }
@@ -678,12 +678,16 @@ func (vs *VariableStatement) String() string {
 		out.WriteString("let ")
 		out.WriteString(vs.Variable)
 		out.WriteString(" = ")
-		out.WriteString(vs.Value)
+		if vs.Value != nil {
+			out.WriteString(vs.Value.String())
+		}
 	case "set":
 		out.WriteString("set ")
 		out.WriteString(vs.Variable)
 		out.WriteString(" to ")
-		out.WriteString(vs.Value)
+		if vs.Value != nil {
+			out.WriteString(vs.Value.String())
+		}
 	case "transform":
 		out.WriteString("transform ")
 		out.WriteString(vs.Variable)
@@ -697,9 +701,9 @@ func (vs *VariableStatement) String() string {
 		out.WriteString(vs.Operation)
 		out.WriteString(" ")
 		out.WriteString(vs.Variable)
-		if vs.Value != "" {
+		if vs.Value != nil {
 			out.WriteString(" ")
-			out.WriteString(vs.Value)
+			out.WriteString(vs.Value.String())
 		}
 	}
 

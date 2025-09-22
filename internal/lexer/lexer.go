@@ -112,8 +112,17 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok.Type = RBRACKET
 		tok.Literal = string(l.ch)
+	case '+':
+		tok.Type = PLUS
+		tok.Literal = string(l.ch)
 	case '-':
 		tok.Type = MINUS
+		tok.Literal = string(l.ch)
+	case '*':
+		tok.Type = STAR
+		tok.Literal = string(l.ch)
+	case '/':
+		tok.Type = SLASH
 		tok.Literal = string(l.ch)
 	case '>':
 		if l.peekChar() == '=' {

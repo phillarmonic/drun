@@ -233,7 +233,8 @@ argument_list = expression { "," expression } ;
 (* Variables *)
 variable_declaration = "let" identifier "be" expression
                      | "set" identifier "to" expression
-                     | "capture" identifier "from" expression ;
+                     | "capture" identifier "from" expression
+                     | "capture" "from" "shell" string "as" variable ;
 
 constant_declaration = "define" identifier "as" expression ;
 
@@ -757,14 +758,37 @@ let git_hash be current git commit
 
 #### Capture from Commands
 
+drun v2 supports two types of capture operations:
+
+#### Expression Capture
+Captures values from expressions, functions, and built-in operations:
+
 ```
 capture <name> from <expression>
 
 # Examples:
-capture running_containers from "docker ps --format json"
-capture disk_usage from "df -h /"
+capture start_time from now
 capture branch_name from current git branch
+capture calculated_value from {a} + {b}
 ```
+
+#### Shell Command Capture
+Captures output from shell commands:
+
+```
+capture from shell "<command>" as $<variable>
+
+# Examples:
+capture from shell "docker ps --format json" as $running_containers
+capture from shell "df -h /" as $disk_usage
+capture from shell "whoami" as $current_user
+```
+
+**Key Differences:**
+- **Expression capture** uses plain identifiers and supports complex expressions with arithmetic operations
+- **Shell capture** uses `$variable` syntax and executes commands in the system shell
+- **Expression capture** can reference other variables: `capture result from {a} - {b}`
+- **Shell capture** supports variable interpolation in commands: `capture from shell "echo 'Hello {name}'" as $greeting`
 
 #### Conditional Assignment
 
@@ -1149,15 +1173,21 @@ set environment to:
 #### Capture from Commands
 
 ```
+# Expression capture (for functions and expressions)
 capture git_branch from current git branch
-capture docker_version from "docker --version"
-capture running_pods from "kubectl get pods --output=json"
+capture start_time from now
+capture calculated_result from {a} + {b}
+
+# Shell command capture (for shell commands)
+capture from shell "docker --version" as $docker_version
+capture from shell "kubectl get pods --output=json" as $running_pods
+capture from shell "whoami" as $current_user
 
 # With error handling
 try:
-  capture service_status from "systemctl status nginx"
+  capture from shell "systemctl status nginx" as $service_status
 catch command_error:
-  set service_status to "unknown"
+  set $service_status to "unknown"
 ```
 
 ### Variable Scoping
