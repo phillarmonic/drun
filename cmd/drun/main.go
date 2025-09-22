@@ -661,14 +661,14 @@ func handleDebugMode() error {
 
 // generateStarterConfig creates a starter drun v2 configuration
 func generateStarterConfig() string {
-	return `# Drun (do-run) task runner template. Effortless tasks, serious speed.
+	return `# drun (do-run) a fast, semantic task runner. Effortless tasks, serious speed.
 # Learn more at https://github.com/phillarmonic/drun
 
 version: 2.0
 
 project "my-app" version "1.0":
-	# Cross-platform shell configuration with sensible defaults
-	# These are all default values, you can remove them if you don't intend to change it.
+	/* Cross-platform shell configuration with sensible defaults
+	 These are all default values, you can remove them if you don't intend to change it. */
 
 	shell config:
 		darwin:
