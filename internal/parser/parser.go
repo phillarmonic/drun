@@ -856,18 +856,25 @@ func (p *Parser) parseCaptureStatement(stmt *ast.ShellStatement) *ast.ShellState
 // readCommandTokens reads tokens and groups them into individual commands
 func (p *Parser) readCommandTokens() []string {
 	var commands []string
-	var lines []string
 	var currentLine strings.Builder
+	currentLineNum := p.curToken.Line
 
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		if p.curToken.Type == lexer.COMMENT {
-			// Skip comments
+			// Skip comments but they might indicate a line break
 			p.nextToken()
 			continue
 		}
 
-		// Reconstruct the original text by looking at token positions and literals
-		// This is a simplified approach that works for basic shell commands
+		// Check if we're on a new line
+		if p.curToken.Line != currentLineNum && currentLine.Len() > 0 {
+			// Save the current line and start a new one
+			commands = append(commands, strings.TrimSpace(currentLine.String()))
+			currentLine.Reset()
+		}
+		currentLineNum = p.curToken.Line
+
+		// Add the current token to the line
 		if p.curToken.Type == lexer.STRING {
 			currentLine.WriteString(fmt.Sprintf("\"%s\"", p.curToken.Literal))
 		} else {
@@ -880,12 +887,6 @@ func (p *Parser) readCommandTokens() []string {
 			// Add space if the next token is on the same line
 			if nextToken.Line == p.curToken.Line {
 				currentLine.WriteString(" ")
-			} else {
-				// New line detected, save current command and start new one
-				if currentLine.Len() > 0 {
-					lines = append(lines, strings.TrimSpace(currentLine.String()))
-					currentLine.Reset()
-				}
 			}
 		}
 
@@ -894,17 +895,18 @@ func (p *Parser) readCommandTokens() []string {
 
 	// Add the last line if there is one
 	if currentLine.Len() > 0 {
-		lines = append(lines, strings.TrimSpace(currentLine.String()))
+		commands = append(commands, strings.TrimSpace(currentLine.String()))
 	}
 
-	// Filter out empty lines
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			commands = append(commands, strings.TrimSpace(line))
+	// Filter out empty commands
+	var filteredCommands []string
+	for _, cmd := range commands {
+		if strings.TrimSpace(cmd) != "" {
+			filteredCommands = append(filteredCommands, strings.TrimSpace(cmd))
 		}
 	}
 
-	return commands
+	return filteredCommands
 }
 
 // parseFileStatement parses file operation statements (create, copy, move, delete, read, write, append)
@@ -2610,16 +2612,6 @@ func (p *Parser) isErrorHandlingToken(tokenType lexer.TokenType) bool {
 func (p *Parser) isThrowActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.THROW, lexer.RETHROW, lexer.IGNORE:
-		return true
-	default:
-		return false
-	}
-}
-
-// isCommandKeyword checks if a token type represents a keyword that can start a shell command
-func (p *Parser) isCommandKeyword(tokenType lexer.TokenType) bool {
-	switch tokenType {
-	case lexer.ECHO:
 		return true
 	default:
 		return false

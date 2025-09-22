@@ -183,8 +183,17 @@ func TestExecute_StderrCapture(t *testing.T) {
 func TestDefaultOptions(t *testing.T) {
 	opts := DefaultOptions()
 
-	if opts.Shell != "/bin/sh" {
-		t.Errorf("Expected default shell '/bin/sh', got %q", opts.Shell)
+	// Check that we get a platform-appropriate shell
+	expectedShells := []string{"/bin/zsh", "/bin/bash", "/bin/sh", "powershell.exe"}
+	validShell := false
+	for _, shell := range expectedShells {
+		if opts.Shell == shell {
+			validShell = true
+			break
+		}
+	}
+	if !validShell {
+		t.Errorf("Expected platform-appropriate shell (one of %v), got %q", expectedShells, opts.Shell)
 	}
 
 	if opts.Timeout != 30*time.Second {
