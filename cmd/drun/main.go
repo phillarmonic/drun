@@ -571,6 +571,7 @@ func setWorkspaceDefault(filename string) error {
 // generateStarterConfig creates a starter drun v2 configuration
 func generateStarterConfig() string {
 	return `# Drun (do-run) task runner template. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
 
 version: 2.0
 
