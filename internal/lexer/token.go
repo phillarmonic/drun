@@ -234,6 +234,7 @@ const (
 	ERROR   // error
 	SUCCESS // success
 	FAIL    // fail
+	ECHO    // echo
 
 	// Parameter keywords
 	REQUIRES // requires
@@ -1073,6 +1074,7 @@ var keywords = map[string]TokenType{
 	"error":       ERROR,
 	"success":     SUCCESS,
 	"fail":        FAIL,
+	"echo":        ECHO,
 	"requires":    REQUIRES,
 	"given":       GIVEN,
 	"accepts":     ACCEPTS,

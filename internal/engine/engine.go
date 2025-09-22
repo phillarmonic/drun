@@ -377,6 +377,10 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	case "fail":
 		_, _ = fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
 		return fmt.Errorf("task failed: %s", interpolatedMessage)
+	case "echo":
+		// Process \n escape sequences for newlines
+		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")
+		_, _ = fmt.Fprintf(e.output, "%s\n", processedMessage)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Action)
 	}
@@ -2604,6 +2608,43 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 	// Simple condition evaluation
 	// Handle various patterns like "variable is value", "variable is not empty", etc.
 
+	// Handle "folder/directory is not empty" pattern
+	if strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Check if this is a folder/directory path check
+			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
+				var folderPath string
+				if strings.HasPrefix(left, "folder ") {
+					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
+				} else if strings.HasPrefix(left, "directory ") {
+					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
+				} else if strings.HasPrefix(left, "dir ") {
+					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
+				}
+
+				// Remove quotes if present
+				folderPath = strings.Trim(folderPath, "\"'")
+
+				// Interpolate variables in the path
+				folderPath = e.interpolateVariables(folderPath, ctx)
+
+				// Check if directory exists and is not empty
+				if !e.dirExists(folderPath) {
+					return false // Directory doesn't exist, treat as empty
+				}
+
+				isEmpty, err := e.isDirEmpty(folderPath)
+				if err != nil {
+					return false // Error checking, treat as empty
+				}
+				return !isEmpty // Return true if directory is NOT empty
+			}
+		}
+	}
+
 	// Handle "variable is not empty" pattern
 	if strings.Contains(condition, " is not empty") {
 		parts := strings.SplitN(condition, " is not empty", 2)
@@ -2667,6 +2708,43 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 		}
 	}
 
+	// Handle "folder/directory is empty" pattern
+	if strings.Contains(condition, " is empty") && !strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Check if this is a folder/directory path check
+			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
+				var folderPath string
+				if strings.HasPrefix(left, "folder ") {
+					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
+				} else if strings.HasPrefix(left, "directory ") {
+					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
+				} else if strings.HasPrefix(left, "dir ") {
+					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
+				}
+
+				// Remove quotes if present
+				folderPath = strings.Trim(folderPath, "\"'")
+
+				// Interpolate variables in the path
+				folderPath = e.interpolateVariables(folderPath, ctx)
+
+				// Check if directory exists and is empty
+				if !e.dirExists(folderPath) {
+					return true // Directory doesn't exist, treat as empty
+				}
+
+				isEmpty, err := e.isDirEmpty(folderPath)
+				if err != nil {
+					return true // Error checking, treat as empty
+				}
+				return isEmpty // Return true if directory IS empty
+			}
+		}
+	}
+
 	// Handle "variable is value" pattern
 	if strings.Contains(condition, " is ") {
 		parts := strings.SplitN(condition, " is ", 2)
@@ -2723,4 +2801,19 @@ func (e *Engine) getFileSize(path string) (int64, error) {
 		return 0, err
 	}
 	return info.Size(), nil
+}
+
+// dirExists checks if a directory exists
+func (e *Engine) dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// isDirEmpty checks if a directory is empty
+func (e *Engine) isDirEmpty(path string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
 }

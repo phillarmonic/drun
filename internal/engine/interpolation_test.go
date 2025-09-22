@@ -2,6 +2,9 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -464,6 +467,164 @@ task "test":
 				"Value2 equals empty string",
 			},
 			notExpected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture output
+			var output strings.Builder
+			engine := NewEngine(&output)
+
+			// Parse and execute
+			lexer := lexer.NewLexer(tt.input)
+			parser := parser.NewParser(lexer)
+			program := parser.ParseProgram()
+
+			if len(parser.Errors()) > 0 {
+				t.Fatalf("Parser errors: %v", parser.Errors())
+			}
+
+			err := engine.ExecuteWithParams(program, tt.taskName, tt.params)
+			if err != nil {
+				t.Fatalf("Execution error: %v", err)
+			}
+
+			outputStr := output.String()
+
+			// Check expected messages are present
+			for _, expected := range tt.expected {
+				if !strings.Contains(outputStr, expected) {
+					t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
+				}
+			}
+
+			// Check that unexpected messages are not present
+			for _, notExpected := range tt.notExpected {
+				if strings.Contains(outputStr, notExpected) {
+					t.Errorf("Expected output to NOT contain %q, but got:\n%s", notExpected, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestEngine_FolderEmptyConditions(t *testing.T) {
+	// Create temporary directories for testing
+	tempDir := t.TempDir()
+	emptyDir := filepath.Join(tempDir, "empty")
+	nonEmptyDir := filepath.Join(tempDir, "nonempty")
+
+	// Create empty directory
+	err := os.MkdirAll(emptyDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create empty directory: %v", err)
+	}
+
+	// Create non-empty directory with a file
+	err = os.MkdirAll(nonEmptyDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create non-empty directory: %v", err)
+	}
+	testFile := filepath.Join(nonEmptyDir, "test.txt")
+	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		input       string
+		taskName    string
+		params      map[string]string
+		expected    []string
+		notExpected []string
+	}{
+		{
+			name: "folder is empty - empty directory",
+			input: fmt.Sprintf(`version: 2.0
+
+task "test":
+  if folder "%s" is empty:
+    info "Folder is empty"
+  
+  if folder "%s" is not empty:
+    info "Folder is not empty"`, emptyDir, emptyDir),
+			taskName:    "test",
+			params:      map[string]string{},
+			expected:    []string{"Folder is empty"},
+			notExpected: []string{"Folder is not empty"},
+		},
+		{
+			name: "folder is not empty - non-empty directory",
+			input: fmt.Sprintf(`version: 2.0
+
+task "test":
+  if folder "%s" is empty:
+    info "Folder is empty"
+  
+  if folder "%s" is not empty:
+    info "Folder is not empty"`, nonEmptyDir, nonEmptyDir),
+			taskName:    "test",
+			params:      map[string]string{},
+			expected:    []string{"Folder is not empty"},
+			notExpected: []string{"Folder is empty"},
+		},
+		{
+			name: "directory keyword works",
+			input: fmt.Sprintf(`version: 2.0
+
+task "test":
+  if directory "%s" is empty:
+    info "Directory is empty"
+  
+  if directory "%s" is not empty:
+    info "Directory is not empty"`, emptyDir, nonEmptyDir),
+			taskName: "test",
+			params:   map[string]string{},
+			expected: []string{"Directory is empty", "Directory is not empty"},
+		},
+		{
+			name: "dir keyword works",
+			input: fmt.Sprintf(`version: 2.0
+
+task "test":
+  if dir "%s" is empty:
+    info "Dir is empty"
+  
+  if dir "%s" is not empty:
+    info "Dir is not empty"`, emptyDir, nonEmptyDir),
+			taskName: "test",
+			params:   map[string]string{},
+			expected: []string{"Dir is empty", "Dir is not empty"},
+		},
+		{
+			name: "non-existent folder is treated as empty",
+			input: `version: 2.0
+
+task "test":
+  if folder "/tmp/non-existent-folder-xyz123" is empty:
+    info "Non-existent folder is empty"
+  
+  if folder "/tmp/non-existent-folder-xyz123" is not empty:
+    info "Non-existent folder is not empty"`,
+			taskName:    "test",
+			params:      map[string]string{},
+			expected:    []string{"Non-existent folder is empty"},
+			notExpected: []string{"Non-existent folder is not empty"},
+		},
+		{
+			name: "folder path with variable interpolation",
+			input: `version: 2.0
+
+task "test":
+  given $folder_path defaults to empty
+  
+  if folder "{$folder_path}" is empty:
+    info "Variable folder is empty"`,
+			taskName: "test",
+			params:   map[string]string{"folder_path": emptyDir},
+			expected: []string{"Variable folder is empty"},
 		},
 	}
 

@@ -815,6 +815,19 @@ if $features is not empty:
 
 if $name is "":
   warn "Name is required"
+
+# Folder/directory empty conditions
+if folder "build" is empty:
+  info "Build directory is empty"
+
+if folder "dist" is not empty:
+  info "Distribution files exist"
+
+if directory "/tmp/cache" is empty:
+  run "rm -rf /tmp/cache"
+
+if dir "{$output_path}" is not empty:
+  warn "Output directory contains files"
 ```
 
 #### Smart Detection Conditions
@@ -1700,6 +1713,48 @@ check if directory ".git" exists
 get size of file "large-file.dat"
 get modification time of file "config.json"
 ```
+
+#### Directory Empty Checks ⭐ *New*
+
+Check if directories are empty or contain files using semantic conditions:
+
+```
+# Basic directory empty checks
+if folder "build" is empty:
+  info "Build directory is clean"
+
+if folder "dist" is not empty:
+  info "Distribution files exist"
+  run "rm -rf dist/*"
+
+# Alternative keywords
+if directory "/tmp/cache" is empty:
+  info "Cache is empty"
+
+if dir "logs" is not empty:
+  info "Log files found"
+  run "gzip logs/*.log"
+
+# With variable interpolation
+if folder "{$output_dir}" is empty:
+  warn "Output directory is empty"
+
+if directory "{$project_root}/node_modules" is not empty:
+  info "Dependencies are installed"
+
+# Practical examples
+if folder "migrations/pending" is not empty:
+  run "php artisan migrate"
+
+if directory "tests/coverage" is empty:
+  run "npm run test:coverage"
+```
+
+**Key Features:**
+- **Multiple keywords**: Use `folder`, `directory`, or `dir` interchangeably
+- **Path interpolation**: Support for variable interpolation in paths
+- **Non-existent handling**: Non-existent directories are treated as empty
+- **Semantic conditions**: Natural `is empty` and `is not empty` syntax
 
 ### Network Actions
 

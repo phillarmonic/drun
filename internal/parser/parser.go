@@ -834,11 +834,12 @@ func (p *Parser) readCommandTokens() []string {
 			continue
 		}
 
-		// If we encounter an IDENT token and we already have tokens in currentCommand,
+		// If we encounter an IDENT token or a command keyword and we already have tokens in currentCommand,
 		// it might be a new command, but we need to be smart about it
-		if p.curToken.Type == lexer.IDENT && len(currentCommand) > 0 {
-			// Check if the previous token suggests this IDENT is part of the same command
-			// For example, if previous token was ILLEGAL (like "-"), this IDENT is likely part of the same command
+		isCommandStart := (p.curToken.Type == lexer.IDENT || p.isCommandKeyword(p.curToken.Type)) && len(currentCommand) > 0
+		if isCommandStart {
+			// Check if the previous token suggests this token is part of the same command
+			// For example, if previous token was ILLEGAL (like "-"), this token is likely part of the same command
 			prevTokenWasFlag := len(currentCommand) > 0 &&
 				(strings.HasPrefix(currentCommand[len(currentCommand)-1], "-") ||
 					currentCommand[len(currentCommand)-1] == "-")
@@ -2521,7 +2522,7 @@ func (p *Parser) isControlFlowToken(tokenType lexer.TokenType) bool {
 // isActionToken checks if a token type represents an action
 func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL,
+	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL, lexer.ECHO,
 		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
 		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
 		return true
@@ -2574,6 +2575,16 @@ func (p *Parser) isErrorHandlingToken(tokenType lexer.TokenType) bool {
 func (p *Parser) isThrowActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.THROW, lexer.RETHROW, lexer.IGNORE:
+		return true
+	default:
+		return false
+	}
+}
+
+// isCommandKeyword checks if a token type represents a keyword that can start a shell command
+func (p *Parser) isCommandKeyword(tokenType lexer.TokenType) bool {
+	switch tokenType {
+	case lexer.ECHO:
 		return true
 	default:
 		return false
