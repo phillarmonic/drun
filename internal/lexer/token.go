@@ -135,6 +135,7 @@ const (
 	// Smart Detection keywords
 	DETECT      // detect
 	AVAILABLE   // available
+	NOT         // not
 	INSTALLED   // installed
 	TOOL        // tool
 	FRAMEWORK   // framework
@@ -569,6 +570,8 @@ func (t TokenType) String() string {
 		return "DETECT"
 	case AVAILABLE:
 		return "AVAILABLE"
+	case NOT:
+		return "NOT"
 	case INSTALLED:
 		return "INSTALLED"
 	case TOOL:
@@ -753,6 +756,8 @@ func (t TokenType) String() string {
 		return "SUCCESS"
 	case FAIL:
 		return "FAIL"
+	case ECHO:
+		return "ECHO"
 	case REQUIRES:
 		return "REQUIRES"
 	case GIVEN:
@@ -1006,6 +1011,7 @@ var keywords = map[string]TokenType{
 	"expect":      EXPECT,
 	"detect":      DETECT,
 	"available":   AVAILABLE,
+	"not":         NOT,
 	"installed":   INSTALLED,
 	"tool":        TOOL,
 	"framework":   FRAMEWORK,

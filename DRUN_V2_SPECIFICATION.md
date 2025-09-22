@@ -1072,9 +1072,15 @@ if dir "{$output_path}" is not empty:
 #### Smart Detection Conditions
 
 ```
-# Tool detection
-if docker is running:
+# Tool availability detection
+if docker is available:
   build container
+else:
+  error "Docker is required"
+
+if docker is not available:
+  error "Docker is required for this task"
+  fail "Missing dependency"
 
 if kubernetes is available:
   deploy to cluster
@@ -2217,6 +2223,16 @@ build multi-platform docker image
 # Detects kubectl, helm, etc.
 deploy to kubernetes
 install helm chart "nginx-ingress"
+
+# Check if tools are available or not available
+if docker is available:
+    info "Docker is ready"
+else:
+    error "Docker not found"
+
+if kubectl is not available:
+    warn "Kubernetes tools not installed"
+    info "Skipping Kubernetes deployment"
 ```
 
 ### DRY Tool Detection

@@ -1581,14 +1581,25 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 	return nil
 }
 
-// executeIfAvailable executes "if tool is available" conditions
+// executeIfAvailable executes "if tool is available" and "if tool is not available" conditions
 func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
 	available := detector.IsToolAvailable(stmt.Target)
 
+	// Handle negation for "not available" conditions
+	var conditionMet bool
+	var conditionText string
+	if stmt.Condition == "not_available" {
+		conditionMet = !available
+		conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+	} else {
+		conditionMet = available
+		conditionText = fmt.Sprintf("%s is available", stmt.Target)
+	}
+
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s is available: %t\n", stmt.Target, available)
-		if available {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if-available body for %s\n", stmt.Target)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s: %t\n", conditionText, conditionMet)
+		if conditionMet {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body for %s\n", stmt.Target)
 			for _, bodyStmt := range stmt.Body {
 				if err := e.executeStatement(bodyStmt, ctx); err != nil {
 					return err
@@ -1605,9 +1616,11 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.Dete
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s is available: %t\n", stmt.Target, available)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s: %t\n", conditionText, conditionMet)
+	}
 
-	if available {
+	if conditionMet {
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, ctx); err != nil {
 				return err
@@ -1652,8 +1665,10 @@ func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *ast.Detect
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
-		stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
+			stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+	}
 
 	if matches {
 		for _, bodyStmt := range stmt.Body {
@@ -1691,8 +1706,10 @@ func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
-		stmt.Target, matches, currentEnv)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
+			stmt.Target, matches, currentEnv)
+	}
 
 	if matches {
 		for _, bodyStmt := range stmt.Body {

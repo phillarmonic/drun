@@ -490,6 +490,90 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 					hook.Body = append(hook.Body, variable)
 				}
 				p.nextToken() // advance to next token after parsing
+			} else if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
+				detection := p.parseDetectionStatement()
+				if detection != nil {
+					hook.Body = append(hook.Body, detection)
+				}
+			} else if p.isControlFlowToken(p.curToken.Type) {
+				controlFlow := p.parseControlFlowStatement()
+				if controlFlow != nil {
+					hook.Body = append(hook.Body, controlFlow)
+				}
+			} else if p.isErrorHandlingToken(p.curToken.Type) {
+				errorHandling := p.parseErrorHandlingStatement()
+				if errorHandling != nil {
+					hook.Body = append(hook.Body, errorHandling)
+				}
+			} else if p.isThrowActionToken(p.curToken.Type) {
+				throw := p.parseThrowStatement()
+				if throw != nil {
+					hook.Body = append(hook.Body, throw)
+				}
+			} else if p.isDockerToken(p.curToken.Type) {
+				// Special handling for RUN token - check context
+				if p.curToken.Type == lexer.RUN {
+					// Look ahead to determine if this is shell or docker command
+					if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
+						// This is "run 'command'" or "run:" - shell command
+						shell := p.parseShellStatement()
+						if shell != nil {
+							hook.Body = append(hook.Body, shell)
+						}
+					} else {
+						// This is "docker run container" - docker command
+						docker := p.parseDockerStatement()
+						if docker != nil {
+							hook.Body = append(hook.Body, docker)
+						}
+					}
+				} else {
+					docker := p.parseDockerStatement()
+					if docker != nil {
+						hook.Body = append(hook.Body, docker)
+					}
+				}
+			} else if p.isGitToken(p.curToken.Type) {
+				// Special handling for CREATE token - check context
+				if p.curToken.Type == lexer.CREATE {
+					// Look ahead to determine if this is git or file operation
+					if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
+						git := p.parseGitStatement()
+						if git != nil {
+							hook.Body = append(hook.Body, git)
+						}
+					} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "file") {
+						file := p.parseFileStatement()
+						if file != nil {
+							hook.Body = append(hook.Body, file)
+						}
+					} else {
+						git := p.parseGitStatement()
+						if git != nil {
+							hook.Body = append(hook.Body, git)
+						}
+					}
+				} else {
+					git := p.parseGitStatement()
+					if git != nil {
+						hook.Body = append(hook.Body, git)
+					}
+				}
+			} else if p.isHTTPToken(p.curToken.Type) {
+				http := p.parseHTTPStatement()
+				if http != nil {
+					hook.Body = append(hook.Body, http)
+				}
+			} else if p.isNetworkToken(p.curToken.Type) {
+				network := p.parseNetworkStatement()
+				if network != nil {
+					hook.Body = append(hook.Body, network)
+				}
+			} else if p.isFileActionToken(p.curToken.Type) {
+				file := p.parseFileStatement()
+				if file != nil {
+					hook.Body = append(hook.Body, file)
+				}
 			} else if p.isActionToken(p.curToken.Type) {
 				if p.isShellActionToken(p.curToken.Type) {
 					shell := p.parseShellStatement()
@@ -2190,9 +2274,16 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			switch p.peekToken.Type {
 			case lexer.IS:
 				p.nextToken() // consume IS
-				if p.peekToken.Type == lexer.AVAILABLE {
+				switch p.peekToken.Type {
+				case lexer.AVAILABLE:
 					p.nextToken() // consume AVAILABLE
 					stmt.Condition = "available"
+				case lexer.NOT:
+					p.nextToken() // consume NOT
+					if p.peekToken.Type == lexer.AVAILABLE {
+						p.nextToken() // consume AVAILABLE
+						stmt.Condition = "not_available"
+					}
 				}
 			case lexer.VERSION:
 				p.nextToken() // consume VERSION

@@ -233,7 +233,7 @@ task "test":
 		{IF, "if"},
 		{VARIABLE, "$features"},
 		{IS, "is"},
-		{IDENT, "not"},
+		{NOT, "not"},
 		{EMPTY, "empty"}, // Test that empty is tokenized as EMPTY in "is not empty"
 		{COLON, ":"},
 		{INDENT, ""},
