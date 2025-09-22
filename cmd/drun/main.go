@@ -574,6 +574,8 @@ func generateStarterConfig() string {
 
 project "my-app" version "1.0":
   # Cross-platform shell configuration with sensible defaults
+  # These are all default values, you can remove them if you don't intend to change it.
+
   shell config:
     darwin:
       executable: "/bin/zsh"
