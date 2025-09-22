@@ -325,7 +325,8 @@ const (
 	NEWLINE
 
 	// Comments
-	COMMENT // # comment
+	COMMENT           // # comment
+	MULTILINE_COMMENT // /* comment */
 )
 
 // Token represents a single token
@@ -882,6 +883,8 @@ func (t TokenType) String() string {
 		return "NEWLINE"
 	case COMMENT:
 		return "COMMENT"
+	case MULTILINE_COMMENT:
+		return "MULTILINE_COMMENT"
 	default:
 		return "UNKNOWN"
 	}

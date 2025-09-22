@@ -1,6 +1,8 @@
-# Drun Lifecycle Hooks Example
-# This example demonstrates the new tool-level lifecycle hooks
-# that run once at drun startup and shutdown
+/*
+    Drun Lifecycle Hooks Example
+    This example demonstrates the new tool-level lifecycle hooks
+    that run once at drun startup and shutdown
+*/
 
 version: 2.0
 

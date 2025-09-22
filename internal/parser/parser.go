@@ -88,7 +88,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 			if task != nil {
 				program.Tasks = append(program.Tasks, task)
 			}
-		case lexer.COMMENT:
+		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments
 		case lexer.DEDENT:
 			// Skip stray lexer.DEDENT tokens (they should be consumed by task parsing)
@@ -183,7 +183,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
-			case lexer.COMMENT:
+			case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 				p.nextToken() // Skip comments
 			default:
 				p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
@@ -287,7 +287,7 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 			if config != nil {
 				stmt.Platforms[platform] = config
 			}
-		case lexer.COMMENT:
+		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments
 		default:
 			p.addError(fmt.Sprintf("unexpected token in shell config: %s", p.curToken.Type))
@@ -346,7 +346,7 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 				p.addError(fmt.Sprintf("unknown shell config key: %s", key))
 				p.nextToken()
 			}
-		case lexer.COMMENT:
+		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments
 		default:
 			p.addError(fmt.Sprintf("unexpected token in platform config: %s", p.curToken.Type))
@@ -378,7 +378,7 @@ func (p *Parser) parseStringArray() []string {
 			}
 			result = append(result, p.curToken.Literal)
 			p.nextToken()
-		} else if p.curToken.Type == lexer.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			p.nextToken() // Skip comments
 		} else {
 			p.addError(fmt.Sprintf("expected array item (- \"value\"), got %s", p.curToken.Type))
@@ -419,7 +419,7 @@ func (p *Parser) parseKeyValuePairs() map[string]string {
 
 			result[key] = p.curToken.Literal
 			p.nextToken()
-		} else if p.curToken.Type == lexer.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			p.nextToken() // Skip comments
 		} else {
 			p.addError(fmt.Sprintf("expected key-value pair (key: \"value\"), got %s", p.curToken.Type))
@@ -503,7 +503,7 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 					}
 				}
 				p.nextToken() // advance to next token after parsing
-			} else if p.curToken.Type == lexer.COMMENT {
+			} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 				p.nextToken() // Skip comments
 				continue
 			} else {
@@ -706,7 +706,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, action)
 				}
 			}
-		} else if p.curToken.Type == lexer.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments in task body
 			continue
 		} else if p.curToken.Type == lexer.NEWLINE {
@@ -860,7 +860,7 @@ func (p *Parser) readCommandTokens() []string {
 	currentLineNum := p.curToken.Line
 
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
-		if p.curToken.Type == lexer.COMMENT {
+		if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments but they might indicate a line break
 			p.nextToken()
 			continue
@@ -883,7 +883,7 @@ func (p *Parser) readCommandTokens() []string {
 
 		// Check if we need to add a space before the next token
 		nextToken := p.peekToken
-		if nextToken.Type != lexer.DEDENT && nextToken.Type != lexer.EOF && nextToken.Type != lexer.COMMENT {
+		if nextToken.Type != lexer.DEDENT && nextToken.Type != lexer.EOF && nextToken.Type != lexer.COMMENT && nextToken.Type != lexer.MULTILINE_COMMENT {
 			// Add space if the next token is on the same line
 			if nextToken.Line == p.curToken.Line {
 				currentLine.WriteString(" ")
@@ -2652,7 +2652,7 @@ func (p *Parser) addError(msg string) {
 
 // skipComments skips over comment tokens
 func (p *Parser) skipComments() {
-	for p.curToken.Type == lexer.COMMENT {
+	for p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 		p.nextToken()
 	}
 }
@@ -3154,7 +3154,7 @@ func (p *Parser) parseTransformStatement(stmt *ast.VariableStatement) *ast.Varia
 	stmt.Function = p.curToken.Literal
 
 	// Parse optional arguments
-	for p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF && p.peekToken.Type != lexer.COMMENT {
+	for p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF && p.peekToken.Type != lexer.COMMENT && p.peekToken.Type != lexer.MULTILINE_COMMENT {
 		// Check if the next token looks like an argument
 		if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.IDENT || p.peekToken.Type == lexer.NUMBER {
 			p.nextToken()
@@ -3706,7 +3706,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if errorHandling != nil {
 				body = append(body, errorHandling)
 			}
-		} else if p.curToken.Type == lexer.COMMENT {
+		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments
 			continue
 		} else if p.curToken.Type == lexer.NEWLINE {

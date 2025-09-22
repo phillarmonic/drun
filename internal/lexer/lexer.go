@@ -122,8 +122,14 @@ func (l *Lexer) NextToken() Token {
 		tok.Type = STAR
 		tok.Literal = string(l.ch)
 	case '/':
-		tok.Type = SLASH
-		tok.Literal = string(l.ch)
+		if l.peekChar() == '*' {
+			tok.Type = MULTILINE_COMMENT
+			tok.Literal = l.readMultilineComment()
+			return tok // Don't call readChar() again
+		} else {
+			tok.Type = SLASH
+			tok.Literal = string(l.ch)
+		}
 	case '>':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -223,6 +229,11 @@ func (l *Lexer) handleIndentation() Token {
 		return l.NextToken()
 	}
 
+	// Handle multiline comment start - don't process indentation for multiline comments
+	if l.ch == '/' && l.peekChar() == '*' {
+		return l.NextToken()
+	}
+
 	// Count indentation (spaces and tabs)
 	indent := 0
 	pos := l.position
@@ -313,6 +324,24 @@ func (l *Lexer) readComment() string {
 	for l.ch != '\n' && l.ch != 0 {
 		l.readChar()
 	}
+	return l.input[position:l.position]
+}
+
+// readMultilineComment reads a multiline comment /* ... */
+func (l *Lexer) readMultilineComment() string {
+	position := l.position
+	l.readChar() // consume '/'
+	l.readChar() // consume '*'
+
+	for l.ch != 0 {
+		if l.ch == '*' && l.peekChar() == '/' {
+			l.readChar() // consume '*'
+			l.readChar() // consume '/'
+			break
+		}
+		l.readChar()
+	}
+
 	return l.input[position:l.position]
 }
 

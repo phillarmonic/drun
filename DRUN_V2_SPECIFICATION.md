@@ -345,6 +345,10 @@ object_member = ( identifier | string_literal ) ":" expression ;
 identifier = letter { letter | digit | "_" } ;
 letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
 digit = "0" | "1" | ... | "9" ;
+
+(* Comments *)
+single_line_comment = "#" { any_character_except_newline } ;
+multiline_comment = "/*" { any_character } "*/" ;
 ```
 
 ---
@@ -394,16 +398,51 @@ true, false, now, current, secret, env
 
 ### Comments
 
+drun v2 supports both single-line and multiline comments for documenting your automation workflows.
+
+#### Single-line Comments
+
+Single-line comments start with `#` and continue to the end of the line:
+
 ```
-# Single-line comment
+# This is a single-line comment
 task "example":  # End-of-line comment
   info "Hello"
+```
+
+#### Multiline Comments
+
+Multiline comments use C-style `/* */` syntax and can span multiple lines:
+
+```
+/*
+    This is a multiline comment
+    that can span several lines
+    and is useful for detailed documentation
+*/
+
+version: 2.0
 
 /*
-Multi-line comment
-Can span multiple lines
+    Project configuration and setup
+    Author: Development Team
+    Last updated: 2025-09-22
 */
+project "my-app" version "1.0":
+    info "Starting application setup"
 ```
+
+**Key Features:**
+- Multiline comments preserve formatting and indentation
+- They can appear anywhere in the file where whitespace is allowed
+- Unterminated multiline comments are handled gracefully (consume to end of file)
+- Comments are completely ignored during parsing and execution
+- Useful for file headers, detailed explanations, and temporary code disabling
+
+**Best Practices:**
+- Use single-line comments for brief explanations
+- Use multiline comments for file headers, detailed documentation, and block commenting
+- Consider using multiline comments to temporarily disable sections of code during development
 
 ### Indentation
 

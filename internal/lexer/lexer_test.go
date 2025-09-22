@@ -258,3 +258,83 @@ task "test":
 		}
 	}
 }
+
+func TestLexer_MultilineComments(t *testing.T) {
+	input := `/*
+    Drun Lifecycle Hooks Example
+    This example demonstrates the new tool-level lifecycle hooks
+    that run once at drun startup and shutdown
+*/
+
+version: 2.0
+
+/* Another multiline comment */
+task "test":
+	info "Hello World"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{MULTILINE_COMMENT, "/*\n    Drun Lifecycle Hooks Example\n    This example demonstrates the new tool-level lifecycle hooks\n    that run once at drun startup and shutdown\n*/"},
+		{VERSION, "version"},
+		{COLON, ":"},
+		{NUMBER, "2.0"},
+		{MULTILINE_COMMENT, "/* Another multiline comment */"},
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{INFO, "info"},
+		{STRING, "Hello World"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q (literal: %q)",
+				i, tt.expectedType, tok.Type, tok.Literal)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_UnterminatedMultilineComment(t *testing.T) {
+	input := `/*
+    This comment is not terminated
+    
+version: 2.0`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{MULTILINE_COMMENT, "/*\n    This comment is not terminated\n    \nversion: 2.0"},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q (literal: %q)",
+				i, tt.expectedType, tok.Type, tok.Literal)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
