@@ -1,38 +1,38 @@
 version: 2.0
 
 project "webapp" version "1.2.0":
-  set registry to "ghcr.io/company"
-  set env to "production"
-  set timeout to "300s"
-  include "shared/docker.drun"
-  
-  before any task:
-    info "🚀 Starting {$globals.project} v{$globals.version} task execution"
-    info "📊 Environment: {$globals.env}"
-    info "🏗️  Registry: {$globals.registry}"
-  
-  after any task:
-    info "✅ Task execution completed for {$globals.project}"
-    info "🕐 Timeout was set to {$globals.timeout}"
+	set registry to "ghcr.io/company"
+	set env to "production"
+	set timeout to "300s"
+	include "shared/docker.drun"
+
+	before any task:
+		info "🚀 Starting {$globals.project} v{$globals.version} task execution"
+		info "📊 Environment: {$globals.env}"
+		info "🏗️  Registry: {$globals.registry}"
+
+	after any task:
+		info "✅ Task execution completed for {$globals.project}"
+		info "🕐 Timeout was set to {$globals.timeout}"
 
 task "build" means "Build the application":
-  info "Building {$globals.project}:{$globals.version}"
-  step "Compiling source code"
-  step "Running tests"
-  step "Building Docker image {$globals.registry}/{$globals.project}:{$globals.version}"
-  success "Build completed successfully!"
+	info "Building {$globals.project}:{$globals.version}"
+	step "Compiling source code"
+	step "Running tests"
+	step "Building Docker image {$globals.registry}/{$globals.project}:{$globals.version}"
+	success "Build completed successfully!"
 
 task "deploy" means "Deploy to environment":
-  requires $target_env from ["dev", "staging", "production"]
-  
-  info "Deploying {$globals.project}:{$globals.version} to {$target_env}"
-  step "Validating deployment target: {$target_env}"
-  step "Pushing image to {$globals.registry}"
-  step "Updating {$target_env} environment"
-  success "Deployment to {$target_env} completed!"
+	requires $target_env from ["dev", "staging", "production"]
+
+	info "Deploying {$globals.project}:{$globals.version} to {$target_env}"
+	step "Validating deployment target: {$target_env}"
+	step "Pushing image to {$globals.registry}"
+	step "Updating {$target_env} environment"
+	success "Deployment to {$target_env} completed!"
 
 task "status" means "Check application status":
-  info "Checking status of {$globals.project} v{$globals.version}"
-  step "Verifying deployment in {$globals.env}"
-  step "Running health checks"
-  success "All systems operational!"
+	info "Checking status of {$globals.project} v{$globals.version}"
+	step "Verifying deployment in {$globals.env}"
+	step "Running health checks"
+	success "All systems operational!"

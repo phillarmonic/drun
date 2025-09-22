@@ -576,61 +576,62 @@ func generateStarterConfig() string {
 version: 2.0
 
 project "my-app" version "1.0":
-  # Cross-platform shell configuration with sensible defaults
-  # These are all default values, you can remove them if you don't intend to change it.
+	# Cross-platform shell configuration with sensible defaults
+	# These are all default values, you can remove them if you don't intend to change it.
 
-  shell config:
-    darwin:
-      executable: "/bin/zsh"
-      args:
-        - "-l"
-        - "-i"
-      environment:
-        TERM: "xterm-256color"
-        SHELL_SESSION_HISTORY: "0"
-    
-    linux:
-      executable: "/bin/bash"
-      args:
-        - "--login"
-        - "--interactive"
-      environment:
-        TERM: "xterm-256color"
-        HISTCONTROL: "ignoredups"
-    
-    windows:
-      executable: "powershell.exe"
-      args:
-        - "-NoProfile"
-        - "-ExecutionPolicy"
-        - "Bypass"
-      environment:
-        PSModulePath: ""
+	shell config:
+		darwin:
+			executable: "/bin/zsh"
+			args:
+				- "-l"
+				- "-i"
+			environment:
+				TERM: "xterm-256color"
+				SHELL_SESSION_HISTORY: "0"
+		
+		linux:
+			executable: "/bin/bash"
+			args:
+				- "--login"
+				- "--interactive"
+			environment:
+				TERM: "xterm-256color"
+				HISTCONTROL: "ignoredups"
+		
+		windows:
+			executable: "powershell.exe"
+			args:
+				- "-NoProfile"
+				- "-ExecutionPolicy"
+				- "Bypass"
+			environment:
+				PSModulePath: ""
 
 task "default" means "Welcome to drun v2":
-  info "Welcome to drun v2! 🚀"
-  step "This is your starter task file"
-  success "Ready to build amazing automation!"
+	echo "Starting up..."
+	info "Welcome to drun v2! 🚀"
+	step "This is your starter task file"
+	success "Ready to build amazing automation!"
 
 task "hello" means "Say hello":
-  info "Hello from the semantic task runner!"
+	info "Hello from the semantic task runner!"
 
 task "build" means "Build the project":
-  step "Building project..."
-  info "Add your build commands here"
-  success "Build completed!"
+	step "Building project..."
+	info "Add your build commands here"
+	success "Build completed!"
 
 task "test" means "Run tests":
-  step "Running tests..."
-  info "Add your test commands here"
-  success "All tests passed!"
+	step "Running tests..."
+	info "Add your test commands here"
+	success "All tests passed!"
 
 task "deploy" means "Deploy application":
-  given $environment defaults to "development"
-  step "Deploying application to {$environment}..."
-  warn "Make sure you're deploying to the right environment!"
-  info "Add your deployment commands here"
-  success "Deployment to {$environment} completed!"
+	given $environment defaults to "development"
+	step "Deploying application to {$environment}..."
+	warn "Make sure you're deploying to the right environment!"
+	info "Add your deployment commands here"
+	success "Deployment to {$environment} completed!"
 `
 }
 

@@ -259,6 +259,30 @@ drun --set-workspace tasks.drun
 
 See the included examples for comprehensive task configurations.
 
+### Indentation
+
+drun v2 supports both **tabs** and **spaces** for indentation, providing flexibility for different coding preferences:
+
+```drun
+# Using spaces (2 or 4 spaces per level)
+task "spaces-example":
+  info "Indented with spaces"
+  if true:
+    step "Nested with spaces"
+
+# Using tabs
+task "tabs-example":
+	info "Indented with tabs"
+	if true:
+		step "Nested with tabs"
+```
+
+**Key points:**
+- **Tab equivalence**: Each tab equals 4 spaces for indentation level calculation
+- **Consistency**: Use consistent indentation within each file (don't mix tabs and spaces)
+- **Flexibility**: Choose the style that works best for your team or editor
+- **Generated files**: `drun --init` creates files with tab indentation by default
+
 📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
 ### Basic Task

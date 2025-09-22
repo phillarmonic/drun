@@ -214,16 +214,23 @@ func (l *Lexer) handleIndentation() Token {
 		return l.NextToken()
 	}
 
-	// Count indentation (spaces only for now)
+	// Count indentation (spaces and tabs)
 	indent := 0
 	pos := l.position
-	for pos < len(l.input) && l.input[pos] == ' ' {
-		indent++
+	indentChars := 0 // count of actual characters to skip
+	for pos < len(l.input) && (l.input[pos] == ' ' || l.input[pos] == '\t') {
+		if l.input[pos] == ' ' {
+			indent++
+		} else if l.input[pos] == '\t' {
+			// Treat each tab as 4 spaces for indentation level calculation
+			indent += 4
+		}
+		indentChars++
 		pos++
 	}
 
 	// Skip the indentation characters
-	for i := 0; i < indent; i++ {
+	for i := 0; i < indentChars; i++ {
 		l.readChar()
 	}
 
@@ -236,8 +243,8 @@ func (l *Lexer) handleIndentation() Token {
 			Type:     INDENT,
 			Literal:  "",
 			Line:     l.line,
-			Column:   l.column - indent,
-			Position: l.position - indent,
+			Column:   l.column - indentChars,
+			Position: l.position - indentChars,
 		}
 	} else if indent < currentIndent {
 		// Decreased indentation - DEDENT token(s)
@@ -268,8 +275,8 @@ func (l *Lexer) handleIndentation() Token {
 			Type:     DEDENT,
 			Literal:  "",
 			Line:     l.line,
-			Column:   l.column - indent,
-			Position: l.position - indent,
+			Column:   l.column - indentChars,
+			Position: l.position - indentChars,
 		}
 	}
 

@@ -402,6 +402,67 @@ Can span multiple lines
 */
 ```
 
+### Indentation
+
+drun v2 uses **Python-style indentation** to define code blocks and supports both **tabs** and **spaces**:
+
+#### Supported Indentation Styles
+
+```drun
+# Spaces (2 or 4 spaces per level)
+task "spaces-example":
+  info "Level 1 with spaces"
+  if true:
+    step "Level 2 with spaces"
+    for each item in ["a", "b"]:
+      info "Level 3: {item}"
+
+# Tabs
+task "tabs-example":
+	info "Level 1 with tabs"
+	if true:
+		step "Level 2 with tabs"
+		for each item in ["a", "b"]:
+			info "Level 3: {item}"
+```
+
+#### Indentation Rules
+
+1. **Tab Equivalence**: Each tab character equals 4 spaces for indentation level calculation
+2. **Consistency**: Maintain consistent indentation style within each file
+3. **Block Structure**: Indentation defines code blocks (similar to Python)
+4. **Nesting**: Deeper indentation creates nested blocks
+5. **Dedentation**: Returning to a previous indentation level closes blocks
+
+#### Mixed Indentation
+
+While both tabs and spaces are supported, **mixing them is discouraged** but technically allowed:
+
+```drun
+task "mixed-example":
+    info "4 spaces"
+	info "1 tab (equivalent to 4 spaces)"
+        info "8 spaces"
+		info "2 tabs (equivalent to 8 spaces)"
+```
+
+#### Error Handling
+
+Invalid indentation patterns will result in parse errors:
+
+```drun
+task "invalid":
+  info "Level 1"
+   info "Invalid: 3 spaces doesn't match any previous level"
+```
+
+#### Best Practices
+
+- **Choose one style**: Use either tabs or spaces consistently throughout your project
+- **Editor configuration**: Configure your editor to show whitespace characters
+- **Team standards**: Establish indentation standards for your team
+- **Generated files**: `drun --init` uses tabs by default
+
 ### String Interpolation
 
 Strings support variable interpolation using `{$variable}` syntax for declared variables and `{variable}` for loop variables:

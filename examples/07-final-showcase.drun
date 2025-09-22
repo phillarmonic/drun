@@ -1,51 +1,51 @@
 version: 2.0
 
 task "showcase" means "Final drun v2 feature showcase":
-  given $project_name defaults to "FinalProject"
-  given $environment defaults to "dev"
-  given $run_tests defaults to "true"
-  
-  info "🚀 Welcome to drun v2 final showcase!"
-  step "Project: {$project_name}"
-  step "Environment: {$environment}"
-  
-  if $environment is "production":
-    warn "⚠️  PRODUCTION DEPLOYMENT - Extra precautions!"
-    step "Creating production backup"
-    step "Enabling monitoring alerts"
-  
-  if $run_tests is "true":
-    step "🧪 Running test suite"
-    info "✅ All tests passed"
-    success "Tests completed successfully!"
-  else:
-    warn "⚠️  Skipping tests"
-  
-  step "🚀 Deploying {project_name} to {environment}"
-  success "🎉 Deployment completed!"
+	given $project_name defaults to "FinalProject"
+	given $environment defaults to "dev"
+	given $run_tests defaults to "true"
+
+	info "🚀 Welcome to drun v2 final showcase!"
+	step "Project: {$project_name}"
+	step "Environment: {$environment}"
+
+	if $environment is "production":
+		warn "⚠️  PRODUCTION DEPLOYMENT - Extra precautions!"
+		step "Creating production backup"
+		step "Enabling monitoring alerts"
+
+	if $run_tests is "true":
+		step "🧪 Running test suite"
+		info "✅ All tests passed"
+		success "Tests completed successfully!"
+	else:
+		warn "⚠️  Skipping tests"
+
+	step "🚀 Deploying {project_name} to {environment}"
+	success "🎉 Deployment completed!"
 
 task "demo loop" means "Loop demonstration":
-  accepts $items as list of strings
-  
-  step "Processing items"
-  
-  for each item in items:
-    step "Processing: {item}"
-    info "✅ Completed: {item}"
-  
-  success "All items processed!"
+	accepts $items as list of strings
+
+	step "Processing items"
+
+	for each item in items:
+		step "Processing: {item}"
+		info "✅ Completed: {item}"
+
+	success "All items processed!"
 
 task "conditional demo" means "Conditional logic demonstration":
-  given $mode defaults to "normal"
-  
-  step "Running in {mode} mode"
-  
-  when mode is "debug":
-    info "🐛 Debug mode enabled"
-    step "Verbose logging activated"
-  
-  when mode is "performance":
-    info "⚡ Performance mode enabled"
-    step "Optimizations applied"
-  
-  success "Demo completed in {mode} mode!"
+	given $mode defaults to "normal"
+
+	step "Running in {mode} mode"
+
+	when mode is "debug":
+		info "🐛 Debug mode enabled"
+		step "Verbose logging activated"
+
+	when mode is "performance":
+		info "⚡ Performance mode enabled"
+		step "Optimizations applied"
+
+	success "Demo completed in {mode} mode!"

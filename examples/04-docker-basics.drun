@@ -2,53 +2,53 @@
 version: 2.0
 
 task "build" means "Build Docker image":
-  given $tag defaults to "latest"
-  
-  step "Building Docker image"
-  info "Building image with tag: {$tag}"
-  
-  # Use shell commands for Docker operations
-  run "docker build -t myapp:{$tag} ."
-  
-  success "Built image: myapp:{$tag}"
+	given $tag defaults to "latest"
+
+	step "Building Docker image"
+	info "Building image with tag: {$tag}"
+
+	# Use shell commands for Docker operations
+	run "docker build -t myapp:{$tag} ."
+
+	success "Built image: myapp:{$tag}"
 
 task "test" means "Test Docker image":
-  step "Testing Docker image"
-  
-  # Check if Docker is available
-  if file "/usr/bin/docker" exists:
-    info "Docker is available"
-    run "docker images myapp"
-  else:
-    warn "Docker not found, skipping test"
-  
-  success "Docker test completed"
+	step "Testing Docker image"
+
+	# Check if Docker is available
+	if file "/usr/bin/docker" exists:
+		info "Docker is available"
+		run "docker images myapp"
+	else:
+		warn "Docker not found, skipping test"
+
+	success "Docker test completed"
 
 task "push" means "Push image to registry":
-  requires $registry
-  given $tag defaults to "latest"
-  
-  step "Pushing image to registry"
-  info "Pushing to registry: {$registry}"
-  
-  run "docker tag myapp:{$tag} {$registry}/myapp:{$tag}"
-  run "docker push {$registry}/myapp:{$tag}"
-  
-  success "Image pushed to {$registry}"
+	requires $registry
+	given $tag defaults to "latest"
+
+	step "Pushing image to registry"
+	info "Pushing to registry: {$registry}"
+
+	run "docker tag myapp:{$tag} {$registry}/myapp:{$tag}"
+	run "docker push {$registry}/myapp:{$tag}"
+
+	success "Image pushed to {$registry}"
 
 task "run local" means "Run container locally":
-  given $port defaults to "8080"
-  
-  step "Starting local container"
-  info "Starting container on port {$port}"
-  
-  run "docker run -d -p {$port}:8080 myapp:latest"
-  
-  success "Container running on port {$port}"
+	given $port defaults to "8080"
+
+	step "Starting local container"
+	info "Starting container on port {$port}"
+
+	run "docker run -d -p {$port}:8080 myapp:latest"
+
+	success "Container running on port {$port}"
 
 task "clean" means "Clean up Docker resources":
-  step "Cleaning Docker resources"
-  
-  run "docker system prune -f"
-  
-  success "Docker cleanup completed"
+	step "Cleaning Docker resources"
+
+	run "docker system prune -f"
+
+	success "Docker cleanup completed"
