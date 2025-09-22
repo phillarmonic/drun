@@ -51,6 +51,7 @@ drun includes powerful built-in functions for common operations:
 - `{hostname}` - Get system hostname
 - `{pwd}` - Get current working directory
 - `{pwd('basename')}` - Get directory name only
+- `{current file}` - Get path to the current drun file being executed
 - `{env('VAR_NAME')}` - Get environment variable
 - `{env('VAR_NAME', 'default')}` - Get environment variable with default
 
@@ -82,6 +83,7 @@ project "my-app" version "1.0"
 task "system info":
   info "🖥️  Running on: {hostname}"
   info "📁 Current directory: {pwd('basename')}"
+  info "📄 Current file: {current file}"
   info "🕒 Current time: {now.format('2006-01-02 15:04:05')}"
   info "🔗 Git commit: {current git commit('short')}"
 

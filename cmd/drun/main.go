@@ -286,7 +286,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute the task with parameters
-	err = eng.ExecuteWithParams(program, target, params)
+	err = eng.ExecuteWithParamsAndFile(program, target, params, actualConfigFile)
 	if err != nil {
 		// Check if it's a parameter validation error (don't show usage)
 		if paramErr, ok := err.(*errors.ParameterValidationError); ok {

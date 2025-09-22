@@ -31,9 +31,10 @@ type Engine struct {
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
-	Parameters map[string]*types.Value // parameter name -> typed value
-	Variables  map[string]string       // captured variables from shell commands
-	Project    *ProjectContext         // project-level settings and hooks
+	Parameters  map[string]*types.Value // parameter name -> typed value
+	Variables   map[string]string       // captured variables from shell commands
+	Project     *ProjectContext         // project-level settings and hooks
+	CurrentFile string                  // path to the current drun file being executed
 }
 
 // ProjectContext holds project-level configuration
@@ -74,6 +75,11 @@ func (e *Engine) Execute(program *ast.Program, taskName string) error {
 
 // ExecuteWithParams runs a v2 program with the given parameters
 func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params map[string]string) error {
+	return e.ExecuteWithParamsAndFile(program, taskName, params, "")
+}
+
+// ExecuteWithParamsAndFile runs a v2 program with the given parameters and current file path
+func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string, params map[string]string, currentFile string) error {
 	if program == nil {
 		return fmt.Errorf("program is nil")
 	}
@@ -98,9 +104,10 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
-		Parameters: make(map[string]*types.Value),
-		Variables:  make(map[string]string),
-		Project:    e.createProjectContext(program.Project),
+		Parameters:  make(map[string]*types.Value),
+		Variables:   make(map[string]string),
+		Project:     e.createProjectContext(program.Project),
+		CurrentFile: currentFile,
 	}
 
 	// Execute all tasks in dependency order
@@ -2089,14 +2096,22 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 2. Check if it's a simple builtin function call (no arguments)
+	// 2. Check for context-aware builtin functions first
+	if expr == "current file" && ctx != nil {
+		if ctx.CurrentFile != "" {
+			return ctx.CurrentFile
+		}
+		return "<no file>"
+	}
+
+	// 3. Check if it's a simple builtin function call (no arguments)
 	if builtins.IsBuiltin(expr) {
 		if result, err := builtins.CallBuiltin(expr); err == nil {
 			return result
 		}
 	}
 
-	// 3. Check for function calls with quoted string arguments
+	// 4. Check for function calls with quoted string arguments
 	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
 	quotedArgRe := regexp.MustCompile(`^([^(]+)\((.+)\)$`)
 	if matches := quotedArgRe.FindStringSubmatch(expr); len(matches) == 3 {
@@ -2113,7 +2128,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 4. Check for function calls with parameter arguments
+	// 5. Check for function calls with parameter arguments
 	// Pattern: "function(param)" where param is a parameter name
 	paramArgRe := regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`)
 	if matches := paramArgRe.FindStringSubmatch(expr); len(matches) == 3 {
@@ -2132,7 +2147,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 5. Check for $globals.key syntax for project settings
+	// 6. Check for $globals.key syntax for project settings
 	if strings.HasPrefix(expr, "$globals.") {
 		if ctx != nil && ctx.Project != nil {
 			key := expr[9:] // Remove "$globals." prefix
