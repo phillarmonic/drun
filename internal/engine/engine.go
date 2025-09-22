@@ -203,7 +203,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 			hasValue = true
 		} else if !param.Required {
 			// For optional parameters (given/accepts), use default value (including empty string)
-			rawValue = param.DefaultValue
+			// Interpolate the default value if it contains braces (for builtin function calls)
+			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
 			hasValue = true
 		} else if param.Required {
 			return errors.NewParameterValidationError(fmt.Sprintf("required parameter '%s' not provided", param.Name))
@@ -1887,15 +1888,18 @@ func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *Execut
 		return fmt.Errorf("failed to evaluate expression: %v", err)
 	}
 
+	// Interpolate the value if it contains braces (for builtin function calls)
+	interpolatedValue := e.interpolateVariables(value, ctx)
+
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varStmt.Variable] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, value)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, interpolatedValue)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, value)
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, interpolatedValue)
 
 	return nil
 }
@@ -1907,15 +1911,18 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 		return fmt.Errorf("failed to evaluate expression: %v", err)
 	}
 
+	// Interpolate the value if it contains braces (for builtin function calls)
+	interpolatedValue := e.interpolateVariables(value, ctx)
+
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varStmt.Variable] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, value)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, interpolatedValue)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, value)
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
 
 	return nil
 }
@@ -2238,7 +2245,30 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		return "<no file>"
 	}
 
-	// 3. Check if it's a simple builtin function call (no arguments)
+	// 3. Check for builtin function with piped operations (e.g., "current git branch | replace '/' by '-'")
+	if strings.Contains(expr, "|") {
+		parts := strings.SplitN(expr, "|", 2)
+		if len(parts) == 2 {
+			funcName := strings.TrimSpace(parts[0])
+			operations := strings.TrimSpace(parts[1])
+
+			// Check if the first part is a builtin function
+			if builtins.IsBuiltin(funcName) {
+				if result, err := builtins.CallBuiltin(funcName); err == nil {
+					// Parse and apply the operations to the result
+					if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
+						if finalResult, err := e.applyBuiltinOperations(result, chain, ctx); err == nil {
+							return finalResult
+						}
+					}
+					// If operations parsing fails, just return the builtin result
+					return result
+				}
+			}
+		}
+	}
+
+	// 4. Check if it's a simple builtin function call (no arguments)
 	if builtins.IsBuiltin(expr) {
 		if result, err := builtins.CallBuiltin(expr); err == nil {
 			return result
@@ -3193,5 +3223,116 @@ func (e *Engine) evaluateFunctionCall(expr *ast.FunctionCallExpression, ctx *Exe
 			return "", fmt.Errorf("failed to execute function '%s': %v", functionStr, err)
 		}
 		return strings.TrimSpace(result.Stdout), nil
+	}
+}
+
+// parseBuiltinOperations parses operations for builtin functions (e.g., "replace '/' by '-'")
+func (e *Engine) parseBuiltinOperations(operations string) (*VariableOperationChain, error) {
+	// Split by | to handle multiple operations
+	parts := strings.Split(operations, "|")
+	var ops []VariableOperation
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Parse individual operation
+		tokens := strings.Fields(part)
+		if len(tokens) == 0 {
+			continue
+		}
+
+		op, err := e.parseBuiltinOperation(tokens)
+		if err != nil {
+			return nil, err
+		}
+		if op != nil {
+			ops = append(ops, *op)
+		}
+	}
+
+	if len(ops) == 0 {
+		return nil, nil
+	}
+
+	return &VariableOperationChain{
+		Variable:   "", // Not used for builtin operations
+		Operations: ops,
+	}, nil
+}
+
+// parseBuiltinOperation parses a single builtin operation
+func (e *Engine) parseBuiltinOperation(tokens []string) (*VariableOperation, error) {
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	opType := tokens[0]
+	args := []string{}
+
+	switch opType {
+	case "replace":
+		// "replace '/' by '-'" or "replace '/' with '-'"
+		if len(tokens) >= 4 && (tokens[2] == "by" || tokens[2] == "with") {
+			// Remove quotes from arguments
+			from := strings.Trim(tokens[1], `"'`)
+			to := strings.Trim(tokens[3], `"'`)
+			args = append(args, from, to)
+		}
+	case "without":
+		// "without prefix 'v'" or "without suffix '.tmp'"
+		if len(tokens) >= 3 {
+			args = append(args, tokens[1]) // "prefix" or "suffix"
+			argValue := strings.Join(tokens[2:], " ")
+			argValue = strings.Trim(argValue, `"'`)
+			args = append(args, argValue)
+		}
+	case "uppercase", "lowercase", "trim":
+		// No arguments needed
+	default:
+		return nil, fmt.Errorf("unknown builtin operation: %s", opType)
+	}
+
+	return &VariableOperation{
+		Type: opType,
+		Args: args,
+	}, nil
+}
+
+// applyBuiltinOperations applies operations to a builtin function result
+func (e *Engine) applyBuiltinOperations(value string, chain *VariableOperationChain, ctx *ExecutionContext) (string, error) {
+	currentValue := value
+
+	for _, op := range chain.Operations {
+		newValue, err := e.applyBuiltinOperation(currentValue, op, ctx)
+		if err != nil {
+			return "", fmt.Errorf("builtin operation '%s' failed: %v", op.Type, err)
+		}
+		currentValue = newValue
+	}
+
+	return currentValue, nil
+}
+
+// applyBuiltinOperation applies a single operation to a builtin function result
+func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *ExecutionContext) (string, error) {
+	switch op.Type {
+	case "replace":
+		if len(op.Args) >= 2 {
+			return strings.ReplaceAll(value, op.Args[0], op.Args[1]), nil
+		}
+		return "", fmt.Errorf("replace operation requires 2 arguments")
+	case "without":
+		return e.applyWithoutOperation(value, op.Args)
+	case "uppercase":
+		return strings.ToUpper(value), nil
+	case "lowercase":
+		return strings.ToLower(value), nil
+	case "trim":
+		return strings.TrimSpace(value), nil
+	default:
+		return "", fmt.Errorf("unknown builtin operation type: %s", op.Type)
 	}
 }

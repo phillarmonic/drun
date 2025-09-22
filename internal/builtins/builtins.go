@@ -40,19 +40,21 @@ var (
 
 // Registry holds all built-in functions
 var Registry = map[string]BuiltinFunction{
-	"current git commit": getCurrentGitCommit,
-	"now.format":         formatCurrentTime,
-	"file exists":        checkFileExists,
-	"dir exists":         checkDirExists,
-	"env":                getEnvironmentVariable,
-	"pwd":                getCurrentDirectory,
-	"hostname":           getHostname,
-	"start progress":     startProgress,
-	"update progress":    updateProgress,
-	"finish progress":    finishProgress,
-	"start timer":        startTimer,
-	"stop timer":         stopTimer,
-	"show elapsed time":  showElapsedTime,
+	"current git commit":    getCurrentGitCommit,
+	"current git branch":    getCurrentGitBranch,
+	"now.format":            formatCurrentTime,
+	"file exists":           checkFileExists,
+	"dir exists":            checkDirExists,
+	"env":                   getEnvironmentVariable,
+	"pwd":                   getCurrentDirectory,
+	"hostname":              getHostname,
+	"start progress":        startProgress,
+	"update progress":       updateProgress,
+	"finish progress":       finishProgress,
+	"start timer":           startTimer,
+	"stop timer":            stopTimer,
+	"show elapsed time":     showElapsedTime,
+	"docker compose status": checkDockerComposeStatus,
 }
 
 // getCurrentGitCommit returns the current git commit hash
@@ -73,6 +75,18 @@ func getCurrentGitCommit(args ...string) (string, error) {
 	}
 
 	return commit, nil
+}
+
+// getCurrentGitBranch returns the current git branch name
+func getCurrentGitBranch(args ...string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get git branch: %w", err)
+	}
+
+	branch := strings.TrimSpace(string(output))
+	return branch, nil
 }
 
 // formatCurrentTime formats the current time
@@ -389,4 +403,135 @@ func createProgressBar(percentage int) string {
 	bar += "]"
 
 	return bar
+}
+
+// checkDockerComposeStatus checks if a Docker Compose project is in a usable state
+func checkDockerComposeStatus(args ...string) (string, error) {
+	// Determine project name/path - default to current directory
+	projectPath := "."
+	if len(args) > 0 {
+		projectPath = args[0]
+	}
+
+	// Detect which Docker Compose command to use (prioritize "docker compose")
+	composeCmd, err := detectDockerComposeCommand()
+	if err != nil {
+		return "unavailable", fmt.Errorf("docker compose not available: %w", err)
+	}
+
+	// Get container status for the project
+	status, err := getComposeProjectStatus(composeCmd, projectPath)
+	if err != nil {
+		return "error", fmt.Errorf("failed to get compose status: %w", err)
+	}
+
+	return status, nil
+}
+
+// detectDockerComposeCommand detects which Docker Compose command to use
+func detectDockerComposeCommand() ([]string, error) {
+	// First try "docker compose" (Docker Compose V2)
+	if isCommandAvailable("docker") {
+		cmd := exec.Command("docker", "compose", "version")
+		if err := cmd.Run(); err == nil {
+			return []string{"docker", "compose"}, nil
+		}
+	}
+
+	// Fallback to standalone "docker-compose" command (V1)
+	if isCommandAvailable("docker-compose") {
+		return []string{"docker-compose"}, nil
+	}
+
+	return nil, fmt.Errorf("neither 'docker compose' nor 'docker-compose' is available")
+}
+
+// getComposeProjectStatus gets the status of containers in a compose project
+func getComposeProjectStatus(composeCmd []string, projectPath string) (string, error) {
+	// Change to project directory if specified
+	originalDir, err := os.Getwd()
+	if err != nil {
+		return "error", err
+	}
+
+	if projectPath != "." {
+		if err := os.Chdir(projectPath); err != nil {
+			return "error", fmt.Errorf("failed to change to project directory: %w", err)
+		}
+		defer func() {
+			_ = os.Chdir(originalDir)
+		}()
+	}
+
+	// Run "docker compose ps" to get container status
+	psCmd := append(composeCmd, "ps", "--format", "table")
+	cmd := exec.Command(psCmd[0], psCmd[1:]...)
+	output, err := cmd.Output()
+	if err != nil {
+		// If ps fails, the project is likely down or not initialized
+		return "down", nil
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	if outputStr == "" {
+		return "down", nil
+	}
+
+	// Parse the output to determine status
+	lines := strings.Split(outputStr, "\n")
+	if len(lines) <= 1 {
+		// Only header line or empty, project is down
+		return "down", nil
+	}
+
+	// Count containers by status
+	var running, restarting, exited, unhealthy int
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+
+		// Look for status indicators in the line
+		lineLower := strings.ToLower(line)
+		if strings.Contains(lineLower, "up") || strings.Contains(lineLower, "running") {
+			running++
+		} else if strings.Contains(lineLower, "restarting") {
+			restarting++
+		} else if strings.Contains(lineLower, "exited") {
+			exited++
+		} else if strings.Contains(lineLower, "unhealthy") {
+			unhealthy++
+		}
+	}
+
+	// Determine overall status
+	totalContainers := running + restarting + exited + unhealthy
+	if totalContainers == 0 {
+		return "down", nil
+	}
+
+	// If any containers are restarting or unhealthy, project is unusable
+	if restarting > 0 || unhealthy > 0 {
+		return "unusable", nil
+	}
+
+	// If all containers are running, project is usable
+	if running == totalContainers {
+		return "usable", nil
+	}
+
+	// If some containers are exited but others are running, it's partially up
+	if running > 0 {
+		return "partial", nil
+	}
+
+	// All containers are exited
+	return "down", nil
+}
+
+// isCommandAvailable checks if a command is available in PATH
+func isCommandAvailable(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }

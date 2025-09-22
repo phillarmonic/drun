@@ -324,7 +324,11 @@ literal = string_literal
 
 string_literal = '"' { string_character } '"' ;
 interpolated_string = '"' { string_character | interpolation } '"' ;
-interpolation = "{" expression "}" ;
+interpolation = "{" expression [ pipe_operations ] "}" ;
+pipe_operations = { "|" pipe_operation } ;
+pipe_operation = "replace" string_literal ( "by" | "with" ) string_literal
+               | "without" ( "prefix" | "suffix" ) string_literal
+               | "uppercase" | "lowercase" | "trim" ;
 
 (* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
 variable = "$" identifier ;  (* Declared variables: $name, $environment *)
@@ -394,6 +398,9 @@ directory, file, exists, running, healthy, available
 
 # Special values
 true, false, now, current, secret, env
+
+# Built-in functions
+current git commit, current git branch, now.format, pwd, hostname, env
 ```
 
 ### Comments
@@ -723,6 +730,12 @@ given timeout defaults to "5m"
 given force defaults to false
 given tags defaults to [] as list of strings
 given features defaults to empty  # equivalent to ""
+
+# Built-in function defaults
+given version defaults to "{current git commit}"
+given branch defaults to "{current git branch}"
+given safe_branch defaults to "{current git branch | replace '/' by '-'}"
+given timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 ```
 
 #### The `empty` Keyword
@@ -915,6 +928,55 @@ else if environment is "staging":
 else:
   error "Invalid deployment conditions"
 ```
+
+#### Enhanced If-Else Chains ⭐ *New*
+
+drun v2 supports natural `else if` syntax for cleaner conditional logic:
+
+```drun
+task "deployment strategy":
+  requires $environment from ["dev", "staging", "production"]
+  
+  if $environment == "production":
+    info "🚀 Production deployment"
+    set $replicas to 5
+    set $timeout to "300s"
+  else if $environment == "staging":
+    info "🧪 Staging deployment"  
+    set $replicas to 3
+    set $timeout to "180s"
+  else if $environment == "dev":
+    info "🔧 Development deployment"
+    set $replicas to 1
+    set $timeout to "60s"
+  else:
+    error "Unknown environment: {$environment}"
+    fail
+
+# Multiple else if chains
+task "build strategy":
+  if file "Dockerfile" exists:
+    info "Building with Docker"
+    build docker image
+  else if file "package.json" exists:
+    info "Building Node.js application"
+    run "npm ci && npm run build"
+  else if file "go.mod" exists:
+    info "Building Go application"
+    run "go build -o app"
+  else if file "requirements.txt" exists:
+    info "Building Python application"
+    run "pip install -r requirements.txt"
+  else:
+    warn "No recognized build configuration found"
+    info "Skipping build step"
+```
+
+**Key Features:**
+- **Natural syntax**: `else if` reads like natural English
+- **Unlimited chaining**: Support for multiple `else if` conditions
+- **Proper precedence**: Conditions evaluated in order, first match wins
+- **Optional else**: Final `else` clause is optional
 
 #### When Statements (Pattern Matching)
 
@@ -2205,6 +2267,125 @@ task "parallel operations":
 - `{stop timer('name')}` - Stop timer and show elapsed time
 - `{show elapsed time('name')}` - Show elapsed time for running timer
 
+### Built-in Functions
+
+drun v2 provides a comprehensive set of built-in functions that can be used in expressions, variable assignments, and parameter defaults. These functions are called using the `{function name}` syntax and support pipe operations for data transformation.
+
+#### Git Functions
+
+```drun
+# Get current git commit hash (short form)
+set $commit to {current git commit}
+info "Deploying commit: {$commit}"
+
+# Get current git branch name
+set $branch to {current git branch}
+info "Building from branch: {$branch}"
+
+# Use in parameter defaults
+task "deploy":
+  given $version defaults to "{current git commit}"
+  given $branch_name defaults to "{current git branch}"
+```
+
+#### System Functions
+
+```drun
+# Get current working directory
+set $project_dir to {pwd}
+
+# Get hostname
+set $host to {hostname}
+
+# Get environment variable
+set $api_key to {env('API_KEY')}
+
+# Format current time
+set $timestamp to {now.format('2006-01-02 15:04:05')}
+```
+
+#### Built-in Function Pipe Operations ⭐ *New*
+
+Built-in functions support pipe operations for data transformation, allowing you to chain operations together:
+
+```drun
+# Replace characters in git branch names
+set $safe_branch to {current git branch | replace "/" by "-"}
+info "Safe branch name: {$safe_branch}"
+
+# Chain multiple operations
+set $clean_branch to {current git branch | replace "/" by "-" | lowercase}
+
+# Use in parameter defaults with pipes
+task "build":
+  given $image_tag defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  given $commit_short defaults to "{current git commit}"
+  
+  info "Building image: myapp:{$image_tag}"
+  info "From commit: {$commit_short}"
+```
+
+#### Available Pipe Operations
+
+**String Operations:**
+- `replace "from" by "to"` - Replace all occurrences of "from" with "to"
+- `replace "from" with "to"` - Alternative syntax for replace
+- `without prefix "text"` - Remove prefix from string
+- `without suffix "text"` - Remove suffix from string
+- `uppercase` - Convert to uppercase
+- `lowercase` - Convert to lowercase
+- `trim` - Remove leading and trailing whitespace
+
+#### Practical Examples
+
+```drun
+task "git branch operations":
+  # Basic git branch usage
+  set $current_branch to {current git branch}
+  info "Current branch: {$current_branch}"
+  
+  # Transform branch name for Docker tags (no slashes allowed)
+  set $docker_tag to {current git branch | replace "/" by "-"}
+  info "Docker tag: myapp:{$docker_tag}"
+  
+  # Create deployment-safe branch names
+  set $deploy_name to {current git branch | replace "/" by "-" | lowercase}
+  info "Deployment name: {$deploy_name}"
+  
+  # Use in complex expressions
+  set $image_name to "registry.example.com/myapp:{current git branch | replace '/' by '-'}"
+  info "Full image name: {$image_name}"
+
+task "parameter defaults with pipes":
+  # Parameter defaults can use piped builtin functions
+  given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  given $build_tag defaults to "{current git commit}"
+  given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+  
+  info "Deployment config:"
+  info "  Branch: {$deployment_branch}"
+  info "  Tag: {$build_tag}"
+  info "  Timestamp: {$timestamp}"
+```
+
+#### Built-in Function Reference
+
+| Function | Description | Example Output |
+|----------|-------------|----------------|
+| `{current git commit}` | Current git commit hash (short) | `a72091f` |
+| `{current git branch}` | Current git branch name | `feature/new-api` |
+| `{pwd}` | Current working directory | `/home/user/project` |
+| `{hostname}` | System hostname | `dev-machine` |
+| `{env('VAR')}` | Environment variable | `production` |
+| `{now.format('layout')}` | Formatted current time | `2025-09-22 14:30:00` |
+
+**Key Features:**
+- **Interpolation**: All built-in functions use `{function}` syntax
+- **Pipe Operations**: Chain transformations with `|` operator
+- **Parameter Defaults**: Use in parameter default values with full pipe support
+- **Variable Assignment**: Assign results to variables for reuse
+- **Expression Context**: Work in any expression context (info messages, conditions, etc.)
+
 ---
 
 ## Smart Detection
@@ -2538,7 +2719,7 @@ project "webapp" version "1.0.0":
   set registry to "ghcr.io/company"
 
 task "build" means "Build Docker image":
-  given tag defaults to current git commit
+  given tag defaults to "{current git commit}"
   
   step "Building application image"
   build docker image "{registry}/webapp:{tag}"
@@ -2559,6 +2740,41 @@ task "deploy" means "Deploy to Kubernetes":
   wait for rollout to complete
   
   success "Deployment to {environment} completed"
+```
+
+### Git Branch Operations ⭐ *New*
+
+```
+version: 2.0
+
+task "git branch operations" means "Demonstrate git branch builtin and pipe operations":
+  info "🌿 Testing git branch operations..."
+  
+  # Basic git branch builtin
+  set $branch to {current git branch}
+  info "Current branch: {$branch}"
+  
+  # Git branch with pipe operations
+  set $safe_branch to {current git branch | replace "/" by "-"}
+  info "Safe branch name: {$safe_branch}"
+  
+  # Use in parameter defaults
+  given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  info "Deployment branch: {$deployment_branch}"
+  
+  success "✅ Git branch operations completed!"
+
+task "parameter defaults with builtins" means "Demonstrate builtin functions in parameter defaults":
+  given $commit defaults to "{current git commit}"
+  given $branch defaults to "{current git branch}"
+  given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
+  
+  info "📋 Parameter values:"
+  info "  Commit: {$commit}"
+  info "  Branch: {$branch}" 
+  info "  Safe branch: {$safe_branch}"
+  
+  success "✅ Parameter defaults test completed!"
 ```
 
 ### Complex CI/CD Pipeline

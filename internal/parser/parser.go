@@ -1466,8 +1466,27 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			// Handle "empty" keyword - treat as empty string
 			p.nextToken()
 			stmt.DefaultValue = ""
+		case lexer.LBRACE:
+			// Handle "{builtin function}" syntax
+			p.nextToken() // consume LBRACE
+			var funcParts []string
+
+			// Read tokens until RBRACE
+			for p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.EOF {
+				p.nextToken()
+				funcParts = append(funcParts, p.curToken.Literal)
+			}
+
+			if p.peekToken.Type != lexer.RBRACE {
+				p.addError("expected '}' to close builtin function call")
+				return nil
+			}
+			p.nextToken() // consume RBRACE
+
+			// Join the function parts and store as the default value
+			stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
 		case lexer.CURRENT:
-			// Handle "current git commit" built-in function
+			// Handle legacy "current git commit" built-in function (for backward compatibility)
 			p.nextToken() // consume CURRENT
 			if p.peekToken.Type == lexer.GIT {
 				p.nextToken() // consume GIT
@@ -2825,10 +2844,23 @@ func (p *Parser) parseIfStatement() *ast.ConditionalStatement {
 	// Check for else clause
 	if p.peekToken.Type == lexer.ELSE {
 		p.nextToken() // consume ELSE
-		if !p.expectPeek(lexer.COLON) {
-			return nil
+
+		// Check if this is "else if" (else followed by if)
+		if p.peekToken.Type == lexer.IF {
+			// This is an "else if" - parse it as a nested if statement
+			// Set current token to IF so parseIfStatement works correctly
+			p.nextToken() // consume IF, now curToken is IF
+			elseIfStmt := p.parseIfStatement()
+			if elseIfStmt != nil {
+				stmt.ElseBody = []ast.Statement{elseIfStmt}
+			}
+		} else {
+			// This is a regular "else" - expect colon and parse body
+			if !p.expectPeek(lexer.COLON) {
+				return nil
+			}
+			stmt.ElseBody = p.parseControlFlowBody()
 		}
-		stmt.ElseBody = p.parseControlFlowBody()
 	}
 
 	return stmt
@@ -3436,17 +3468,28 @@ func (p *Parser) parsePrimaryExpression() ast.Expression {
 			Value: p.curToken.Literal,
 		}
 	case lexer.LBRACE:
-		// Parse {identifier} expressions
-		if !p.expectPeek(lexer.IDENT) {
+		// Parse {expression} - could be single identifier or multi-word expression
+		p.nextToken() // consume LBRACE
+
+		var parts []string
+
+		// Read tokens until RBRACE
+		for p.curToken.Type != lexer.RBRACE && p.curToken.Type != lexer.EOF {
+			parts = append(parts, p.curToken.Literal)
+			p.nextToken()
+		}
+
+		if p.curToken.Type != lexer.RBRACE {
+			p.addError("expected '}' to close brace expression")
 			return nil
 		}
-		identifier := p.curToken.Literal
-		if !p.expectPeek(lexer.RBRACE) {
-			return nil
-		}
-		return &ast.IdentifierExpression{
+
+		// Join the parts to create the expression and preserve braces for interpolation
+		expression := "{" + strings.Join(parts, " ") + "}"
+
+		return &ast.LiteralExpression{
 			Token: p.curToken,
-			Value: identifier,
+			Value: expression,
 		}
 	case lexer.IDENT:
 		// Handle function calls like "now" or simple identifiers

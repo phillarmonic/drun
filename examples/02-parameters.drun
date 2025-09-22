@@ -11,7 +11,7 @@ task "greet" means "Greet someone by name":
 
 task "deploy app" means "Deploy application to environment":
 	requires $environment from ["dev", "staging", "production"]
-	given $version defaults to "current git commit"
+	given $version defaults to "{current git commit}"
 	given $replicas defaults to "3"
 
 	step "Deploying to {$environment}"
