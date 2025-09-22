@@ -270,25 +270,110 @@ verify_installation() {
     log_info "Version: $version_output"
 }
 
-# Check if binary is in PATH
+# Add directory to Windows PATH using PowerShell
+add_to_windows_path() {
+    local dir_to_add="$1"
+    
+    log_info "Attempting to add $dir_to_add to Windows PATH..."
+    
+    # Convert Unix-style path to Windows-style for PowerShell
+    local windows_path
+    if command -v cygpath >/dev/null 2>&1; then
+        # Cygwin/MSYS2 environment
+        windows_path=$(cygpath -w "$dir_to_add")
+    else
+        # Git Bash - simple conversion
+        windows_path=$(echo "$dir_to_add" | sed 's|^/c/|C:\\|' | sed 's|/|\\|g')
+    fi
+    
+    # Try to add to user PATH using PowerShell
+    local ps_command="
+        \$currentPath = [Environment]::GetEnvironmentVariable('PATH', 'User');
+        if (\$currentPath -notlike '*$windows_path*') {
+            \$newPath = if (\$currentPath) { \$currentPath + ';$windows_path' } else { '$windows_path' };
+            [Environment]::SetEnvironmentVariable('PATH', \$newPath, 'User');
+            Write-Host 'Successfully added to PATH';
+        } else {
+            Write-Host 'Already in PATH';
+        }
+    "
+    
+    if command -v powershell.exe >/dev/null 2>&1; then
+        if powershell.exe -Command "$ps_command" 2>/dev/null; then
+            log_success "Successfully added $dir_to_add to Windows PATH"
+            log_info "You may need to restart your terminal for changes to take effect"
+            return 0
+        else
+            log_warn "Failed to modify Windows PATH automatically"
+        fi
+    else
+        log_warn "PowerShell not available for automatic PATH modification"
+    fi
+    
+    return 1
+}
+
+# Add directory to shell profile PATH
+add_to_shell_profile() {
+    local dir_to_add="$1"
+    local profile_file="$HOME/.bashrc"
+    
+    # Check for other common shell profiles
+    if [[ -f "$HOME/.zshrc" ]]; then
+        profile_file="$HOME/.zshrc"
+    elif [[ -f "$HOME/.bash_profile" ]]; then
+        profile_file="$HOME/.bash_profile"
+    fi
+    
+    local path_export="export PATH=\"\$PATH:$dir_to_add\""
+    
+    # Check if already in profile
+    if [[ -f "$profile_file" ]] && grep -q "$dir_to_add" "$profile_file"; then
+        log_info "$dir_to_add already in $profile_file"
+        return 0
+    fi
+    
+    log_info "Adding $dir_to_add to $profile_file"
+    if echo "$path_export" >> "$profile_file"; then
+        log_success "Added to $profile_file"
+        log_info "Run 'source $profile_file' or restart your shell to apply changes"
+        return 0
+    else
+        log_warn "Failed to add to $profile_file"
+        return 1
+    fi
+}
+
+# Check if binary is in PATH and offer to add it
 check_path() {
     if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
         log_warn "$INSTALL_DIR is not in your PATH"
         
         if [[ "$PLATFORM_OS" == "windows" ]]; then
-            log_info "To add $INSTALL_DIR to your PATH on Windows:"
-            log_info "1. Open System Properties > Advanced > Environment Variables"
-            log_info "2. Edit the PATH variable and add: $INSTALL_DIR"
-            log_info "3. Restart your terminal/shell"
-            log_info ""
-            log_info "Or for Git Bash/MSYS2, add to your shell profile:"
-            log_info "echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc"
+            # Try automatic PATH modification
+            if add_to_windows_path "$INSTALL_DIR"; then
+                # Also add to shell profile as backup
+                add_to_shell_profile "$INSTALL_DIR"
+            else
+                log_info "Falling back to shell profile modification..."
+                if add_to_shell_profile "$INSTALL_DIR"; then
+                    log_info "Added to shell profile successfully"
+                else
+                    # Manual instructions as last resort
+                    log_info "Manual setup required. To add $INSTALL_DIR to your PATH:"
+                    log_info "1. Open System Properties > Advanced > Environment Variables"
+                    log_info "2. Edit the PATH variable and add: $INSTALL_DIR"
+                    log_info "3. Restart your terminal/shell"
+                fi
+            fi
         else
-            log_info "Add the following to your shell profile (.bashrc, .zshrc, etc.):"
-            log_info "export PATH=\"\$PATH:$INSTALL_DIR\""
-            log_info ""
-            log_info "Or run: echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc"
-            log_info "Then restart your shell or run: source ~/.bashrc"
+            # Unix/Linux/macOS
+            if add_to_shell_profile "$INSTALL_DIR"; then
+                log_info "PATH updated successfully"
+            else
+                log_info "Manual setup required. Add the following to your shell profile:"
+                log_info "export PATH=\"\$PATH:$INSTALL_DIR\""
+            fi
         fi
     else
         log_success "$INSTALL_DIR is in your PATH"
@@ -320,6 +405,11 @@ REQUIREMENTS:
     - tar
     - Linux, macOS, or Windows
     - amd64 or arm64 architecture
+
+FEATURES:
+    - Automatic platform detection
+    - Automatic PATH configuration (Windows and Unix)
+    - Creates install directory if needed
 
 EOF
 }
@@ -370,6 +460,11 @@ main() {
     log_info ""
     log_info "Documentation: https://github.com/${REPO}"
     log_info "Examples: https://github.com/${REPO}/tree/master/examples"
+    echo ""
+    log_info "To uninstall: rm ${INSTALL_DIR}/${BINARY_NAME}"
+    if [[ "$PLATFORM_OS" == "windows" ]]; then
+        log_info "To remove from PATH: manually edit Environment Variables or shell profile"
+    fi
 }
 
 # Run main function with all arguments
