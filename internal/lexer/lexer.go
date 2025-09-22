@@ -219,9 +219,10 @@ func (l *Lexer) handleIndentation() Token {
 	pos := l.position
 	indentChars := 0 // count of actual characters to skip
 	for pos < len(l.input) && (l.input[pos] == ' ' || l.input[pos] == '\t') {
-		if l.input[pos] == ' ' {
+		switch l.input[pos] {
+		case ' ':
 			indent++
-		} else if l.input[pos] == '\t' {
+		case '\t':
 			// Treat each tab as 4 spaces for indentation level calculation
 			indent += 4
 		}
