@@ -14,8 +14,11 @@ import (
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/debug"
 	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/phillarmonic/drun/internal/errors"
+	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/figlet/figletlib"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -31,6 +34,14 @@ var (
 	saveAsDefault bool
 	setWorkspace  string
 	selfUpdate    bool
+	// Debug flags
+	debugMode   bool
+	debugTokens bool
+	debugAST    bool
+	debugJSON   bool
+	debugErrors bool
+	debugFull   bool
+	debugInput  string
 )
 
 // WorkspaceConfig represents the workspace configuration
@@ -163,7 +174,10 @@ Examples:
   drun hello                    # Run the 'hello' task
   drun build --env=production   # Run 'build' task with environment
   drun --list                   # List all available tasks
-  drun --init                   # Create a new drun file`,
+  drun --init                   # Create a new drun file
+  drun --debug --tokens         # Debug lexer tokens
+  drun --debug --ast            # Debug AST structure
+  drun --debug --full           # Full debug output`,
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
@@ -180,6 +194,15 @@ func init() {
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[drun CLI cmd] Save custom file name as workspace default (use with --init)")
 	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[drun CLI cmd] Set workspace default task file location")
 	rootCmd.Flags().BoolVar(&selfUpdate, "self-update", false, "[drun CLI cmd] Check for updates and update drun to the latest version")
+
+	// Debug flags
+	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "[drun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
+	rootCmd.Flags().BoolVar(&debugTokens, "debug-tokens", false, "[drun CLI cmd] Show lexer tokens (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugAST, "debug-ast", false, "[drun CLI cmd] Show AST structure (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugJSON, "debug-json", false, "[drun CLI cmd] Show AST as JSON (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugErrors, "debug-errors", false, "[drun CLI cmd] Show parse errors only (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugFull, "debug-full", false, "[drun CLI cmd] Show full debug output (requires --debug)")
+	rootCmd.Flags().StringVar(&debugInput, "debug-input", "", "[drun CLI cmd] Debug input string directly instead of file (requires --debug)")
 
 	// Add completion commands
 	rootCmd.AddCommand(completionCmd)
@@ -204,6 +227,11 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Handle --set-workspace flag
 	if setWorkspace != "" {
 		return setWorkspaceDefault(setWorkspace)
+	}
+
+	// Handle debug mode
+	if debugMode {
+		return handleDebugMode()
 	}
 
 	// Determine the config file to use
@@ -565,6 +593,69 @@ func setWorkspaceDefault(filename string) error {
 
 	fmt.Printf("✅ Set workspace default task file to: %s\n", filename)
 	fmt.Printf("💾 Saved to .drun/.drun_workspace.yml\n")
+	return nil
+}
+
+// handleDebugMode handles debug mode execution
+func handleDebugMode() error {
+	var content string
+
+	// Get content from input string or file
+	if debugInput != "" {
+		content = debugInput
+	} else {
+		// Determine the config file to use
+		actualConfigFile, err := findConfigFile(configFile)
+		if err != nil {
+			return fmt.Errorf("no drun task file found for debugging: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
+		}
+
+		// Read the drun file
+		data, err := os.ReadFile(actualConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to read drun file '%s': %w", actualConfigFile, err)
+		}
+		content = string(data)
+	}
+
+	// Handle specific debug flags
+	if debugFull {
+		debug.DebugFull(content)
+		return nil
+	}
+
+	// Handle individual debug flags
+	hasSpecificFlag := debugTokens || debugAST || debugJSON || debugErrors
+
+	if debugTokens {
+		debug.DebugTokens(content)
+	}
+
+	if debugAST || debugJSON || debugErrors {
+		// Parse without full debug output
+		l := lexer.NewLexer(content)
+		p := parser.NewParser(l)
+		program := p.ParseProgram()
+		parseErrors := p.Errors()
+
+		if debugErrors {
+			debug.DebugParseErrors(parseErrors)
+		}
+
+		if debugAST {
+			debug.DebugAST(program)
+		}
+
+		if debugJSON {
+			debug.DebugJSON(program)
+		}
+	}
+
+	// If no specific debug flags were set, show full debug by default
+	if !hasSpecificFlag {
+		debug.DebugFull(content)
+	}
+
 	return nil
 }
 

@@ -672,6 +672,38 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - `completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
 - `cleanup-backups`: Clean up old backup files created during updates
 
+### Debug Options
+
+drun includes comprehensive debugging capabilities to help you understand how your tasks are parsed and executed:
+
+- `--debug`: Enable debug mode (shows full debug output by default)
+- `--debug-tokens`: Show lexer tokens from the parsing process
+- `--debug-ast`: Show the Abstract Syntax Tree structure
+- `--debug-json`: Show AST as JSON for detailed inspection
+- `--debug-errors`: Show only parse errors
+- `--debug-full`: Show complete debug information (tokens + AST + errors)
+- `--debug-input "string"`: Debug input string directly instead of reading from file
+
+**Debug Examples:**
+```bash
+# Show full debug output for a file
+drun --debug -f my-tasks.drun
+
+# Show only the lexer tokens
+drun --debug --debug-tokens -f my-tasks.drun
+
+# Debug inline input directly
+drun --debug --debug-input 'task "test": info "hello"'
+
+# Show AST structure only
+drun --debug --debug-ast -f my-tasks.drun
+
+# Show AST as JSON for tooling integration
+drun --debug --debug-json -f my-tasks.drun
+```
+
+> **Note:** As of v2.0, debug functionality has been integrated into the main `drun` command. The separate debug tool has been removed for a more streamlined experience.
+
 ## Shell Completion
 
 drun supports intelligent shell completion for bash, zsh, fish, and PowerShell with smart task and command detection. The completion system provides:
