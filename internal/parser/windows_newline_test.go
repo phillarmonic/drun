@@ -70,6 +70,22 @@ task "greet" means "Greet someone by name":
 	info "Hello, {$title} {$name}! Nice to meet you. 😊"
 `,
 		},
+		{
+			name: "hello_world_with_blank_lines",
+			input: `# Hello World - Your First drun v2 Task
+# This demonstrates the most basic semantic syntax
+
+version: 2.0
+
+task "hello":
+	info "Hello from drun v2! 👋"
+
+task "hello world":
+	step "Starting hello world example"
+	info "Welcome to the semantic task runner!"
+	success "Hello world completed successfully!"
+`,
+		},
 	}
 
 	for _, tt := range tests {

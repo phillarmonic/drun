@@ -644,9 +644,14 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
-		// Skip any NEWLINE tokens that might appear in the task body
-		for p.curToken.Type == lexer.NEWLINE {
+		// Skip any NEWLINE tokens that might appear in the task body, but stop if we hit DEDENT
+		for p.curToken.Type == lexer.NEWLINE && p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 			p.nextToken()
+		}
+
+		// If we've reached DEDENT or EOF after skipping newlines, break out of the loop
+		if p.curToken.Type == lexer.DEDENT || p.curToken.Type == lexer.EOF {
+			break
 		}
 
 		if p.isDependencyToken(p.curToken.Type) {
