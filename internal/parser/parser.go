@@ -90,6 +90,8 @@ func (p *Parser) ParseProgram() *ast.Program {
 			}
 		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments
+		case lexer.NEWLINE:
+			p.nextToken() // Skip newlines
 		case lexer.DEDENT:
 			// Skip stray lexer.DEDENT tokens (they should be consumed by task parsing)
 			p.nextToken()
@@ -2764,9 +2766,9 @@ func (p *Parser) addError(msg string) {
 	}
 }
 
-// skipComments skips over comment tokens
+// skipComments skips over comment tokens and newlines
 func (p *Parser) skipComments() {
-	for p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
+	for p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT || p.curToken.Type == lexer.NEWLINE {
 		p.nextToken()
 	}
 }

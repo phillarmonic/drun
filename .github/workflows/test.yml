@@ -137,3 +137,151 @@ jobs:
       with:
         name: drun-${{ runner.os }}
         path: bin/drun*
+
+  # Example file testing job - tests parsing and execution of example files
+  test-examples:
+    name: Test Examples on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: lint  # Only run after lint succeeds
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build drun binary (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        go build -o bin/drun ./cmd/drun
+        ./bin/drun --version
+
+    - name: Build drun binary (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        go build -o bin/drun.exe ./cmd/drun
+        ./bin/drun.exe --version
+
+    - name: Test parsing of all example files
+      shell: bash
+      run: |
+        echo "🧪 Testing parsing of all example files on ${{ matrix.os }}..."
+        
+        # Set binary name based on OS
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          DRUN_BIN="./bin/drun.exe"
+        else
+          DRUN_BIN="./bin/drun"
+        fi
+        
+        # Test that all example files can be parsed without errors
+        failed_files=()
+        
+        for file in examples/*.drun; do
+          if [[ -f "$file" ]]; then
+            echo "📄 Testing parsing: $file"
+            if ! $DRUN_BIN --list --file "$file" >/dev/null 2>&1; then
+              echo "❌ Failed to parse: $file"
+              failed_files+=("$file")
+            else
+              echo "✅ Successfully parsed: $file"
+            fi
+          fi
+        done
+        
+        if [[ ${#failed_files[@]} -gt 0 ]]; then
+          echo ""
+          echo "❌ Failed to parse ${#failed_files[@]} files:"
+          for file in "${failed_files[@]}"; do
+            echo "  - $file"
+            echo "    Error details:"
+            $DRUN_BIN --list --file "$file" 2>&1 | head -10 | sed 's/^/      /'
+          done
+          exit 1
+        fi
+        
+        echo "✅ All example files parsed successfully!"
+
+    - name: Test safe example executions
+      shell: bash
+      run: |
+        echo "🚀 Testing execution of safe example files..."
+        
+        # Set binary name based on OS
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          DRUN_BIN="./bin/drun.exe"
+        else
+          DRUN_BIN="./bin/drun"
+        fi
+        
+        # Test basic hello world
+        echo "📄 Testing: examples/01-hello-world.drun"
+        $DRUN_BIN hello --file examples/01-hello-world.drun
+        $DRUN_BIN "hello world" --file examples/01-hello-world.drun
+        
+        # Test interpolation (safe tasks only)
+        echo "📄 Testing: examples/03-interpolation.drun"
+        $DRUN_BIN greet --file examples/03-interpolation.drun name="CI Test" title="GitHub Actions"
+        
+        # Test project declarations
+        echo "📄 Testing: examples/21-project-declarations.drun"
+        $DRUN_BIN build --file examples/21-project-declarations.drun
+        $DRUN_BIN status --file examples/21-project-declarations.drun
+        
+        # Test explicit indentation
+        echo "📄 Testing: examples/15-explicit-indent.drun"
+        $DRUN_BIN "explicit indent" --file examples/15-explicit-indent.drun
+        
+        # Test builtin functions (safe ones)
+        echo "📄 Testing: examples/08-builtin-functions.drun"
+        $DRUN_BIN "system info" --file examples/08-builtin-functions.drun
+        
+        echo "✅ Safe example executions completed!"
+
+    - name: Test Windows-specific parsing edge cases
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        echo "🪟 Testing Windows-specific parsing scenarios..."
+        
+        DRUN_BIN="./bin/drun.exe"
+        
+        # Test examples that have blank lines and various formatting
+        # These will test CRLF vs LF handling on Windows
+        
+        echo "📄 Testing examples with blank lines and complex formatting..."
+        
+        # Test hello world (has blank lines)
+        $DRUN_BIN --list --file examples/01-hello-world.drun
+        $DRUN_BIN hello --file examples/01-hello-world.drun
+        
+        # Test parameters (complex structure with blank lines)
+        $DRUN_BIN --list --file examples/02-parameters.drun
+        
+        # Test project declarations (has project block with blank lines)
+        $DRUN_BIN --list --file examples/21-project-declarations.drun
+        $DRUN_BIN build --file examples/21-project-declarations.drun
+        
+        # Test variable operations (complex with multiple blank line sections)
+        $DRUN_BIN --list --file examples/28-variable-operations.drun
+        $DRUN_BIN basic_variable_operations --file examples/28-variable-operations.drun
+        
+        # Test builtin functions (has various formatting)
+        $DRUN_BIN --list --file examples/08-builtin-functions.drun
+        $DRUN_BIN "system info" --file examples/08-builtin-functions.drun
+        
+        # Test lifecycle hooks (complex indentation and blank lines)
+        $DRUN_BIN --list --file examples/39-drun-lifecycle-hooks.drun
+        
+        echo "✅ Windows-specific parsing tests with real example files passed!"
