@@ -209,7 +209,6 @@ jobs:
             else
               exit_code=$?
               echo "❌ FAILED"
-              failed_files+=("$file")
               
               # Show the actual error output
               echo "    Error details for $file:"
@@ -224,18 +223,12 @@ jobs:
                 fi
               fi
               echo ""
+              echo "❌ STOPPING: First parsing failure detected. Fix this issue before continuing."
+              echo "   Failed file: $file"
+              exit 1
             fi
           fi
         done
-        
-        if [[ ${#failed_files[@]} -gt 0 ]]; then
-          echo ""
-          echo "❌ SUMMARY: Failed to parse ${#failed_files[@]} out of $(ls examples/*.drun | wc -l) files:"
-          for file in "${failed_files[@]}"; do
-            echo "  - $file"
-          done
-          exit 1
-        fi
         
         echo "✅ All $(ls examples/*.drun | wc -l) example files parsed successfully!"
 
@@ -280,7 +273,10 @@ jobs:
                 sed 's/^/      /' /tmp/exec_error.log
               fi
             fi
-            return 1
+            echo ""
+            echo "❌ STOPPING: First execution failure detected. Fix this issue before continuing."
+            echo "   Failed: $file -> $task"
+            exit 1
           fi
         }
         
@@ -338,7 +334,10 @@ jobs:
                   sed 's/^/      /' /tmp/win_error.log
                 fi
               fi
-              return 1
+              echo ""
+              echo "❌ STOPPING: First Windows test failure detected. Fix this issue before continuing."
+              echo "   Failed: $file"
+              exit 1
             fi
           else
             # Execute specific task
@@ -356,7 +355,10 @@ jobs:
                   sed 's/^/      /' /tmp/win_error.log
                 fi
               fi
-              return 1
+              echo ""
+              echo "❌ STOPPING: First Windows test failure detected. Fix this issue before continuing."
+              echo "   Failed: $file -> $task"
+              exit 1
             fi
           fi
         }
