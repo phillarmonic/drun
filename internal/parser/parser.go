@@ -644,6 +644,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
+		// Skip any NEWLINE tokens that might appear in the task body
+		for p.curToken.Type == lexer.NEWLINE {
+			p.nextToken()
+		}
+
 		if p.isDependencyToken(p.curToken.Type) {
 			dep := p.parseDependencyStatement()
 			if dep != nil {
@@ -803,7 +808,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			// Skip newlines in task body
 			continue
 		} else {
-			p.addError(fmt.Sprintf("unexpected token in task body: %s (peek: %s)", p.curToken.Type, p.peekToken.Type))
+			p.addError(fmt.Sprintf("unexpected token in task body: %s (peek: %s) at line %d, column %d", p.curToken.Type, p.peekToken.Type, p.curToken.Line, p.curToken.Column))
 			break // Stop parsing on unexpected token
 		}
 	}

@@ -59,6 +59,17 @@ task "test":
 	info "test with extra blank line"
 `,
 		},
+		{
+			name: "parameters_with_blank_line_before_info",
+			input: `version: 2.0
+
+task "greet" means "Greet someone by name":
+	requires $name
+	given $title defaults to "friend"
+
+	info "Hello, {$title} {$name}! Nice to meet you. 😊"
+`,
+		},
 	}
 
 	for _, tt := range tests {
