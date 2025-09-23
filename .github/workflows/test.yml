@@ -161,6 +161,12 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Install coreutils on macOS (for timeout command)
+      if: runner.os == 'macOS'
+      run: |
+        echo "Installing coreutils for gtimeout command..."
+        brew install coreutils
+
     - name: Build drun binary (Unix)
       if: runner.os != 'Windows'
       run: |
@@ -178,11 +184,16 @@ jobs:
       run: |
         echo "🧪 Testing parsing of all example files on ${{ matrix.os }}..."
         
-        # Set binary name based on OS
+        # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           DRUN_BIN="./bin/drun.exe"
+          TIMEOUT_CMD="timeout 60"
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
           DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="timeout 60"
         fi
         
         # Test that all example files can be parsed without errors
@@ -190,64 +201,107 @@ jobs:
         
         for file in examples/*.drun; do
           if [[ -f "$file" ]]; then
-            echo "📄 Testing parsing: $file"
-            if ! $DRUN_BIN --list --file "$file" >/dev/null 2>&1; then
-              echo "❌ Failed to parse: $file"
-              failed_files+=("$file")
+            echo -n "📄 Testing parsing: $file ... "
+            
+            # Use timeout to prevent infinite loops (60 seconds)
+            if $TIMEOUT_CMD $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/parse_error.log; then
+              echo "✅ SUCCESS"
             else
-              echo "✅ Successfully parsed: $file"
+              exit_code=$?
+              echo "❌ FAILED"
+              failed_files+=("$file")
+              
+              # Show the actual error output
+              echo "    Error details for $file:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Parsing took longer than 60 seconds (possible infinite loop)"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/parse_error.log ]]; then
+                  sed 's/^/      /' /tmp/parse_error.log
+                else
+                  echo "      No error log available"
+                fi
+              fi
+              echo ""
             fi
           fi
         done
         
         if [[ ${#failed_files[@]} -gt 0 ]]; then
           echo ""
-          echo "❌ Failed to parse ${#failed_files[@]} files:"
+          echo "❌ SUMMARY: Failed to parse ${#failed_files[@]} out of $(ls examples/*.drun | wc -l) files:"
           for file in "${failed_files[@]}"; do
             echo "  - $file"
-            echo "    Error details:"
-            $DRUN_BIN --list --file "$file" 2>&1 | head -10 | sed 's/^/      /'
           done
           exit 1
         fi
         
-        echo "✅ All example files parsed successfully!"
+        echo "✅ All $(ls examples/*.drun | wc -l) example files parsed successfully!"
 
     - name: Test safe example executions
       shell: bash
       run: |
         echo "🚀 Testing execution of safe example files..."
         
-        # Set binary name based on OS
+        # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           DRUN_BIN="./bin/drun.exe"
+          TIMEOUT_CMD="timeout 60"
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
           DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="timeout 60"
         fi
         
+        # Helper function to run with timeout and error handling
+        run_with_timeout() {
+          local file="$1"
+          local task="$2"
+          shift 2
+          local args="$@"
+          
+          echo -n "📄 Testing: $file -> $task ... "
+          
+          # Execute with timeout
+          if $TIMEOUT_CMD $DRUN_BIN "$task" --file "$file" $args >/dev/null 2>/tmp/exec_error.log; then
+            echo "✅ SUCCESS"
+          else
+            exit_code=$?
+            echo "❌ FAILED"
+            echo "    Error details for $file -> $task:"
+            if [[ $exit_code -eq 124 ]]; then
+              echo "      ⏰ TIMEOUT: Execution took longer than 60 seconds"
+            else
+              echo "      Exit code: $exit_code"
+              if [[ -f /tmp/exec_error.log ]]; then
+                sed 's/^/      /' /tmp/exec_error.log
+              fi
+            fi
+            return 1
+          fi
+        }
+        
         # Test basic hello world
-        echo "📄 Testing: examples/01-hello-world.drun"
-        $DRUN_BIN hello --file examples/01-hello-world.drun
-        $DRUN_BIN "hello world" --file examples/01-hello-world.drun
+        run_with_timeout "examples/01-hello-world.drun" "hello"
+        run_with_timeout "examples/01-hello-world.drun" "hello world"
         
         # Test interpolation (safe tasks only)
-        echo "📄 Testing: examples/03-interpolation.drun"
-        $DRUN_BIN greet --file examples/03-interpolation.drun name="CI Test" title="GitHub Actions"
+        run_with_timeout "examples/03-interpolation.drun" "greet" name="CI Test" title="GitHub Actions"
         
         # Test project declarations
-        echo "📄 Testing: examples/21-project-declarations.drun"
-        $DRUN_BIN build --file examples/21-project-declarations.drun
-        $DRUN_BIN status --file examples/21-project-declarations.drun
+        run_with_timeout "examples/21-project-declarations.drun" "build"
+        run_with_timeout "examples/21-project-declarations.drun" "status"
         
         # Test explicit indentation
-        echo "📄 Testing: examples/15-explicit-indent.drun"
-        $DRUN_BIN "explicit indent" --file examples/15-explicit-indent.drun
+        run_with_timeout "examples/15-explicit-indent.drun" "explicit indent"
         
         # Test builtin functions (safe ones)
-        echo "📄 Testing: examples/08-builtin-functions.drun"
-        $DRUN_BIN "system info" --file examples/08-builtin-functions.drun
+        run_with_timeout "examples/08-builtin-functions.drun" "system info"
         
-        echo "✅ Safe example executions completed!"
+        echo "✅ All safe example executions completed successfully!"
 
     - name: Test Windows-specific parsing edge cases
       if: matrix.os == 'windows-latest'
@@ -257,31 +311,78 @@ jobs:
         
         DRUN_BIN="./bin/drun.exe"
         
-        # Test examples that have blank lines and various formatting
-        # These will test CRLF vs LF handling on Windows
+        # Helper function for Windows tests with timeout
+        test_windows_file() {
+          local file="$1"
+          local task="$2"
+          
+          echo -n "📄 Windows test: $file"
+          if [[ -n "$task" ]]; then
+            echo -n " -> $task"
+          fi
+          echo -n " ... "
+          
+          if [[ -z "$task" ]]; then
+            # Just list tasks
+            if timeout 60 $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/win_error.log; then
+              echo "✅ SUCCESS"
+            else
+              exit_code=$?
+              echo "❌ FAILED"
+              echo "    Error details:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Operation took longer than 60 seconds"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/win_error.log ]]; then
+                  sed 's/^/      /' /tmp/win_error.log
+                fi
+              fi
+              return 1
+            fi
+          else
+            # Execute specific task
+            if timeout 60 $DRUN_BIN "$task" --file "$file" >/dev/null 2>/tmp/win_error.log; then
+              echo "✅ SUCCESS"
+            else
+              exit_code=$?
+              echo "❌ FAILED"
+              echo "    Error details:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Execution took longer than 60 seconds"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/win_error.log ]]; then
+                  sed 's/^/      /' /tmp/win_error.log
+                fi
+              fi
+              return 1
+            fi
+          fi
+        }
         
-        echo "📄 Testing examples with blank lines and complex formatting..."
+        echo "Testing examples with blank lines and complex formatting..."
         
         # Test hello world (has blank lines)
-        $DRUN_BIN --list --file examples/01-hello-world.drun
-        $DRUN_BIN hello --file examples/01-hello-world.drun
+        test_windows_file "examples/01-hello-world.drun"
+        test_windows_file "examples/01-hello-world.drun" "hello"
         
         # Test parameters (complex structure with blank lines)
-        $DRUN_BIN --list --file examples/02-parameters.drun
+        test_windows_file "examples/02-parameters.drun"
         
         # Test project declarations (has project block with blank lines)
-        $DRUN_BIN --list --file examples/21-project-declarations.drun
-        $DRUN_BIN build --file examples/21-project-declarations.drun
+        test_windows_file "examples/21-project-declarations.drun"
+        test_windows_file "examples/21-project-declarations.drun" "build"
         
         # Test variable operations (complex with multiple blank line sections)
-        $DRUN_BIN --list --file examples/28-variable-operations.drun
-        $DRUN_BIN basic_variable_operations --file examples/28-variable-operations.drun
+        test_windows_file "examples/28-variable-operations.drun"
+        test_windows_file "examples/28-variable-operations.drun" "basic_variable_operations"
         
         # Test builtin functions (has various formatting)
-        $DRUN_BIN --list --file examples/08-builtin-functions.drun
-        $DRUN_BIN "system info" --file examples/08-builtin-functions.drun
+        test_windows_file "examples/08-builtin-functions.drun"
+        test_windows_file "examples/08-builtin-functions.drun" "system info"
         
         # Test lifecycle hooks (complex indentation and blank lines)
-        $DRUN_BIN --list --file examples/39-drun-lifecycle-hooks.drun
+        test_windows_file "examples/39-drun-lifecycle-hooks.drun"
         
-        echo "✅ Windows-specific parsing tests with real example files passed!"
+        echo "✅ All Windows-specific parsing tests passed!"
