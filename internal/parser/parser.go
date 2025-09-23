@@ -267,8 +267,8 @@ func (p *Parser) parseShellConfigStatement() *ast.ShellConfigStatement {
 		return nil
 	}
 
-	// Expect indented block with platform configurations
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect indented block with platform configurations (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return nil
 	}
 
@@ -307,8 +307,8 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 		Environment: make(map[string]string),
 	}
 
-	// Expect indented block
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect indented block (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return nil
 	}
 
@@ -364,8 +364,8 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 func (p *Parser) parseStringArray() []string {
 	var result []string
 
-	// Expect indented block
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect indented block (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return result
 	}
 
@@ -396,8 +396,8 @@ func (p *Parser) parseStringArray() []string {
 func (p *Parser) parseKeyValuePairs() map[string]string {
 	result := make(map[string]string)
 
-	// Expect indented block
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect indented block (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return result
 	}
 
@@ -635,8 +635,8 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 		return nil
 	}
 
-	// Expect lexer.INDENT to start task body
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect lexer.INDENT to start task body (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return nil
 	}
 
@@ -893,8 +893,8 @@ func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.She
 		return nil
 	}
 
-	// Expect INDENT
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect INDENT (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return nil
 	}
 
@@ -2745,6 +2745,23 @@ func (p *Parser) expectPeek(t lexer.TokenType) bool {
 	}
 }
 
+// expectPeekSkipNewlines expects a token type but skips any NEWLINE tokens first
+func (p *Parser) expectPeekSkipNewlines(t lexer.TokenType) bool {
+	// Skip any NEWLINE tokens
+	for p.peekToken.Type == lexer.NEWLINE {
+		p.nextToken() // consume the NEWLINE
+	}
+
+	// Now check for the expected token
+	if p.peekToken.Type == t {
+		p.nextToken()
+		return true
+	} else {
+		p.peekError(t)
+		return false
+	}
+}
+
 // peekError adds an error for unexpected peek token
 func (p *Parser) peekError(t lexer.TokenType) {
 	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
@@ -3388,8 +3405,8 @@ func (p *Parser) parseMultilineShellCapture(stmt *ast.VariableStatement) *ast.Va
 	// Mark this as a shell capture by setting a special operation
 	stmt.Operation = "capture_shell"
 
-	// Expect INDENT
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect INDENT (skip any newlines first)
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
 		return nil
 	}
 
