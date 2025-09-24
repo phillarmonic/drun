@@ -191,6 +191,7 @@ func TestIsBuiltin(t *testing.T) {
 		"hostname", "pwd", "env", "file exists", "now.format",
 		"start progress", "update progress", "finish progress",
 		"start timer", "stop timer", "show elapsed time",
+		"docker compose status", "current git branch",
 	}
 
 	for _, builtin := range builtins {
@@ -222,6 +223,26 @@ func TestGetCurrentGitCommit(t *testing.T) {
 	if err == nil {
 		if len(result) != 7 { // Short hash length
 			t.Errorf("Expected 7-character short commit hash, got %d characters: %s", len(result), result)
+		}
+	}
+
+	// Note: We don't fail the test if git is not available or we're not in a git repo
+	// This makes the test more robust in different environments
+}
+
+func TestGetCurrentGitBranch(t *testing.T) {
+	// This test might fail in environments without git or outside a git repo
+	// So we'll make it more lenient
+	result, err := getCurrentGitBranch()
+
+	// If we're in a git repo, should get a branch name
+	if err == nil {
+		if result == "" {
+			t.Error("Expected non-empty branch name")
+		}
+		// Branch names should not contain newlines
+		if strings.Contains(result, "\n") {
+			t.Errorf("Branch name should not contain newlines: %q", result)
 		}
 	}
 
@@ -467,5 +488,149 @@ func TestProgressBar(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("For percentage %d, expected %q, got %q", test.percentage, test.expected, result)
 		}
+	}
+}
+
+func TestDetectDockerComposeCommand(t *testing.T) {
+	// This test will check if the detection logic works
+	// Note: The actual result depends on what's installed on the system
+	cmd, err := detectDockerComposeCommand()
+
+	if err != nil {
+		// If neither docker compose nor docker-compose is available, that's fine for testing
+		// We just want to make sure the function handles this case properly
+		if !strings.Contains(err.Error(), "neither 'docker compose' nor 'docker-compose' is available") {
+			t.Errorf("Unexpected error message: %v", err)
+		}
+		return
+	}
+
+	// If we get a command, it should be one of the expected forms
+	if len(cmd) == 0 {
+		t.Error("Expected non-empty command slice")
+		return
+	}
+
+	// Should be either ["docker", "compose"] or ["docker-compose"]
+	if len(cmd) == 2 {
+		if cmd[0] != "docker" || cmd[1] != "compose" {
+			t.Errorf("Expected [docker, compose], got %v", cmd)
+		}
+	} else if len(cmd) == 1 {
+		if cmd[0] != "docker-compose" {
+			t.Errorf("Expected [docker-compose], got %v", cmd)
+		}
+	} else {
+		t.Errorf("Unexpected command format: %v", cmd)
+	}
+}
+
+func TestIsCommandAvailable(t *testing.T) {
+	// Test with a command that should always be available on Unix systems
+	if !isCommandAvailable("ls") && !isCommandAvailable("dir") {
+		t.Error("Expected either 'ls' or 'dir' to be available")
+	}
+
+	// Test with a command that should not exist
+	if isCommandAvailable("this_command_definitely_does_not_exist_12345") {
+		t.Error("Expected non-existent command to return false")
+	}
+}
+
+func TestCheckDockerComposeStatus(t *testing.T) {
+	// Test with current directory (should work even if no compose project exists)
+	result, err := checkDockerComposeStatus()
+
+	// The function should not error even if docker compose is not available
+	// It should return "unavailable" in that case
+	if err != nil {
+		// Check if it's the expected "unavailable" case
+		if !strings.Contains(err.Error(), "docker compose not available") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if result != "unavailable" {
+			t.Errorf("Expected 'unavailable' when docker compose not available, got %s", result)
+		}
+		return
+	}
+
+	// If docker compose is available, we should get a valid status
+	validStatuses := []string{"down", "usable", "unusable", "partial", "error"}
+	found := false
+	for _, status := range validStatuses {
+		if result == status {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Expected one of %v, got %s", validStatuses, result)
+	}
+}
+
+func TestCheckDockerComposeStatusWithPath(t *testing.T) {
+	// Test with a non-existent directory
+	result, err := checkDockerComposeStatus("/non/existent/directory")
+
+	if err != nil {
+		// Should get an error about the directory not existing or docker compose not available
+		if !strings.Contains(err.Error(), "docker compose not available") &&
+			!strings.Contains(err.Error(), "failed to change to project directory") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		return
+	}
+
+	// If no error, should be a valid status
+	validStatuses := []string{"down", "usable", "unusable", "partial", "error"}
+	found := false
+	for _, status := range validStatuses {
+		if result == status {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Expected one of %v, got %s", validStatuses, result)
+	}
+}
+
+func TestDockerComposeStatusInterpolation(t *testing.T) {
+	// Test that the builtin function works correctly in interpolation context
+	// This tests the exact scenario from our example
+
+	// First verify the function is registered as a builtin
+	if !IsBuiltin("docker compose status") {
+		t.Error("docker compose status should be registered as a builtin function")
+	}
+
+	// Test calling it directly
+	result, err := CallBuiltin("docker compose status")
+	if err != nil {
+		// Should get a result even if docker compose is not available
+		if !strings.Contains(err.Error(), "docker compose not available") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		// If error, result should be "unavailable"
+		if result != "unavailable" {
+			t.Errorf("Expected 'unavailable' when docker compose not available, got %s", result)
+		}
+		return
+	}
+
+	// If no error, should be a valid status
+	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
+	found := false
+	for _, status := range validStatuses {
+		if result == status {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Expected one of %v, got %s", validStatuses, result)
 	}
 }

@@ -26,7 +26,7 @@ task "multiline shell test":
     export VAR=test
     echo $VAR
   
-  capture as $result:
+  capture from shell as $result:
     echo "Captured output"
     whoami
     hostname
@@ -109,26 +109,24 @@ task "multiline shell test":
 	}
 
 	// Check capture statement (multiline)
-	captureStmt, ok := task.Body[4].(*ast.ShellStatement)
+	captureStmt, ok := task.Body[4].(*ast.VariableStatement)
 	if !ok {
-		t.Fatalf("Expected statement 4 to be ShellStatement, got %T", task.Body[4])
+		t.Fatalf("Expected statement 4 to be VariableStatement, got %T", task.Body[4])
 	}
-	if captureStmt.Action != "capture" {
-		t.Errorf("Expected action 'capture', got %s", captureStmt.Action)
+	if captureStmt.Operation != "capture_shell" {
+		t.Errorf("Expected operation 'capture_shell', got %s", captureStmt.Operation)
 	}
-	if !captureStmt.IsMultiline {
-		t.Errorf("Expected IsMultiline to be true")
+	if captureStmt.Variable != "$result" {
+		t.Errorf("Expected capture variable '$result', got %s", captureStmt.Variable)
 	}
-	if captureStmt.CaptureVar != "result" {
-		t.Errorf("Expected capture variable 'result', got %s", captureStmt.CaptureVar)
+	// Check that the value contains the expected commands
+	literalExpr, ok := captureStmt.Value.(*ast.LiteralExpression)
+	if !ok {
+		t.Fatalf("Expected capture value to be LiteralExpression, got %T", captureStmt.Value)
 	}
-	expectedCaptureCommands := []string{
-		"echo \"Captured output\"",
-		"whoami",
-		"hostname",
-	}
-	if len(captureStmt.Commands) != len(expectedCaptureCommands) {
-		t.Errorf("Expected %d commands, got %d", len(expectedCaptureCommands), len(captureStmt.Commands))
+	expectedScript := "echo \"Captured output\"\nwhoami\nhostname"
+	if literalExpr.Value != expectedScript {
+		t.Errorf("Expected script '%s', got '%s'", expectedScript, literalExpr.Value)
 	}
 }
 
@@ -142,9 +140,9 @@ task "mixed shell test":
     echo "multiline command 1"
     echo "multiline command 2"
   
-  capture "whoami" as $user
+  capture from shell "whoami" as $user
   
-  capture as $info:
+  capture from shell as $info:
     echo "User: $(whoami)"
     echo "Date: $(date)"
   
@@ -185,27 +183,27 @@ task "mixed shell test":
 	}
 
 	// Check single-line capture
-	captureSingle, ok := task.Body[2].(*ast.ShellStatement)
+	captureSingle, ok := task.Body[2].(*ast.VariableStatement)
 	if !ok {
-		t.Fatalf("Expected statement 2 to be ShellStatement")
+		t.Fatalf("Expected statement 2 to be VariableStatement")
 	}
-	if captureSingle.IsMultiline {
-		t.Errorf("Expected single-line capture to have IsMultiline=false")
+	if captureSingle.Operation != "capture_shell" {
+		t.Errorf("Expected operation 'capture_shell', got %s", captureSingle.Operation)
 	}
-	if captureSingle.CaptureVar != "user" {
-		t.Errorf("Expected capture variable 'user', got %s", captureSingle.CaptureVar)
+	if captureSingle.Variable != "$user" {
+		t.Errorf("Expected capture variable '$user', got %s", captureSingle.Variable)
 	}
 
 	// Check multiline capture
-	captureMulti, ok := task.Body[3].(*ast.ShellStatement)
+	captureMulti, ok := task.Body[3].(*ast.VariableStatement)
 	if !ok {
-		t.Fatalf("Expected statement 3 to be ShellStatement")
+		t.Fatalf("Expected statement 3 to be VariableStatement")
 	}
-	if !captureMulti.IsMultiline {
-		t.Errorf("Expected multiline capture to have IsMultiline=true")
+	if captureMulti.Operation != "capture_shell" {
+		t.Errorf("Expected operation 'capture_shell', got %s", captureMulti.Operation)
 	}
-	if captureMulti.CaptureVar != "info" {
-		t.Errorf("Expected capture variable 'info', got %s", captureMulti.CaptureVar)
+	if captureMulti.Variable != "$info" {
+		t.Errorf("Expected capture variable '$info', got %s", captureMulti.Variable)
 	}
 }
 

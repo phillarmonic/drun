@@ -112,9 +112,24 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok.Type = RBRACKET
 		tok.Literal = string(l.ch)
+	case '+':
+		tok.Type = PLUS
+		tok.Literal = string(l.ch)
 	case '-':
 		tok.Type = MINUS
 		tok.Literal = string(l.ch)
+	case '*':
+		tok.Type = STAR
+		tok.Literal = string(l.ch)
+	case '/':
+		if l.peekChar() == '*' {
+			tok.Type = MULTILINE_COMMENT
+			tok.Literal = l.readMultilineComment()
+			return tok // Don't call readChar() again
+		} else {
+			tok.Type = SLASH
+			tok.Literal = string(l.ch)
+		}
 	case '>':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -214,16 +229,29 @@ func (l *Lexer) handleIndentation() Token {
 		return l.NextToken()
 	}
 
-	// Count indentation (spaces only for now)
+	// Handle multiline comment start - don't process indentation for multiline comments
+	if l.ch == '/' && l.peekChar() == '*' {
+		return l.NextToken()
+	}
+
+	// Count indentation (spaces and tabs)
 	indent := 0
 	pos := l.position
-	for pos < len(l.input) && l.input[pos] == ' ' {
-		indent++
+	indentChars := 0 // count of actual characters to skip
+	for pos < len(l.input) && (l.input[pos] == ' ' || l.input[pos] == '\t') {
+		switch l.input[pos] {
+		case ' ':
+			indent++
+		case '\t':
+			// Treat each tab as 4 spaces for indentation level calculation
+			indent += 4
+		}
+		indentChars++
 		pos++
 	}
 
 	// Skip the indentation characters
-	for i := 0; i < indent; i++ {
+	for i := 0; i < indentChars; i++ {
 		l.readChar()
 	}
 
@@ -236,8 +264,8 @@ func (l *Lexer) handleIndentation() Token {
 			Type:     INDENT,
 			Literal:  "",
 			Line:     l.line,
-			Column:   l.column - indent,
-			Position: l.position - indent,
+			Column:   l.column - indentChars,
+			Position: l.position - indentChars,
 		}
 	} else if indent < currentIndent {
 		// Decreased indentation - DEDENT token(s)
@@ -268,8 +296,8 @@ func (l *Lexer) handleIndentation() Token {
 			Type:     DEDENT,
 			Literal:  "",
 			Line:     l.line,
-			Column:   l.column - indent,
-			Position: l.position - indent,
+			Column:   l.column - indentChars,
+			Position: l.position - indentChars,
 		}
 	}
 
@@ -296,6 +324,24 @@ func (l *Lexer) readComment() string {
 	for l.ch != '\n' && l.ch != 0 {
 		l.readChar()
 	}
+	return l.input[position:l.position]
+}
+
+// readMultilineComment reads a multiline comment /* ... */
+func (l *Lexer) readMultilineComment() string {
+	position := l.position
+	l.readChar() // consume '/'
+	l.readChar() // consume '*'
+
+	for l.ch != 0 {
+		if l.ch == '*' && l.peekChar() == '/' {
+			l.readChar() // consume '*'
+			l.readChar() // consume '/'
+			break
+		}
+		l.readChar()
+	}
+
 	return l.input[position:l.position]
 }
 

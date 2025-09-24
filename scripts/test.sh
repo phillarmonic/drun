@@ -184,7 +184,8 @@ build_test_flags() {
     fi
     
     if [[ "$COVERAGE" == true ]]; then
-        flags+=("-cover" "-coverprofile=coverage.out")
+        mkdir -p coverage
+        flags+=("-cover" "-coverprofile=coverage/coverage.out")
     fi
     
     # Handle empty array case
@@ -249,12 +250,12 @@ run_benchmarks() {
 
 # Generate coverage report
 generate_coverage_report() {
-    if [[ "$COVERAGE" == true && -f "coverage.out" ]]; then
+    if [[ "$COVERAGE" == true && -f "coverage/coverage.out" ]]; then
         log_section "Generating Coverage Report"
         
         # Calculate total coverage
         local total_coverage
-        total_coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        total_coverage=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
         
         log_info "Total coverage: ${total_coverage}%"
         
@@ -266,13 +267,13 @@ generate_coverage_report() {
         fi
         
         # Generate HTML report
-        go tool cover -html=coverage.out -o coverage.html
+        go tool cover -html=coverage/coverage.out -o coverage/coverage.html
         log_info "HTML coverage report generated: coverage.html"
         
         # Show per-package coverage
         echo ""
         log_info "Per-package coverage:"
-        go tool cover -func=coverage.out | grep -E "(internal/|total:)" | while read -r line; do
+        go tool cover -func=coverage/coverage.out | grep -E "(internal/|total:)" | while read -r line; do
             if [[ $line == *"total:"* ]]; then
                 echo -e "  ${GREEN}$line${NC}"
             else

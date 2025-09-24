@@ -1,0 +1,92 @@
+version: 2.0
+
+project "Sequential Matrix Demo" version "1.0":
+	set platforms as list to ["linux", "darwin", "windows"]
+	set architectures as list to ["amd64", "arm64"]
+	set registry to "ghcr.io/company"
+
+task "cross platform build" means "Build application for multiple platforms and architectures":
+	info "🏗️  Starting cross-platform build matrix"
+	
+	# Sequential matrix: platforms × architectures
+	for each $platform in $globals.platforms:
+		info "📦 Building for platform: {$platform}"
+		for each $arch in $globals.architectures:
+			info "  🔧 Compiling {$platform}/{$arch}"
+			step "Setting up {$platform} build environment"
+			step "Compiling binary for {$platform}-{$arch}"
+			step "Running tests on {$platform}-{$arch}"
+			step "Packaging {$platform}-{$arch} build"
+			success "✅ {$platform}/{$arch} build completed"
+	
+	success "🎉 All cross-platform builds completed!"
+
+task "test matrix" means "Run comprehensive test matrix":
+	info "🧪 Starting test matrix execution"
+	
+	# Database versions × Test suites matrix
+	for each $db in ["postgres:13", "postgres:14", "postgres:15", "mysql:8.0"]:
+		info "🗄️  Testing with database: {$db}"
+		for each $suite in ["unit", "integration", "e2e", "performance"]:
+			info "  🔍 Running {$suite} tests"
+			step "Starting {$db} container"
+			step "Waiting for {$db} to be ready"
+			step "Running {$suite} test suite"
+			step "Collecting test results"
+			step "Stopping {$db} container"
+			success "✅ {$suite} tests passed with {$db}"
+	
+	success "🎉 All test combinations completed!"
+
+task "deployment matrix" means "Deploy to multiple environments with different configurations":
+	info "🚀 Starting deployment matrix"
+	
+	# Environment × Service matrix
+	for each $env in ["dev", "staging", "production"]:
+		info "🌍 Deploying to environment: {$env}"
+		for each $service in ["api", "web", "worker", "scheduler"]:
+			info "  📦 Deploying {$service} service"
+			step "Building {$service} image for {$env}"
+			step "Pushing image to {registry}"
+			step "Deploying {$service} to {$env}"
+			step "Running health checks for {$service}"
+			step "Verifying {$service} deployment in {$env}"
+			success "✅ {$service} deployed to {$env}"
+	
+	success "🎉 All services deployed to all environments!"
+
+task "simple array demo" means "Demonstrate basic array literal usage":
+	info "📋 Array literal examples"
+	
+	# Simple array iteration
+	for each $language in ["Go", "Python", "JavaScript", "Rust", "Java"]:
+		info "  💻 Processing language: {$language}"
+		step "Setting up {$language} environment"
+		step "Running {$language} linter"
+		step "Building {$language} project"
+	
+	# Operating systems
+	for each $os in ["ubuntu-20.04", "ubuntu-22.04", "macos-latest", "windows-latest"]:
+		info "  🖥️  Testing on OS: {$os}"
+		step "Configuring {$os} runner"
+		step "Installing dependencies on {$os}"
+		step "Running tests on {$os}"
+	
+	success "✅ Array demonstrations completed!"
+
+task "nested matrix demo" means "Demonstrate deeply nested matrix execution":
+	info "🔄 Complex nested matrix execution"
+	
+	# Three-level nesting: OS × Language × Version
+	for each $os in ["ubuntu", "alpine"]:
+		info "🐧 Operating System: {$os}"
+		for each $lang in ["node", "python", "go"]:
+			info "  📚 Language: {$lang}"
+			for each $version in ["latest", "lts", "stable"]:
+				info "    🏷️  Version: {$version}"
+				step "Setting up {$os} with {$lang}:{$version}"
+				step "Running compatibility tests"
+				step "Performance benchmarking"
+				success "✅ {$os}/{$lang}:{$version} completed"
+	
+	success "🎉 Nested matrix execution completed!"

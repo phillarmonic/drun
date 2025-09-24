@@ -111,6 +111,7 @@ project_declaration = "project" string_literal [ "version" string_literal ] ":"
                      { project_setting } ;
 
 project_setting = "set" identifier "to" expression
+                | "set" identifier "as" "list" "to" array_literal
                 | "include" string_literal
                 | "before" "any" "task" ":" statement_block
                 | "after" "any" "task" ":" statement_block
@@ -151,8 +152,10 @@ dependency_list = dependency_item { ( "," | "and" ) dependency_item } [ "then" d
 dependency_item = identifier [ "in" "parallel" ] ;
 
 (* Lifecycle hooks *)
-lifecycle_hook = "before" "running" ":" statement_block
-               | "after" "running" ":" statement_block ;
+lifecycle_hook = "before" "any" "task" ":" statement_block
+               | "after" "any" "task" ":" statement_block
+               | "on" "drun" "setup" ":" statement_block
+               | "on" "drun" "teardown" ":" statement_block ;
 
 (* Statements *)
 statement_block = { statement } ;
@@ -181,11 +184,10 @@ if_statement = "if" condition ":" statement_block
               [ "else" "if" condition ":" statement_block ]
               [ "else" ":" statement_block ] ;
 
-when_statement = "when" expression ":"
-                { "is" expression ":" statement_block }
-                [ "else" ":" statement_block ] ;
+when_statement = "when" expression ":" statement_block
+                [ "otherwise" ":" statement_block ] ;
 
-for_statement = "for" "each" identifier "in" expression [ "in" "parallel" ] ":"
+for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
                statement_block ;
 
 try_statement = "try" ":" statement_block
@@ -231,7 +233,8 @@ argument_list = expression { "," expression } ;
 (* Variables *)
 variable_declaration = "let" identifier "be" expression
                      | "set" identifier "to" expression
-                     | "capture" identifier "from" expression ;
+                     | "capture" identifier "from" expression
+                     | "capture" "from" "shell" string "as" variable ;
 
 constant_declaration = "define" identifier "as" expression ;
 
@@ -321,7 +324,11 @@ literal = string_literal
 
 string_literal = '"' { string_character } '"' ;
 interpolated_string = '"' { string_character | interpolation } '"' ;
-interpolation = "{" expression "}" ;
+interpolation = "{" expression [ pipe_operations ] "}" ;
+pipe_operations = { "|" pipe_operation } ;
+pipe_operation = "replace" string_literal ( "by" | "with" ) string_literal
+               | "without" ( "prefix" | "suffix" ) string_literal
+               | "uppercase" | "lowercase" | "trim" ;
 
 (* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
 variable = "$" identifier ;  (* Declared variables: $name, $environment *)
@@ -342,6 +349,10 @@ object_member = ( identifier | string_literal ) ":" expression ;
 identifier = letter { letter | digit | "_" } ;
 letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
 digit = "0" | "1" | ... | "9" ;
+
+(* Comments *)
+single_line_comment = "#" { any_character_except_newline } ;
+multiline_comment = "/*" { any_character } "*/" ;
 ```
 
 ---
@@ -369,7 +380,7 @@ if, else, when, for, each, in, try, catch, finally, break, continue
 task, project, let, set, capture, define, given, requires, accepts
 
 # Dependencies and lifecycle
-depends, on, before, after, running, then, parallel
+depends, on, before, after, running, then, parallel, drun, setup, teardown
 
 # Types and constraints
 from, matching, pattern, format, as, list, of, between, and, defaults, to
@@ -387,20 +398,119 @@ directory, file, exists, running, healthy, available
 
 # Special values
 true, false, now, current, secret, env
+
+# Built-in functions
+current git commit, current git branch, now.format, pwd, hostname, env
 ```
 
 ### Comments
 
+drun v2 supports both single-line and multiline comments for documenting your automation workflows.
+
+#### Single-line Comments
+
+Single-line comments start with `#` and continue to the end of the line:
+
 ```
-# Single-line comment
+# This is a single-line comment
 task "example":  # End-of-line comment
   info "Hello"
+```
+
+#### Multiline Comments
+
+Multiline comments use C-style `/* */` syntax and can span multiple lines:
+
+```
+/*
+    This is a multiline comment
+    that can span several lines
+    and is useful for detailed documentation
+*/
+
+version: 2.0
 
 /*
-Multi-line comment
-Can span multiple lines
+    Project configuration and setup
+    Author: Development Team
+    Last updated: 2025-09-22
 */
+project "my-app" version "1.0":
+    info "Starting application setup"
 ```
+
+**Key Features:**
+- Multiline comments preserve formatting and indentation
+- They can appear anywhere in the file where whitespace is allowed
+- Unterminated multiline comments are handled gracefully (consume to end of file)
+- Comments are completely ignored during parsing and execution
+- Useful for file headers, detailed explanations, and temporary code disabling
+
+**Best Practices:**
+- Use single-line comments for brief explanations
+- Use multiline comments for file headers, detailed documentation, and block commenting
+- Consider using multiline comments to temporarily disable sections of code during development
+
+### Indentation
+
+drun v2 uses **Python-style indentation** to define code blocks and supports both **tabs** and **spaces**:
+
+#### Supported Indentation Styles
+
+```drun
+# Spaces (2 or 4 spaces per level)
+task "spaces-example":
+  info "Level 1 with spaces"
+  if true:
+    step "Level 2 with spaces"
+    for each item in ["a", "b"]:
+      info "Level 3: {item}"
+
+# Tabs
+task "tabs-example":
+	info "Level 1 with tabs"
+	if true:
+		step "Level 2 with tabs"
+		for each item in ["a", "b"]:
+			info "Level 3: {item}"
+```
+
+#### Indentation Rules
+
+1. **Tab Equivalence**: Each tab character equals 4 spaces for indentation level calculation
+2. **Consistency**: Maintain consistent indentation style within each file
+3. **Block Structure**: Indentation defines code blocks (similar to Python)
+4. **Nesting**: Deeper indentation creates nested blocks
+5. **Dedentation**: Returning to a previous indentation level closes blocks
+
+#### Mixed Indentation
+
+While both tabs and spaces are supported, **mixing them is discouraged** but technically allowed:
+
+```drun
+task "mixed-example":
+    info "4 spaces"
+	info "1 tab (equivalent to 4 spaces)"
+        info "8 spaces"
+		info "2 tabs (equivalent to 8 spaces)"
+```
+
+#### Error Handling
+
+Invalid indentation patterns will result in parse errors:
+
+```drun
+task "invalid":
+  info "Level 1"
+   info "Invalid: 3 spaces doesn't match any previous level"
+```
+
+#### Best Practices
+
+- **Choose one style**: Use either tabs or spaces consistently throughout your project
+- **Editor configuration**: Configure your editor to show whitespace characters
+- **Team standards**: Establish indentation standards for your team
+- **Generated files**: `drun --init` uses tabs by default
 
 ### String Interpolation
 
@@ -506,6 +616,73 @@ task "example":
   capture "whoami" as $user # Uses configured shell and environment
 ```
 
+### Lifecycle Hooks
+
+drun v2 supports two types of lifecycle hooks that allow you to execute code at different points in the execution pipeline:
+
+#### Task-Level Lifecycle Hooks
+
+These hooks run around individual task execution:
+
+```
+project "myapp":
+  before any task:
+    info "🚀 Starting task: {$globals.current_task}"
+    capture task_start_time from now
+  
+  after any task:
+    capture task_end_time from now
+    let task_duration be {task_end_time} - {task_start_time}
+    info "✅ Task completed in {task_duration}"
+```
+
+- **`before any task`**: Executes before each individual task runs
+- **`after any task`**: Executes after each individual task completes
+
+#### Tool-Level Lifecycle Hooks
+
+These hooks run once per drun execution, providing tool-level startup and shutdown capabilities:
+
+```
+project "myapp":
+  on drun setup:
+    info "🚀 Starting drun execution pipeline"
+    info "📊 Tool version: {$globals.drun_version}"
+    capture pipeline_start_time from now
+  
+  on drun teardown:
+    capture pipeline_end_time from now
+    let total_time be {pipeline_end_time} - {pipeline_start_time}
+    info "🏁 Drun execution pipeline completed"
+    info "📊 Total execution time: {total_time}"
+```
+
+- **`on drun setup`**: Executes once at the very beginning of drun execution (before any tasks)
+- **`on drun teardown`**: Executes once at the very end of drun execution (after all tasks complete)
+
+#### Execution Order
+
+When both types of lifecycle hooks are present, they execute in this order:
+
+1. **`on drun setup`** - Tool startup (once)
+2. **`before any task`** - Before target task (once per task)
+3. **Task execution** - The actual task(s)
+4. **`after any task`** - After target task (once per task)
+5. **`on drun teardown`** - Tool shutdown (once)
+
+#### Use Cases
+
+**Task-Level Hooks** are ideal for:
+- Task-specific logging and timing
+- Setting up task-specific environment
+- Task cleanup operations
+
+**Tool-Level Hooks** are ideal for:
+- Global initialization and cleanup
+- Pipeline-wide logging and metrics
+- Tool version reporting
+- Overall execution timing
+
 ### Task Definition
 
 ```
@@ -552,7 +729,44 @@ given replicas defaults to 3
 given timeout defaults to "5m"
 given force defaults to false
 given tags defaults to [] as list of strings
+given features defaults to empty  # equivalent to ""
+
+# Built-in function defaults
+given version defaults to "{current git commit}"
+given branch defaults to "{current git branch}"
+given safe_branch defaults to "{current git branch | replace '/' by '-'}"
+given timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 ```
+
+#### The `empty` Keyword
+
+The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
+
+```
+# Default value usage
+given $name defaults to empty
+given $features as list defaults to empty
+given $config defaults to ""  # equivalent to empty
+
+# Condition usage
+if $features is empty:
+  info "No features specified"
+
+if $features is not empty:
+  info "Features: {$features}"
+
+# The empty keyword works with all parameter types
+given $message defaults to empty     # string parameter
+given $items as list defaults to empty  # list parameter (empty list)
+given $enabled defaults to false    # boolean parameter (use false, not empty)
+```
+
+**Key Features:**
+- `empty` is semantically equivalent to `""` (empty string)
+- Works as default values for any parameter type
+- Works in conditional expressions (`is empty`, `is not empty`)
+- For list parameters, `empty` creates an empty list `[]`
+- More readable than empty quotes in semantic contexts
 
 #### Variadic Parameters
 
@@ -596,14 +810,83 @@ let git_hash be current git commit
 
 #### Capture from Commands
 
+drun v2 supports two types of capture operations:
+
+#### Expression Capture
+Captures values from expressions, functions, and built-in operations:
+
 ```
 capture <name> from <expression>
 
 # Examples:
-capture running_containers from "docker ps --format json"
-capture disk_usage from "df -h /"
+capture start_time from now
 capture branch_name from current git branch
+capture calculated_value from {a} + {b}
 ```
+
+#### Shell Command Capture
+Captures output from shell commands:
+
+```
+capture from shell "<command>" as $<variable>
+
+# Examples:
+capture from shell "docker ps --format json" as $running_containers
+capture from shell "df -h /" as $disk_usage
+capture from shell "whoami" as $current_user
+```
+
+#### Multiline Shell Command Capture
+
+For complex shell operations that span multiple commands, use the multiline syntax:
+
+```
+capture from shell as $<variable>:
+  <command1>
+  <command2>
+  <command3>
+```
+
+**Examples:**
+
+```
+# Capture system information
+capture from shell as $system_info:
+  echo "System Information:"
+  echo "User: $(whoami)"
+  echo "Date: $(date)"
+  echo "Hostname: $(hostname)"
+  echo "Working Directory: $(pwd)"
+
+# Capture build information
+capture from shell as $build_details:
+  echo "Build Details:"
+  echo "Commit: $(git rev-parse --short HEAD)"
+  echo "Branch: $(git branch --show-current)"
+  echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "Built by: $(whoami)"
+
+# Capture file analysis
+capture from shell as $file_report:
+  echo "File Analysis Report:"
+  echo "Text files: $(find . -name '*.txt' | wc -l)"
+  echo "Markdown files: $(find . -name '*.md' | wc -l)"
+  echo "Total files: $(find . -type f | wc -l)"
+```
+
+**Key Features:**
+- All commands are executed as a single shell script
+- Output from all commands is captured together
+- Commands can use shell features like pipes, redirections, and command substitution
+- Variable interpolation works within the commands: `echo "Hello {$username}"`
+- Each command runs in the same shell session, so environment variables persist
+
+**Key Differences:**
+- **Expression capture** uses plain identifiers and supports complex expressions with arithmetic operations
+- **Shell capture** uses `$variable` syntax and executes commands in the system shell
+- **Expression capture** can reference other variables: `capture result from {a} - {b}`
+- **Shell capture** supports variable interpolation in commands: `capture from shell "echo 'Hello {name}'" as $greeting`
+- **Multiline shell capture** executes multiple commands as a single script and captures all output
 
 #### Conditional Assignment
 
@@ -646,6 +929,55 @@ else:
   error "Invalid deployment conditions"
 ```
 
+#### Enhanced If-Else Chains ⭐ *New*
+
+drun v2 supports natural `else if` syntax for cleaner conditional logic:
+
+```drun
+task "deployment strategy":
+  requires $environment from ["dev", "staging", "production"]
+  
+  if $environment == "production":
+    info "🚀 Production deployment"
+    set $replicas to 5
+    set $timeout to "300s"
+  else if $environment == "staging":
+    info "🧪 Staging deployment"  
+    set $replicas to 3
+    set $timeout to "180s"
+  else if $environment == "dev":
+    info "🔧 Development deployment"
+    set $replicas to 1
+    set $timeout to "60s"
+  else:
+    error "Unknown environment: {$environment}"
+    fail
+
+# Multiple else if chains
+task "build strategy":
+  if file "Dockerfile" exists:
+    info "Building with Docker"
+    build docker image
+  else if file "package.json" exists:
+    info "Building Node.js application"
+    run "npm ci && npm run build"
+  else if file "go.mod" exists:
+    info "Building Go application"
+    run "go build -o app"
+  else if file "requirements.txt" exists:
+    info "Building Python application"
+    run "pip install -r requirements.txt"
+  else:
+    warn "No recognized build configuration found"
+    info "Skipping build step"
+```
+
+**Key Features:**
+- **Natural syntax**: `else if` reads like natural English
+- **Unlimited chaining**: Support for multiple `else if` conditions
+- **Proper precedence**: Conditions evaluated in order, first match wins
+- **Optional else**: Final `else` clause is optional
+
 #### When Statements (Pattern Matching)
 
 ```
@@ -668,17 +1000,22 @@ when package_manager:
 for each <variable> in <expression> [in parallel]:
   <statements>
 
-# Examples:
-for each env in ["dev", "staging", "prod"]:
-  deploy to {env}
+# Examples with array literals:
+for each $env in ["dev", "staging", "prod"]:
+  deploy to {$env}
 
-for each service in microservices in parallel:
-  test service {service}
+for each $service in microservices in parallel:
+  test service {$service}
 
-# Nested loops (matrix execution)
-for each os in ["ubuntu", "alpine"]:
-  for each version in ["16", "18", "20"]:
-    test on {os} with node {version}
+# Matrix execution (nested loops)
+for each $os in ["ubuntu", "alpine", "debian"]:
+  for each $version in ["16", "18", "20"]:
+    test on {$os} with node {$version}
+
+# Parallel matrix execution
+for each $region in ["us-east", "eu-west"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$region}
 ```
 
 #### Exception Handling
@@ -774,14 +1111,94 @@ if replicas > 0:
 
 if version >= "2.0.0":
   use new features
+
+# Empty/non-empty conditions
+if $features is empty:
+  info "No features specified"
+
+if $features is not empty:
+  info "Features: {$features}"
+
+if $name is "":
+  warn "Name is required"
+
+# Folder/directory empty conditions
+if folder "build" is empty:
+  info "Build directory is empty"
+
+if folder "dist" is not empty:
+  info "Distribution files exist"
+
+if directory "/tmp/cache" is empty:
+  run "rm -rf /tmp/cache"
+
+if dir "{$output_path}" is not empty:
+  warn "Output directory contains files"
 ```
+
+#### When-Otherwise Conditions
+
+The `when-otherwise` syntax provides a clean alternative to `if-else` for simple conditional logic:
+
+```
+# Basic when-otherwise
+when $platform is "windows":
+  step "Building Windows binary with .exe extension"
+otherwise:
+  step "Building Unix binary without extension"
+
+# When without otherwise (optional else clause)
+when $environment is "production":
+  step "Deploy with production settings"
+  step "Enable monitoring"
+
+# Nested when-otherwise
+when $platform is "windows":
+  info "Windows platform detected"
+  when $arch is "amd64":
+    step "Building for Windows x64"
+  otherwise:
+    step "Building for Windows ARM"
+otherwise:
+  info "Unix-like platform detected"
+  when $platform is "darwin":
+    step "Building for macOS"
+  otherwise:
+    step "Building for Linux"
+
+# When-otherwise in loops (matrix execution)
+for each $platform in ["windows", "linux", "darwin"]:
+  when $platform is "windows":
+    run "GOOS={$platform} go build -o app.exe"
+  otherwise:
+    run "GOOS={$platform} go build -o app"
+```
+
+**Supported Condition Types:**
+- String equality: `$var is "value"`
+- String inequality: `$var is not "value"`
+- Empty checks: `$var is empty`, `$var is not empty`
+- All condition types supported by `if` statements
+
+**Key Features:**
+- Clean, readable syntax for simple conditions
+- Optional `otherwise` clause (equivalent to `else`)
+- Full nesting support
+- Works seamlessly with loops and matrix execution
+- Consistent variable scoping rules
 
 #### Smart Detection Conditions
 
 ```
-# Tool detection
-if docker is running:
+# Tool availability detection
+if docker is available:
   build container
+else:
+  error "Docker is required"
+
+if docker is not available:
+  error "Docker is required for this task"
+  fail "Missing dependency"
 
 if kubernetes is available:
   deploy to cluster
@@ -900,15 +1317,15 @@ All variables in drun v2 must be prefixed with `$` to distinguish them from keyw
    - `$name`, `$environment`, `$commit_hash`
    - Used in: parameter declarations, let/set statements, variable references
 
-2. **Loop Variables**: Use bare identifiers (no `$` prefix)
-   - `item`, `file`, `i`, `attempt`
-   - Used in: `for each item in items`, `for i in range 1 to 10`
+2. **Loop Variables**: Use `$` prefix for consistency with scoping system
+   - `$item`, `$file`, `$i`, `$attempt`
+   - Used in: `for each $item in items`, `for $i in range 1 to 10`
 
 3. **Interpolation Syntax**:
    - Task variables: `{$variable_name}`
    - Project settings: `{$globals.setting_name}`
    - Built-in project vars: `{$globals.project}`, `{$globals.version}`
-   - Loop variables: `{variable_name}`
+   - Loop variables: `{$variable_name}`
    - Built-in functions: `{now.format()}`, `{pwd}`
 
 #### Examples
@@ -927,17 +1344,17 @@ given $tag defaults to "latest"
 let $commit = current git commit
 set $counter to 0
 
-# Loop variables (bare identifiers)
-for each item in items:
-  info "Processing {item}"  # Loop variable interpolation
+# Loop variables (with $ prefix)
+for each $item in items:
+  info "Processing {$item}"  # Loop variable interpolation
 
-for i in range 1 to 5:
-  info "Attempt {i} of 5"   # Loop variable interpolation
+for $i in range 1 to 5:
+  info "Attempt {$i} of 5"   # Loop variable interpolation
 
 # Mixed interpolation with different scopes
 info "Deploying {$tag} to {$environment} from {$globals.registry}"
 info "Project: {$globals.project} v{$globals.version}"
-info "API: {$globals.api_url} - Processing item {item}"
+info "API: {$globals.api_url} - Processing item {$item}"
 ```
 
 #### Let Bindings (Immutable)
@@ -965,15 +1382,21 @@ set environment to:
 #### Capture from Commands
 
 ```
+# Expression capture (for functions and expressions)
 capture git_branch from current git branch
-capture docker_version from "docker --version"
-capture running_pods from "kubectl get pods --output=json"
+capture start_time from now
+capture calculated_result from {a} + {b}
+
+# Shell command capture (for shell commands)
+capture from shell "docker --version" as $docker_version
+capture from shell "kubectl get pods --output=json" as $running_pods
+capture from shell "whoami" as $current_user
 
 # With error handling
 try:
-  capture service_status from "systemctl status nginx"
+  capture from shell "systemctl status nginx" as $service_status
 catch command_error:
-  set service_status to "unknown"
+  set $service_status to "unknown"
 ```
 
 ### Variable Scoping
@@ -989,6 +1412,8 @@ project "myapp" version "1.0.0":
   set registry to "ghcr.io/company"    # Project setting
   set api_url to "https://api.example.com"
   set timeout to "30s"
+  set platforms as list to ["linux", "darwin", "windows"]  # Array setting
+  set environments as list to ["dev", "staging", "production"]
 ```
 
 **Accessing Project Settings:**
@@ -1017,13 +1442,13 @@ task "deploy":
 
 1. **Project Settings**: Declared without `$`, accessed via `$globals.key`
 2. **Task Variables**: Declared with `$`, accessed with `$variable`
-3. **Loop Variables**: Bare identifiers, accessed with `{variable}`
+3. **Loop Variables**: Use `$` prefix, accessed with `{$variable}`
 4. **Built-in Variables**: Special project variables via `$globals.project` and `$globals.version`
 
 **Variable Resolution Order:**
 1. Parameters (`$param`)
 2. Task variables (`$variable`)
-3. Loop variables (`variable`)
+3. Loop variables (`$variable`)
 4. Project settings (`$globals.key`)
 5. Built-in functions
 
@@ -1090,6 +1515,53 @@ run "docker push {image_name}"
 # Multiple interpolations
 run "kubectl set image deployment/{app_name} {app_name}={image_name}"
 ```
+
+#### Strict Variable Checking
+
+**New in v2.0**: drun now enforces strict variable checking by default to prevent runtime errors from undefined variables.
+
+**Default Behavior (Strict Mode)**:
+```
+task "example":
+    let $name = "world"
+    info "Hello {$name}"        # ✅ Works: variable defined
+    info "Hello {$undefined}"   # ❌ Error: undefined variable: {$undefined}
+```
+
+**Error Messages**:
+```bash
+# Single undefined variable
+Error: task 'example' failed: in info statement: undefined variable: {$undefined}
+
+# Multiple undefined variables  
+Error: task 'example' failed: in info statement: undefined variables: {$var1}, {$var2}
+
+# In shell commands
+Error: task 'example' failed: in shell command: undefined variable: {$missing}
+
+# In conditions
+Error: task 'example' failed: in when condition: undefined variable: {$undefined_var}
+```
+
+**Allow Undefined Variables**:
+Use the `--allow-undefined-variables` CLI flag to revert to legacy behavior:
+
+```bash
+drun my-task --allow-undefined-variables
+# Output: Hello {$undefined}  (literal text)
+```
+
+**Benefits**:
+- **Early Error Detection**: Catch typos and missing variables before execution
+- **Clear Error Context**: Precise location (statement type) and variable name
+- **Prevent Silent Failures**: Avoid unexpected behavior from undefined variables
+- **Better Developer Experience**: Forces explicit variable definitions
+
+**Variable Resolution Order**:
+1. Task parameters (`accepts $param`)
+2. Local variables (`let $var = "value"`)
+3. Project settings (`$globals.setting`)
+4. Built-in variables (`$globals.version`, `$globals.project`)
 
 ### Advanced Variable Operations
 
@@ -1352,6 +1824,160 @@ task "build":
 
 ---
 
+## Array Literals and Matrix Execution
+
+drun v2 supports array literals for defining lists of values directly in the code, enabling powerful matrix execution patterns for comprehensive testing and deployment scenarios.
+
+### Array Literal Syntax
+
+Array literals use square bracket notation with comma-separated values:
+
+```
+# Basic array literals
+["item1", "item2", "item3"]
+["linux", "darwin", "windows"]
+["dev", "staging", "production"]
+
+# Numbers and mixed types
+[1, 2, 3, 4, 5]
+["port", 8080, "timeout", "30s"]
+```
+
+### Project-Level Array Settings
+
+Arrays can be defined at the project level using two syntaxes:
+
+```
+project "myapp" version "1.0.0":
+  # Simple string settings
+  set registry to "ghcr.io/company"
+  set api_url to "https://api.example.com"
+  
+  # Array settings using "as list to" syntax
+  set platforms as list to ["linux", "darwin", "windows"]
+  set environments as list to ["dev", "staging", "production"]
+  set node_versions as list to ["16", "18", "20"]
+  set databases as list to ["postgres", "mysql", "mongodb"]
+```
+
+**Accessing Project Arrays:** Project-level arrays must be accessed using the consistent `$globals.` prefix:
+
+```
+# ✅ Correct: Use $globals prefix for consistency
+for each $platform in $globals.platforms:
+  info "Building for {$platform}"
+
+# ❌ Deprecated: Direct access (will show deprecation warning)
+for each $platform in platforms:
+  info "Building for {$platform}"
+```
+
+This maintains consistency with other global variable access patterns like `{$globals.project}`, `{$globals.version}`, and `{$globals.registry}`.
+
+### Loop Variables with Array Literals
+
+Loop variables use the `$variable` syntax for consistency with the scoping system:
+
+```
+# Direct array literal in loops
+for each $platform in ["linux", "darwin", "windows"]:
+  info "Building for {$platform}"
+
+# Using project-defined arrays
+for each $env in $globals.environments:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$env}
+```
+
+### Matrix Execution Patterns
+
+Matrix execution allows comprehensive testing across multiple dimensions:
+
+#### Sequential Matrix Execution
+
+```
+# Cross-platform builds (OS × Architecture)
+for each $platform in $globals.platforms:
+  for each $arch in ["amd64", "arm64"]:
+    build for {$platform}/{$arch}
+
+# Database testing (Database × Version × Test Suite)
+for each $db in $globals.databases:
+  for each $version in ["latest", "lts", "stable"]:
+    for each $suite in ["unit", "integration", "performance"]:
+      test {$db}:{$version} with {$suite} tests
+```
+
+#### Parallel Matrix Execution
+
+```
+# Multi-region deployment (parallel regions, sequential services)
+for each $region in ["us-east", "eu-west", "ap-south"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$region}
+
+# CI/CD pipeline parallelization
+for each $job in ["lint", "test", "security-scan", "build"] in parallel:
+  when $job is "lint":
+    for each $linter in ["eslint", "prettier", "golangci-lint"]:
+      run {$linter}
+  when $job is "test":
+    for each $suite in ["unit", "integration"]:
+      run {$suite} tests
+```
+
+#### Mixed Parallel/Sequential Execution
+
+```
+# Parallel environments, sequential deployment steps
+for each $env in ["dev", "staging", "production"] in parallel:
+  for each $step in ["build", "test", "deploy", "verify"]:
+    execute {$step} in {$env}
+```
+
+### Real-World Matrix Use Cases
+
+#### DevOps Scenarios
+- **Multi-platform builds**: OS × Architecture × Compiler Version
+- **Deployment strategies**: Environment × Service × Region
+- **Testing matrices**: Browser × Device × Test Suite
+- **Performance testing**: Load Level × Endpoint × Configuration
+
+#### CI/CD Pipelines
+- **Parallel job execution**: Lint, Test, Security, Build
+- **Multi-environment deployment**: Dev, Staging, Production
+- **Canary deployments**: Service × Traffic Percentage
+- **Integration testing**: Service × Database × Version
+
+#### Infrastructure Management
+- **Multi-cloud deployment**: Provider × Region × Service
+- **Monitoring setup**: Service × Metric × Alert Rule
+- **Security scanning**: Tool × Target × Severity Level
+- **Backup strategies**: Database × Schedule × Retention Policy
+
+### Variable Scoping in Matrix Execution
+
+Loop variables follow the established scoping rules:
+
+```
+project "matrix-demo":
+  set platforms as list to ["linux", "darwin", "windows"]
+  set registry to "ghcr.io/company"
+
+task "matrix-build":
+  # Project arrays accessed via $globals
+  for each $platform in $globals.platforms:
+    # Loop variable uses $variable syntax
+    for each $arch in ["amd64", "arm64"]:
+      # Both loop variables available in nested scope
+      info "Building {$globals.registry}/app:{$platform}-{$arch}"
+      build for {$platform}/{$arch}
+```
+
+This matrix execution system enables comprehensive automation workflows while maintaining drun's natural language philosophy and clear variable scoping.
+
+---
+
 ## Built-in Actions
 
 ### Shell Commands
@@ -1367,8 +1993,8 @@ exec "date +%Y-%m-%d"
 shell "pwd"
 
 # Capture output to variable
-capture "git rev-parse --short HEAD" as $commit_hash
-capture "whoami" as $username
+capture from shell "git rev-parse --short HEAD" as $commit_hash
+capture from shell "whoami" as $username
 ```
 
 #### Multiline Commands (Block Syntax)
@@ -1384,7 +2010,7 @@ run:
   npm run build
 
 # Multiline with output capture
-capture as $build_info:
+capture from shell as $build_info:
   echo "Build Information:"
   echo "Commit: $(git rev-parse --short HEAD)"
   echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -1487,7 +2113,7 @@ task "deploy application":
     npm run test
   
   # Capture complex information
-  capture as $deployment_info:
+  capture from shell as $deployment_info:
     echo "=== Deployment Information ==="
     echo "Version: $(git describe --tags --always)"
     echo "Branch: $(git branch --show-current)"
@@ -1659,6 +2285,48 @@ check if directory ".git" exists
 get size of file "large-file.dat"
 get modification time of file "config.json"
 ```
+
+#### Directory Empty Checks ⭐ *New*
+
+Check if directories are empty or contain files using semantic conditions:
+
+```
+# Basic directory empty checks
+if folder "build" is empty:
+  info "Build directory is clean"
+
+if folder "dist" is not empty:
+  info "Distribution files exist"
+  run "rm -rf dist/*"
+
+# Alternative keywords
+if directory "/tmp/cache" is empty:
+  info "Cache is empty"
+
+if dir "logs" is not empty:
+  info "Log files found"
+  run "gzip logs/*.log"
+
+# With variable interpolation
+if folder "{$output_dir}" is empty:
+  warn "Output directory is empty"
+
+if directory "{$project_root}/node_modules" is not empty:
+  info "Dependencies are installed"
+
+# Practical examples
+if folder "migrations/pending" is not empty:
+  run "php artisan migrate"
+
+if directory "tests/coverage" is empty:
+  run "npm run test:coverage"
+```
+
+**Key Features:**
+- **Multiple keywords**: Use `folder`, `directory`, or `dir` interchangeably
+- **Path interpolation**: Support for variable interpolation in paths
+- **Non-existent handling**: Non-existent directories are treated as empty
+- **Semantic conditions**: Natural `is empty` and `is not empty` syntax
 
 ### Network Actions
 
@@ -1858,6 +2526,125 @@ task "parallel operations":
 - `{stop timer('name')}` - Stop timer and show elapsed time
 - `{show elapsed time('name')}` - Show elapsed time for running timer
 
+### Built-in Functions
+
+drun v2 provides a comprehensive set of built-in functions that can be used in expressions, variable assignments, and parameter defaults. These functions are called using the `{function name}` syntax and support pipe operations for data transformation.
+
+#### Git Functions
+
+```drun
+# Get current git commit hash (short form)
+set $commit to {current git commit}
+info "Deploying commit: {$commit}"
+
+# Get current git branch name
+set $branch to {current git branch}
+info "Building from branch: {$branch}"
+
+# Use in parameter defaults
+task "deploy":
+  given $version defaults to "{current git commit}"
+  given $branch_name defaults to "{current git branch}"
+```
+
+#### System Functions
+
+```drun
+# Get current working directory
+set $project_dir to {pwd}
+
+# Get hostname
+set $host to {hostname}
+
+# Get environment variable
+set $api_key to {env('API_KEY')}
+
+# Format current time
+set $timestamp to {now.format('2006-01-02 15:04:05')}
+```
+
+#### Built-in Function Pipe Operations ⭐ *New*
+
+Built-in functions support pipe operations for data transformation, allowing you to chain operations together:
+
+```drun
+# Replace characters in git branch names
+set $safe_branch to {current git branch | replace "/" by "-"}
+info "Safe branch name: {$safe_branch}"
+
+# Chain multiple operations
+set $clean_branch to {current git branch | replace "/" by "-" | lowercase}
+
+# Use in parameter defaults with pipes
+task "build":
+  given $image_tag defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  given $commit_short defaults to "{current git commit}"
+  
+  info "Building image: myapp:{$image_tag}"
+  info "From commit: {$commit_short}"
+```
+
+#### Available Pipe Operations
+
+**String Operations:**
+- `replace "from" by "to"` - Replace all occurrences of "from" with "to"
+- `replace "from" with "to"` - Alternative syntax for replace
+- `without prefix "text"` - Remove prefix from string
+- `without suffix "text"` - Remove suffix from string
+- `uppercase` - Convert to uppercase
+- `lowercase` - Convert to lowercase
+- `trim` - Remove leading and trailing whitespace
+
+#### Practical Examples
+
+```drun
+task "git branch operations":
+  # Basic git branch usage
+  set $current_branch to {current git branch}
+  info "Current branch: {$current_branch}"
+  
+  # Transform branch name for Docker tags (no slashes allowed)
+  set $docker_tag to {current git branch | replace "/" by "-"}
+  info "Docker tag: myapp:{$docker_tag}"
+  
+  # Create deployment-safe branch names
+  set $deploy_name to {current git branch | replace "/" by "-" | lowercase}
+  info "Deployment name: {$deploy_name}"
+  
+  # Use in complex expressions
+  set $image_name to "registry.example.com/myapp:{current git branch | replace '/' by '-'}"
+  info "Full image name: {$image_name}"
+
+task "parameter defaults with pipes":
+  # Parameter defaults can use piped builtin functions
+  given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  given $build_tag defaults to "{current git commit}"
+  given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+  
+  info "Deployment config:"
+  info "  Branch: {$deployment_branch}"
+  info "  Tag: {$build_tag}"
+  info "  Timestamp: {$timestamp}"
+```
+
+#### Built-in Function Reference
+
+| Function | Description | Example Output |
+|----------|-------------|----------------|
+| `{current git commit}` | Current git commit hash (short) | `a72091f` |
+| `{current git branch}` | Current git branch name | `feature/new-api` |
+| `{pwd}` | Current working directory | `/home/user/project` |
+| `{hostname}` | System hostname | `dev-machine` |
+| `{env('VAR')}` | Environment variable | `production` |
+| `{now.format('layout')}` | Formatted current time | `2025-09-22 14:30:00` |
+
+**Key Features:**
+- **Interpolation**: All built-in functions use `{function}` syntax
+- **Pipe Operations**: Chain transformations with `|` operator
+- **Parameter Defaults**: Use in parameter default values with full pipe support
+- **Variable Assignment**: Assign results to variables for reuse
+- **Expression Context**: Work in any expression context (info messages, conditions, etc.)
+
 ---
 
 ## Smart Detection
@@ -1876,6 +2663,16 @@ build multi-platform docker image
 # Detects kubectl, helm, etc.
 deploy to kubernetes
 install helm chart "nginx-ingress"
+
+# Check if tools are available or not available
+if docker is available:
+    info "Docker is ready"
+else:
+    error "Docker not found"
+
+if kubectl is not available:
+    warn "Kubernetes tools not installed"
+    info "Skipping Kubernetes deployment"
 ```
 
 ### DRY Tool Detection
@@ -2181,7 +2978,7 @@ project "webapp" version "1.0.0":
   set registry to "ghcr.io/company"
 
 task "build" means "Build Docker image":
-  given tag defaults to current git commit
+  given tag defaults to "{current git commit}"
   
   step "Building application image"
   build docker image "{registry}/webapp:{tag}"
@@ -2202,6 +2999,41 @@ task "deploy" means "Deploy to Kubernetes":
   wait for rollout to complete
   
   success "Deployment to {environment} completed"
+```
+
+### Git Branch Operations ⭐ *New*
+
+```
+version: 2.0
+
+task "git branch operations" means "Demonstrate git branch builtin and pipe operations":
+  info "🌿 Testing git branch operations..."
+  
+  # Basic git branch builtin
+  set $branch to {current git branch}
+  info "Current branch: {$branch}"
+  
+  # Git branch with pipe operations
+  set $safe_branch to {current git branch | replace "/" by "-"}
+  info "Safe branch name: {$safe_branch}"
+  
+  # Use in parameter defaults
+  given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
+  info "Deployment branch: {$deployment_branch}"
+  
+  success "✅ Git branch operations completed!"
+
+task "parameter defaults with builtins" means "Demonstrate builtin functions in parameter defaults":
+  given $commit defaults to "{current git commit}"
+  given $branch defaults to "{current git branch}"
+  given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
+  
+  info "📋 Parameter values:"
+  info "  Commit: {$commit}"
+  info "  Branch: {$branch}" 
+  info "  Safe branch: {$safe_branch}"
+  
+  success "✅ Parameter defaults test completed!"
 ```
 
 ### Complex CI/CD Pipeline
@@ -2269,6 +3101,18 @@ project "advanced-example":
     capture end_time from now
     let duration be {end_time} - {start_time}
     info "Task completed in {duration}"
+  
+  # Tool-level lifecycle hooks (run once per drun execution)
+  on drun setup:
+    info "🚀 Starting drun execution pipeline"
+    info "📊 Tool version: {$globals.drun_version}"
+    capture pipeline_start_time from now
+  
+  on drun teardown:
+    capture pipeline_end_time from now
+    let total_time be {pipeline_end_time} - {pipeline_start_time}
+    info "🏁 Drun execution pipeline completed"
+    info "📊 Total execution time: {total_time}"
 
 task "smart deployment" means "Intelligent deployment with auto-detection":
   requires environment from ["dev", "staging", "production"]

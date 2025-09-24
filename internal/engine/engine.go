@@ -24,26 +24,36 @@ import (
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output  io.Writer
-	dryRun  bool
-	verbose bool
+	output             io.Writer
+	dryRun             bool
+	verbose            bool
+	allowUndefinedVars bool
+
+	// Cached regex patterns for performance
+	interpolationRegex *regexp.Regexp
+	quotedArgRegex     *regexp.Regexp
+	paramArgRegex      *regexp.Regexp
 }
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
-	Parameters map[string]*types.Value // parameter name -> typed value
-	Variables  map[string]string       // captured variables from shell commands
-	Project    *ProjectContext         // project-level settings and hooks
+	Parameters  map[string]*types.Value // parameter name -> typed value
+	Variables   map[string]string       // captured variables from shell commands
+	Project     *ProjectContext         // project-level settings and hooks
+	CurrentFile string                  // path to the current drun file being executed
+	CurrentTask string                  // name of the currently executing task
 }
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name         string                              // project name
-	Version      string                              // project version
-	Settings     map[string]string                   // project settings (set key to value)
-	BeforeHooks  []ast.Statement                     // before any task hooks
-	AfterHooks   []ast.Statement                     // after any task hooks
-	ShellConfigs map[string]*ast.PlatformShellConfig // platform-specific shell configurations
+	Name          string                              // project name
+	Version       string                              // project version
+	Settings      map[string]string                   // project settings (set key to value)
+	BeforeHooks   []ast.Statement                     // before any task hooks
+	AfterHooks    []ast.Statement                     // after any task hooks
+	SetupHooks    []ast.Statement                     // on drun setup hooks
+	TeardownHooks []ast.Statement                     // on drun teardown hooks
+	ShellConfigs  map[string]*ast.PlatformShellConfig // platform-specific shell configurations
 }
 
 // NewEngine creates a new v2 execution engine
@@ -54,6 +64,11 @@ func NewEngine(output io.Writer) *Engine {
 	return &Engine{
 		output: output,
 		dryRun: false,
+
+		// Pre-compile regex patterns for performance
+		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
+		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
+		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
 }
 
@@ -67,6 +82,11 @@ func (e *Engine) SetVerbose(verbose bool) {
 	e.verbose = verbose
 }
 
+// SetAllowUndefinedVars enables or disables strict variable checking
+func (e *Engine) SetAllowUndefinedVars(allow bool) {
+	e.allowUndefinedVars = allow
+}
+
 // Execute runs a v2 program with no parameters
 func (e *Engine) Execute(program *ast.Program, taskName string) error {
 	return e.ExecuteWithParams(program, taskName, map[string]string{})
@@ -74,6 +94,11 @@ func (e *Engine) Execute(program *ast.Program, taskName string) error {
 
 // ExecuteWithParams runs a v2 program with the given parameters
 func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params map[string]string) error {
+	return e.ExecuteWithParamsAndFile(program, taskName, params, "")
+}
+
+// ExecuteWithParamsAndFile runs a v2 program with the given parameters and current file path
+func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string, params map[string]string, currentFile string) error {
 	if program == nil {
 		return fmt.Errorf("program is nil")
 	}
@@ -98,9 +123,19 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
-		Parameters: make(map[string]*types.Value),
-		Variables:  make(map[string]string),
-		Project:    e.createProjectContext(program.Project),
+		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
+		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
+		Project:     e.createProjectContext(program.Project),
+		CurrentFile: currentFile,
+	}
+
+	// Execute drun setup hooks
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.SetupHooks {
+			if err := e.executeStatement(hook, ctx); err != nil {
+				return fmt.Errorf("drun setup hook failed: %v", err)
+			}
+		}
 	}
 
 	// Execute all tasks in dependency order
@@ -122,6 +157,9 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		if err := e.setupTaskParameters(currentTask, params, ctx); err != nil {
 			return err
 		}
+
+		// Set current task name for globals access
+		ctx.CurrentTask = currentTaskName
 
 		// Execute before hooks only for the target task
 		if currentTaskName == taskName && ctx.Project != nil {
@@ -147,6 +185,15 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 		}
 	}
 
+	// Execute drun teardown hooks
+	if ctx.Project != nil {
+		for _, hook := range ctx.Project.TeardownHooks {
+			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -160,8 +207,10 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 		if providedValue, exists := params[param.Name]; exists {
 			rawValue = providedValue
 			hasValue = true
-		} else if param.DefaultValue != "" {
-			rawValue = param.DefaultValue
+		} else if !param.Required {
+			// For optional parameters (given/accepts), use default value (including empty string)
+			// Interpolate the default value if it contains braces (for builtin function calls)
+			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
 			hasValue = true
 		} else if param.Required {
 			return errors.NewParameterValidationError(fmt.Sprintf("required parameter '%s' not provided", param.Name))
@@ -207,25 +256,34 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	}
 
 	ctx := &ProjectContext{
-		Name:         project.Name,
-		Version:      project.Version,
-		Settings:     make(map[string]string),
-		BeforeHooks:  []ast.Statement{},
-		AfterHooks:   []ast.Statement{},
-		ShellConfigs: make(map[string]*ast.PlatformShellConfig),
+		Name:          project.Name,
+		Version:       project.Version,
+		Settings:      make(map[string]string, 8),                   // Pre-allocate for typical settings count
+		BeforeHooks:   make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
+		AfterHooks:    make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
+		SetupHooks:    make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
+		TeardownHooks: make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
+		ShellConfigs:  make(map[string]*ast.PlatformShellConfig, 4), // Pre-allocate for typical platform count
 	}
 
 	// Process project settings
 	for _, setting := range project.Settings {
 		switch s := setting.(type) {
 		case *ast.SetStatement:
-			ctx.Settings[s.Key] = s.Value
+			// Convert expression to string representation
+			if s.Value != nil {
+				ctx.Settings[s.Key] = s.Value.String()
+			}
 		case *ast.LifecycleHook:
 			switch s.Type {
 			case "before":
 				ctx.BeforeHooks = append(ctx.BeforeHooks, s.Body...)
 			case "after":
 				ctx.AfterHooks = append(ctx.AfterHooks, s.Body...)
+			case "setup":
+				ctx.SetupHooks = append(ctx.SetupHooks, s.Body...)
+			case "teardown":
+				ctx.TeardownHooks = append(ctx.TeardownHooks, s.Body...)
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform
@@ -354,7 +412,10 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 // executeAction executes a single action statement
 func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the message
-	interpolatedMessage := e.interpolateVariables(action.Message, ctx)
+	interpolatedMessage, err := e.interpolateVariablesWithError(action.Message, ctx)
+	if err != nil {
+		return fmt.Errorf("in %s statement: %w", action.Action, err)
+	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
@@ -376,6 +437,10 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	case "fail":
 		_, _ = fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
 		return fmt.Errorf("task failed: %s", interpolatedMessage)
+	case "echo":
+		// Process \n escape sequences for newlines
+		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")
+		_, _ = fmt.Fprintf(e.output, "%s\n", processedMessage)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Action)
 	}
@@ -394,12 +459,17 @@ func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionConte
 // executeSingleLineShell executes a single-line shell command
 func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the command
-	interpolatedCommand := e.interpolateVariables(shellStmt.Command, ctx)
+	interpolatedCommand, err := e.interpolateVariablesWithError(shellStmt.Command, ctx)
+	if err != nil {
+		return fmt.Errorf("in shell command: %w", err)
+	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute shell command: %s\n", interpolatedCommand)
 		if shellStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[shellStmt.CaptureVar] = "[DRY RUN] command output"
 		}
 		return nil
 	}
@@ -468,6 +538,8 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 		}
 		if shellStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[shellStmt.CaptureVar] = "[DRY RUN] command output"
 		}
 		return nil
 	}
@@ -547,6 +619,8 @@ func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext)
 		_, _ = fmt.Fprintf(e.output, "📁 %s\n", result.Message)
 		if fileStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture file content in variable '%s'\n", fileStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[fileStmt.CaptureVar] = "[DRY RUN] file content"
 		}
 		return nil
 	}
@@ -768,7 +842,7 @@ func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionCo
 	name := e.interpolateVariables(dockerStmt.Name, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(dockerStmt.Options))
 	for key, value := range dockerStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -936,7 +1010,7 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 	name := e.interpolateVariables(gitStmt.Name, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(gitStmt.Options))
 	for key, value := range gitStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -1199,19 +1273,19 @@ func (e *Engine) executeHTTP(httpStmt *ast.HTTPStatement, ctx *ExecutionContext)
 	body := e.interpolateVariables(httpStmt.Body, ctx)
 
 	// Interpolate headers
-	headers := make(map[string]string)
+	headers := make(map[string]string, len(httpStmt.Headers))
 	for key, value := range httpStmt.Headers {
 		headers[key] = e.interpolateVariables(value, ctx)
 	}
 
 	// Interpolate auth
-	auth := make(map[string]string)
+	auth := make(map[string]string, len(httpStmt.Auth))
 	for key, value := range httpStmt.Auth {
 		auth[key] = e.interpolateVariables(value, ctx)
 	}
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(httpStmt.Options))
 	for key, value := range httpStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -1337,7 +1411,7 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 	condition := e.interpolateVariables(networkStmt.Condition, ctx)
 
 	// Interpolate options
-	options := make(map[string]string)
+	options := make(map[string]string, len(networkStmt.Options))
 	for key, value := range networkStmt.Options {
 		options[key] = e.interpolateVariables(value, ctx)
 	}
@@ -1516,6 +1590,8 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 			} else {
 				_, _ = fmt.Fprintf(e.output, "🔍 Detected %s version: %s\n", stmt.Target, version)
 			}
+			// Set the detected version in variables (e.g., docker_version)
+			ctx.Variables[stmt.Target+"_version"] = version
 		} else {
 			available := detector.IsToolAvailable(stmt.Target)
 			if e.dryRun {
@@ -1529,14 +1605,25 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 	return nil
 }
 
-// executeIfAvailable executes "if tool is available" conditions
+// executeIfAvailable executes "if tool is available" and "if tool is not available" conditions
 func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
 	available := detector.IsToolAvailable(stmt.Target)
 
+	// Handle negation for "not available" conditions
+	var conditionMet bool
+	var conditionText string
+	if stmt.Condition == "not_available" {
+		conditionMet = !available
+		conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+	} else {
+		conditionMet = available
+		conditionText = fmt.Sprintf("%s is available", stmt.Target)
+	}
+
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s is available: %t\n", stmt.Target, available)
-		if available {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if-available body for %s\n", stmt.Target)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s: %t\n", conditionText, conditionMet)
+		if conditionMet {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body for %s\n", stmt.Target)
 			for _, bodyStmt := range stmt.Body {
 				if err := e.executeStatement(bodyStmt, ctx); err != nil {
 					return err
@@ -1553,9 +1640,11 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.Dete
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s is available: %t\n", stmt.Target, available)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s: %t\n", conditionText, conditionMet)
+	}
 
-	if available {
+	if conditionMet {
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, ctx); err != nil {
 				return err
@@ -1600,8 +1689,10 @@ func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *ast.Detect
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
-		stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
+			stmt.Target, version, stmt.Condition, targetVersion, matches, version)
+	}
 
 	if matches {
 		for _, bodyStmt := range stmt.Body {
@@ -1639,8 +1730,10 @@ func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
-		stmt.Target, matches, currentEnv)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
+			stmt.Target, matches, currentEnv)
+	}
 
 	if matches {
 		for _, bodyStmt := range stmt.Body {
@@ -1677,9 +1770,15 @@ func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *ast.
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: %s\n", workingTool)
 			if stmt.CaptureVar != "" {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture as %s: %s\n", stmt.CaptureVar, workingTool)
+				// Set the variable in dry-run mode too
+				ctx.Variables[stmt.CaptureVar] = workingTool
 			}
 		} else {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: none available\n")
+			if stmt.CaptureVar != "" {
+				// Set a placeholder in dry-run mode when no tool is found
+				ctx.Variables[stmt.CaptureVar] = "[DRY RUN] no tool available"
+			}
 		}
 		return nil
 	}
@@ -1802,6 +1901,10 @@ func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionC
 		return e.executeSetStatement(varStmt, ctx)
 	case "transform":
 		return e.executeTransformStatement(varStmt, ctx)
+	case "capture":
+		return e.executeCaptureStatement(varStmt, ctx)
+	case "capture_shell":
+		return e.executeCaptureShellStatement(varStmt, ctx)
 	default:
 		return fmt.Errorf("unknown variable operation: %s", varStmt.Operation)
 	}
@@ -1809,34 +1912,46 @@ func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionC
 
 // executeLetStatement executes "let variable = value" statements
 func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value := e.interpolateVariables(varStmt.Value, ctx)
+	value, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
+
+	// Interpolate the value if it contains braces (for builtin function calls)
+	interpolatedValue := e.interpolateVariables(value, ctx)
 
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varStmt.Variable] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, value)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, interpolatedValue)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, value)
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, interpolatedValue)
 
 	return nil
 }
 
 // executeSetStatement executes "set variable to value" statements
 func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value := e.interpolateVariables(varStmt.Value, ctx)
+	value, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
+
+	// Interpolate the value if it contains braces (for builtin function calls)
+	interpolatedValue := e.interpolateVariables(value, ctx)
 
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varStmt.Variable] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, value)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, interpolatedValue)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, value)
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
 
 	return nil
 }
@@ -1865,6 +1980,69 @@ func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *
 	}
 	_, _ = fmt.Fprintf(e.output, "🔄 Transformed variable %s with %s: %s -> %s\n",
 		varStmt.Variable, varStmt.Function, currentValue, newValue)
+
+	return nil
+}
+
+// executeCaptureStatement executes "capture variable_name from expression" statements
+func (e *Engine) executeCaptureStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	expression, err := e.evaluateExpression(varStmt.Value, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate expression: %v", err)
+	}
+
+	// The expression is already evaluated, so we can use it directly as the value
+	value := expression
+
+	// Store the captured value in the context
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s: %s\n",
+			varStmt.Variable, value)
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📥 Captured %s: %s\n",
+			varStmt.Variable, value)
+	}
+
+	return nil
+}
+
+// executeCaptureShellStatement executes "capture from shell command as $variable" statements
+func (e *Engine) executeCaptureShellStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	// Extract the command from the literal expression
+	literalExpr, ok := varStmt.Value.(*ast.LiteralExpression)
+	if !ok {
+		return fmt.Errorf("expected literal expression for shell capture command")
+	}
+
+	// Interpolate variables in the command
+	command := e.interpolateVariables(literalExpr.Value, ctx)
+
+	// Execute the shell command
+	shellOpts := e.getPlatformShellConfig(ctx)
+	result, err := shell.Execute(command, shellOpts)
+	if err != nil {
+		return fmt.Errorf("failed to capture from shell command '%s': %v", command, err)
+	}
+
+	// Store the captured output (trimmed)
+	value := strings.TrimSpace(result.Stdout)
+	ctx.Variables[varStmt.Variable] = value
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s from shell: %s\n",
+			varStmt.Variable, value)
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📥 Captured %s from shell: %s\n",
+			varStmt.Variable, value)
+	}
 
 	return nil
 }
@@ -2015,21 +2193,132 @@ func ParseStringWithFilename(input, filename string) (*ast.Program, error) {
 
 // interpolateVariables replaces {variable} placeholders with actual values
 func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
-	// Use regex to find {variable} patterns
-	re := regexp.MustCompile(`\{([^}]+)\}`)
+	result, _ := e.interpolateVariablesWithError(message, ctx)
+	return result
+}
 
-	return re.ReplaceAllStringFunc(message, func(match string) string {
+// interpolateVariablesWithError replaces {variable} placeholders with actual values and returns any undefined variable errors
+func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionContext) (string, error) {
+	var undefinedVars []string
+
+	// Use cached regex for better performance
+	result := e.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
 		// Extract content (remove { and })
 		content := match[1 : len(match)-1]
 
-		// Try to resolve the content
-		if result := e.resolveExpression(content, ctx); result != "" {
-			return result
+		// Try to resolve simple variables first (most common case)
+		if resolved, found := e.resolveSimpleVariableDirectly(content, ctx); found {
+			return resolved
 		}
 
-		// If nothing worked, return the original placeholder
+		// Fall back to complex expression resolution
+		if resolved := e.resolveExpression(content, ctx); resolved != "" {
+			return resolved
+		}
+
+		// If nothing worked, check if we should be strict about undefined variables
+		if !e.allowUndefinedVars {
+			// For complex expressions, check if the base variable exists
+			if e.isComplexExpression(content) {
+				baseVar := e.extractBaseVariable(content)
+				if baseVar != "" && !e.variableExists(baseVar, ctx) {
+					undefinedVars = append(undefinedVars, baseVar)
+					return match
+				}
+				// If base variable exists but expression failed, allow it (might be a function call or other valid expression)
+			} else {
+				// For simple variables, report as undefined
+				undefinedVars = append(undefinedVars, content)
+			}
+			return match // Return original placeholder for now
+		}
+
+		// If allowing undefined variables, return the original placeholder
 		return match
 	})
+
+	// If we found undefined variables in strict mode, return an error
+	if len(undefinedVars) > 0 {
+		if len(undefinedVars) == 1 {
+			return result, fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
+		}
+		return result, fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
+	}
+
+	return result, nil
+}
+
+// resolveSimpleVariableDirectly handles simple variable resolution with proper empty string support
+func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionContext) (string, bool) {
+	if ctx == nil {
+		return "", false
+	}
+
+	// Handle variables with $ prefix (most common case for interpolation)
+	if strings.HasPrefix(variable, "$") {
+		// First try to find the variable with the $ prefix (shell captures)
+		if value, exists := ctx.Variables[variable]; exists {
+			return value, true
+		}
+
+		// Then try without the $ prefix (legacy variables)
+		varName := variable[1:] // Remove the $ prefix
+
+		// Check parameters (stored without $ prefix)
+		if value, exists := ctx.Parameters[varName]; exists {
+			return value.AsString(), true
+		}
+
+		// Check captured variables (stored without $ prefix)
+		if value, exists := ctx.Variables[varName]; exists {
+			return value, true
+		}
+
+		// Check project-level variables for backward compatibility
+		if ctx.Project != nil {
+			// Check built-in project variables
+			if varName == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name, true
+			}
+			if varName == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version, true
+			}
+			// Check project settings
+			if ctx.Project.Settings != nil {
+				if value, exists := ctx.Project.Settings[varName]; exists {
+					return value, true
+				}
+			}
+		}
+	} else {
+		// Check parameters (bare identifiers)
+		if value, exists := ctx.Parameters[variable]; exists {
+			return value.AsString(), true
+		}
+		// Check captured variables (bare identifiers)
+		if value, exists := ctx.Variables[variable]; exists {
+			return value, true
+		}
+
+		// Check project-level variables for backward compatibility
+		if ctx.Project != nil {
+			// Check built-in project variables
+			if variable == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name, true
+			}
+			if variable == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version, true
+			}
+			// Check project settings
+			if ctx.Project.Settings != nil {
+				if value, exists := ctx.Project.Settings[variable]; exists {
+					return value, true
+				}
+			}
+		}
+	}
+
+	return "", false
 }
 
 // resolveExpression resolves various types of expressions
@@ -2046,17 +2335,47 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 2. Check if it's a simple builtin function call (no arguments)
+	// 2. Check for context-aware builtin functions first
+	if expr == "current file" && ctx != nil {
+		if ctx.CurrentFile != "" {
+			return ctx.CurrentFile
+		}
+		return "<no file>"
+	}
+
+	// 3. Check for builtin function with piped operations (e.g., "current git branch | replace '/' by '-'")
+	if strings.Contains(expr, "|") {
+		parts := strings.SplitN(expr, "|", 2)
+		if len(parts) == 2 {
+			funcName := strings.TrimSpace(parts[0])
+			operations := strings.TrimSpace(parts[1])
+
+			// Check if the first part is a builtin function
+			if builtins.IsBuiltin(funcName) {
+				if result, err := builtins.CallBuiltin(funcName); err == nil {
+					// Parse and apply the operations to the result
+					if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
+						if finalResult, err := e.applyBuiltinOperations(result, chain, ctx); err == nil {
+							return finalResult
+						}
+					}
+					// If operations parsing fails, just return the builtin result
+					return result
+				}
+			}
+		}
+	}
+
+	// 4. Check if it's a simple builtin function call (no arguments)
 	if builtins.IsBuiltin(expr) {
 		if result, err := builtins.CallBuiltin(expr); err == nil {
 			return result
 		}
 	}
 
-	// 3. Check for function calls with quoted string arguments
+	// 4. Check for function calls with quoted string arguments
 	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
-	quotedArgRe := regexp.MustCompile(`^([^(]+)\((.+)\)$`)
-	if matches := quotedArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+	if matches := e.quotedArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
 		funcName := strings.TrimSpace(matches[1])
 		argsStr := matches[2]
 
@@ -2070,10 +2389,9 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 4. Check for function calls with parameter arguments
+	// 5. Check for function calls with parameter arguments
 	// Pattern: "function(param)" where param is a parameter name
-	paramArgRe := regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`)
-	if matches := paramArgRe.FindStringSubmatch(expr); len(matches) == 3 {
+	if matches := e.paramArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
 		funcName := strings.TrimSpace(matches[1])
 		paramName := strings.TrimSpace(matches[2])
 
@@ -2089,7 +2407,7 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 		}
 	}
 
-	// 5. Check for $globals.key syntax for project settings
+	// 6. Check for $globals.key syntax for project settings
 	if strings.HasPrefix(expr, "$globals.") {
 		if ctx != nil && ctx.Project != nil {
 			key := expr[9:] // Remove "$globals." prefix
@@ -2103,23 +2421,36 @@ func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
 			if key == "project" && ctx.Project.Name != "" {
 				return ctx.Project.Name
 			}
+			// Check current task
+			if key == "current_task" && ctx.CurrentTask != "" {
+				return ctx.CurrentTask
+			}
 		}
 		return ""
 	}
 
-	// 6. Check for simple parameter lookup
+	// 6. Check for simple parameter lookup (fallback for complex expressions)
 	if ctx != nil {
-		if value, exists := ctx.Parameters[expr]; exists {
-			return value.AsString()
-		}
-		// Also check captured variables
-		if value, exists := ctx.Variables[expr]; exists {
-			return value
-		}
-		// Check for variables with $ prefix (task-scoped variables)
+		// Check for variables with $ prefix first (parameters and task-scoped variables)
 		if strings.HasPrefix(expr, "$") {
 			varName := expr[1:] // Remove the $ prefix
+
+			// Check parameters (stored without $ prefix)
+			if value, exists := ctx.Parameters[varName]; exists {
+				return value.AsString()
+			}
+
+			// Check captured variables (stored without $ prefix)
 			if value, exists := ctx.Variables[varName]; exists {
+				return value
+			}
+		} else {
+			// Check parameters (bare identifiers)
+			if value, exists := ctx.Parameters[expr]; exists {
+				return value.AsString()
+			}
+			// Check captured variables (bare identifiers)
+			if value, exists := ctx.Variables[expr]; exists {
 				return value
 			}
 		}
@@ -2144,29 +2475,35 @@ func (e *Engine) resolveSimpleVariable(variable string, ctx *ExecutionContext) s
 			if key == "project" && ctx.Project.Name != "" {
 				return ctx.Project.Name
 			}
+			// Check current task
+			if key == "current_task" && ctx.CurrentTask != "" {
+				return ctx.CurrentTask
+			}
 		}
 		return ""
 	}
 
 	// Handle regular variables
 	if ctx != nil {
-		// Check parameters
-		if value, exists := ctx.Parameters[variable]; exists {
-			return value.AsString()
-		}
-		// Check captured variables
-		if value, exists := ctx.Variables[variable]; exists {
-			return value
-		}
-		// Check for variables with $ prefix (task-scoped variables)
+		// Check for variables with $ prefix first (parameters and task-scoped variables)
 		if strings.HasPrefix(variable, "$") {
 			varName := variable[1:] // Remove the $ prefix
+
+			// Check parameters (stored without $ prefix)
+			if value, exists := ctx.Parameters[varName]; exists {
+				return value.AsString()
+			}
+
+			// Check captured variables (stored without $ prefix)
 			if value, exists := ctx.Variables[varName]; exists {
 				return value
 			}
-		}
-		// Check loop variables (bare identifiers)
-		if !strings.HasPrefix(variable, "$") {
+		} else {
+			// Check parameters (bare identifiers)
+			if value, exists := ctx.Parameters[variable]; exists {
+				return value.AsString()
+			}
+			// Check captured variables (bare identifiers)
 			if value, exists := ctx.Variables[variable]; exists {
 				return value
 			}
@@ -2195,6 +2532,13 @@ func (e *Engine) parseQuotedArguments(argsStr string) []string {
 
 // executeConditional executes conditional statements (when, if/else)
 func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
+	// In strict mode, check for undefined variables in the condition
+	if !e.allowUndefinedVars {
+		if err := e.checkConditionForUndefinedVars(stmt.Condition, ctx); err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+		}
+	}
+
 	// Evaluate the condition
 	conditionResult := e.evaluateCondition(stmt.Condition, ctx)
 
@@ -2285,9 +2629,9 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 	executeItem := func(body []ast.Statement, variables map[string]string) error {
 		// Create a new context for this parallel execution
 		loopCtx := &ExecutionContext{
-			Parameters: make(map[string]*types.Value),
-			Variables:  make(map[string]string),
-			Project:    ctx.Project, // inherit project context
+			Parameters: make(map[string]*types.Value, len(ctx.Parameters)+len(variables)), // Pre-allocate for parent + new variables
+			Variables:  make(map[string]string, len(ctx.Variables)+len(variables)),        // Pre-allocate for parent + new variables
+			Project:    ctx.Project,                                                       // inherit project context
 		}
 
 		// Copy existing parameters and variables
@@ -2434,11 +2778,40 @@ func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 
 // executeEachLoop executes traditional each loops
 func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
-	// Resolve the iterable (could be a parameter, variable, file list, etc.)
-	var iterableStr string
+	// Resolve the iterable (could be a parameter, variable, array literal, etc.)
+	var items []string
 
-	// First check if it's a variable (starts with $)
-	if strings.HasPrefix(stmt.Iterable, "$") {
+	// Check if it's an array literal (starts with '[')
+	if strings.HasPrefix(stmt.Iterable, "[") && strings.HasSuffix(stmt.Iterable, "]") {
+		// Parse array literal
+		items = e.parseArrayLiteralString(stmt.Iterable)
+	} else if strings.HasPrefix(stmt.Iterable, "$globals.") {
+		// Handle $globals.key syntax for project settings (check this before general $ variables)
+		if ctx.Project != nil && ctx.Project.Settings != nil {
+			key := stmt.Iterable[9:] // Remove "$globals." prefix
+			if projectValue, exists := ctx.Project.Settings[key]; exists {
+				// Handle project setting (could be array or string)
+				if strings.HasPrefix(projectValue, "[") && strings.HasSuffix(projectValue, "]") {
+					// It's an array literal stored as a string
+					items = e.parseArrayLiteralString(projectValue)
+				} else {
+					// It's a regular string, split by whitespace
+					iterableStr := strings.TrimSpace(projectValue)
+					if iterableStr == "" {
+						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+						return nil
+					}
+					items = strings.Fields(iterableStr)
+				}
+			} else {
+				return fmt.Errorf("project setting '%s' not found", key)
+			}
+		} else {
+			return fmt.Errorf("no project defined for $globals access")
+		}
+	} else if strings.HasPrefix(stmt.Iterable, "$") {
+		// Variable reference
+		var iterableStr string
 		// Try both with and without $ prefix to handle different storage methods
 		if value, exists := ctx.Variables[stmt.Iterable]; exists {
 			iterableStr = value
@@ -2447,23 +2820,68 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 		} else {
 			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
 		}
-	} else {
-		// Check parameters
-		iterableValue, exists := ctx.Parameters[stmt.Iterable]
-		if !exists {
-			return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+
+		// Split by space to get items (for our variable operations system)
+		iterableStr = strings.TrimSpace(iterableStr)
+		if iterableStr == "" {
+			_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+			return nil
 		}
-		iterableStr = iterableValue.AsString()
-	}
 
-	// Split by space to get items (for our variable operations system)
-	iterableStr = strings.TrimSpace(iterableStr)
-	if iterableStr == "" {
-		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
-		return nil
-	}
+		items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+	} else {
+		// Check if it's a legacy direct project setting access (for backward compatibility)
+		if ctx.Project != nil && ctx.Project.Settings != nil {
+			if projectValue, exists := ctx.Project.Settings[stmt.Iterable]; exists {
+				// Handle project setting (could be array or string) - but warn about deprecated usage
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Direct project setting access '%s' is deprecated. Use '$globals.%s' instead.\n", stmt.Iterable, stmt.Iterable)
+				if strings.HasPrefix(projectValue, "[") && strings.HasSuffix(projectValue, "]") {
+					// It's an array literal stored as a string
+					items = e.parseArrayLiteralString(projectValue)
+				} else {
+					// It's a regular string, split by whitespace
+					iterableStr := strings.TrimSpace(projectValue)
+					if iterableStr == "" {
+						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+						return nil
+					}
+					items = strings.Fields(iterableStr)
+				}
+			} else {
+				// Parameter reference
+				iterableValue, exists := ctx.Parameters[stmt.Iterable]
+				if !exists {
+					return fmt.Errorf("iterable '%s' not found in parameters or project settings", stmt.Iterable)
+				}
+				iterableStr := iterableValue.AsString()
 
-	items := strings.Fields(iterableStr) // Use Fields to split by any whitespace
+				// Split by space to get items (for our variable operations system)
+				iterableStr = strings.TrimSpace(iterableStr)
+				if iterableStr == "" {
+					_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+					return nil
+				}
+
+				items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+			}
+		} else {
+			// Parameter reference (no project)
+			iterableValue, exists := ctx.Parameters[stmt.Iterable]
+			if !exists {
+				return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+			}
+			iterableStr := iterableValue.AsString()
+
+			// Split by space to get items (for our variable operations system)
+			iterableStr = strings.TrimSpace(iterableStr)
+			if iterableStr == "" {
+				_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+				return nil
+			}
+
+			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		}
+	}
 
 	if len(items) == 0 {
 		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
@@ -2528,9 +2946,9 @@ func (e *Engine) applyFilter(items []string, filter *ast.FilterExpression, ctx *
 // createLoopContext creates a new execution context for a loop iteration
 func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string) *ExecutionContext {
 	loopCtx := &ExecutionContext{
-		Parameters: make(map[string]*types.Value),
-		Variables:  make(map[string]string),
-		Project:    ctx.Project, // inherit project context
+		Parameters: make(map[string]*types.Value, len(ctx.Parameters)+1), // Pre-allocate for parent + loop variable
+		Variables:  make(map[string]string, len(ctx.Variables)+1),        // Pre-allocate for parent + loop variable
+		Project:    ctx.Project,                                          // inherit project context
 	}
 
 	// Copy existing parameters and variables
@@ -2549,10 +2967,326 @@ func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string
 	return loopCtx
 }
 
+// parseArrayLiteralString parses an array literal string like ["item1", "item2", "item3"] into a slice of strings
+func (e *Engine) parseArrayLiteralString(arrayStr string) []string {
+	// Remove brackets
+	arrayStr = strings.TrimSpace(arrayStr)
+	if len(arrayStr) < 2 || arrayStr[0] != '[' || arrayStr[len(arrayStr)-1] != ']' {
+		return []string{}
+	}
+
+	content := arrayStr[1 : len(arrayStr)-1]
+	content = strings.TrimSpace(content)
+
+	// Handle empty array
+	if content == "" {
+		return []string{}
+	}
+
+	var items []string
+	var current strings.Builder
+	inQuotes := false
+	escaped := false
+
+	for _, char := range content {
+		switch char {
+		case '\\':
+			if !escaped {
+				escaped = true
+				continue
+			}
+			current.WriteRune(char)
+		case '"':
+			if !escaped {
+				inQuotes = !inQuotes
+			} else {
+				current.WriteRune(char)
+			}
+		case ',':
+			if !inQuotes && !escaped {
+				// End of current item
+				item := strings.TrimSpace(current.String())
+				if item != "" {
+					items = append(items, item)
+				}
+				current.Reset()
+			} else {
+				current.WriteRune(char)
+			}
+		default:
+			current.WriteRune(char)
+		}
+		escaped = false
+	}
+
+	// Add the last item
+	item := strings.TrimSpace(current.String())
+	if item != "" {
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// checkConditionForUndefinedVars checks if a condition contains undefined variables
+func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
+	// For conditions, we only need to check simple variable references like "$var is value"
+	// Complex expressions in conditions are handled by the condition evaluation itself
+	re := regexp.MustCompile(`\$\w+`)
+	matches := re.FindAllString(condition, -1)
+
+	var undefinedVars []string
+	for _, match := range matches {
+		varName := match[1:] // Remove $ prefix
+
+		// Check if variable exists in parameters or variables
+		if _, exists := ctx.Parameters[varName]; exists {
+			continue
+		}
+		if _, exists := ctx.Variables[varName]; exists {
+			continue
+		}
+		if _, exists := ctx.Variables[match]; exists { // Check with $ prefix
+			continue
+		}
+
+		// Variable not found
+		undefinedVars = append(undefinedVars, match)
+	}
+
+	if len(undefinedVars) > 0 {
+		if len(undefinedVars) == 1 {
+			return fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
+		}
+		return fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
+	}
+
+	return nil
+}
+
+// isComplexExpression checks if an expression contains operations or function calls
+func (e *Engine) isComplexExpression(expr string) bool {
+	// Check for variable operations like "without", "with", etc.
+	if strings.Contains(expr, " without ") || strings.Contains(expr, " with ") {
+		return true
+	}
+	// Check for function calls (contains parentheses or dots)
+	if strings.Contains(expr, "(") || strings.Contains(expr, ".") {
+		return true
+	}
+	// Check for pipe operations
+	if strings.Contains(expr, " | ") {
+		return true
+	}
+	return false
+}
+
+// extractBaseVariable extracts the base variable from a complex expression
+func (e *Engine) extractBaseVariable(expr string) string {
+	// For expressions like "$version without prefix 'v'", extract "$version"
+	parts := strings.Fields(expr)
+	if len(parts) > 0 && strings.HasPrefix(parts[0], "$") {
+		return parts[0]
+	}
+	return ""
+}
+
+// variableExists checks if a variable exists in the context
+func (e *Engine) variableExists(varName string, ctx *ExecutionContext) bool {
+	if ctx == nil {
+		return false
+	}
+
+	// Remove $ prefix for checking
+	cleanName := varName
+	if strings.HasPrefix(varName, "$") {
+		cleanName = varName[1:]
+	}
+
+	// Check parameters
+	if _, exists := ctx.Parameters[cleanName]; exists {
+		return true
+	}
+	// Check variables
+	if _, exists := ctx.Variables[cleanName]; exists {
+		return true
+	}
+	// Check variables with $ prefix
+	if _, exists := ctx.Variables[varName]; exists {
+		return true
+	}
+
+	// Check project-level variables for backward compatibility
+	if ctx.Project != nil {
+		// Check built-in project variables
+		if cleanName == "project" && ctx.Project.Name != "" {
+			return true
+		}
+		if cleanName == "version" && ctx.Project.Version != "" {
+			return true
+		}
+		// Check project settings
+		if ctx.Project.Settings != nil {
+			if _, exists := ctx.Project.Settings[cleanName]; exists {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // evaluateCondition evaluates condition expressions
 func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool {
 	// Simple condition evaluation
-	// For now, we'll handle basic patterns like "variable is value"
+	// Handle various patterns like "variable is value", "variable is not empty", etc.
+
+	// Handle "folder/directory is not empty" pattern
+	if strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Check if this is a folder/directory path check
+			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
+				var folderPath string
+				if strings.HasPrefix(left, "folder ") {
+					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
+				} else if strings.HasPrefix(left, "directory ") {
+					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
+				} else if strings.HasPrefix(left, "dir ") {
+					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
+				}
+
+				// Remove quotes if present
+				folderPath = strings.Trim(folderPath, "\"'")
+
+				// Interpolate variables in the path
+				folderPath = e.interpolateVariables(folderPath, ctx)
+
+				// Check if directory exists and is not empty
+				if !e.dirExists(folderPath) {
+					return false // Directory doesn't exist, treat as empty
+				}
+
+				isEmpty, err := e.isDirEmpty(folderPath)
+				if err != nil {
+					return false // Error checking, treat as empty
+				}
+				return !isEmpty // Return true if directory is NOT empty
+			}
+		}
+	}
+
+	// Handle "variable is not empty" pattern
+	if strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
+			// Try to get the value of the left side from parameters
+			if value, exists := ctx.Parameters[paramName]; exists {
+				valueStr := value.AsString()
+				// For lists, check if the list is empty
+				if value.Type == types.ListType {
+					if list, err := value.AsList(); err == nil {
+						return len(list) > 0
+					}
+				}
+				// For other types, check if string representation is not empty
+				return strings.TrimSpace(valueStr) != ""
+			}
+
+			// Try interpolating the variable
+			interpolated := e.interpolateVariables("{"+left+"}", ctx)
+			// If interpolation didn't change it, the variable doesn't exist (treat as empty)
+			if interpolated == "{"+left+"}" {
+				return false
+			}
+			return strings.TrimSpace(interpolated) != ""
+		}
+	}
+
+	// Handle "variable is not value" pattern
+	if strings.Contains(condition, " is not ") && !strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is not ", 2)
+		if len(parts) == 2 {
+			left := strings.TrimSpace(parts[0])
+			right := strings.TrimSpace(parts[1])
+
+			// Handle "empty" keyword - treat as empty string
+			if right == "empty" {
+				right = ""
+			}
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
+			// Try to get the value of the left side from parameters first
+			if value, exists := ctx.Parameters[paramName]; exists {
+				return value.AsString() != right
+			}
+
+			// Try to get the value from variables (let statements)
+			if value, exists := ctx.Variables[paramName]; exists {
+				return value != right
+			}
+
+			// Also try with the $ prefix (variables stored with $ prefix)
+			if value, exists := ctx.Variables["$"+paramName]; exists {
+				return value != right
+			}
+
+			// If not found in parameters or variables, compare as strings
+			return left != right
+		}
+	}
+
+	// Handle "folder/directory is empty" pattern
+	if strings.Contains(condition, " is empty") && !strings.Contains(condition, " is not empty") {
+		parts := strings.SplitN(condition, " is empty", 2)
+		if len(parts) >= 1 {
+			left := strings.TrimSpace(parts[0])
+
+			// Check if this is a folder/directory path check
+			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
+				var folderPath string
+				if strings.HasPrefix(left, "folder ") {
+					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
+				} else if strings.HasPrefix(left, "directory ") {
+					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
+				} else if strings.HasPrefix(left, "dir ") {
+					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
+				}
+
+				// Remove quotes if present
+				folderPath = strings.Trim(folderPath, "\"'")
+
+				// Interpolate variables in the path
+				folderPath = e.interpolateVariables(folderPath, ctx)
+
+				// Check if directory exists and is empty
+				if !e.dirExists(folderPath) {
+					return true // Directory doesn't exist, treat as empty
+				}
+
+				isEmpty, err := e.isDirEmpty(folderPath)
+				if err != nil {
+					return true // Error checking, treat as empty
+				}
+				return isEmpty // Return true if directory IS empty
+			}
+		}
+	}
 
 	// Handle "variable is value" pattern
 	if strings.Contains(condition, " is ") {
@@ -2561,12 +3295,33 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			left := strings.TrimSpace(parts[0])
 			right := strings.TrimSpace(parts[1])
 
-			// Try to get the value of the left side from parameters
-			if value, exists := ctx.Parameters[left]; exists {
+			// Handle "empty" keyword - treat as empty string
+			if right == "empty" {
+				right = ""
+			}
+
+			// Strip $ prefix if present
+			paramName := left
+			if strings.HasPrefix(left, "$") {
+				paramName = left[1:]
+			}
+
+			// Try to get the value of the left side from parameters first
+			if value, exists := ctx.Parameters[paramName]; exists {
 				return value.AsString() == right
 			}
 
-			// If not found in parameters, compare as strings
+			// Try to get the value from variables (let statements)
+			if value, exists := ctx.Variables[paramName]; exists {
+				return value == right
+			}
+
+			// Also try with the $ prefix (variables stored with $ prefix)
+			if value, exists := ctx.Variables["$"+paramName]; exists {
+				return value == right
+			}
+
+			// If not found in parameters or variables, compare as strings
 			return left == right
 		}
 	}
@@ -2599,4 +3354,353 @@ func (e *Engine) getFileSize(path string) (int64, error) {
 		return 0, err
 	}
 	return info.Size(), nil
+}
+
+// dirExists checks if a directory exists
+func (e *Engine) dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// isDirEmpty checks if a directory is empty
+func (e *Engine) isDirEmpty(path string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
+}
+
+// evaluateExpression evaluates an AST expression and returns its string value
+func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) (string, error) {
+	if expr == nil {
+		return "", nil
+	}
+
+	switch ex := expr.(type) {
+	case *ast.LiteralExpression:
+		return ex.Value, nil
+
+	case *ast.IdentifierExpression:
+		// Look up variable value
+		varName := ex.Value
+		if strings.HasPrefix(varName, "$") {
+			// Direct $variable reference
+			if value, exists := ctx.Variables[varName]; exists {
+				return value, nil
+			}
+			return "", fmt.Errorf("undefined variable: %s", varName)
+		} else {
+			// {variable} reference - look up without braces
+			if value, exists := ctx.Variables[varName]; exists {
+				return value, nil
+			}
+			return "", fmt.Errorf("undefined variable: %s", varName)
+		}
+
+	case *ast.BinaryExpression:
+		return e.evaluateBinaryExpression(ex, ctx)
+
+	case *ast.FunctionCallExpression:
+		return e.evaluateFunctionCall(ex, ctx)
+
+	default:
+		return "", fmt.Errorf("unsupported expression type: %T", expr)
+	}
+}
+
+// evaluateBinaryExpression evaluates binary operations like {a} - {b}
+func (e *Engine) evaluateBinaryExpression(expr *ast.BinaryExpression, ctx *ExecutionContext) (string, error) {
+	leftVal, err := e.evaluateExpression(expr.Left, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	rightVal, err := e.evaluateExpression(expr.Right, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	switch expr.Operator {
+	case "-":
+		// Try to parse as numbers for arithmetic
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum - rightNum
+			// Return as integer if it's a whole number
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot subtract non-numeric values: %s - %s", leftVal, rightVal)
+
+	case "+":
+		// Try to parse as numbers for arithmetic
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum + rightNum
+			// Return as integer if it's a whole number
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		// If not numbers, concatenate as strings
+		return leftVal + rightVal, nil
+
+	case "*":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			result := leftNum * rightNum
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot multiply non-numeric values: %s * %s", leftVal, rightVal)
+
+	case "/":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if rightNum == 0 {
+				return "", fmt.Errorf("division by zero")
+			}
+			result := leftNum / rightNum
+			if result == float64(int64(result)) {
+				return fmt.Sprintf("%.0f", result), nil
+			}
+			return fmt.Sprintf("%g", result), nil
+		}
+		return "", fmt.Errorf("cannot divide non-numeric values: %s / %s", leftVal, rightVal)
+
+	case "==":
+		if leftVal == rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "!=":
+		if leftVal != rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "<":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum < rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal < rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case ">":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum > rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal > rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case "<=":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum <= rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal <= rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	case ">=":
+		leftNum, leftErr := strconv.ParseFloat(leftVal, 64)
+		rightNum, rightErr := strconv.ParseFloat(rightVal, 64)
+
+		if leftErr == nil && rightErr == nil {
+			if leftNum >= rightNum {
+				return "true", nil
+			}
+			return "false", nil
+		}
+		// String comparison
+		if leftVal >= rightVal {
+			return "true", nil
+		}
+		return "false", nil
+
+	default:
+		return "", fmt.Errorf("unsupported binary operator: %s", expr.Operator)
+	}
+}
+
+// evaluateFunctionCall evaluates function calls like now(), current git branch
+func (e *Engine) evaluateFunctionCall(expr *ast.FunctionCallExpression, ctx *ExecutionContext) (string, error) {
+	switch expr.Function {
+	case "now":
+		return fmt.Sprintf("%d", time.Now().Unix()), nil
+
+	default:
+		// For other functions, treat them as shell commands or interpolation
+		functionStr := expr.Function
+		if len(expr.Arguments) > 0 {
+			var args []string
+			for _, arg := range expr.Arguments {
+				argVal, err := e.evaluateExpression(arg, ctx)
+				if err != nil {
+					return "", err
+				}
+				args = append(args, argVal)
+			}
+			functionStr += "(" + strings.Join(args, ", ") + ")"
+		}
+
+		// Try to execute as shell command
+		shellOpts := e.getPlatformShellConfig(ctx)
+		result, err := shell.Execute(functionStr, shellOpts)
+		if err != nil {
+			return "", fmt.Errorf("failed to execute function '%s': %v", functionStr, err)
+		}
+		return strings.TrimSpace(result.Stdout), nil
+	}
+}
+
+// parseBuiltinOperations parses operations for builtin functions (e.g., "replace '/' by '-'")
+func (e *Engine) parseBuiltinOperations(operations string) (*VariableOperationChain, error) {
+	// Split by | to handle multiple operations
+	parts := strings.Split(operations, "|")
+	var ops []VariableOperation
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Parse individual operation
+		tokens := strings.Fields(part)
+		if len(tokens) == 0 {
+			continue
+		}
+
+		op, err := e.parseBuiltinOperation(tokens)
+		if err != nil {
+			return nil, err
+		}
+		if op != nil {
+			ops = append(ops, *op)
+		}
+	}
+
+	if len(ops) == 0 {
+		return nil, nil
+	}
+
+	return &VariableOperationChain{
+		Variable:   "", // Not used for builtin operations
+		Operations: ops,
+	}, nil
+}
+
+// parseBuiltinOperation parses a single builtin operation
+func (e *Engine) parseBuiltinOperation(tokens []string) (*VariableOperation, error) {
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	opType := tokens[0]
+	args := []string{}
+
+	switch opType {
+	case "replace":
+		// "replace '/' by '-'" or "replace '/' with '-'"
+		if len(tokens) >= 4 && (tokens[2] == "by" || tokens[2] == "with") {
+			// Remove quotes from arguments
+			from := strings.Trim(tokens[1], `"'`)
+			to := strings.Trim(tokens[3], `"'`)
+			args = append(args, from, to)
+		}
+	case "without":
+		// "without prefix 'v'" or "without suffix '.tmp'"
+		if len(tokens) >= 3 {
+			args = append(args, tokens[1]) // "prefix" or "suffix"
+			argValue := strings.Join(tokens[2:], " ")
+			argValue = strings.Trim(argValue, `"'`)
+			args = append(args, argValue)
+		}
+	case "uppercase", "lowercase", "trim":
+		// No arguments needed
+	default:
+		return nil, fmt.Errorf("unknown builtin operation: %s", opType)
+	}
+
+	return &VariableOperation{
+		Type: opType,
+		Args: args,
+	}, nil
+}
+
+// applyBuiltinOperations applies operations to a builtin function result
+func (e *Engine) applyBuiltinOperations(value string, chain *VariableOperationChain, ctx *ExecutionContext) (string, error) {
+	currentValue := value
+
+	for _, op := range chain.Operations {
+		newValue, err := e.applyBuiltinOperation(currentValue, op, ctx)
+		if err != nil {
+			return "", fmt.Errorf("builtin operation '%s' failed: %v", op.Type, err)
+		}
+		currentValue = newValue
+	}
+
+	return currentValue, nil
+}
+
+// applyBuiltinOperation applies a single operation to a builtin function result
+func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *ExecutionContext) (string, error) {
+	switch op.Type {
+	case "replace":
+		if len(op.Args) >= 2 {
+			return strings.ReplaceAll(value, op.Args[0], op.Args[1]), nil
+		}
+		return "", fmt.Errorf("replace operation requires 2 arguments")
+	case "without":
+		return e.applyWithoutOperation(value, op.Args)
+	case "uppercase":
+		return strings.ToUpper(value), nil
+	case "lowercase":
+		return strings.ToLower(value), nil
+	case "trim":
+		return strings.TrimSpace(value), nil
+	default:
+		return "", fmt.Errorf("unknown builtin operation type: %s", op.Type)
+	}
 }

@@ -1,0 +1,30 @@
+version: 2.0
+
+task "test git branch" means "Test current git branch builtin and pipe operations":
+	info "🌿 Testing git branch operations..."
+	
+	# Test basic git branch builtin
+	set $branch to {current git branch}
+	info "Current branch: {$branch}"
+	
+	# Test git branch with pipe operations
+	set $safe_branch to {current git branch | replace "/" by "-"}
+	info "Safe branch name: {$safe_branch}"
+	
+	# Test with parameter default using git branch
+	given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
+	info "Deployment branch: {$deployment_branch}"
+	
+	success "✅ Git branch operations completed!"
+
+task "test parameter defaults" means "Test parameter defaults with builtin functions":
+	given $commit defaults to "{current git commit}"
+	given $branch defaults to "{current git branch}"
+	given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
+	
+	info "📋 Parameter values:"
+	info "  Commit: {$commit}"
+	info "  Branch: {$branch}" 
+	info "  Safe branch: {$safe_branch}"
+	
+	success "✅ Parameter defaults test completed!"

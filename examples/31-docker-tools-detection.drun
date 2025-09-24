@@ -3,63 +3,63 @@ version: 2.0
 project "docker-tools-detection" version "1.0":
 
 task "check-docker-ecosystem" means "Check Docker, Buildx, and Compose availability":
-  info "🐳 Checking Docker ecosystem tools"
-  
-  # Check basic Docker
-  if docker is available:
-    info "✅ Docker is available"
-    detect docker version
-    info "Docker version: {docker_version}"
-  else:
-    warn "❌ Docker is not available"
-  
-  # Check Docker Buildx (supports both "docker buildx" and "docker-buildx")
-  if "docker buildx" is available:
-    info "✅ Docker Buildx is available"
-    run "docker buildx version"
-  else:
-    info "❌ Docker Buildx is not available"
-  
-  # Check Docker Compose (supports both "docker compose" and "docker-compose")  
-  if "docker compose" is available:
-    info "✅ Docker Compose is available"
-    run "docker compose version"
-  else:
-    info "❌ Docker Compose is not available"
-  
-  success "Docker ecosystem check completed!"
+	info "🐳 Checking Docker ecosystem tools"
+
+	# Check basic Docker
+	if docker is available:
+		info "✅ Docker is available"
+		detect docker version
+		info "Docker version: {docker_version}"
+	else:
+		warn "❌ Docker is not available"
+
+	# Check Docker Buildx (supports both "docker buildx" and "docker-buildx")
+	if "docker buildx" is available:
+		info "✅ Docker Buildx is available"
+		run "docker buildx version"
+	else:
+		info "❌ Docker Buildx is not available"
+
+	# Check Docker Compose (supports both "docker compose" and "docker-compose")  
+	if "docker compose" is available:
+		info "✅ Docker Compose is available"
+		run "docker compose version"
+	else:
+		info "❌ Docker Compose is not available"
+
+	success "Docker ecosystem check completed!"
 
 task "demo-buildx" means "Demonstrate Docker Buildx multi-platform builds":
-  info "🔨 Docker Buildx Multi-Platform Demo"
-  
-  if "docker buildx" is available:
-    info "Setting up multi-platform builder..."
-    run "docker buildx create --name multiarch --use --bootstrap || true"
-    run "docker buildx inspect multiarch"
-    
-    info "Available platforms:"
-    run "docker buildx ls"
-    
-    success "Docker Buildx is ready for cross-platform builds!"
-  else:
-    error "Docker Buildx is required for multi-platform builds"
+	info "🔨 Docker Buildx Multi-Platform Demo"
+
+	if "docker buildx" is available:
+		info "Setting up multi-platform builder..."
+		run "docker buildx create --name multiarch --use --bootstrap || true"
+		run "docker buildx inspect multiarch"
+
+		info "Available platforms:"
+		run "docker buildx ls"
+
+		success "Docker Buildx is ready for cross-platform builds!"
+	else:
+		error "Docker Buildx is required for multi-platform builds"
 
 task "demo-compose" means "Demonstrate Docker Compose V2 features":
-  info "🐙 Docker Compose V2 Demo"
-  
-  if "docker compose" is available:
-    info "Docker Compose V2 detected - modern syntax available!"
-    
-    info "Compose version information:"
-    run "docker compose version"
-    
-    info "Example commands you can use:"
-    info "  docker compose up -d"
-    info "  docker compose down"
-    info "  docker compose ps"
-    info "  docker compose logs"
-    
-    success "Docker Compose V2 is ready!"
-  else:
-    warn "Docker Compose V2 not available - checking for legacy version..."
-    run "docker-compose --version || echo 'No Docker Compose found'"
+	info "🐙 Docker Compose V2 Demo"
+
+	if "docker compose" is available:
+		info "Docker Compose V2 detected - modern syntax available!"
+
+		info "Compose version information:"
+		run "docker compose version"
+
+		info "Example commands you can use:"
+		info "  docker compose up -d"
+		info "  docker compose down"
+		info "  docker compose ps"
+		info "  docker compose logs"
+
+		success "Docker Compose V2 is ready!"
+	else:
+		warn "Docker Compose V2 not available - checking for legacy version..."
+		run "docker-compose --version || echo 'No Docker Compose found'"

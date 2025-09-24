@@ -1,5 +1,7 @@
 # drun (do run)
 
+#### Deprecation notice: V1 is now deprecated. Please migrate to V2. We'll maintain this standard in future major versions.
+
 A **semantic, English-like** task automation language with intelligent execution, smart detection, and powerful built-in actions. Write automation tasks in natural language that compiles to efficient shell commands.
 
 ## Features
@@ -7,10 +9,10 @@ A **semantic, English-like** task automation language with intelligent execution
 ### 🚀 **Core Features**
 
 - **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
-- **Smart Parameters**: Type-safe parameters with constraints and defaults (`requires $env from ["dev", "prod"]`)
+- **Smart Parameters**: Type-safe parameters with constraints, defaults, and semantic `empty` keyword (`requires $env from ["dev", "prod"]`, `given $features defaults to empty`)
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
-- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands
+- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands (soon)
 - **Smart Detection**: Auto-detect project types, tools, and environments
 - **Shell Integration**: Seamless shell command execution with output capture
 - **Cross-Platform**: Works on Linux, macOS, and Windows with intelligent shell selection
@@ -49,6 +51,7 @@ drun includes powerful built-in functions for common operations:
 - `{hostname}` - Get system hostname
 - `{pwd}` - Get current working directory
 - `{pwd('basename')}` - Get directory name only
+- `{current file}` - Get path to the current drun file being executed
 - `{env('VAR_NAME')}` - Get environment variable
 - `{env('VAR_NAME', 'default')}` - Get environment variable with default
 
@@ -80,6 +83,7 @@ project "my-app" version "1.0"
 task "system info":
   info "🖥️  Running on: {hostname}"
   info "📁 Current directory: {pwd('basename')}"
+  info "📄 Current file: {current file}"
   info "🕒 Current time: {now.format('2006-01-02 15:04:05')}"
   info "🔗 Git commit: {current git commit('short')}"
 
@@ -257,6 +261,30 @@ drun --set-workspace tasks.drun
 
 See the included examples for comprehensive task configurations.
 
+### Indentation
+
+drun v2 supports both **tabs** and **spaces** for indentation, providing flexibility for different coding preferences:
+
+```drun
+# Using spaces (2 or 4 spaces per level)
+task "spaces-example":
+  info "Indented with spaces"
+  if true:
+    step "Nested with spaces"
+
+# Using tabs
+task "tabs-example":
+	info "Indented with tabs"
+	if true:
+		step "Nested with tabs"
+```
+
+**Key points:**
+- **Tab equivalence**: Each tab equals 4 spaces for indentation level calculation
+- **Consistency**: Use consistent indentation within each file (don't mix tabs and spaces)
+- **Flexibility**: Choose the style that works best for your team or editor
+- **Generated files**: `drun --init` creates files with tab indentation by default
+
 📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
 ### Basic Task
@@ -295,12 +323,12 @@ drun greet name=Alice title=Ms.
 task "deploy" means "Deploy to environment with version":
   requires $environment from ["dev", "staging", "prod"]
   given $version defaults to "latest"
-  given $features as list defaults to ""
+  given $features as list defaults to empty  # 🆕 empty keyword
   given $force as boolean defaults to false
   
   info "Deploying {$version} to {$environment}"
   
-  if $features is not "":
+  if $features is not empty:  # 🆕 semantic empty conditions
     info "Features: {$features}"
   
   if $force is true:
@@ -319,6 +347,35 @@ drun deploy environment=staging version=v1.1.0 features=auth,ui
 # Force deployment
 drun deploy environment=prod version=v1.2.0 force=true
 ```
+
+### The `empty` Keyword ⭐ *New*
+
+The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
+
+```drun
+task "example" means "Demonstrate empty keyword usage":
+  # Default values - both are equivalent
+  given $name defaults to empty      # semantic empty
+  given $title defaults to ""        # traditional empty string
+  given $features as list defaults to empty  # empty list
+  
+  # Conditions - semantic and readable
+  if $name is empty:
+    warn "Name is required"
+  
+  if $features is not empty:
+    info "Enabled features: {$features}"
+  
+  # Works with all parameter types
+  if $title is empty:
+    info "Using default title"
+```
+
+**Key Benefits:**
+- **Semantic**: More readable than empty quotes in automation contexts
+- **Equivalent**: `empty` is exactly the same as `""` 
+- **Flexible**: Works as default values and in conditions
+- **Type-aware**: Creates appropriate empty values (empty string, empty list, etc.)
 
 ### Task with Dependencies
 
@@ -614,8 +671,87 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)
 - `--shell`: Override shell type (linux/darwin/windows)
+- `--allow-undefined-variables`: Allow undefined variables in interpolation (default: strict mode)
 - `completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
 - `cleanup-backups`: Clean up old backup files created during updates
+
+### Debug Options
+
+drun includes comprehensive debugging capabilities to help you understand how your tasks are parsed and executed:
+
+- `--debug`: Enable debug mode (shows full debug output by default)
+- `--debug-tokens`: Show lexer tokens from the parsing process
+- `--debug-ast`: Show the Abstract Syntax Tree structure
+- `--debug-json`: Show AST as JSON for detailed inspection
+- `--debug-errors`: Show only parse errors
+- `--debug-full`: Show complete debug information (tokens + AST + errors)
+- `--debug-input "string"`: Debug input string directly instead of reading from file
+
+**Debug Examples:**
+```bash
+# Show full debug output for a file
+drun --debug -f my-tasks.drun
+
+# Show only the lexer tokens
+drun --debug --debug-tokens -f my-tasks.drun
+
+# Debug inline input directly
+drun --debug --debug-input 'task "test": info "hello"'
+
+# Show AST structure only
+drun --debug --debug-ast -f my-tasks.drun
+
+# Show AST as JSON for tooling integration
+drun --debug --debug-json -f my-tasks.drun
+```
+
+> **Note:** As of v2.0, debug functionality has been integrated into the main `drun` command. The separate debug tool has been removed for a more streamlined experience.
+
+## Variable Checking
+
+drun v2 includes **strict variable checking** by default to catch undefined variables early and prevent runtime errors.
+
+### Strict Mode (Default)
+
+By default, drun operates in strict mode and will fail with a clear error message if any undefined variables are encountered:
+
+```bash
+# This will fail if $undefined_var is not defined
+drun my-task
+# Error: task 'my-task' failed: in info statement: undefined variable: {$undefined_var}
+```
+
+### Allow Undefined Variables
+
+Use the `--allow-undefined-variables` flag to allow undefined variables (legacy behavior):
+
+```bash
+# This will show {$undefined_var} as literal text
+drun my-task --allow-undefined-variables
+```
+
+### Benefits of Strict Mode
+
+- **🐛 Early Error Detection**: Catch typos and missing variables before execution
+- **🔍 Clear Error Messages**: Precise location and context of undefined variables
+- **🛡️ Prevent Silent Failures**: Avoid unexpected behavior from missing variables
+- **📝 Better Documentation**: Forces explicit variable definitions
+
+### Examples
+
+```drun
+version: 2.0
+
+task "strict example":
+    let $name = "world"
+    info "Hello {$name}"           # ✅ Works: variable is defined
+    info "Hello {$typo_name}"      # ❌ Fails: undefined variable (strict mode)
+    
+task "with parameters":
+    accepts $target as string
+    info "Deploying to {$target}"  # ✅ Works: parameter is defined
+    info "Version: {$version}"     # ❌ Fails: undefined variable (strict mode)
+```
 
 ## Shell Completion
 

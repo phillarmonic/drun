@@ -2,6 +2,8 @@ package shell
 
 import (
 	"bytes"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +74,14 @@ func TestExecute_WithEnvironment(t *testing.T) {
 		"TEST_VAR": "test_value_123",
 	}
 
-	result, err := Execute("echo $TEST_VAR", opts)
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = "echo $env:TEST_VAR"
+	} else {
+		cmd = "echo $TEST_VAR"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -85,15 +94,37 @@ func TestExecute_WithEnvironment(t *testing.T) {
 func TestExecute_WithWorkingDir(t *testing.T) {
 	opts := DefaultOptions()
 	opts.CaptureOutput = true
-	opts.WorkingDir = "/tmp"
 
-	result, err := Execute("pwd", opts)
+	var expectedDir, cmd string
+	if runtime.GOOS == "windows" {
+		// Use a directory that exists on Windows
+		expectedDir = os.Getenv("TEMP")
+		if expectedDir == "" {
+			expectedDir = "C:\\Windows\\Temp"
+		}
+		opts.WorkingDir = expectedDir
+		cmd = "Get-Location | Select-Object -ExpandProperty Path"
+	} else {
+		expectedDir = "/tmp"
+		opts.WorkingDir = expectedDir
+		cmd = "pwd"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Stdout != "/tmp" {
-		t.Errorf("Expected '/tmp', got %q", result.Stdout)
+	if runtime.GOOS == "windows" {
+		// On Windows, check if we're in a temp directory (path normalization can vary)
+		actualPath := strings.TrimSpace(result.Stdout)
+		if !strings.Contains(strings.ToLower(actualPath), "temp") {
+			t.Errorf("Expected output to contain 'temp' directory, got %q", actualPath)
+		}
+	} else {
+		if result.Stdout != expectedDir {
+			t.Errorf("Expected %q, got %q", expectedDir, result.Stdout)
+		}
 	}
 }
 
@@ -150,14 +181,23 @@ func TestExecute_MultilineOutput(t *testing.T) {
 	opts := DefaultOptions()
 	opts.CaptureOutput = true
 
-	result, err := Execute("echo 'line1'; echo 'line2'; echo 'line3'", opts)
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = "echo line1; echo line2; echo line3"
+	} else {
+		cmd = "echo 'line1'; echo 'line2'; echo 'line3'"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	// Normalize line endings for cross-platform compatibility
+	normalizedOutput := strings.ReplaceAll(result.Stdout, "\r\n", "\n")
 	expected := "line1\nline2\nline3"
-	if result.Stdout != expected {
-		t.Errorf("Expected %q, got %q", expected, result.Stdout)
+	if normalizedOutput != expected {
+		t.Errorf("Expected %q, got %q (normalized: %q)", expected, result.Stdout, normalizedOutput)
 	}
 }
 
@@ -183,8 +223,17 @@ func TestExecute_StderrCapture(t *testing.T) {
 func TestDefaultOptions(t *testing.T) {
 	opts := DefaultOptions()
 
-	if opts.Shell != "/bin/sh" {
-		t.Errorf("Expected default shell '/bin/sh', got %q", opts.Shell)
+	// Check that we get a platform-appropriate shell
+	expectedShells := []string{"/bin/zsh", "/bin/bash", "/bin/sh", "powershell.exe"}
+	validShell := false
+	for _, shell := range expectedShells {
+		if opts.Shell == shell {
+			validShell = true
+			break
+		}
+	}
+	if !validShell {
+		t.Errorf("Expected platform-appropriate shell (one of %v), got %q", expectedShells, opts.Shell)
 	}
 
 	if opts.Timeout != 30*time.Second {

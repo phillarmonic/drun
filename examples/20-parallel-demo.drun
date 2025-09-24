@@ -1,30 +1,30 @@
 version: 2.0
 
 task "sequential demo" means "Sequential processing demo":
-  accepts $items as list
-  
-  info "Starting sequential processing"
-  for each item in items:
-    info "Processing: {item}"
-    step "Working on {item}"
-  
-  success "Sequential processing completed!"
+	accepts $items as list
+
+	info "Starting sequential processing"
+	for each $item in items:
+		info "Processing: {$item}"
+		step "Working on {$item}"
+
+	success "Sequential processing completed!"
 
 task "parallel demo" means "Parallel processing demo":
-  accepts $items as list
-  
-  info "Starting parallel processing"
-  for each item in items in parallel:
-    info "Processing: {item}"
-    step "Working on {item}"
-  
-  success "Parallel processing completed!"
+	accepts $items as list
+
+	info "Starting parallel processing"
+	for each $item in items in parallel:
+		info "Processing: {$item}"
+		step "Working on {$item}"
+
+	success "Parallel processing completed!"
 
 task "simple parallel" means "Simple parallel execution":
-  info "Running parallel tasks"
-  
-  for i in range 1 to 3 in parallel:
-    step "Task {i}"
-    info "Executing parallel task {i}"
-  
-  success "All parallel tasks completed!"
+	info "Running parallel tasks"
+
+	for $i in range 1 to 3 in parallel:
+		step "Task {$i}"
+		info "Executing parallel task {$i}"
+
+	success "All parallel tasks completed!"

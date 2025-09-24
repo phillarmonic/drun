@@ -89,13 +89,16 @@ type ProjectSetting interface {
 type SetStatement struct {
 	Token lexer.Token // the SET token
 	Key   string      // setting key
-	Value string      // setting value
+	Value Expression  // setting value (can be string literal or array literal)
 }
 
 func (ss *SetStatement) statementNode()      {}
 func (ss *SetStatement) projectSettingNode() {}
 func (ss *SetStatement) String() string {
-	return fmt.Sprintf("set %s to %s", ss.Key, ss.Value)
+	if ss.Value != nil {
+		return fmt.Sprintf("set %s to %s", ss.Key, ss.Value.String())
+	}
+	return fmt.Sprintf("set %s to <nil>", ss.Key)
 }
 
 // IncludeStatement represents an include directive
@@ -147,11 +150,11 @@ type PlatformShellConfig struct {
 	Environment map[string]string // environment variables
 }
 
-// LifecycleHook represents before/after hooks
+// LifecycleHook represents lifecycle hooks
 type LifecycleHook struct {
-	Token lexer.Token // the BEFORE or AFTER token
-	Type  string      // "before" or "after"
-	Scope string      // "any" for global hooks
+	Token lexer.Token // the ON, BEFORE, or AFTER token
+	Type  string      // "before", "after", "setup", or "teardown"
+	Scope string      // "any" for task hooks, "drun" for tool hooks
 	Body  []Statement // hook body statements
 }
 
@@ -159,10 +162,23 @@ func (lh *LifecycleHook) statementNode()      {}
 func (lh *LifecycleHook) projectSettingNode() {}
 func (lh *LifecycleHook) String() string {
 	var out strings.Builder
-	out.WriteString(lh.Type)
-	out.WriteString(" ")
-	out.WriteString(lh.Scope)
-	out.WriteString(" task:")
+
+	// Handle different syntax formats
+	if lh.Scope == "drun" {
+		// New syntax: "on drun setup:" or "on drun teardown:"
+		out.WriteString("on ")
+		out.WriteString(lh.Scope)
+		out.WriteString(" ")
+		out.WriteString(lh.Type)
+		out.WriteString(":")
+	} else {
+		// Old syntax: "before any task:" or "after any task:"
+		out.WriteString(lh.Type)
+		out.WriteString(" ")
+		out.WriteString(lh.Scope)
+		out.WriteString(" task:")
+	}
+
 	for _, stmt := range lh.Body {
 		out.WriteString("\n    ")
 		out.WriteString(stmt.String())
@@ -651,7 +667,7 @@ type VariableStatement struct {
 	Token     lexer.Token // the LET, SET, or TRANSFORM token
 	Operation string      // "let", "set", "transform"
 	Variable  string      // variable name
-	Value     string      // value or expression
+	Value     Expression  // value or expression
 	Function  string      // function name for operations (concat, split, etc.)
 	Arguments []string    // function arguments
 }
@@ -665,12 +681,16 @@ func (vs *VariableStatement) String() string {
 		out.WriteString("let ")
 		out.WriteString(vs.Variable)
 		out.WriteString(" = ")
-		out.WriteString(vs.Value)
+		if vs.Value != nil {
+			out.WriteString(vs.Value.String())
+		}
 	case "set":
 		out.WriteString("set ")
 		out.WriteString(vs.Variable)
 		out.WriteString(" to ")
-		out.WriteString(vs.Value)
+		if vs.Value != nil {
+			out.WriteString(vs.Value.String())
+		}
 	case "transform":
 		out.WriteString("transform ")
 		out.WriteString(vs.Variable)
@@ -684,9 +704,9 @@ func (vs *VariableStatement) String() string {
 		out.WriteString(vs.Operation)
 		out.WriteString(" ")
 		out.WriteString(vs.Variable)
-		if vs.Value != "" {
+		if vs.Value != nil {
 			out.WriteString(" ")
-			out.WriteString(vs.Value)
+			out.WriteString(vs.Value.String())
 		}
 	}
 

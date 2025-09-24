@@ -84,16 +84,34 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         echo "Running CI Test Suite..."
-        go test -race -cover -coverprofile=coverage.out ./internal/...
+        echo "Cleaning up any .out files..."
+        Get-ChildItem -Path . -Name "*.out" -File | Remove-Item -Force -ErrorAction SilentlyContinue
+        echo "Testing race..."
+        New-Item -ItemType Directory -Force -Path coverage
+        go test -race -cover -coverprofile="coverage\coverage.cov" github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
+        if ($LASTEXITCODE -ne 0) {
+          echo "❌ Tests failed!"
+          exit $LASTEXITCODE
+        }
+        echo "Building the binary..."
         go build -o bin/drun.exe ./cmd/drun
+        if ($LASTEXITCODE -ne 0) {
+          echo "❌ Build failed!"
+          exit $LASTEXITCODE
+        }
+        echo "Testing the binary..."
         ./bin/drun.exe --version
+        if ($LASTEXITCODE -ne 0) {
+          echo "❌ Binary test failed!"
+          exit $LASTEXITCODE
+        }
         echo "CI tests passed!"
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
       uses: codecov/codecov-action@v3
       with:
-        file: ./coverage.out
+        file: ./coverage/coverage.cov
         flags: unittests
         name: codecov-umbrella
 
@@ -137,3 +155,260 @@ jobs:
       with:
         name: drun-${{ runner.os }}
         path: bin/drun*
+
+  # Example file testing job - tests parsing and execution of example files
+  test-examples:
+    name: Test Examples on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: lint  # Only run after lint succeeds
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Configure Git line endings (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.25
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Install coreutils on macOS (for timeout command)
+      if: runner.os == 'macOS'
+      run: |
+        echo "Installing coreutils for gtimeout command..."
+        brew install coreutils
+
+    - name: Build drun binary (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        go build -o bin/drun ./cmd/drun
+        ./bin/drun --version
+
+    - name: Build drun binary (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        go build -o bin/drun.exe ./cmd/drun
+        ./bin/drun.exe --version
+
+    - name: Test parsing of all example files
+      shell: bash
+      run: |
+        echo "🧪 Testing parsing of all example files on ${{ matrix.os }}..."
+        
+        # Set binary name and timeout command based on OS
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          DRUN_BIN="./bin/drun.exe"
+          TIMEOUT_CMD="timeout 60"
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
+        else
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="timeout 60"
+        fi
+        
+        # Test that all example files can be parsed without errors
+        failed_files=()
+        
+        for file in examples/*.drun; do
+          if [[ -f "$file" ]]; then
+            echo -n "📄 Testing parsing: $file ... "
+            
+            # Use timeout to prevent infinite loops (60 seconds)
+            if $TIMEOUT_CMD $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/parse_error.log; then
+              echo "✅ SUCCESS"
+            else
+              exit_code=$?
+              echo "❌ FAILED"
+              
+              # Show the actual error output
+              echo "    Error details for $file:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Parsing took longer than 60 seconds (possible infinite loop)"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/parse_error.log ]]; then
+                  sed 's/^/      /' /tmp/parse_error.log
+                else
+                  echo "      No error log available"
+                fi
+              fi
+              echo ""
+              echo "❌ STOPPING: First parsing failure detected. Fix this issue before continuing."
+              echo "   Failed file: $file"
+              exit 1
+            fi
+          fi
+        done
+        
+        echo "✅ All $(ls examples/*.drun | wc -l) example files parsed successfully!"
+
+    - name: Test safe example executions
+      shell: bash
+      run: |
+        echo "🚀 Testing execution of safe example files..."
+        
+        # Set binary name and timeout command based on OS
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          DRUN_BIN="./bin/drun.exe"
+          TIMEOUT_CMD="timeout 60"
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
+        else
+          DRUN_BIN="./bin/drun"
+          TIMEOUT_CMD="timeout 60"
+        fi
+        
+        # Helper function to run with timeout and error handling
+        run_with_timeout() {
+          local file="$1"
+          local task="$2"
+          shift 2
+          local args="$@"
+          
+          echo -n "📄 Testing: $file -> $task ... "
+          
+          # Execute with timeout
+          if $TIMEOUT_CMD $DRUN_BIN "$task" --file "$file" $args >/dev/null 2>/tmp/exec_error.log; then
+            echo "✅ SUCCESS"
+          else
+            exit_code=$?
+            echo "❌ FAILED"
+            echo "    Error details for $file -> $task:"
+            if [[ $exit_code -eq 124 ]]; then
+              echo "      ⏰ TIMEOUT: Execution took longer than 60 seconds"
+            else
+              echo "      Exit code: $exit_code"
+              if [[ -f /tmp/exec_error.log ]]; then
+                sed 's/^/      /' /tmp/exec_error.log
+              fi
+            fi
+            echo ""
+            echo "❌ STOPPING: First execution failure detected. Fix this issue before continuing."
+            echo "   Failed: $file -> $task"
+            exit 1
+          fi
+        }
+        
+        # Test basic hello world
+        run_with_timeout "examples/01-hello-world.drun" "hello"
+        run_with_timeout "examples/01-hello-world.drun" "hello world"
+        
+        # Test interpolation (safe tasks only)
+        run_with_timeout "examples/03-interpolation.drun" "greet" name="CI Test" title="GitHub Actions"
+        
+        # Test project declarations
+        run_with_timeout "examples/21-project-declarations.drun" "build"
+        run_with_timeout "examples/21-project-declarations.drun" "status"
+        
+        # Test explicit indentation
+        run_with_timeout "examples/15-explicit-indent.drun" "explicit indent"
+        
+        # Test builtin functions (safe ones)
+        run_with_timeout "examples/08-builtin-functions.drun" "system info"
+        
+        echo "✅ All safe example executions completed successfully!"
+
+    - name: Test Windows-specific parsing edge cases
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        echo "🪟 Testing Windows-specific parsing scenarios..."
+        
+        DRUN_BIN="./bin/drun.exe"
+        
+        # Helper function for Windows tests with timeout
+        test_windows_file() {
+          local file="$1"
+          local task="$2"
+          
+          echo -n "📄 Windows test: $file"
+          if [[ -n "$task" ]]; then
+            echo -n " -> $task"
+          fi
+          echo -n " ... "
+          
+          if [[ -z "$task" ]]; then
+            # Just list tasks
+            if timeout 60 $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/win_error.log; then
+              echo "✅ SUCCESS"
+            else
+              exit_code=$?
+              echo "❌ FAILED"
+              echo "    Error details:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Operation took longer than 60 seconds"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/win_error.log ]]; then
+                  sed 's/^/      /' /tmp/win_error.log
+                fi
+              fi
+              echo ""
+              echo "❌ STOPPING: First Windows test failure detected. Fix this issue before continuing."
+              echo "   Failed: $file"
+              exit 1
+            fi
+          else
+            # Execute specific task
+            if timeout 60 $DRUN_BIN "$task" --file "$file" >/dev/null 2>/tmp/win_error.log; then
+              echo "✅ SUCCESS"
+            else
+              exit_code=$?
+              echo "❌ FAILED"
+              echo "    Error details:"
+              if [[ $exit_code -eq 124 ]]; then
+                echo "      ⏰ TIMEOUT: Execution took longer than 60 seconds"
+              else
+                echo "      Exit code: $exit_code"
+                if [[ -f /tmp/win_error.log ]]; then
+                  sed 's/^/      /' /tmp/win_error.log
+                fi
+              fi
+              echo ""
+              echo "❌ STOPPING: First Windows test failure detected. Fix this issue before continuing."
+              echo "   Failed: $file -> $task"
+              exit 1
+            fi
+          fi
+        }
+        
+        echo "Testing examples with blank lines and complex formatting..."
+        
+        # Test hello world (has blank lines)
+        test_windows_file "examples/01-hello-world.drun"
+        test_windows_file "examples/01-hello-world.drun" "hello"
+        
+        # Test parameters (complex structure with blank lines)
+        test_windows_file "examples/02-parameters.drun"
+        
+        # Test project declarations (has project block with blank lines)
+        test_windows_file "examples/21-project-declarations.drun"
+        test_windows_file "examples/21-project-declarations.drun" "build"
+        
+        # Test variable operations (complex with multiple blank line sections)
+        test_windows_file "examples/28-variable-operations.drun"
+        test_windows_file "examples/28-variable-operations.drun" "basic_variable_operations"
+        
+        # Test builtin functions (has various formatting)
+        test_windows_file "examples/08-builtin-functions.drun"
+        test_windows_file "examples/08-builtin-functions.drun" "system info"
+        
+        # Test lifecycle hooks (complex indentation and blank lines)
+        test_windows_file "examples/39-drun-lifecycle-hooks.drun"
+        
+        echo "✅ All Windows-specific parsing tests passed!"

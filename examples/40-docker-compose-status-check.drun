@@ -1,0 +1,71 @@
+version: 2.0
+
+project "docker-compose-status-demo" version "1.0":
+
+task "check-compose-status" means "Demonstrate Docker Compose status checking":
+	info "🐳 Docker Compose Status Checker Demo"
+	
+	# Check status of compose project in current directory
+	info "📍 Checking compose status in current directory..."
+	set $status to "{docker compose status}"
+	info "Status: {$status}"
+	
+	# Interpret the status
+	if $status is "usable":
+		success "✅ Compose project is running and usable!"
+	else if $status is "down":
+		warn "⬇️  Compose project is down"
+	else if $status is "unusable":
+		error "❌ Compose project has issues (restarting/unhealthy containers)"
+	else if $status is "partial":
+		warn "⚠️  Compose project is partially running"
+	else if $status is "unavailable":
+		warn "🚫 Docker Compose is not available on this system"
+	else if $status is "error":
+		error "💥 Error checking compose status"
+	else:
+		info "❓ Unknown status: {$status}"
+
+task "check-specific-project" means "Check status of a specific compose project":
+	info "🎯 Checking specific project status"
+	
+	# You can specify a path to a specific compose project
+	# set $project_path to "/path/to/your/compose/project"
+	# set $status to "{docker compose status $project_path}"
+	# info "Project at {$project_path} status: {$status}"
+	
+	info "💡 To check a specific project, uncomment and modify the lines above"
+	info "   Example: set $status to builtin function 'docker compose status /path/to/project'"
+
+task "compose-health-check" means "Complete compose project health check":
+	info "🏥 Complete Docker Compose Health Check"
+	
+	# Check if docker compose is available
+	set $status to "{docker compose status}"
+	
+	if $status is "unavailable":
+		error "Docker Compose is not installed or not available"
+		info "Please install Docker Compose:"
+		info "  - Docker Desktop (includes Compose V2)"
+		info "  - Or standalone docker-compose"
+		throw "Docker Compose not available"
+	
+	info "Docker Compose is available ✅"
+	
+	# Check project status
+	if $status is "usable":
+		success "🎉 All containers are running properly!"
+		info "Your compose project is ready to use"
+	else if $status is "down":
+		info "🔄 Starting compose project..."
+		info "You can run: docker compose up -d"
+	else if $status is "unusable":
+		warn "🔧 Some containers need attention"
+		info "Check container logs: docker compose logs"
+		info "Restart problematic services: docker compose restart"
+	else if $status is "partial":
+		warn "⚡ Project is partially running"
+		info "Some services may be stopped or failed"
+		info "Check status: docker compose ps"
+	else:
+		error "Unexpected status: {$status}"

@@ -39,7 +39,9 @@ func (e *ParseError) FormatError() string {
 		result.WriteString(fmt.Sprintf("   \033[34m%s\033[0m | %s\n", lineNumStr, sourceLine))
 
 		// Show the caret pointing to the error position
-		spaces := strings.Repeat(" ", len(lineNumStr)) + " | " + strings.Repeat(" ", e.Token.Column-1)
+		// Calculate visual column position accounting for tab expansion
+		visualColumn := e.calculateVisualColumn(sourceLine, e.Token.Column)
+		spaces := strings.Repeat(" ", len(lineNumStr)) + " | " + strings.Repeat(" ", visualColumn-1)
 		result.WriteString(fmt.Sprintf("   %s\033[31m^\033[0m\n", spaces))
 
 		// Add helpful suggestions for common errors
@@ -50,6 +52,23 @@ func (e *ParseError) FormatError() string {
 	}
 
 	return result.String()
+}
+
+// calculateVisualColumn calculates the visual column position accounting for tab expansion
+func (e *ParseError) calculateVisualColumn(sourceLine string, tokenColumn int) int {
+	visualColumn := 1
+	for i, char := range sourceLine {
+		if i >= tokenColumn-1 { // tokenColumn is 1-based
+			break
+		}
+		if char == '\t' {
+			// Expand tab to next multiple of 4 (standard tab width)
+			visualColumn = ((visualColumn-1)/4+1)*4 + 1
+		} else {
+			visualColumn++
+		}
+	}
+	return visualColumn
 }
 
 // getSuggestion returns a helpful suggestion for common parsing errors

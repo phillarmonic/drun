@@ -1,26 +1,26 @@
 version: 2.0
 
 project "shell-test" version "1.0":
-  shell config:
-    darwin:
-      executable: "/bin/zsh"
-      args:
-        - "-l"
-        - "-i"
-      environment:
-        TERM: "xterm-256color"
-        TEST_VAR: "hello from shell config"
-    linux:
-      executable: "/bin/zsh"
-      args:
-        - "-l"
-        - "-i"
-      environment:
-        TEST_VAR: "hello from shell config"
+	shell config:
+		darwin:
+			executable: "/bin/zsh"
+			args:
+				- "-l"
+				- "-i"
+			environment:
+				TERM: "xterm-256color"
+				TEST_VAR: "hello from shell config"
+		linux:
+			executable: "/bin/zsh"
+			args:
+				- "-l"
+				- "-i"
+			environment:
+				TEST_VAR: "hello from shell config"
 
 task "test-shell":
-  info "Testing shell configuration"
-  run "echo $SHELL"
-  run "echo $TERM"
-  run "echo $TEST_VAR"
-  success "Shell test completed!"
+	info "Testing shell configuration"
+	run "echo $SHELL"
+	run "echo $TERM"
+	run "echo $TEST_VAR"
+	success "Shell test completed!"

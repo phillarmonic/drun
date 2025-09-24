@@ -1,49 +1,49 @@
 version: 2.0
 
 project "awesome-project" version "1.0.0":
-  set remote to "origin"
-  set main_branch to "main"
-  
-  before any task:
-    info "Starting Git operations for {$project} v{$version}"
-  
-  after any task:
-    info "Git operations completed"
+	set remote to "origin"
+	set main_branch to "main"
+
+	before any task:
+		info "Starting Git operations for {$project} v{$version}"
+
+	after any task:
+		info "Git operations completed"
 
 task "setup_repo" means "Initialize and set up Git repository":
-  git init repository in "."
-  git add files "README.md"
-  git commit changes with message "Initial commit"
-  success "Repository initialized and first commit made!"
+	git init repository in "."
+	git add files "README.md"
+	git commit changes with message "Initial commit"
+	success "Repository initialized and first commit made!"
 
 task "stage_changes" means "Stage all changes for commit":
-  git add files "."
-  git status
-  success "All changes staged successfully!"
+	git add files "."
+	git status
+	success "All changes staged successfully!"
 
 task "commit_changes" means "Commit staged changes":
-  requires $commit_message from ["Initial commit", "Update code", "Fix bugs"]
-  depends on stage_changes
-  
-  git commit changes with message "{$commit_message}"
-  success "Changes committed with message: {$commit_message}"
+	requires $commit_message from ["Initial commit", "Update code", "Fix bugs"]
+	depends on stage_changes
+
+	git commit changes with message "{$commit_message}"
+	success "Changes committed with message: {$commit_message}"
 
 task "push_changes" means "Push changes to remote repository":
-  depends on commit_changes
-  
-  git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
-  success "Changes pushed to {$globals.remote}/{$globals.main_branch}!"
+	depends on commit_changes
+
+	git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
+	success "Changes pushed to {$globals.remote}/{$globals.main_branch}!"
 
 task "check_status" means "Check repository status and current branch":
-  git status
-  git show current branch
-  success "Repository status checked!"
+	git status
+	git show current branch
+	success "Repository status checked!"
 
 task "quick_commit" means "Quick add, commit, and push":
-  requires $message from ["Quick fix", "Update", "Hotfix", "Patch"]
-  
-  info "Quick commit and push"
-  git add files "."
-  git commit changes with message "{$message}"
-  git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
-  success "Quick commit and push completed!"
+	requires $message from ["Quick fix", "Update", "Hotfix", "Patch"]
+
+	info "Quick commit and push"
+	git add files "."
+	git commit changes with message "{$message}"
+	git push to remote "{$globals.remote}" branch "{$globals.main_branch}"
+	success "Quick commit and push completed!"

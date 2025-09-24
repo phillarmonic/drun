@@ -31,6 +31,11 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[35-advanced-parameter-validation.drun](35-advanced-parameter-validation.drun)** - Advanced parameter validation with pattern macros (`semver`, `uuid`, `url`)
 - **[36-advanced-variable-operations.drun](36-advanced-variable-operations.drun)** - Comprehensive showcase of variable operations (`filtered`, `sorted`, `without`, `split`, chaining)
 
+### 🔄 Matrix Execution & Array Literals
+- **[42-matrix-sequential.drun](42-matrix-sequential.drun)** - Sequential matrix execution patterns (OS × Architecture, Database × Test Suite)
+- **[43-matrix-parallel.drun](43-matrix-parallel.drun)** - Parallel matrix execution (Multi-region deployment, CI/CD parallelization)
+- **[44-array-literals-showcase.drun](44-array-literals-showcase.drun)** - Comprehensive array literal examples and real-world use cases
+
 ## 🚀 Quick Start
 
 ### Hello World
@@ -99,13 +104,32 @@ when environment:
   is "staging": run integration tests
   else: skip validation
 
-# Intelligent loops
-for each service in ["api", "web", "worker"]:
-  deploy service {service}
+# Array literals and loops
+for each $service in ["api", "web", "worker"]:
+  deploy service {$service}
 
-# Parallel execution
-for each region in ["us-east", "eu-west"] in parallel:
-  deploy to {region}
+# Parallel matrix execution
+for each $region in ["us-east", "eu-west"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$region}
+```
+
+### Array Literals & Matrix Execution
+```
+# Project-level array definitions
+project "MyApp" version "1.0":
+  set platforms as list to ["linux", "darwin", "windows"]
+  set architectures as list to ["amd64", "arm64"]
+
+# Sequential matrix execution
+for each $platform in platforms:
+  for each $arch in architectures:
+    build for {$platform}/{$arch}
+
+# Parallel matrix execution  
+for each $env in ["dev", "staging", "prod"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$env}
 ```
 
 ### Smart Detection

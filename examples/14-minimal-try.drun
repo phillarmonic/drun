@@ -1,8 +1,8 @@
 version: 2.0
 
 task "minimal":
-  try:
-    info "test"
-  catch:
-    warn "error"
+	try:
+		info "test"
+	catch:
+		warn "error"
 

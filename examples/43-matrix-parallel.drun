@@ -1,0 +1,137 @@
+version: 2.0
+
+project "Parallel Matrix Demo" version "1.0":
+	set cloud_regions as list to ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
+	set microservices as list to ["auth", "api", "web", "worker", "scheduler"]
+	set registry to "ghcr.io/company"
+
+task "parallel build matrix" means "Build multiple targets in parallel":
+	info "🚀 Starting parallel build matrix"
+	
+	# Parallel platform builds
+	for each $platform in ["linux", "darwin", "windows"] in parallel:
+		info "🏗️  Building for {$platform} (parallel)"
+		for each $arch in ["amd64", "arm64"]:
+			info "  🔧 Compiling {$platform}/{$arch}"
+			step "Cross-compiling for {$platform}-{$arch}"
+			step "Running unit tests for {$platform}-{$arch}"
+			step "Creating distribution package"
+		success "✅ {$platform} builds completed"
+	
+	success "🎉 All parallel builds completed!"
+
+task "parallel deployment" means "Deploy services to multiple regions in parallel":
+	info "🌍 Starting parallel multi-region deployment"
+	
+	# Deploy to regions in parallel, services sequentially within each region
+	for each $region in cloud_regions in parallel:
+		info "📍 Deploying to region: {$region} (parallel)"
+		for each $service in microservices:
+			info "  📦 Deploying {$service} to {$region}"
+			step "Building {$service} image for {$region}"
+			step "Pushing to {$region} registry"
+			step "Deploying {$service} in {$region}"
+			step "Configuring {$service} load balancer"
+			step "Running health checks for {$service}"
+		success "✅ All services deployed to {$region}"
+	
+	success "🎉 Multi-region deployment completed!"
+
+task "parallel test matrix" means "Run test suites in parallel across environments":
+	info "🧪 Starting parallel test execution"
+	
+	# Parallel test execution across different environments
+	for each $env in ["dev", "staging", "production"] in parallel:
+		info "🔬 Testing environment: {$env} (parallel)"
+		for each $test_type in ["smoke", "regression", "load", "security"]:
+			info "  🔍 Running {$test_type} tests in {$env}"
+			step "Setting up {$env} test environment"
+			step "Executing {$test_type} test suite"
+			step "Collecting {$test_type} test results"
+			step "Generating {$test_type} test report"
+		success "✅ All tests completed in {$env}"
+	
+	success "🎉 Parallel testing completed!"
+
+task "mixed parallel matrix" means "Demonstrate mixed sequential and parallel execution":
+	info "🔄 Mixed parallel/sequential matrix execution"
+	
+	# Outer loop parallel, inner loop sequential
+	for each $database in ["postgres", "mysql", "mongodb"] in parallel:
+		info "🗄️  Testing with {$database} (parallel)"
+		for each $version in ["latest", "lts", "stable"]:
+			info "  📋 Version: {$version} (sequential)"
+			step "Starting {$database}:{$version} container"
+			step "Running migration tests"
+			step "Running performance tests"
+			step "Running backup/restore tests"
+			step "Cleaning up {$database}:{$version}"
+		success "✅ {$database} testing completed"
+	
+	success "🎉 Mixed execution matrix completed!"
+
+task "ci pipeline matrix" means "Simulate CI/CD pipeline with parallel jobs":
+	info "⚙️  Starting CI/CD pipeline matrix"
+	
+	# Parallel CI jobs
+	for each $job in ["lint", "test", "security-scan", "build"] in parallel:
+		info "🔧 Running CI job: {$job} (parallel)"
+		
+		when $job is "lint":
+			for each $linter in ["eslint", "prettier", "golangci-lint"]:
+				step "Running {$linter}"
+		
+		when $job is "test":
+			for each $test_suite in ["unit", "integration"]:
+				step "Running {$test_suite} tests"
+		
+		when $job is "security-scan":
+			for each $sec_tool in ["snyk", "trivy", "gosec"]:
+				step "Running {$sec_tool} security scan"
+		
+		when $job is "build":
+			for each $build_target in ["docker", "binary", "docs"]:
+				step "Building {$build_target}"
+		
+		success "✅ {$job} job completed"
+	
+	success "🎉 CI/CD pipeline completed!"
+
+task "performance matrix" means "Run performance tests across different configurations":
+	info "📊 Starting performance test matrix"
+	
+	# Parallel performance testing
+	for each $load_level in ["low", "medium", "high", "peak"] in parallel:
+		info "⚡ Load level: {$load_level} (parallel)"
+		for each $endpoint in ["/api/users", "/api/orders", "/api/products", "/api/analytics"]:
+			info "  🎯 Testing endpoint: {$endpoint}"
+			step "Configuring {$load_level} load for {$endpoint}"
+			step "Running performance test"
+			step "Measuring response times"
+			step "Analyzing throughput"
+			step "Checking error rates"
+		success "✅ {$load_level} load testing completed"
+	
+	success "🎉 Performance matrix completed!"
+
+task "canary deployment matrix" means "Deploy canary releases in parallel":
+	info "🐤 Starting canary deployment matrix"
+	
+	# Parallel canary deployments
+	for each $service in ["api", "web", "worker"] in parallel:
+		info "🚀 Canary deployment for {$service} (parallel)"
+		for each $percentage in ["10", "25", "50", "100"]:
+			info "  📈 Rolling out {$percentage}% traffic to {$service}"
+			step "Deploying {$service} canary with {$percentage}% traffic"
+			step "Monitoring {$service} metrics"
+			step "Checking {$service} error rates"
+			step "Validating {$service} performance"
+			
+			if $percentage == "100":
+				step "Promoting {$service} canary to production"
+			else:
+				step "Continuing {$service} canary rollout"
+		
+		success "✅ {$service} canary deployment completed"
+	
+	success "🎉 All canary deployments completed!"

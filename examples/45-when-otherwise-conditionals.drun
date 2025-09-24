@@ -1,0 +1,173 @@
+# When-Otherwise Conditional Logic Examples
+# Built with drun v2 - https://github.com/phillarmonic/drun
+version: 2.0
+
+project "conditional-demo" version "1.0":
+	set supported_platforms as list to ["windows", "linux", "darwin"]
+	set build_modes as list to ["debug", "release"]
+	set deployment_envs as list to ["dev", "staging", "production"]
+
+task "basic conditionals" means "Demonstrate basic when-otherwise syntax":
+	info "🔀 Basic When-Otherwise Conditional Examples"
+	
+	let $platform = "windows"
+	info "Current platform: {$platform}"
+	
+	when $platform is "windows":
+		info "✅ Windows platform detected"
+		step "Using Windows-specific build commands"
+		step "Setting up .exe file extensions"
+	otherwise:
+		info "✅ Unix-like platform detected"
+		step "Using Unix build commands"
+		step "No file extension needed"
+	
+	success "🎉 Basic conditional logic completed"
+
+task "negation conditionals" means "Demonstrate when-otherwise with negation":
+	info "🚫 When-Otherwise with Negation Examples"
+	
+	let $environment = "development"
+	info "Current environment: {$environment}"
+	
+	when $environment is not "production":
+		info "✅ Non-production environment"
+		step "Using development settings"
+		step "Enabling debug logging"
+		step "Skipping security hardening"
+	otherwise:
+		info "✅ Production environment detected"
+		step "Using production settings"
+		step "Enabling security hardening"
+		step "Disabling debug features"
+	
+	let $feature_flag = ""
+	info "Feature flag value: '{$feature_flag}'"
+	
+	when $feature_flag is not empty:
+		info "✅ Feature flag is set: {$feature_flag}"
+		step "Enabling feature: {$feature_flag}"
+	otherwise:
+		info "✅ No feature flag set"
+		step "Using default feature set"
+	
+	success "🎉 Negation conditional logic completed"
+
+task "nested conditionals" means "Demonstrate nested when-otherwise logic":
+	info "🔗 Nested When-Otherwise Examples"
+	
+	let $os = "windows"
+	let $arch = "arm64"
+	
+	info "Building for OS: {$os}, Architecture: {$arch}"
+	
+	when $os is "windows":
+		info "🪟 Windows build process"
+		when $arch is "amd64":
+			step "Building Windows x64 binary"
+			step "Using x64 optimizations"
+		otherwise:
+			step "Building Windows ARM64 binary"
+			step "Using ARM64 optimizations"
+		step "Adding .exe extension"
+	otherwise:
+		info "🐧 Unix-like build process"
+		when $os is "darwin":
+			step "Building macOS binary"
+			step "Code signing for macOS"
+		otherwise:
+			step "Building Linux binary"
+			step "Creating AppImage package"
+		step "Setting executable permissions"
+	
+	success "🎉 Nested conditional logic completed"
+
+task "matrix conditionals" means "Demonstrate when-otherwise in matrix execution":
+	info "🌐 Matrix Execution with When-Otherwise"
+	
+	for each $platform in $globals.supported_platforms:
+		info "📦 Processing platform: {$platform}"
+		
+		for each $mode in $globals.build_modes:
+			info "  🔧 Build mode: {$mode}"
+			
+			when $platform is "windows":
+				when $mode is "debug":
+					step "Building Windows debug binary with symbols"
+					step "Output: app-{$platform}-{$mode}.exe"
+				otherwise:
+					step "Building Windows release binary (optimized)"
+					step "Output: app-{$platform}-{$mode}.exe"
+			otherwise:
+				when $mode is "debug":
+					step "Building {$platform} debug binary with symbols"
+					step "Output: app-{$platform}-{$mode}"
+				otherwise:
+					step "Building {$platform} release binary (optimized)"
+					step "Output: app-{$platform}-{$mode}"
+	
+	success "🎉 Matrix conditional logic completed"
+
+task "deployment conditionals" means "Demonstrate deployment logic with conditionals":
+	info "🚀 Deployment Conditional Logic"
+	
+	for each $env in $globals.deployment_envs:
+		info "🌍 Deploying to environment: {$env}"
+		
+		when $env is "production":
+			info "🔒 Production deployment - extra security"
+			step "Running security scans"
+			step "Requiring manual approval"
+			step "Creating backup before deployment"
+			step "Deploying with zero-downtime strategy"
+			step "Running smoke tests"
+		otherwise:
+			when $env is "staging":
+				info "🧪 Staging deployment - testing focus"
+				step "Running full test suite"
+				step "Deploying with test data"
+				step "Enabling debug features"
+			otherwise:
+				info "🛠️ Development deployment - fast iteration"
+				step "Skipping tests for speed"
+				step "Hot-reloading enabled"
+				step "Debug mode active"
+	
+	success "🎉 Deployment conditional logic completed"
+
+task "error handling conditionals" means "Demonstrate error handling with conditionals":
+	info "⚠️ Error Handling with When-Otherwise"
+	
+	let $service_status = "unhealthy"
+	let $retry_count = "3"
+	
+	when $service_status is not "healthy":
+		info "🚨 Service is not healthy: {$service_status}"
+		
+		when $retry_count is not "0":
+			info "🔄 Attempting recovery (retries left: {$retry_count})"
+			step "Restarting service"
+			step "Checking health endpoint"
+			step "Updating load balancer"
+		otherwise:
+			info "💥 Max retries exceeded"
+			step "Alerting operations team"
+			step "Switching to backup service"
+			step "Creating incident report"
+	otherwise:
+		info "✅ Service is healthy"
+		step "Continuing normal operations"
+	
+	success "🎉 Error handling conditional logic completed"
+
+task "comprehensive demo" means "Run all conditional examples":
+	info "🎯 Running Comprehensive When-Otherwise Demo"
+	
+	run "drun basic conditionals"
+	run "drun negation conditionals" 
+	run "drun nested conditionals"
+	run "drun matrix conditionals"
+	run "drun deployment conditionals"
+	run "drun error handling conditionals"
+	
+	success "🌟 All when-otherwise examples completed successfully!"

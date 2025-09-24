@@ -1,119 +1,119 @@
 version: 2.0
 
 project "advanced-variable-operations" version "1.0":
-  set registry to "ghcr.io/company"
-  set env to "production"
+	set registry to "ghcr.io/company"
+	set env to "production"
 
 task "string_operations" means "Demonstrate string manipulation operations":
-  set $version to "v2.1.0-beta"
-  set $filename to "my-app.tar.gz"
-  set $url to "https://api.example.com/v1/users"
-  
-  info "🔤 String Operations:"
-  info "  Original version: {$version}"
-  info "  Without prefix 'v': {$version without prefix 'v'}"
-  info "  Without suffix '-beta': {$version without suffix '-beta'}"
-  info "  Clean version: {$version without prefix 'v' | without suffix '-beta'}"
-  
-  info "  Original filename: {$filename}"
-  info "  Without extension: {$filename without suffix '.tar.gz'}"
-  info "  Just extension: tar.gz"
-  
-  info "  Original URL: {$url}"
-  info "  Without protocol: {$url without prefix 'https://'}"
-  info "  Without path: {$url without suffix '/v1/users'}"
+	set $version to "v2.1.0-beta"
+	set $filename to "my-app.tar.gz"
+	set $url to "https://api.example.com/v1/users"
+
+	info "🔤 String Operations:"
+	info "  Original version: {$version}"
+	info "  Without prefix 'v': {$version without prefix 'v'}"
+	info "  Without suffix '-beta': {$version without suffix '-beta'}"
+	info "  Clean version: {$version without prefix 'v' | without suffix '-beta'}"
+
+	info "  Original filename: {$filename}"
+	info "  Without extension: {$filename without suffix '.tar.gz'}"
+	info "  Just extension: tar.gz"
+
+	info "  Original URL: {$url}"
+	info "  Without protocol: {$url without prefix 'https://'}"
+	info "  Without path: {$url without suffix '/v1/users'}"
 
 task "array_operations" means "Demonstrate array manipulation operations":
-  set $files to "app.js test.js config.json package.json readme.md main.py utils.py"
-  set $numbers to "3 1 4 1 5 9 2 6 5"
-  
-  info "📋 Array Operations:"
-  info "  All files: {$files}"
-  info "  JavaScript files: {$files filtered by extension '.js'}"
-  info "  Python files: {$files filtered by extension '.py'}"
-  info "  JSON files: {$files filtered by extension '.json'}"
-  
-  info "  Files sorted: {$files sorted by name}"
-  info "  Files reversed: {$files reversed}"
-  info "  First file: {$files first}"
-  info "  Last file: {$files last}"
-  
-  info "  Numbers: {$numbers}"
-  info "  Unique numbers: {$numbers unique}"
-  info "  Numbers sorted: {$numbers sorted by name}"
-  info "  Numbers reversed: {$numbers reversed}"
+	set $files to "app.js test.js config.json package.json readme.md main.py utils.py"
+	set $numbers to "3 1 4 1 5 9 2 6 5"
+
+	info "📋 Array Operations:"
+	info "  All files: {$files}"
+	info "  JavaScript files: {$files filtered by extension '.js'}"
+	info "  Python files: {$files filtered by extension '.py'}"
+	info "  JSON files: {$files filtered by extension '.json'}"
+
+	info "  Files sorted: {$files sorted by name}"
+	info "  Files reversed: {$files reversed}"
+	info "  First file: {$files first}"
+	info "  Last file: {$files last}"
+
+	info "  Numbers: {$numbers}"
+	info "  Unique numbers: {$numbers unique}"
+	info "  Numbers sorted: {$numbers sorted by name}"
+	info "  Numbers reversed: {$numbers reversed}"
 
 task "path_operations" means "Demonstrate path manipulation operations":
-  set $source_file to "/home/user/projects/myapp/src/main.js"
-  set $config_file to "/etc/nginx/sites-available/default.conf"
-  set $log_file to "/var/log/application.log"
-  
-  info "📁 Path Operations:"
-  info "  Source file: {$source_file}"
-  info "    Basename: {$source_file basename}"
-  info "    Directory: {$source_file dirname}"
-  info "    Extension: {$source_file extension}"
-  info "    Name without extension: {$source_file basename | without suffix '.js'}"
-  
-  info "  Config file: {$config_file}"
-  info "    Basename: {$config_file basename}"
-  info "    Directory: {$config_file dirname}"
-  info "    Extension: {$config_file extension}"
-  
-  info "  Log file: {$log_file}"
-  info "    Basename: {$log_file basename}"
-  info "    Directory: {$log_file dirname}"
-  info "    Extension: {$log_file extension}"
+	set $source_file to "/home/user/projects/myapp/src/main.js"
+	set $config_file to "/etc/nginx/sites-available/default.conf"
+	set $log_file to "/var/log/application.log"
+
+	info "📁 Path Operations:"
+	info "  Source file: {$source_file}"
+	info "    Basename: {$source_file basename}"
+	info "    Directory: {$source_file dirname}"
+	info "    Extension: {$source_file extension}"
+	info "    Name without extension: {$source_file basename | without suffix '.js'}"
+
+	info "  Config file: {$config_file}"
+	info "    Basename: {$config_file basename}"
+	info "    Directory: {$config_file dirname}"
+	info "    Extension: {$config_file extension}"
+
+	info "  Log file: {$log_file}"
+	info "    Basename: {$log_file basename}"
+	info "    Directory: {$log_file dirname}"
+	info "    Extension: {$log_file extension}"
 
 task "chained_operations" means "Demonstrate complex operation chaining":
-  set $project_files to "src/app.js src/utils.js tests/app.test.js tests/utils.test.js docs/readme.md config.json package.json"
-  set $docker_images to "nginx:1.21 postgres:13 redis:6.2 node:16-alpine python:3.9"
-  
-  info "⛓️  Complex Operation Chaining:"
-  info "  All project files: {$project_files}"
-  info "  Source JS files (sorted): {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
-  info "  Test files (sorted): {$project_files filtered by prefix 'tests/' | sorted by name}"
-  info "  Config files: {$project_files filtered by extension '.json'}"
-  
-  info "  Docker images: {$docker_images}"
-  info "  Processing each image:"
-  for each img in $docker_images:
-    info "    Image: {img} -> Name: {img without suffix ':*'}"
-  
-  info "  Unique file extensions:"
-  set $all_extensions to "js js test.js md json json"
-  info "    {$all_extensions unique | sorted by name}"
+	set $project_files to "src/app.js src/utils.js tests/app.test.js tests/utils.test.js docs/readme.md config.json package.json"
+	set $docker_images to "nginx:1.21 postgres:13 redis:6.2 node:16-alpine python:3.9"
+
+	info "⛓️  Complex Operation Chaining:"
+	info "  All project files: {$project_files}"
+	info "  Source JS files (sorted): {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
+	info "  Test files (sorted): {$project_files filtered by prefix 'tests/' | sorted by name}"
+	info "  Config files: {$project_files filtered by extension '.json'}"
+
+	info "  Docker images: {$docker_images}"
+	info "  Processing each image:"
+	for each img in $docker_images:
+		info "    Image: {img} -> Name: {img without suffix ':*'}"
+
+	info "  Unique file extensions:"
+	set $all_extensions to "js js test.js md json json"
+	info "    {$all_extensions unique | sorted by name}"
 
 task "real_world_example" means "Real-world deployment scenario":
-  requires $environment from ["dev", "staging", "production"]
-  given $version defaults to "latest"
-  
-  set $app_name to "{$globals.project}"
-  set $image_tag to "{$globals.registry}/{$app_name}:{$version}"
-  set $clean_version to "{$version without prefix 'v'}"
-  
-  info "🚀 Deployment Configuration:"
-  info "  Environment: {$environment}"
-  info "  App name: {$app_name}"
-  info "  Full image tag: {$image_tag}"
-  info "  Clean version: {$clean_version}"
-  
-  # Simulate file processing
-  set $deployment_files to "deployment.yaml service.yaml ingress.yaml configmap.yaml"
-  info "  Processing deployment files:"
-  for each file in $deployment_files:
-    info "    📄 {file} -> {file without suffix '.yaml'} configuration"
-  
-  # Simulate environment-specific processing
-  if $environment == "production":
-    set $replicas to "3"
-    set $resources to "high"
-  else:
-    set $replicas to "1" 
-    set $resources to "low"
-  
-  info "  Scaling configuration:"
-  info "    Replicas: {$replicas}"
-  info "    Resources: {$resources}"
-  
-  success "✅ Deployment configuration ready for {$environment}!"
+	requires $environment from ["dev", "staging", "production"]
+	given $version defaults to "latest"
+
+	set $app_name to "{$globals.project}"
+	set $image_tag to "{$globals.registry}/{$app_name}:{$version}"
+	set $clean_version to "{$version without prefix 'v'}"
+
+	info "🚀 Deployment Configuration:"
+	info "  Environment: {$environment}"
+	info "  App name: {$app_name}"
+	info "  Full image tag: {$image_tag}"
+	info "  Clean version: {$clean_version}"
+
+	# Simulate file processing
+	set $deployment_files to "deployment.yaml service.yaml ingress.yaml configmap.yaml"
+	info "  Processing deployment files:"
+	for each file in $deployment_files:
+		info "    📄 {file} -> {file without suffix '.yaml'} configuration"
+
+	# Simulate environment-specific processing
+	if $environment == "production":
+		set $replicas to "3"
+		set $resources to "high"
+	else:
+		set $replicas to "1" 
+		set $resources to "low"
+
+	info "  Scaling configuration:"
+	info "    Replicas: {$replicas}"
+	info "    Resources: {$resources}"
+
+	success "✅ Deployment configuration ready for {$environment}!"

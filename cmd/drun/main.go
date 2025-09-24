@@ -14,23 +14,35 @@ import (
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/debug"
 	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/phillarmonic/drun/internal/errors"
+	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/figlet/figletlib"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
 var (
-	configFile    string
-	listTasks     bool
-	dryRun        bool
-	verbose       bool
-	showVersion   bool
-	initConfig    bool
-	saveAsDefault bool
-	setWorkspace  string
-	selfUpdate    bool
+	configFile         string
+	listTasks          bool
+	dryRun             bool
+	verbose            bool
+	showVersion        bool
+	initConfig         bool
+	saveAsDefault      bool
+	setWorkspace       string
+	selfUpdate         bool
+	allowUndefinedVars bool
+	// Debug flags
+	debugMode   bool
+	debugTokens bool
+	debugAST    bool
+	debugJSON   bool
+	debugErrors bool
+	debugFull   bool
+	debugInput  string
 )
 
 // WorkspaceConfig represents the workspace configuration
@@ -163,7 +175,10 @@ Examples:
   drun hello                    # Run the 'hello' task
   drun build --env=production   # Run 'build' task with environment
   drun --list                   # List all available tasks
-  drun --init                   # Create a new drun file`,
+  drun --init                   # Create a new drun file
+  drun --debug --tokens         # Debug lexer tokens
+  drun --debug --ast            # Debug AST structure
+  drun --debug --full           # Full debug output`,
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
@@ -180,6 +195,16 @@ func init() {
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[drun CLI cmd] Save custom file name as workspace default (use with --init)")
 	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[drun CLI cmd] Set workspace default task file location")
 	rootCmd.Flags().BoolVar(&selfUpdate, "self-update", false, "[drun CLI cmd] Check for updates and update drun to the latest version")
+	rootCmd.Flags().BoolVar(&allowUndefinedVars, "allow-undefined-variables", false, "[drun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
+
+	// Debug flags
+	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "[drun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
+	rootCmd.Flags().BoolVar(&debugTokens, "debug-tokens", false, "[drun CLI cmd] Show lexer tokens (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugAST, "debug-ast", false, "[drun CLI cmd] Show AST structure (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugJSON, "debug-json", false, "[drun CLI cmd] Show AST as JSON (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugErrors, "debug-errors", false, "[drun CLI cmd] Show parse errors only (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugFull, "debug-full", false, "[drun CLI cmd] Show full debug output (requires --debug)")
+	rootCmd.Flags().StringVar(&debugInput, "debug-input", "", "[drun CLI cmd] Debug input string directly instead of file (requires --debug)")
 
 	// Add completion commands
 	rootCmd.AddCommand(completionCmd)
@@ -204,6 +229,11 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	// Handle --set-workspace flag
 	if setWorkspace != "" {
 		return setWorkspaceDefault(setWorkspace)
+	}
+
+	// Handle debug mode
+	if debugMode {
+		return handleDebugMode()
 	}
 
 	// Determine the config file to use
@@ -234,6 +264,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	eng := engine.NewEngine(os.Stdout)
 	eng.SetDryRun(dryRun)
 	eng.SetVerbose(verbose)
+	eng.SetAllowUndefinedVars(allowUndefinedVars)
 
 	// Handle --list flag
 	if listTasks {
@@ -258,15 +289,16 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute the task with parameters
-	err = eng.ExecuteWithParams(program, target, params)
+	err = eng.ExecuteWithParamsAndFile(program, target, params, actualConfigFile)
 	if err != nil {
 		// Check if it's a parameter validation error (don't show usage)
 		if paramErr, ok := err.(*errors.ParameterValidationError); ok {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", paramErr.Message)
 			os.Exit(1)
 		}
-		// For other errors, return normally (will show usage)
-		return fmt.Errorf("execution failed: %w", err)
+		// For task execution errors, don't show usage - just print error and exit
+		fmt.Fprintf(os.Stderr, "Error: execution failed: %v\n", err)
+		os.Exit(1)
 	}
 	return nil
 }
@@ -398,7 +430,7 @@ func listAllTasks(eng *engine.Engine, program *ast.Program) error {
 	}
 
 	for _, task := range tasks {
-		fmt.Printf("  %-20s %s\n", task.Name, task.Description)
+		fmt.Printf("  %-20s  %s\n", task.Name, task.Description)
 	}
 
 	return nil
@@ -568,64 +600,133 @@ func setWorkspaceDefault(filename string) error {
 	return nil
 }
 
+// handleDebugMode handles debug mode execution
+func handleDebugMode() error {
+	var content string
+
+	// Get content from input string or file
+	if debugInput != "" {
+		content = debugInput
+	} else {
+		// Determine the config file to use
+		actualConfigFile, err := findConfigFile(configFile)
+		if err != nil {
+			return fmt.Errorf("no drun task file found for debugging: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
+		}
+
+		// Read the drun file
+		data, err := os.ReadFile(actualConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to read drun file '%s': %w", actualConfigFile, err)
+		}
+		content = string(data)
+	}
+
+	// Handle specific debug flags
+	if debugFull {
+		debug.DebugFull(content)
+		return nil
+	}
+
+	// Handle individual debug flags
+	hasSpecificFlag := debugTokens || debugAST || debugJSON || debugErrors
+
+	if debugTokens {
+		debug.DebugTokens(content)
+	}
+
+	if debugAST || debugJSON || debugErrors {
+		// Parse without full debug output
+		l := lexer.NewLexer(content)
+		p := parser.NewParser(l)
+		program := p.ParseProgram()
+		parseErrors := p.Errors()
+
+		if debugErrors {
+			debug.DebugParseErrors(parseErrors)
+		}
+
+		if debugAST {
+			debug.DebugAST(program)
+		}
+
+		if debugJSON {
+			debug.DebugJSON(program)
+		}
+	}
+
+	// If no specific debug flags were set, show full debug by default
+	if !hasSpecificFlag {
+		debug.DebugFull(content)
+	}
+
+	return nil
+}
+
 // generateStarterConfig creates a starter drun v2 configuration
 func generateStarterConfig() string {
-	return `version: 2.0
+	return `# drun (do-run) a fast, semantic task runner. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+
+version: 2.0
 
 project "my-app" version "1.0":
-  # Cross-platform shell configuration with sensible defaults
-  shell config:
-    darwin:
-      executable: "/bin/zsh"
-      args:
-        - "-l"
-        - "-i"
-      environment:
-        TERM: "xterm-256color"
-        SHELL_SESSION_HISTORY: "0"
-    
-    linux:
-      executable: "/bin/bash"
-      args:
-        - "--login"
-        - "--interactive"
-      environment:
-        TERM: "xterm-256color"
-        HISTCONTROL: "ignoredups"
-    
-    windows:
-      executable: "powershell.exe"
-      args:
-        - "-NoProfile"
-        - "-ExecutionPolicy"
-        - "Bypass"
-      environment:
-        PSModulePath: ""
+	/* Cross-platform shell configuration with sensible defaults
+	 These are all default values, you can remove them if you don't intend to change it. */
+
+	shell config:
+		darwin:
+			executable: "/bin/zsh"
+			args:
+				- "-l"
+				- "-i"
+			environment:
+				TERM: "xterm-256color"
+				SHELL_SESSION_HISTORY: "0"
+		
+		linux:
+			executable: "/bin/bash"
+			args:
+				- "--login"
+				- "--interactive"
+			environment:
+				TERM: "xterm-256color"
+				HISTCONTROL: "ignoredups"
+		
+		windows:
+			executable: "powershell.exe"
+			args:
+				- "-NoProfile"
+				- "-ExecutionPolicy"
+				- "Bypass"
+			environment:
+				PSModulePath: ""
 
 task "default" means "Welcome to drun v2":
-  info "Welcome to drun v2! 🚀"
-  step "This is your starter task file"
-  success "Ready to build amazing automation!"
+	echo "Starting up..."
+	info "Welcome to drun v2! 🚀"
+	step "This is your starter task file"
+	success "Ready to build amazing automation!"
 
 task "hello" means "Say hello":
-  info "Hello from the semantic task runner!"
+	info "Hello from the semantic task runner!"
 
 task "build" means "Build the project":
-  step "Building project..."
-  info "Add your build commands here"
-  success "Build completed!"
+	step "Building project..."
+	info "Add your build commands here"
+	success "Build completed!"
 
 task "test" means "Run tests":
-  step "Running tests..."
-  info "Add your test commands here"
-  success "All tests passed!"
+	step "Running tests..."
+	info "Add your test commands here"
+	success "All tests passed!"
 
 task "deploy" means "Deploy application":
-  given $environment defaults to "development"
-  step "Deploying application to {$environment}..."
-  warn "Make sure you're deploying to the right environment!"
-  info "Add your deployment commands here"
-  success "Deployment to {$environment} completed!"
+	given $environment defaults to "development"
+	step "Deploying application to {$environment}..."
+	warn "Make sure you're deploying to the right environment!"
+	info "Add your deployment commands here"
+	success "Deployment to {$environment} completed!"
 `
 }
 

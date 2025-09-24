@@ -56,7 +56,7 @@ task "hello":
 		t.Errorf("setSetting.Key not 'registry'. got=%q", setSetting.Key)
 	}
 
-	if setSetting.Value != "ghcr.io/company" {
+	if setSetting.Value.String() != "ghcr.io/company" {
 		t.Errorf("setSetting.Value not 'ghcr.io/company'. got=%q", setSetting.Value)
 	}
 
@@ -171,6 +171,77 @@ task "deploy":
 
 	if afterHook.Type != "after" {
 		t.Errorf("afterHook.Type not 'after'. got=%q", afterHook.Type)
+	}
+}
+
+func TestParser_ProjectWithDrunLifecycleHooks(t *testing.T) {
+	input := `version: 2.0
+
+project "myapp":
+  on drun setup:
+    info "🚀 Starting drun execution pipeline"
+    info "📊 Tool version: v2.0"
+  
+  on drun teardown:
+    info "🏁 Drun execution pipeline completed"
+    info "📊 Total execution time: 5s"
+
+task "deploy":
+  info "Deploying application"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	if program == nil {
+		t.Fatalf("ParseProgram() returned nil")
+	}
+
+	if program.Project == nil {
+		t.Fatalf("program.Project is nil")
+	}
+
+	// Check lifecycle hooks
+	if len(program.Project.Settings) != 2 {
+		t.Fatalf("project should have 2 drun lifecycle hooks. got=%d", len(program.Project.Settings))
+	}
+
+	// Check setup hook
+	setupHook, ok := program.Project.Settings[0].(*ast.LifecycleHook)
+	if !ok {
+		t.Fatalf("project.Settings[0] is not *ast.LifecycleHook. got=%T", program.Project.Settings[0])
+	}
+
+	if setupHook.Type != "setup" {
+		t.Errorf("setupHook.Type not 'setup'. got=%q", setupHook.Type)
+	}
+
+	if setupHook.Scope != "drun" {
+		t.Errorf("setupHook.Scope not 'drun'. got=%q", setupHook.Scope)
+	}
+
+	if len(setupHook.Body) != 2 {
+		t.Fatalf("setupHook should have 2 statements. got=%d", len(setupHook.Body))
+	}
+
+	// Check teardown hook
+	teardownHook, ok := program.Project.Settings[1].(*ast.LifecycleHook)
+	if !ok {
+		t.Fatalf("project.Settings[1] is not *ast.LifecycleHook. got=%T", program.Project.Settings[1])
+	}
+
+	if teardownHook.Type != "teardown" {
+		t.Errorf("teardownHook.Type not 'teardown'. got=%q", teardownHook.Type)
+	}
+
+	if teardownHook.Scope != "drun" {
+		t.Errorf("teardownHook.Scope not 'drun'. got=%q", teardownHook.Scope)
+	}
+
+	if len(teardownHook.Body) != 2 {
+		t.Fatalf("teardownHook should have 2 statements. got=%d", len(teardownHook.Body))
 	}
 }
 

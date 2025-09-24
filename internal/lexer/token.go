@@ -17,20 +17,23 @@ const (
 	VARIABLE // $variable
 
 	// Keywords
-	VERSION // version
-	TASK    // task
-	MEANS   // means
-	PROJECT // project
-	SET     // set
-	INCLUDE // include
-	BEFORE  // before
-	AFTER   // after
-	ANY     // any
-	DEPENDS // depends
-	ON      // on
-	THEN    // then
-	AND     // and
-	OR      // or
+	VERSION  // version
+	TASK     // task
+	MEANS    // means
+	PROJECT  // project
+	SET      // set
+	INCLUDE  // include
+	BEFORE   // before
+	AFTER    // after
+	ANY      // any
+	DRUN     // drun
+	SETUP    // setup
+	TEARDOWN // teardown
+	DEPENDS  // depends
+	ON       // on
+	THEN     // then
+	AND      // and
+	OR       // or
 
 	// Docker keywords
 	DOCKER    // docker
@@ -132,6 +135,7 @@ const (
 	// Smart Detection keywords
 	DETECT      // detect
 	AVAILABLE   // available
+	NOT         // not
 	INSTALLED   // installed
 	TOOL        // tool
 	FRAMEWORK   // framework
@@ -234,6 +238,7 @@ const (
 	ERROR   // error
 	SUCCESS // success
 	FAIL    // fail
+	ECHO    // echo
 
 	// Parameter keywords
 	REQUIRES // requires
@@ -247,17 +252,19 @@ const (
 	OF       // of
 
 	// Control flow keywords
-	WHEN     // when
-	IF       // if
-	ELSE     // else
-	FOR      // for
-	EACH     // each
-	IN       // in
-	PARALLEL // parallel
-	IS       // is
+	WHEN      // when
+	IF        // if
+	ELSE      // else
+	OTHERWISE // otherwise
+	FOR       // for
+	EACH      // each
+	IN        // in
+	PARALLEL  // parallel
+	IS        // is
 
 	// Built-in functions/conditions
 	EXISTS // exists
+	EMPTY  // empty
 
 	// Shell operations
 	RUN     // run
@@ -298,7 +305,10 @@ const (
 	// Identifiers and operators
 	IDENT  // user-defined identifiers
 	ASSIGN // :
+	PLUS   // +
 	MINUS  // -
+	STAR   // *
+	SLASH  // /
 	EQUALS // =
 
 	// Punctuation
@@ -317,7 +327,8 @@ const (
 	NEWLINE
 
 	// Comments
-	COMMENT // # comment
+	COMMENT           // # comment
+	MULTILINE_COMMENT // /* comment */
 )
 
 // Token represents a single token
@@ -362,6 +373,12 @@ func (t TokenType) String() string {
 		return "AFTER"
 	case ANY:
 		return "ANY"
+	case DRUN:
+		return "DRUN"
+	case SETUP:
+		return "SETUP"
+	case TEARDOWN:
+		return "TEARDOWN"
 	case DEPENDS:
 		return "DEPENDS"
 	case ON:
@@ -554,6 +571,8 @@ func (t TokenType) String() string {
 		return "DETECT"
 	case AVAILABLE:
 		return "AVAILABLE"
+	case NOT:
+		return "NOT"
 	case INSTALLED:
 		return "INSTALLED"
 	case TOOL:
@@ -738,6 +757,8 @@ func (t TokenType) String() string {
 		return "SUCCESS"
 	case FAIL:
 		return "FAIL"
+	case ECHO:
+		return "ECHO"
 	case REQUIRES:
 		return "REQUIRES"
 	case GIVEN:
@@ -762,6 +783,8 @@ func (t TokenType) String() string {
 		return "IF"
 	case ELSE:
 		return "ELSE"
+	case OTHERWISE:
+		return "OTHERWISE"
 	case FOR:
 		return "FOR"
 	case EACH:
@@ -834,8 +857,14 @@ func (t TokenType) String() string {
 		return "IDENT"
 	case ASSIGN:
 		return "ASSIGN"
+	case PLUS:
+		return "PLUS"
 	case MINUS:
 		return "MINUS"
+	case STAR:
+		return "STAR"
+	case SLASH:
+		return "SLASH"
 	case EQUALS:
 		return "EQUALS"
 	case COLON:
@@ -862,6 +891,8 @@ func (t TokenType) String() string {
 		return "NEWLINE"
 	case COMMENT:
 		return "COMMENT"
+	case MULTILINE_COMMENT:
+		return "MULTILINE_COMMENT"
 	default:
 		return "UNKNOWN"
 	}
@@ -884,6 +915,9 @@ var keywords = map[string]TokenType{
 	"before":      BEFORE,
 	"after":       AFTER,
 	"any":         ANY,
+	"drun":        DRUN,
+	"setup":       SETUP,
+	"teardown":    TEARDOWN,
 	"depends":     DEPENDS,
 	"on":          ON,
 	"then":        THEN,
@@ -980,6 +1014,7 @@ var keywords = map[string]TokenType{
 	"expect":      EXPECT,
 	"detect":      DETECT,
 	"available":   AVAILABLE,
+	"not":         NOT,
 	"installed":   INSTALLED,
 	"tool":        TOOL,
 	"framework":   FRAMEWORK,
@@ -1072,6 +1107,7 @@ var keywords = map[string]TokenType{
 	"error":       ERROR,
 	"success":     SUCCESS,
 	"fail":        FAIL,
+	"echo":        ECHO,
 	"requires":    REQUIRES,
 	"given":       GIVEN,
 	"accepts":     ACCEPTS,
@@ -1084,12 +1120,14 @@ var keywords = map[string]TokenType{
 	"when":        WHEN,
 	"if":          IF,
 	"else":        ELSE,
+	"otherwise":   OTHERWISE,
 	"for":         FOR,
 	"each":        EACH,
 	"in":          IN,
 	"parallel":    PARALLEL,
 	"is":          IS,
 	"exists":      EXISTS,
+	"empty":       EMPTY,
 	"run":         RUN,
 	"exec":        EXEC,
 	"shell":       SHELL,
