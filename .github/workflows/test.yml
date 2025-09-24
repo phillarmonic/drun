@@ -84,6 +84,8 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         echo "Running CI Test Suite..."
+        echo "Cleaning up any .out files..."
+        if (Test-Path "*.out") { Remove-Item "*.out" -Force }
         echo "Testing race..."
         mkdir -p coverage
         go test -race -cover -coverprofile=coverage/coverage.out ./internal/...
@@ -97,7 +99,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
       uses: codecov/codecov-action@v3
       with:
-        file: ./coverage.out
+        file: ./coverage/coverage.out
         flags: unittests
         name: codecov-umbrella
 
