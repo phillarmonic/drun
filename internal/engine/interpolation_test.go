@@ -191,7 +191,7 @@ func TestVariableInterpolationEdgeCases(t *testing.T) {
 		unexpectedOutput []string // strings that should NOT be present in output
 	}{
 		{
-			name: "undefined variable should remain as placeholder",
+			name: "undefined variable should remain as placeholder (allow undefined)",
 			input: `version: 2.0
 
 task "undefined":
@@ -263,6 +263,11 @@ task "repeat":
 			// Create engine with buffer to capture output
 			var output bytes.Buffer
 			engine := NewEngine(&output)
+
+			// For the undefined variable test, allow undefined variables
+			if strings.Contains(tt.name, "allow undefined") {
+				engine.SetAllowUndefinedVars(true)
+			}
 
 			// Execute the task
 			err := engine.ExecuteWithParams(program, tt.taskName, tt.params)

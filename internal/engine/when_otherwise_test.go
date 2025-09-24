@@ -275,6 +275,30 @@ func TestEngine_WhenOtherwiseConditionTypes(t *testing.T) {
 			varValue:  "value",
 			expected:  false,
 		},
+		{
+			name:      "not empty check true",
+			condition: "$var is not empty",
+			varValue:  "value",
+			expected:  true,
+		},
+		{
+			name:      "not empty check false",
+			condition: "$var is not empty",
+			varValue:  "",
+			expected:  false,
+		},
+		{
+			name:      "complex inequality with spaces",
+			condition: "$var is not \"windows\"",
+			varValue:  "linux",
+			expected:  true,
+		},
+		{
+			name:      "complex inequality false",
+			condition: "$var is not \"windows\"",
+			varValue:  "windows",
+			expected:  false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -370,5 +394,157 @@ task "scoping":
 	// Check that otherwise block doesn't execute
 	if strings.Contains(outputStr, "In otherwise: should not execute") {
 		t.Error("Otherwise block should not execute when condition is true")
+	}
+}
+
+func TestEngine_WhenOtherwiseNegationScenarios(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedOutput []string
+		notExpected    []string
+	}{
+		{
+			name: "is not condition with non-production environment",
+			input: `version: 2.0
+task "test":
+	let $env = "development"
+	when $env is not "production":
+		info "Non-production environment detected"
+		step "Using development settings"
+	otherwise:
+		info "Production environment detected"
+		step "Using production settings"`,
+			expectedOutput: []string{
+				"Non-production environment detected",
+				"Using development settings",
+			},
+			notExpected: []string{
+				"Production environment detected",
+				"Using production settings",
+			},
+		},
+		{
+			name: "is not condition with production environment",
+			input: `version: 2.0
+task "test":
+	let $env = "production"
+	when $env is not "production":
+		info "Non-production environment detected"
+		step "Using development settings"
+	otherwise:
+		info "Production environment detected"
+		step "Using production settings"`,
+			expectedOutput: []string{
+				"Production environment detected",
+				"Using production settings",
+			},
+			notExpected: []string{
+				"Non-production environment detected",
+				"Using development settings",
+			},
+		},
+		{
+			name: "is not empty condition with value",
+			input: `version: 2.0
+task "test":
+	let $feature = "new-ui"
+	when $feature is not empty:
+		info "Feature flag is set: {$feature}"
+		step "Enabling feature: {$feature}"
+	otherwise:
+		info "No feature flag set"
+		step "Using default features"`,
+			expectedOutput: []string{
+				"Feature flag is set: new-ui",
+				"Enabling feature: new-ui",
+			},
+			notExpected: []string{
+				"No feature flag set",
+				"Using default features",
+			},
+		},
+		{
+			name: "is not empty condition with empty value",
+			input: `version: 2.0
+task "test":
+	let $feature = ""
+	when $feature is not empty:
+		info "Feature flag is set: {$feature}"
+		step "Enabling feature: {$feature}"
+	otherwise:
+		info "No feature flag set"
+		step "Using default features"`,
+			expectedOutput: []string{
+				"No feature flag set",
+				"Using default features",
+			},
+			notExpected: []string{
+				"Feature flag is set:",
+				"Enabling feature:",
+			},
+		},
+		{
+			name: "nested negation conditions",
+			input: `version: 2.0
+task "test":
+	let $platform = "linux"
+	let $mode = "debug"
+	when $platform is not "windows":
+		info "Unix-like platform: {$platform}"
+		when $mode is not "release":
+			info "Debug mode enabled"
+			step "Building with debug symbols"
+		otherwise:
+			info "Release mode enabled"
+			step "Building optimized binary"
+	otherwise:
+		info "Windows platform detected"`,
+			expectedOutput: []string{
+				"Unix-like platform: linux",
+				"Debug mode enabled",
+				"Building with debug symbols",
+			},
+			notExpected: []string{
+				"Windows platform detected",
+				"Release mode enabled",
+				"Building optimized binary",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			engine := NewEngine(&output)
+			engine.SetDryRun(true)
+
+			lexer := lexer.NewLexer(tt.input)
+			parser := parser.NewParser(lexer)
+			program := parser.ParseProgram()
+
+			if len(parser.Errors()) > 0 {
+				t.Fatalf("Parser errors: %v", parser.Errors())
+			}
+
+			err := engine.Execute(program, "test")
+			if err != nil {
+				t.Fatalf("Execution error: %v", err)
+			}
+
+			outputStr := output.String()
+
+			for _, expected := range tt.expectedOutput {
+				if !strings.Contains(outputStr, expected) {
+					t.Errorf("Expected output to contain %q, got:\n%s", expected, outputStr)
+				}
+			}
+
+			for _, notExpected := range tt.notExpected {
+				if strings.Contains(outputStr, notExpected) {
+					t.Errorf("Expected output to NOT contain %q, got:\n%s", notExpected, outputStr)
+				}
+			}
+		})
 	}
 }

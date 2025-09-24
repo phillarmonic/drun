@@ -24,9 +24,10 @@ import (
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output  io.Writer
-	dryRun  bool
-	verbose bool
+	output             io.Writer
+	dryRun             bool
+	verbose            bool
+	allowUndefinedVars bool
 
 	// Cached regex patterns for performance
 	interpolationRegex *regexp.Regexp
@@ -79,6 +80,11 @@ func (e *Engine) SetDryRun(dryRun bool) {
 // SetVerbose enables or disables verbose mode
 func (e *Engine) SetVerbose(verbose bool) {
 	e.verbose = verbose
+}
+
+// SetAllowUndefinedVars enables or disables strict variable checking
+func (e *Engine) SetAllowUndefinedVars(allow bool) {
+	e.allowUndefinedVars = allow
 }
 
 // Execute runs a v2 program with no parameters
@@ -406,7 +412,10 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 // executeAction executes a single action statement
 func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the message
-	interpolatedMessage := e.interpolateVariables(action.Message, ctx)
+	interpolatedMessage, err := e.interpolateVariablesWithError(action.Message, ctx)
+	if err != nil {
+		return fmt.Errorf("in %s statement: %w", action.Action, err)
+	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
@@ -450,12 +459,17 @@ func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionConte
 // executeSingleLineShell executes a single-line shell command
 func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in the command
-	interpolatedCommand := e.interpolateVariables(shellStmt.Command, ctx)
+	interpolatedCommand, err := e.interpolateVariablesWithError(shellStmt.Command, ctx)
+	if err != nil {
+		return fmt.Errorf("in shell command: %w", err)
+	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute shell command: %s\n", interpolatedCommand)
 		if shellStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[shellStmt.CaptureVar] = "[DRY RUN] command output"
 		}
 		return nil
 	}
@@ -524,6 +538,8 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 		}
 		if shellStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture output as: %s\n", shellStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[shellStmt.CaptureVar] = "[DRY RUN] command output"
 		}
 		return nil
 	}
@@ -603,6 +619,8 @@ func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext)
 		_, _ = fmt.Fprintf(e.output, "📁 %s\n", result.Message)
 		if fileStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture file content in variable '%s'\n", fileStmt.CaptureVar)
+			// Set a placeholder value for the captured variable in dry-run mode
+			ctx.Variables[fileStmt.CaptureVar] = "[DRY RUN] file content"
 		}
 		return nil
 	}
@@ -1572,6 +1590,8 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 			} else {
 				_, _ = fmt.Fprintf(e.output, "🔍 Detected %s version: %s\n", stmt.Target, version)
 			}
+			// Set the detected version in variables (e.g., docker_version)
+			ctx.Variables[stmt.Target+"_version"] = version
 		} else {
 			available := detector.IsToolAvailable(stmt.Target)
 			if e.dryRun {
@@ -1750,9 +1770,15 @@ func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *ast.
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: %s\n", workingTool)
 			if stmt.CaptureVar != "" {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture as %s: %s\n", stmt.CaptureVar, workingTool)
+				// Set the variable in dry-run mode too
+				ctx.Variables[stmt.CaptureVar] = workingTool
 			}
 		} else {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find: none available\n")
+			if stmt.CaptureVar != "" {
+				// Set a placeholder in dry-run mode when no tool is found
+				ctx.Variables[stmt.CaptureVar] = "[DRY RUN] no tool available"
+			}
 		}
 		return nil
 	}
@@ -2167,24 +2193,59 @@ func ParseStringWithFilename(input, filename string) (*ast.Program, error) {
 
 // interpolateVariables replaces {variable} placeholders with actual values
 func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
+	result, _ := e.interpolateVariablesWithError(message, ctx)
+	return result
+}
+
+// interpolateVariablesWithError replaces {variable} placeholders with actual values and returns any undefined variable errors
+func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionContext) (string, error) {
+	var undefinedVars []string
+
 	// Use cached regex for better performance
-	return e.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
+	result := e.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
 		// Extract content (remove { and })
 		content := match[1 : len(match)-1]
 
 		// Try to resolve simple variables first (most common case)
-		if result, found := e.resolveSimpleVariableDirectly(content, ctx); found {
-			return result
+		if resolved, found := e.resolveSimpleVariableDirectly(content, ctx); found {
+			return resolved
 		}
 
 		// Fall back to complex expression resolution
-		if result := e.resolveExpression(content, ctx); result != "" {
-			return result
+		if resolved := e.resolveExpression(content, ctx); resolved != "" {
+			return resolved
 		}
 
-		// If nothing worked, return the original placeholder
+		// If nothing worked, check if we should be strict about undefined variables
+		if !e.allowUndefinedVars {
+			// For complex expressions, check if the base variable exists
+			if e.isComplexExpression(content) {
+				baseVar := e.extractBaseVariable(content)
+				if baseVar != "" && !e.variableExists(baseVar, ctx) {
+					undefinedVars = append(undefinedVars, baseVar)
+					return match
+				}
+				// If base variable exists but expression failed, allow it (might be a function call or other valid expression)
+			} else {
+				// For simple variables, report as undefined
+				undefinedVars = append(undefinedVars, content)
+			}
+			return match // Return original placeholder for now
+		}
+
+		// If allowing undefined variables, return the original placeholder
 		return match
 	})
+
+	// If we found undefined variables in strict mode, return an error
+	if len(undefinedVars) > 0 {
+		if len(undefinedVars) == 1 {
+			return result, fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
+		}
+		return result, fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
+	}
+
+	return result, nil
 }
 
 // resolveSimpleVariableDirectly handles simple variable resolution with proper empty string support
@@ -2212,6 +2273,23 @@ func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionCo
 		if value, exists := ctx.Variables[varName]; exists {
 			return value, true
 		}
+
+		// Check project-level variables for backward compatibility
+		if ctx.Project != nil {
+			// Check built-in project variables
+			if varName == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name, true
+			}
+			if varName == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version, true
+			}
+			// Check project settings
+			if ctx.Project.Settings != nil {
+				if value, exists := ctx.Project.Settings[varName]; exists {
+					return value, true
+				}
+			}
+		}
 	} else {
 		// Check parameters (bare identifiers)
 		if value, exists := ctx.Parameters[variable]; exists {
@@ -2220,6 +2298,23 @@ func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionCo
 		// Check captured variables (bare identifiers)
 		if value, exists := ctx.Variables[variable]; exists {
 			return value, true
+		}
+
+		// Check project-level variables for backward compatibility
+		if ctx.Project != nil {
+			// Check built-in project variables
+			if variable == "project" && ctx.Project.Name != "" {
+				return ctx.Project.Name, true
+			}
+			if variable == "version" && ctx.Project.Version != "" {
+				return ctx.Project.Version, true
+			}
+			// Check project settings
+			if ctx.Project.Settings != nil {
+				if value, exists := ctx.Project.Settings[variable]; exists {
+					return value, true
+				}
+			}
 		}
 	}
 
@@ -2437,6 +2532,13 @@ func (e *Engine) parseQuotedArguments(argsStr string) []string {
 
 // executeConditional executes conditional statements (when, if/else)
 func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
+	// In strict mode, check for undefined variables in the condition
+	if !e.allowUndefinedVars {
+		if err := e.checkConditionForUndefinedVars(stmt.Condition, ctx); err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+		}
+	}
+
 	// Evaluate the condition
 	conditionResult := e.evaluateCondition(stmt.Condition, ctx)
 
@@ -2924,6 +3026,114 @@ func (e *Engine) parseArrayLiteralString(arrayStr string) []string {
 	}
 
 	return items
+}
+
+// checkConditionForUndefinedVars checks if a condition contains undefined variables
+func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
+	// For conditions, we only need to check simple variable references like "$var is value"
+	// Complex expressions in conditions are handled by the condition evaluation itself
+	re := regexp.MustCompile(`\$\w+`)
+	matches := re.FindAllString(condition, -1)
+
+	var undefinedVars []string
+	for _, match := range matches {
+		varName := match[1:] // Remove $ prefix
+
+		// Check if variable exists in parameters or variables
+		if _, exists := ctx.Parameters[varName]; exists {
+			continue
+		}
+		if _, exists := ctx.Variables[varName]; exists {
+			continue
+		}
+		if _, exists := ctx.Variables[match]; exists { // Check with $ prefix
+			continue
+		}
+
+		// Variable not found
+		undefinedVars = append(undefinedVars, match)
+	}
+
+	if len(undefinedVars) > 0 {
+		if len(undefinedVars) == 1 {
+			return fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
+		}
+		return fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
+	}
+
+	return nil
+}
+
+// isComplexExpression checks if an expression contains operations or function calls
+func (e *Engine) isComplexExpression(expr string) bool {
+	// Check for variable operations like "without", "with", etc.
+	if strings.Contains(expr, " without ") || strings.Contains(expr, " with ") {
+		return true
+	}
+	// Check for function calls (contains parentheses or dots)
+	if strings.Contains(expr, "(") || strings.Contains(expr, ".") {
+		return true
+	}
+	// Check for pipe operations
+	if strings.Contains(expr, " | ") {
+		return true
+	}
+	return false
+}
+
+// extractBaseVariable extracts the base variable from a complex expression
+func (e *Engine) extractBaseVariable(expr string) string {
+	// For expressions like "$version without prefix 'v'", extract "$version"
+	parts := strings.Fields(expr)
+	if len(parts) > 0 && strings.HasPrefix(parts[0], "$") {
+		return parts[0]
+	}
+	return ""
+}
+
+// variableExists checks if a variable exists in the context
+func (e *Engine) variableExists(varName string, ctx *ExecutionContext) bool {
+	if ctx == nil {
+		return false
+	}
+
+	// Remove $ prefix for checking
+	cleanName := varName
+	if strings.HasPrefix(varName, "$") {
+		cleanName = varName[1:]
+	}
+
+	// Check parameters
+	if _, exists := ctx.Parameters[cleanName]; exists {
+		return true
+	}
+	// Check variables
+	if _, exists := ctx.Variables[cleanName]; exists {
+		return true
+	}
+	// Check variables with $ prefix
+	if _, exists := ctx.Variables[varName]; exists {
+		return true
+	}
+
+	// Check project-level variables for backward compatibility
+	if ctx.Project != nil {
+		// Check built-in project variables
+		if cleanName == "project" && ctx.Project.Name != "" {
+			return true
+		}
+		if cleanName == "version" && ctx.Project.Version != "" {
+			return true
+		}
+		// Check project settings
+		if ctx.Project.Settings != nil {
+			if _, exists := ctx.Project.Settings[cleanName]; exists {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // evaluateCondition evaluates condition expressions

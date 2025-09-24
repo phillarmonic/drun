@@ -671,6 +671,7 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)
 - `--shell`: Override shell type (linux/darwin/windows)
+- `--allow-undefined-variables`: Allow undefined variables in interpolation (default: strict mode)
 - `completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
 - `cleanup-backups`: Clean up old backup files created during updates
 
@@ -705,6 +706,52 @@ drun --debug --debug-json -f my-tasks.drun
 ```
 
 > **Note:** As of v2.0, debug functionality has been integrated into the main `drun` command. The separate debug tool has been removed for a more streamlined experience.
+
+## Variable Checking
+
+drun v2 includes **strict variable checking** by default to catch undefined variables early and prevent runtime errors.
+
+### Strict Mode (Default)
+
+By default, drun operates in strict mode and will fail with a clear error message if any undefined variables are encountered:
+
+```bash
+# This will fail if $undefined_var is not defined
+drun my-task
+# Error: task 'my-task' failed: in info statement: undefined variable: {$undefined_var}
+```
+
+### Allow Undefined Variables
+
+Use the `--allow-undefined-variables` flag to allow undefined variables (legacy behavior):
+
+```bash
+# This will show {$undefined_var} as literal text
+drun my-task --allow-undefined-variables
+```
+
+### Benefits of Strict Mode
+
+- **🐛 Early Error Detection**: Catch typos and missing variables before execution
+- **🔍 Clear Error Messages**: Precise location and context of undefined variables
+- **🛡️ Prevent Silent Failures**: Avoid unexpected behavior from missing variables
+- **📝 Better Documentation**: Forces explicit variable definitions
+
+### Examples
+
+```drun
+version: 2.0
+
+task "strict example":
+    let $name = "world"
+    info "Hello {$name}"           # ✅ Works: variable is defined
+    info "Hello {$typo_name}"      # ❌ Fails: undefined variable (strict mode)
+    
+task "with parameters":
+    accepts $target as string
+    info "Deploying to {$target}"  # ✅ Works: parameter is defined
+    info "Version: {$version}"     # ❌ Fails: undefined variable (strict mode)
+```
 
 ## Shell Completion
 

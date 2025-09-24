@@ -25,15 +25,16 @@ import (
 )
 
 var (
-	configFile    string
-	listTasks     bool
-	dryRun        bool
-	verbose       bool
-	showVersion   bool
-	initConfig    bool
-	saveAsDefault bool
-	setWorkspace  string
-	selfUpdate    bool
+	configFile         string
+	listTasks          bool
+	dryRun             bool
+	verbose            bool
+	showVersion        bool
+	initConfig         bool
+	saveAsDefault      bool
+	setWorkspace       string
+	selfUpdate         bool
+	allowUndefinedVars bool
 	// Debug flags
 	debugMode   bool
 	debugTokens bool
@@ -194,6 +195,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[drun CLI cmd] Save custom file name as workspace default (use with --init)")
 	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[drun CLI cmd] Set workspace default task file location")
 	rootCmd.Flags().BoolVar(&selfUpdate, "self-update", false, "[drun CLI cmd] Check for updates and update drun to the latest version")
+	rootCmd.Flags().BoolVar(&allowUndefinedVars, "allow-undefined-variables", false, "[drun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
 
 	// Debug flags
 	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "[drun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
@@ -262,6 +264,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	eng := engine.NewEngine(os.Stdout)
 	eng.SetDryRun(dryRun)
 	eng.SetVerbose(verbose)
+	eng.SetAllowUndefinedVars(allowUndefinedVars)
 
 	// Handle --list flag
 	if listTasks {

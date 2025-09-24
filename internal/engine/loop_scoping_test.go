@@ -28,6 +28,7 @@ task "scoping test":
 	var output bytes.Buffer
 	engine := NewEngine(&output)
 	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(true) // Allow undefined variables for scoping test
 
 	lexer := lexer.NewLexer(input)
 	parser := parser.NewParser(lexer)
@@ -90,6 +91,7 @@ task "nested scoping":
 	var output bytes.Buffer
 	engine := NewEngine(&output)
 	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(true) // Allow undefined variables for scoping test
 
 	lexer := lexer.NewLexer(input)
 	parser := parser.NewParser(lexer)
@@ -135,6 +137,7 @@ task "parallel scoping":
 	var output bytes.Buffer
 	engine := NewEngine(&output)
 	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(true) // Allow undefined variables for scoping test
 
 	lexer := lexer.NewLexer(input)
 	parser := parser.NewParser(lexer)
@@ -189,6 +192,7 @@ task "context isolation":
 	var output bytes.Buffer
 	engine := NewEngine(&output)
 	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(true) // Allow undefined variables for scoping test
 
 	lexer := lexer.NewLexer(input)
 	parser := parser.NewParser(lexer)
@@ -272,6 +276,7 @@ task "interpolation test":
 	var output bytes.Buffer
 	engine := NewEngine(&output)
 	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(true) // Allow undefined variables for scoping test
 
 	lexer := lexer.NewLexer(input)
 	parser := parser.NewParser(lexer)

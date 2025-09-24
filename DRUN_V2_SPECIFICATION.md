@@ -1516,6 +1516,53 @@ run "docker push {image_name}"
 run "kubectl set image deployment/{app_name} {app_name}={image_name}"
 ```
 
+#### Strict Variable Checking
+
+**New in v2.0**: drun now enforces strict variable checking by default to prevent runtime errors from undefined variables.
+
+**Default Behavior (Strict Mode)**:
+```
+task "example":
+    let $name = "world"
+    info "Hello {$name}"        # ✅ Works: variable defined
+    info "Hello {$undefined}"   # ❌ Error: undefined variable: {$undefined}
+```
+
+**Error Messages**:
+```bash
+# Single undefined variable
+Error: task 'example' failed: in info statement: undefined variable: {$undefined}
+
+# Multiple undefined variables  
+Error: task 'example' failed: in info statement: undefined variables: {$var1}, {$var2}
+
+# In shell commands
+Error: task 'example' failed: in shell command: undefined variable: {$missing}
+
+# In conditions
+Error: task 'example' failed: in when condition: undefined variable: {$undefined_var}
+```
+
+**Allow Undefined Variables**:
+Use the `--allow-undefined-variables` CLI flag to revert to legacy behavior:
+
+```bash
+drun my-task --allow-undefined-variables
+# Output: Hello {$undefined}  (literal text)
+```
+
+**Benefits**:
+- **Early Error Detection**: Catch typos and missing variables before execution
+- **Clear Error Context**: Precise location (statement type) and variable name
+- **Prevent Silent Failures**: Avoid unexpected behavior from undefined variables
+- **Better Developer Experience**: Forces explicit variable definitions
+
+**Variable Resolution Order**:
+1. Task parameters (`accepts $param`)
+2. Local variables (`let $var = "value"`)
+3. Project settings (`$globals.setting`)
+4. Built-in variables (`$globals.version`, `$globals.project`)
+
 ### Advanced Variable Operations
 
 drun v2 provides powerful variable transformation operations that can be chained together for complex data manipulation.
