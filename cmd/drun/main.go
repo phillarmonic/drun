@@ -293,8 +293,9 @@ func runDrun(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", paramErr.Message)
 			os.Exit(1)
 		}
-		// For other errors, return normally (will show usage)
-		return fmt.Errorf("execution failed: %w", err)
+		// For task execution errors, don't show usage - just print error and exit
+		fmt.Fprintf(os.Stderr, "Error: execution failed: %v\n", err)
+		os.Exit(1)
 	}
 	return nil
 }
