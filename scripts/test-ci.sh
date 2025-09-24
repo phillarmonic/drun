@@ -25,7 +25,8 @@ fi
 
 # Run unit tests with coverage
 echo "🧪 Running unit tests..."
-go test -race -cover -coverprofile=coverage.out ./internal/...
+mkdir -p coverage
+go test -race -cover -coverprofile=coverage/coverage.out ./internal/...
 
 if [ $? -ne 0 ]; then
     echo "❌ Tests failed!"
@@ -34,7 +35,7 @@ fi
 
 # Show coverage summary (like drun test recipe)
 echo "📊 Coverage Summary:"
-go tool cover -func=coverage.out | tail -1
+go tool cover -func=coverage/coverage.out | tail -1
 
 # Check build with version info (like GHA)
 echo "🔨 Testing build..."
@@ -55,6 +56,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Clean up
-rm -f bin/drun coverage.out
+rm -f bin/drun
+rm -rf coverage/
 
 echo "✅ CI tests passed!"
