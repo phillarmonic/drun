@@ -3021,12 +3021,22 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 				paramName = left[1:]
 			}
 
-			// Try to get the value of the left side from parameters
+			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
 				return value.AsString() != right
 			}
 
-			// If not found in parameters, compare as strings
+			// Try to get the value from variables (let statements)
+			if value, exists := ctx.Variables[paramName]; exists {
+				return value != right
+			}
+
+			// Also try with the $ prefix (variables stored with $ prefix)
+			if value, exists := ctx.Variables["$"+paramName]; exists {
+				return value != right
+			}
+
+			// If not found in parameters or variables, compare as strings
 			return left != right
 		}
 	}
@@ -3086,12 +3096,22 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 				paramName = left[1:]
 			}
 
-			// Try to get the value of the left side from parameters
+			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
 				return value.AsString() == right
 			}
 
-			// If not found in parameters, compare as strings
+			// Try to get the value from variables (let statements)
+			if value, exists := ctx.Variables[paramName]; exists {
+				return value == right
+			}
+
+			// Also try with the $ prefix (variables stored with $ prefix)
+			if value, exists := ctx.Variables["$"+paramName]; exists {
+				return value == right
+			}
+
+			// If not found in parameters or variables, compare as strings
 			return left == right
 		}
 	}

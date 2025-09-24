@@ -184,9 +184,8 @@ if_statement = "if" condition ":" statement_block
               [ "else" "if" condition ":" statement_block ]
               [ "else" ":" statement_block ] ;
 
-when_statement = "when" expression ":"
-                { "is" expression ":" statement_block }
-                [ "else" ":" statement_block ] ;
+when_statement = "when" expression ":" statement_block
+                [ "otherwise" ":" statement_block ] ;
 
 for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
                statement_block ;
@@ -1136,6 +1135,57 @@ if directory "/tmp/cache" is empty:
 if dir "{$output_path}" is not empty:
   warn "Output directory contains files"
 ```
+
+#### When-Otherwise Conditions
+
+The `when-otherwise` syntax provides a clean alternative to `if-else` for simple conditional logic:
+
+```
+# Basic when-otherwise
+when $platform is "windows":
+  step "Building Windows binary with .exe extension"
+otherwise:
+  step "Building Unix binary without extension"
+
+# When without otherwise (optional else clause)
+when $environment is "production":
+  step "Deploy with production settings"
+  step "Enable monitoring"
+
+# Nested when-otherwise
+when $platform is "windows":
+  info "Windows platform detected"
+  when $arch is "amd64":
+    step "Building for Windows x64"
+  otherwise:
+    step "Building for Windows ARM"
+otherwise:
+  info "Unix-like platform detected"
+  when $platform is "darwin":
+    step "Building for macOS"
+  otherwise:
+    step "Building for Linux"
+
+# When-otherwise in loops (matrix execution)
+for each $platform in ["windows", "linux", "darwin"]:
+  when $platform is "windows":
+    run "GOOS={$platform} go build -o app.exe"
+  otherwise:
+    run "GOOS={$platform} go build -o app"
+```
+
+**Supported Condition Types:**
+- String equality: `$var is "value"`
+- String inequality: `$var is not "value"`
+- Empty checks: `$var is empty`, `$var is not empty`
+- All condition types supported by `if` statements
+
+**Key Features:**
+- Clean, readable syntax for simple conditions
+- Optional `otherwise` clause (equivalent to `else`)
+- Full nesting support
+- Works seamlessly with loops and matrix execution
+- Consistent variable scoping rules
 
 #### Smart Detection Conditions
 

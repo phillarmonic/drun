@@ -252,14 +252,15 @@ const (
 	OF       // of
 
 	// Control flow keywords
-	WHEN     // when
-	IF       // if
-	ELSE     // else
-	FOR      // for
-	EACH     // each
-	IN       // in
-	PARALLEL // parallel
-	IS       // is
+	WHEN      // when
+	IF        // if
+	ELSE      // else
+	OTHERWISE // otherwise
+	FOR       // for
+	EACH      // each
+	IN        // in
+	PARALLEL  // parallel
+	IS        // is
 
 	// Built-in functions/conditions
 	EXISTS // exists
@@ -782,6 +783,8 @@ func (t TokenType) String() string {
 		return "IF"
 	case ELSE:
 		return "ELSE"
+	case OTHERWISE:
+		return "OTHERWISE"
 	case FOR:
 		return "FOR"
 	case EACH:
@@ -1117,6 +1120,7 @@ var keywords = map[string]TokenType{
 	"when":        WHEN,
 	"if":          IF,
 	"else":        ELSE,
+	"otherwise":   OTHERWISE,
 	"for":         FOR,
 	"each":        EACH,
 	"in":          IN,

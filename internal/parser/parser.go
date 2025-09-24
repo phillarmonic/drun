@@ -2843,7 +2843,7 @@ func (p *Parser) parseControlFlowStatement() ast.Statement {
 	}
 }
 
-// parseWhenStatement parses when statements: when condition:
+// parseWhenStatement parses when statements: when condition: ... otherwise: ...
 func (p *Parser) parseWhenStatement() *ast.ConditionalStatement {
 	stmt := &ast.ConditionalStatement{
 		Token: p.curToken,
@@ -2863,6 +2863,15 @@ func (p *Parser) parseWhenStatement() *ast.ConditionalStatement {
 
 	// Parse body
 	stmt.Body = p.parseControlFlowBody()
+
+	// Check for otherwise clause
+	if p.peekToken.Type == lexer.OTHERWISE {
+		p.nextToken() // consume OTHERWISE
+		if !p.expectPeek(lexer.COLON) {
+			return nil
+		}
+		stmt.ElseBody = p.parseControlFlowBody()
+	}
 
 	return stmt
 }
