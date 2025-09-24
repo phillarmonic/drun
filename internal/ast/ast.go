@@ -89,13 +89,16 @@ type ProjectSetting interface {
 type SetStatement struct {
 	Token lexer.Token // the SET token
 	Key   string      // setting key
-	Value string      // setting value
+	Value Expression  // setting value (can be string literal or array literal)
 }
 
 func (ss *SetStatement) statementNode()      {}
 func (ss *SetStatement) projectSettingNode() {}
 func (ss *SetStatement) String() string {
-	return fmt.Sprintf("set %s to %s", ss.Key, ss.Value)
+	if ss.Value != nil {
+		return fmt.Sprintf("set %s to %s", ss.Key, ss.Value.String())
+	}
+	return fmt.Sprintf("set %s to <nil>", ss.Key)
 }
 
 // IncludeStatement represents an include directive

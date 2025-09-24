@@ -427,7 +427,7 @@ func listAllTasks(eng *engine.Engine, program *ast.Program) error {
 	}
 
 	for _, task := range tasks {
-		fmt.Printf("  %-20s %s\n", task.Name, task.Description)
+		fmt.Printf("  %-20s  %s\n", task.Name, task.Description)
 	}
 
 	return nil

@@ -264,7 +264,10 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	for _, setting := range project.Settings {
 		switch s := setting.(type) {
 		case *ast.SetStatement:
-			ctx.Settings[s.Key] = s.Value
+			// Convert expression to string representation
+			if s.Value != nil {
+				ctx.Settings[s.Key] = s.Value.String()
+			}
 		case *ast.LifecycleHook:
 			switch s.Type {
 			case "before":
@@ -2673,11 +2676,16 @@ func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 
 // executeEachLoop executes traditional each loops
 func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
-	// Resolve the iterable (could be a parameter, variable, file list, etc.)
-	var iterableStr string
+	// Resolve the iterable (could be a parameter, variable, array literal, etc.)
+	var items []string
 
-	// First check if it's a variable (starts with $)
-	if strings.HasPrefix(stmt.Iterable, "$") {
+	// Check if it's an array literal (starts with '[')
+	if strings.HasPrefix(stmt.Iterable, "[") && strings.HasSuffix(stmt.Iterable, "]") {
+		// Parse array literal
+		items = e.parseArrayLiteralString(stmt.Iterable)
+	} else if strings.HasPrefix(stmt.Iterable, "$") {
+		// Variable reference
+		var iterableStr string
 		// Try both with and without $ prefix to handle different storage methods
 		if value, exists := ctx.Variables[stmt.Iterable]; exists {
 			iterableStr = value
@@ -2686,23 +2694,67 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 		} else {
 			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
 		}
-	} else {
-		// Check parameters
-		iterableValue, exists := ctx.Parameters[stmt.Iterable]
-		if !exists {
-			return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+
+		// Split by space to get items (for our variable operations system)
+		iterableStr = strings.TrimSpace(iterableStr)
+		if iterableStr == "" {
+			_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+			return nil
 		}
-		iterableStr = iterableValue.AsString()
-	}
 
-	// Split by space to get items (for our variable operations system)
-	iterableStr = strings.TrimSpace(iterableStr)
-	if iterableStr == "" {
-		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
-		return nil
-	}
+		items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+	} else {
+		// Check if it's a project setting first (if project exists)
+		if ctx.Project != nil && ctx.Project.Settings != nil {
+			if projectValue, exists := ctx.Project.Settings[stmt.Iterable]; exists {
+				// Handle project setting (could be array or string)
+				if strings.HasPrefix(projectValue, "[") && strings.HasSuffix(projectValue, "]") {
+					// It's an array literal stored as a string
+					items = e.parseArrayLiteralString(projectValue)
+				} else {
+					// It's a regular string, split by whitespace
+					iterableStr := strings.TrimSpace(projectValue)
+					if iterableStr == "" {
+						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+						return nil
+					}
+					items = strings.Fields(iterableStr)
+				}
+			} else {
+				// Parameter reference
+				iterableValue, exists := ctx.Parameters[stmt.Iterable]
+				if !exists {
+					return fmt.Errorf("iterable '%s' not found in parameters or project settings", stmt.Iterable)
+				}
+				iterableStr := iterableValue.AsString()
 
-	items := strings.Fields(iterableStr) // Use Fields to split by any whitespace
+				// Split by space to get items (for our variable operations system)
+				iterableStr = strings.TrimSpace(iterableStr)
+				if iterableStr == "" {
+					_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+					return nil
+				}
+
+				items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+			}
+		} else {
+			// Parameter reference (no project)
+			iterableValue, exists := ctx.Parameters[stmt.Iterable]
+			if !exists {
+				return fmt.Errorf("iterable '%s' not found in parameters", stmt.Iterable)
+			}
+			iterableStr := iterableValue.AsString()
+
+			// Split by space to get items (for our variable operations system)
+			iterableStr = strings.TrimSpace(iterableStr)
+			if iterableStr == "" {
+				_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+				return nil
+			}
+
+			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		}
+	}
 
 	if len(items) == 0 {
 		_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
@@ -2786,6 +2838,67 @@ func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string
 	loopCtx.Variables[variable] = value
 
 	return loopCtx
+}
+
+// parseArrayLiteralString parses an array literal string like ["item1", "item2", "item3"] into a slice of strings
+func (e *Engine) parseArrayLiteralString(arrayStr string) []string {
+	// Remove brackets
+	arrayStr = strings.TrimSpace(arrayStr)
+	if len(arrayStr) < 2 || arrayStr[0] != '[' || arrayStr[len(arrayStr)-1] != ']' {
+		return []string{}
+	}
+
+	content := arrayStr[1 : len(arrayStr)-1]
+	content = strings.TrimSpace(content)
+
+	// Handle empty array
+	if content == "" {
+		return []string{}
+	}
+
+	var items []string
+	var current strings.Builder
+	inQuotes := false
+	escaped := false
+
+	for _, char := range content {
+		switch char {
+		case '\\':
+			if !escaped {
+				escaped = true
+				continue
+			}
+			current.WriteRune(char)
+		case '"':
+			if !escaped {
+				inQuotes = !inQuotes
+			} else {
+				current.WriteRune(char)
+			}
+		case ',':
+			if !inQuotes && !escaped {
+				// End of current item
+				item := strings.TrimSpace(current.String())
+				if item != "" {
+					items = append(items, item)
+				}
+				current.Reset()
+			} else {
+				current.WriteRune(char)
+			}
+		default:
+			current.WriteRune(char)
+		}
+		escaped = false
+	}
+
+	// Add the last item
+	item := strings.TrimSpace(current.String())
+	if item != "" {
+		items = append(items, item)
+	}
+
+	return items
 }
 
 // evaluateCondition evaluates condition expressions

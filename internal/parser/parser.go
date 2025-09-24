@@ -187,6 +187,8 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 				}
 			case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 				p.nextToken() // Skip comments
+			case lexer.NEWLINE:
+				p.nextToken() // Skip newlines
 			default:
 				p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
 				p.nextToken()
@@ -204,7 +206,9 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 	return stmt
 }
 
-// parseSetStatement parses a set statement (set key to value)
+// parseSetStatement parses a set statement with two syntaxes:
+// 1. set key to "value"
+// 2. set key as list to ["value1", "value2", "value3"]
 func (p *Parser) parseSetStatement() *ast.SetStatement {
 	stmt := &ast.SetStatement{Token: p.curToken}
 
@@ -221,18 +225,32 @@ func (p *Parser) parseSetStatement() *ast.SetStatement {
 	}
 	stmt.Key = p.curToken.Literal
 
-	// Expect "to"
-	if !p.expectPeek(lexer.TO) {
+	// Check for optional "as list" syntax or direct "to"
+	switch p.peekToken.Type {
+	case lexer.AS:
+		p.nextToken() // consume AS
+		if !p.expectPeek(lexer.LIST) {
+			return nil
+		}
+		// Now expect "to"
+		if !p.expectPeek(lexer.TO) {
+			return nil
+		}
+	case lexer.TO:
+		p.nextToken() // consume TO
+	default:
+		p.addError(fmt.Sprintf("expected 'as list to' or 'to', got %s instead", p.peekToken.Type))
 		return nil
 	}
 
-	// Expect value (string)
-	if !p.expectPeek(lexer.STRING) {
-		return nil
-	}
-	stmt.Value = p.curToken.Literal
-
+	// Parse expression (string literal or array literal)
 	p.nextToken()
+	stmt.Value = p.parseExpression()
+	if stmt.Value == nil {
+		return nil
+	}
+
+	p.nextToken() // advance to next token
 	return stmt
 }
 
@@ -2905,7 +2923,7 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 	switch p.peekToken.Type {
 	case lexer.EACH:
 		return p.parseForEachStatement(stmt)
-	case lexer.IDENT:
+	case lexer.IDENT, lexer.VARIABLE:
 		// This could be "for i in range" or "for variable in iterable"
 		return p.parseForVariableStatement(stmt)
 	default:
@@ -2979,13 +2997,22 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 			return nil
 		}
 
-		// Accept both IDENT and VARIABLE for iterable
+		// Accept IDENT, VARIABLE, and array literals for iterable
 		switch p.peekToken.Type {
 		case lexer.IDENT, lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
+		case lexer.LBRACKET:
+			// Parse array literal as iterable
+			p.nextToken()
+			arrayExpr := p.parseArrayLiteral()
+			if arrayExpr != nil {
+				stmt.Iterable = arrayExpr.String()
+			} else {
+				return nil
+			}
 		default:
-			p.addError(fmt.Sprintf("expected identifier or variable for iterable, got %s", p.peekToken.Type))
+			p.addError(fmt.Sprintf("expected identifier, variable, or array literal for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
 	}
@@ -3016,10 +3043,15 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 
 // parseForVariableStatement parses "for variable in range" or "for variable in iterable"
 func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
-	if !p.expectPeek(lexer.IDENT) {
+	// Accept both IDENT and VARIABLE tokens
+	switch p.peekToken.Type {
+	case lexer.IDENT, lexer.VARIABLE:
+		p.nextToken()
+		stmt.Variable = p.curToken.Literal
+	default:
+		p.addError(fmt.Sprintf("expected identifier or variable, got %s instead", p.peekToken.Type))
 		return nil
 	}
-	stmt.Variable = p.curToken.Literal
 
 	if !p.expectPeek(lexer.IN) {
 		return nil
@@ -3057,13 +3089,22 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 	} else {
 		// Regular "for variable in iterable"
 		stmt.Type = "each"
-		// Accept both IDENT and VARIABLE for iterable
+		// Accept IDENT, VARIABLE, and array literals for iterable
 		switch p.peekToken.Type {
 		case lexer.IDENT, lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
+		case lexer.LBRACKET:
+			// Parse array literal as iterable
+			p.nextToken()
+			arrayExpr := p.parseArrayLiteral()
+			if arrayExpr != nil {
+				stmt.Iterable = arrayExpr.String()
+			} else {
+				return nil
+			}
 		default:
-			p.addError(fmt.Sprintf("expected identifier or variable for iterable, got %s", p.peekToken.Type))
+			p.addError(fmt.Sprintf("expected identifier, variable, or array literal for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
 	}
@@ -3539,6 +3580,9 @@ func (p *Parser) parsePrimaryExpression() ast.Expression {
 			Token: p.curToken,
 			Value: p.curToken.Literal, // This includes the $ prefix
 		}
+	case lexer.LBRACKET:
+		// Parse array literal ["item1", "item2", "item3"]
+		return p.parseArrayLiteral()
 	default:
 		p.addError(fmt.Sprintf("unexpected token in expression: %s", p.curToken.Type))
 		return nil
@@ -3576,6 +3620,37 @@ func (p *Parser) parseFunctionCall() ast.Expression {
 	}
 }
 
+// parseArrayLiteral parses array literals like ["item1", "item2", "item3"]
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	array := &ast.ArrayLiteral{
+		Token:    p.curToken, // LBRACKET
+		Elements: []ast.Expression{},
+	}
+
+	// Handle empty array []
+	if p.peekToken.Type == lexer.RBRACKET {
+		p.nextToken() // consume RBRACKET
+		return array
+	}
+
+	// Parse first element
+	p.nextToken()
+	array.Elements = append(array.Elements, p.parseExpression())
+
+	// Parse remaining elements separated by commas
+	for p.peekToken.Type == lexer.COMMA {
+		p.nextToken() // consume comma
+		p.nextToken() // move to next element
+		array.Elements = append(array.Elements, p.parseExpression())
+	}
+
+	if !p.expectPeek(lexer.RBRACKET) {
+		return nil
+	}
+
+	return array
+}
+
 // expectPeekVariableName checks for variable names using $variable syntax
 func (p *Parser) expectPeekVariableName() bool {
 	if p.peekToken.Type != lexer.VARIABLE {
@@ -3606,14 +3681,14 @@ func (p *Parser) getVariableName() string {
 	return p.curToken.Literal
 }
 
-// expectPeekIdentifierLike checks for identifier-like tokens (IDENT or keywords that can be used as identifiers)
+// expectPeekIdentifierLike checks for identifier-like tokens (IDENT, VARIABLE, or keywords that can be used as identifiers)
 func (p *Parser) expectPeekIdentifierLike() bool {
 	switch p.peekToken.Type {
-	case lexer.IDENT, lexer.SERVICE, lexer.ENVIRONMENT, lexer.HOST, lexer.PORT:
+	case lexer.IDENT, lexer.VARIABLE, lexer.SERVICE, lexer.ENVIRONMENT, lexer.HOST, lexer.PORT, lexer.VERSION, lexer.TOOL:
 		p.nextToken()
 		return true
 	default:
-		p.addError(fmt.Sprintf("expected identifier, got %s instead", p.peekToken.Type))
+		p.addError(fmt.Sprintf("expected identifier or variable, got %s instead", p.peekToken.Type))
 		return false
 	}
 }

@@ -67,3 +67,18 @@ func (fce *FunctionCallExpression) String() string {
 	}
 	return fce.Function
 }
+
+// ArrayLiteral represents array literals like ["item1", "item2", "item3"]
+type ArrayLiteral struct {
+	Token    lexer.Token  // the LBRACKET token
+	Elements []Expression // array elements
+}
+
+func (al *ArrayLiteral) expressionNode() {}
+func (al *ArrayLiteral) String() string {
+	var elements []string
+	for _, elem := range al.Elements {
+		elements = append(elements, elem.String())
+	}
+	return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
+}

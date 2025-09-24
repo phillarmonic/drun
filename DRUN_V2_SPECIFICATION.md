@@ -111,6 +111,7 @@ project_declaration = "project" string_literal [ "version" string_literal ] ":"
                      { project_setting } ;
 
 project_setting = "set" identifier "to" expression
+                | "set" identifier "as" "list" "to" array_literal
                 | "include" string_literal
                 | "before" "any" "task" ":" statement_block
                 | "after" "any" "task" ":" statement_block
@@ -187,7 +188,7 @@ when_statement = "when" expression ":"
                 { "is" expression ":" statement_block }
                 [ "else" ":" statement_block ] ;
 
-for_statement = "for" "each" identifier "in" expression [ "in" "parallel" ] ":"
+for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
                statement_block ;
 
 try_statement = "try" ":" statement_block
@@ -1000,17 +1001,22 @@ when package_manager:
 for each <variable> in <expression> [in parallel]:
   <statements>
 
-# Examples:
-for each env in ["dev", "staging", "prod"]:
-  deploy to {env}
+# Examples with array literals:
+for each $env in ["dev", "staging", "prod"]:
+  deploy to {$env}
 
-for each service in microservices in parallel:
-  test service {service}
+for each $service in microservices in parallel:
+  test service {$service}
 
-# Nested loops (matrix execution)
-for each os in ["ubuntu", "alpine"]:
-  for each version in ["16", "18", "20"]:
-    test on {os} with node {version}
+# Matrix execution (nested loops)
+for each $os in ["ubuntu", "alpine", "debian"]:
+  for each $version in ["16", "18", "20"]:
+    test on {$os} with node {$version}
+
+# Parallel matrix execution
+for each $region in ["us-east", "eu-west"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$region}
 ```
 
 #### Exception Handling
@@ -1261,15 +1267,15 @@ All variables in drun v2 must be prefixed with `$` to distinguish them from keyw
    - `$name`, `$environment`, `$commit_hash`
    - Used in: parameter declarations, let/set statements, variable references
 
-2. **Loop Variables**: Use bare identifiers (no `$` prefix)
-   - `item`, `file`, `i`, `attempt`
-   - Used in: `for each item in items`, `for i in range 1 to 10`
+2. **Loop Variables**: Use `$` prefix for consistency with scoping system
+   - `$item`, `$file`, `$i`, `$attempt`
+   - Used in: `for each $item in items`, `for $i in range 1 to 10`
 
 3. **Interpolation Syntax**:
    - Task variables: `{$variable_name}`
    - Project settings: `{$globals.setting_name}`
    - Built-in project vars: `{$globals.project}`, `{$globals.version}`
-   - Loop variables: `{variable_name}`
+   - Loop variables: `{$variable_name}`
    - Built-in functions: `{now.format()}`, `{pwd}`
 
 #### Examples
@@ -1288,17 +1294,17 @@ given $tag defaults to "latest"
 let $commit = current git commit
 set $counter to 0
 
-# Loop variables (bare identifiers)
-for each item in items:
-  info "Processing {item}"  # Loop variable interpolation
+# Loop variables (with $ prefix)
+for each $item in items:
+  info "Processing {$item}"  # Loop variable interpolation
 
-for i in range 1 to 5:
-  info "Attempt {i} of 5"   # Loop variable interpolation
+for $i in range 1 to 5:
+  info "Attempt {$i} of 5"   # Loop variable interpolation
 
 # Mixed interpolation with different scopes
 info "Deploying {$tag} to {$environment} from {$globals.registry}"
 info "Project: {$globals.project} v{$globals.version}"
-info "API: {$globals.api_url} - Processing item {item}"
+info "API: {$globals.api_url} - Processing item {$item}"
 ```
 
 #### Let Bindings (Immutable)
@@ -1356,6 +1362,8 @@ project "myapp" version "1.0.0":
   set registry to "ghcr.io/company"    # Project setting
   set api_url to "https://api.example.com"
   set timeout to "30s"
+  set platforms as list to ["linux", "darwin", "windows"]  # Array setting
+  set environments as list to ["dev", "staging", "production"]
 ```
 
 **Accessing Project Settings:**
@@ -1384,13 +1392,13 @@ task "deploy":
 
 1. **Project Settings**: Declared without `$`, accessed via `$globals.key`
 2. **Task Variables**: Declared with `$`, accessed with `$variable`
-3. **Loop Variables**: Bare identifiers, accessed with `{variable}`
+3. **Loop Variables**: Use `$` prefix, accessed with `{$variable}`
 4. **Built-in Variables**: Special project variables via `$globals.project` and `$globals.version`
 
 **Variable Resolution Order:**
 1. Parameters (`$param`)
 2. Task variables (`$variable`)
-3. Loop variables (`variable`)
+3. Loop variables (`$variable`)
 4. Project settings (`$globals.key`)
 5. Built-in functions
 
@@ -1716,6 +1724,146 @@ task "build":
   let clean_version be {version} without prefix "v"
   let image_tag be "myapp:{clean_version}"
 ```
+
+---
+
+## Array Literals and Matrix Execution
+
+drun v2 supports array literals for defining lists of values directly in the code, enabling powerful matrix execution patterns for comprehensive testing and deployment scenarios.
+
+### Array Literal Syntax
+
+Array literals use square bracket notation with comma-separated values:
+
+```
+# Basic array literals
+["item1", "item2", "item3"]
+["linux", "darwin", "windows"]
+["dev", "staging", "production"]
+
+# Numbers and mixed types
+[1, 2, 3, 4, 5]
+["port", 8080, "timeout", "30s"]
+```
+
+### Project-Level Array Settings
+
+Arrays can be defined at the project level using two syntaxes:
+
+```
+project "myapp" version "1.0.0":
+  # Simple string settings
+  set registry to "ghcr.io/company"
+  set api_url to "https://api.example.com"
+  
+  # Array settings using "as list to" syntax
+  set platforms as list to ["linux", "darwin", "windows"]
+  set environments as list to ["dev", "staging", "production"]
+  set node_versions as list to ["16", "18", "20"]
+  set databases as list to ["postgres", "mysql", "mongodb"]
+```
+
+### Loop Variables with Array Literals
+
+Loop variables use the `$variable` syntax for consistency with the scoping system:
+
+```
+# Direct array literal in loops
+for each $platform in ["linux", "darwin", "windows"]:
+  info "Building for {$platform}"
+
+# Using project-defined arrays
+for each $env in $globals.environments:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$env}
+```
+
+### Matrix Execution Patterns
+
+Matrix execution allows comprehensive testing across multiple dimensions:
+
+#### Sequential Matrix Execution
+
+```
+# Cross-platform builds (OS × Architecture)
+for each $platform in $globals.platforms:
+  for each $arch in ["amd64", "arm64"]:
+    build for {$platform}/{$arch}
+
+# Database testing (Database × Version × Test Suite)
+for each $db in $globals.databases:
+  for each $version in ["latest", "lts", "stable"]:
+    for each $suite in ["unit", "integration", "performance"]:
+      test {$db}:{$version} with {$suite} tests
+```
+
+#### Parallel Matrix Execution
+
+```
+# Multi-region deployment (parallel regions, sequential services)
+for each $region in ["us-east", "eu-west", "ap-south"] in parallel:
+  for each $service in ["api", "web", "worker"]:
+    deploy {$service} to {$region}
+
+# CI/CD pipeline parallelization
+for each $job in ["lint", "test", "security-scan", "build"] in parallel:
+  when $job is "lint":
+    for each $linter in ["eslint", "prettier", "golangci-lint"]:
+      run {$linter}
+  when $job is "test":
+    for each $suite in ["unit", "integration"]:
+      run {$suite} tests
+```
+
+#### Mixed Parallel/Sequential Execution
+
+```
+# Parallel environments, sequential deployment steps
+for each $env in ["dev", "staging", "production"] in parallel:
+  for each $step in ["build", "test", "deploy", "verify"]:
+    execute {$step} in {$env}
+```
+
+### Real-World Matrix Use Cases
+
+#### DevOps Scenarios
+- **Multi-platform builds**: OS × Architecture × Compiler Version
+- **Deployment strategies**: Environment × Service × Region
+- **Testing matrices**: Browser × Device × Test Suite
+- **Performance testing**: Load Level × Endpoint × Configuration
+
+#### CI/CD Pipelines
+- **Parallel job execution**: Lint, Test, Security, Build
+- **Multi-environment deployment**: Dev, Staging, Production
+- **Canary deployments**: Service × Traffic Percentage
+- **Integration testing**: Service × Database × Version
+
+#### Infrastructure Management
+- **Multi-cloud deployment**: Provider × Region × Service
+- **Monitoring setup**: Service × Metric × Alert Rule
+- **Security scanning**: Tool × Target × Severity Level
+- **Backup strategies**: Database × Schedule × Retention Policy
+
+### Variable Scoping in Matrix Execution
+
+Loop variables follow the established scoping rules:
+
+```
+project "matrix-demo":
+  set platforms as list to ["linux", "darwin", "windows"]
+  set registry to "ghcr.io/company"
+
+task "matrix-build":
+  # Project arrays accessed via $globals
+  for each $platform in $globals.platforms:
+    # Loop variable uses $variable syntax
+    for each $arch in ["amd64", "arm64"]:
+      # Both loop variables available in nested scope
+      info "Building {$globals.registry}/app:{$platform}-{$arch}"
+      build for {$platform}/{$arch}
+```
+
+This matrix execution system enables comprehensive automation workflows while maintaining drun's natural language philosophy and clear variable scoping.
 
 ---
 

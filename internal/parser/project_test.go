@@ -56,7 +56,7 @@ task "hello":
 		t.Errorf("setSetting.Key not 'registry'. got=%q", setSetting.Key)
 	}
 
-	if setSetting.Value != "ghcr.io/company" {
+	if setSetting.Value.String() != "ghcr.io/company" {
 		t.Errorf("setSetting.Value not 'ghcr.io/company'. got=%q", setSetting.Value)
 	}
 

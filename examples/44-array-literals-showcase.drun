@@ -1,0 +1,172 @@
+version: 2.0
+
+project "Array Literals Showcase" version "1.0":
+	set supported_languages as list to ["Go", "Python", "JavaScript", "Rust", "Java", "C++"]
+	set deployment_targets as list to ["kubernetes", "docker-swarm", "nomad", "ecs"]
+	set registry to "ghcr.io/company"
+	set notification_channels as list to ["slack", "email", "teams", "discord"]
+
+task "array syntax examples" means "Demonstrate various array literal syntaxes":
+	info "📋 Array Literal Syntax Examples"
+	
+	# Project-level arrays (defined above)
+	info "🔧 Using project-level arrays:"
+	for each $lang in supported_languages:
+		info "  💻 Language: {$lang}"
+	
+	# Inline array literals
+	info "🎯 Using inline array literals:"
+	for each $framework in ["React", "Vue", "Angular", "Svelte"]:
+		info "  🖼️  Framework: {$framework}"
+	
+	for each $database in ["PostgreSQL", "MySQL", "MongoDB", "Redis", "CouchDB"]:
+		info "  🗄️  Database: {$database}"
+	
+	# Empty array handling
+	info "📭 Empty array example:"
+	for each $item in []:
+		info "  This should not execute"
+	info "✅ Empty array handled correctly"
+	
+	# Single item arrays
+	info "1️⃣  Single item arrays:"
+	for each $singleton in ["only-item"]:
+		info "  📦 Single item: {$singleton}"
+	
+	success "🎉 Array syntax examples completed!"
+
+task "build matrix showcase" means "Comprehensive build matrix using arrays":
+	info "🏗️  Build Matrix Showcase"
+	
+	# Operating systems × Architectures
+	for each $os in ["ubuntu-20.04", "ubuntu-22.04", "macos-12", "macos-13", "windows-2019", "windows-2022"]:
+		info "🖥️  Building on: {$os}"
+		for each $arch in ["x86_64", "aarch64", "arm64"]:
+			info "  🔧 Architecture: {$arch}"
+			step "Setting up {$os} environment for {$arch}"
+			step "Installing build dependencies"
+			step "Compiling for {$os}-{$arch}"
+			step "Running architecture-specific tests"
+			step "Creating {$os}-{$arch} artifacts"
+	
+	success "✅ Build matrix completed!"
+
+task "deployment strategies" means "Different deployment strategies using arrays":
+	info "🚀 Deployment Strategies"
+	
+	# Blue-Green deployment
+	info "🔵🟢 Blue-Green Deployment:"
+	for each $color in ["blue", "green"]:
+		info "  🎨 Deploying to {$color} environment"
+		for each $service in ["frontend", "backend", "database"]:
+			step "Deploying {$service} to {$color}"
+			step "Health checking {$service} in {$color}"
+		step "Switching traffic to {$color}"
+	
+	# Rolling deployment
+	info "🔄 Rolling Deployment:"
+	for each $batch in ["batch-1", "batch-2", "batch-3", "batch-4"]:
+		info "  📦 Processing {$batch}"
+		for each $instance in ["instance-a", "instance-b", "instance-c"]:
+			step "Updating {$instance} in {$batch}"
+			step "Verifying {$instance} health"
+	
+	# Canary deployment percentages
+	info "🐤 Canary Deployment:"
+	for each $percentage in ["5", "10", "25", "50", "75", "100"]:
+		info "  📈 Rolling out {$percentage}% traffic"
+		step "Configuring load balancer for {$percentage}%"
+		step "Monitoring metrics at {$percentage}%"
+		step "Validating performance at {$percentage}%"
+	
+	success "✅ All deployment strategies completed!"
+
+task "testing matrix comprehensive" means "Comprehensive testing matrix":
+	info "🧪 Comprehensive Testing Matrix"
+	
+	# Browser × Device testing
+	for each $browser in ["chrome", "firefox", "safari", "edge"]:
+		info "🌐 Testing browser: {$browser}"
+		for each $device in ["desktop", "tablet", "mobile"]:
+			info "  📱 Device type: {$device}"
+			for each $resolution in ["1920x1080", "1366x768", "375x667", "768x1024"]:
+				step "Testing {$browser} on {$device} at {$resolution}"
+				step "Running UI tests"
+				step "Checking responsive design"
+				step "Validating accessibility"
+	
+	# API testing matrix
+	info "🔌 API Testing Matrix:"
+	for each $version in ["v1", "v2", "v3"]:
+		info "  📋 API Version: {$version}"
+		for each $method in ["GET", "POST", "PUT", "DELETE", "PATCH"]:
+			info "    🔧 HTTP Method: {$method}"
+			for each $format in ["json", "xml", "yaml"]:
+				step "Testing {$method} {$version} with {$format}"
+				step "Validating {$format} response format"
+				step "Checking {$method} error handling"
+	
+	success "✅ Comprehensive testing completed!"
+
+task "monitoring setup" means "Set up monitoring across multiple dimensions":
+	info "📊 Monitoring Setup Matrix"
+	
+	# Metrics × Services × Environments
+	for each $metric_type in ["performance", "availability", "security", "business"]:
+		info "📈 Setting up {$metric_type} monitoring"
+		for each $service in ["api", "web", "database", "cache", "queue"]:
+			info "  🔧 Service: {$service}"
+			for each $env in ["dev", "staging", "prod"]:
+				step "Configuring {$metric_type} alerts for {$service} in {$env}"
+				step "Setting up {$metric_type} dashboards"
+				step "Testing {$metric_type} notifications"
+	
+	# Notification channels setup
+	info "🔔 Notification Channels:"
+	for each $channel in notification_channels:
+		info "  📢 Channel: {$channel}"
+		for each $severity in ["critical", "warning", "info"]:
+			step "Configuring {$severity} alerts for {$channel}"
+			step "Testing {$channel} integration"
+	
+	success "✅ Monitoring setup completed!"
+
+task "security scanning matrix" means "Security scanning across multiple dimensions":
+	info "🔒 Security Scanning Matrix"
+	
+	# Scan types × Targets
+	for each $scan_type in ["sast", "dast", "dependency", "container", "infrastructure"]:
+		info "🔍 Running {$scan_type} scans"
+		for each $target in ["source-code", "web-app", "api", "containers", "infrastructure"]:
+			info "  🎯 Target: {$target}"
+			for each $tool in ["snyk", "sonarqube", "trivy", "owasp-zap", "checkov"]:
+				step "Running {$tool} {$scan_type} scan on {$target}"
+				step "Analyzing {$tool} results"
+				step "Generating {$tool} security report"
+	
+	# Compliance checks
+	info "📋 Compliance Checks:"
+	for each $standard in ["SOC2", "ISO27001", "PCI-DSS", "GDPR", "HIPAA"]:
+		info "  ⚖️  Standard: {$standard}"
+		for each $control in ["access", "encryption", "logging", "backup"]:
+			step "Validating {$control} compliance for {$standard}"
+			step "Documenting {$control} evidence"
+	
+	success "✅ Security scanning completed!"
+
+task "data pipeline matrix" means "Data processing pipeline with multiple formats and destinations":
+	info "📊 Data Pipeline Matrix"
+	
+	# Source × Format × Destination
+	for each $source in ["database", "api", "file", "stream"]:
+		info "📥 Processing from source: {$source}"
+		for each $format in ["json", "csv", "parquet", "avro", "xml"]:
+			info "  📄 Format: {$format}"
+			for each $destination in ["warehouse", "lake", "cache", "search", "analytics"]:
+				step "Extracting data from {$source}"
+				step "Transforming {$source} data to {$format}"
+				step "Validating {$format} data quality"
+				step "Loading {$format} data to {$destination}"
+				step "Verifying {$destination} data integrity"
+	
+	success "✅ Data pipeline matrix completed!"
