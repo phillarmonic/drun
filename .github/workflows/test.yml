@@ -85,11 +85,11 @@ jobs:
       run: |
         echo "Running CI Test Suite..."
         echo "Cleaning up any .out files..."
-        if (Test-Path "*.out") { Remove-Item "*.out" -Force }
+        Get-ChildItem -Path . -Name "*.out" -File | Remove-Item -Force -ErrorAction SilentlyContinue
         echo "Testing race..."
-        mkdir -p coverage
-        go test -race -cover -coverprofile=coverage/coverage.out ./internal/...
-        echo "Buidling the binary..."
+        New-Item -ItemType Directory -Force -Path coverage
+        go test -race -cover -coverprofile=coverage\coverage.out github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
+        echo "Building the binary..."
         go build -o bin/drun.exe ./cmd/drun
         echo "Testing the binary..."
         ./bin/drun.exe --version
