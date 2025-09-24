@@ -177,9 +177,9 @@ project "test" version "1.0":
 	set environments as list to ["dev", "staging"]
 
 task "deploy":
-	for each $platform in platforms:
+	for each $platform in $globals.platforms:
 		info "Platform: {$platform}"
-	for each $env in environments:
+	for each $env in $globals.environments:
 		info "Environment: {$env}"`
 
 	var output bytes.Buffer
@@ -283,9 +283,9 @@ project "complex" version "1.0":
 
 task "complex matrix":
 	info "Starting complex matrix"
-	for each $db in databases:
+	for each $db in $globals.databases:
 		info "Testing database: {$db}"
-		for each $version in versions:
+		for each $version in $globals.versions:
 			info "  Version: {$version}"
 			for each $test_type in ["unit", "integration"]:
 				step "Run {$test_type} tests on {$db}:{$version}"

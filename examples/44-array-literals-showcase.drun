@@ -11,7 +11,7 @@ task "array syntax examples" means "Demonstrate various array literal syntaxes":
 	
 	# Project-level arrays (defined above)
 	info "🔧 Using project-level arrays:"
-	for each $lang in supported_languages:
+	for each $lang in $globals.supported_languages:
 		info "  💻 Language: {$lang}"
 	
 	# Inline array literals
@@ -123,7 +123,7 @@ task "monitoring setup" means "Set up monitoring across multiple dimensions":
 	
 	# Notification channels setup
 	info "🔔 Notification Channels:"
-	for each $channel in notification_channels:
+	for each $channel in $globals.notification_channels:
 		info "  📢 Channel: {$channel}"
 		for each $severity in ["critical", "warning", "info"]:
 			step "Configuring {$severity} alerts for {$channel}"

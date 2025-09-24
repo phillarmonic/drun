@@ -9,9 +9,9 @@ task "cross platform build" means "Build application for multiple platforms and 
 	info "🏗️  Starting cross-platform build matrix"
 	
 	# Sequential matrix: platforms × architectures
-	for each $platform in platforms:
+	for each $platform in $globals.platforms:
 		info "📦 Building for platform: {$platform}"
-		for each $arch in architectures:
+		for each $arch in $globals.architectures:
 			info "  🔧 Compiling {$platform}/{$arch}"
 			step "Setting up {$platform} build environment"
 			step "Compiling binary for {$platform}-{$arch}"

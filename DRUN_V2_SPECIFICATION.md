@@ -1763,6 +1763,20 @@ project "myapp" version "1.0.0":
   set databases as list to ["postgres", "mysql", "mongodb"]
 ```
 
+**Accessing Project Arrays:** Project-level arrays must be accessed using the consistent `$globals.` prefix:
+
+```
+# ✅ Correct: Use $globals prefix for consistency
+for each $platform in $globals.platforms:
+  info "Building for {$platform}"
+
+# ❌ Deprecated: Direct access (will show deprecation warning)
+for each $platform in platforms:
+  info "Building for {$platform}"
+```
+
+This maintains consistency with other global variable access patterns like `{$globals.project}`, `{$globals.version}`, and `{$globals.registry}`.
+
 ### Loop Variables with Array Literals
 
 Loop variables use the `$variable` syntax for consistency with the scoping system:

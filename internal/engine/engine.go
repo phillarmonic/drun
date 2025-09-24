@@ -2683,6 +2683,30 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 	if strings.HasPrefix(stmt.Iterable, "[") && strings.HasSuffix(stmt.Iterable, "]") {
 		// Parse array literal
 		items = e.parseArrayLiteralString(stmt.Iterable)
+	} else if strings.HasPrefix(stmt.Iterable, "$globals.") {
+		// Handle $globals.key syntax for project settings (check this before general $ variables)
+		if ctx.Project != nil && ctx.Project.Settings != nil {
+			key := stmt.Iterable[9:] // Remove "$globals." prefix
+			if projectValue, exists := ctx.Project.Settings[key]; exists {
+				// Handle project setting (could be array or string)
+				if strings.HasPrefix(projectValue, "[") && strings.HasSuffix(projectValue, "]") {
+					// It's an array literal stored as a string
+					items = e.parseArrayLiteralString(projectValue)
+				} else {
+					// It's a regular string, split by whitespace
+					iterableStr := strings.TrimSpace(projectValue)
+					if iterableStr == "" {
+						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
+						return nil
+					}
+					items = strings.Fields(iterableStr)
+				}
+			} else {
+				return fmt.Errorf("project setting '%s' not found", key)
+			}
+		} else {
+			return fmt.Errorf("no project defined for $globals access")
+		}
 	} else if strings.HasPrefix(stmt.Iterable, "$") {
 		// Variable reference
 		var iterableStr string
@@ -2704,10 +2728,11 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 
 		items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
 	} else {
-		// Check if it's a project setting first (if project exists)
+		// Check if it's a legacy direct project setting access (for backward compatibility)
 		if ctx.Project != nil && ctx.Project.Settings != nil {
 			if projectValue, exists := ctx.Project.Settings[stmt.Iterable]; exists {
-				// Handle project setting (could be array or string)
+				// Handle project setting (could be array or string) - but warn about deprecated usage
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Direct project setting access '%s' is deprecated. Use '$globals.%s' instead.\n", stmt.Iterable, stmt.Iterable)
 				if strings.HasPrefix(projectValue, "[") && strings.HasSuffix(projectValue, "]") {
 					// It's an array literal stored as a string
 					items = e.parseArrayLiteralString(projectValue)

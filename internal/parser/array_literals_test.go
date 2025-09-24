@@ -150,7 +150,7 @@ project "test" version "1.0":
 	set registry to "ghcr.io/company"
 
 task "deploy":
-	for each $platform in platforms:
+	for each $platform in $globals.platforms:
 		info "Deploying to {$platform}"
 `
 
@@ -215,8 +215,8 @@ task "deploy":
 		t.Fatalf("Expected LoopStatement, got %T", task.Body[0])
 	}
 
-	if loop.Iterable != "platforms" {
-		t.Errorf("Expected loop to iterate over 'platforms', got %q", loop.Iterable)
+	if loop.Iterable != "$globals.platforms" {
+		t.Errorf("Expected loop to iterate over '$globals.platforms', got %q", loop.Iterable)
 	}
 }
 
