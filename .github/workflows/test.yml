@@ -88,7 +88,7 @@ jobs:
         Get-ChildItem -Path . -Name "*.out" -File | Remove-Item -Force -ErrorAction SilentlyContinue
         echo "Testing race..."
         New-Item -ItemType Directory -Force -Path coverage
-        go test -race -cover -coverprofile=coverage\coverage.out github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
+        go test -race -cover -coverprofile=coverage\coverage.cov github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
         echo "Building the binary..."
         go build -o bin/drun.exe ./cmd/drun
         echo "Testing the binary..."
@@ -99,7 +99,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
       uses: codecov/codecov-action@v3
       with:
-        file: ./coverage/coverage.out
+        file: ./coverage/coverage.cov
         flags: unittests
         name: codecov-umbrella
 

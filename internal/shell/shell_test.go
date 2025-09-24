@@ -76,7 +76,7 @@ func TestExecute_WithEnvironment(t *testing.T) {
 
 	var cmd string
 	if runtime.GOOS == "windows" {
-		cmd = "echo %TEST_VAR%"
+		cmd = "echo $env:TEST_VAR"
 	} else {
 		cmd = "echo $TEST_VAR"
 	}
@@ -103,7 +103,7 @@ func TestExecute_WithWorkingDir(t *testing.T) {
 			expectedDir = "C:\\Windows\\Temp"
 		}
 		opts.WorkingDir = expectedDir
-		cmd = "cd"
+		cmd = "Get-Location | Select-Object -ExpandProperty Path"
 	} else {
 		expectedDir = "/tmp"
 		opts.WorkingDir = expectedDir
@@ -182,7 +182,7 @@ func TestExecute_MultilineOutput(t *testing.T) {
 
 	var cmd string
 	if runtime.GOOS == "windows" {
-		cmd = "echo line1 && echo line2 && echo line3"
+		cmd = "echo line1; echo line2; echo line3"
 	} else {
 		cmd = "echo 'line1'; echo 'line2'; echo 'line3'"
 	}
