@@ -2,6 +2,8 @@ package shell
 
 import (
 	"bytes"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +74,14 @@ func TestExecute_WithEnvironment(t *testing.T) {
 		"TEST_VAR": "test_value_123",
 	}
 
-	result, err := Execute("echo $TEST_VAR", opts)
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = "echo %TEST_VAR%"
+	} else {
+		cmd = "echo $TEST_VAR"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -85,15 +94,36 @@ func TestExecute_WithEnvironment(t *testing.T) {
 func TestExecute_WithWorkingDir(t *testing.T) {
 	opts := DefaultOptions()
 	opts.CaptureOutput = true
-	opts.WorkingDir = "/tmp"
 
-	result, err := Execute("pwd", opts)
+	var expectedDir, cmd string
+	if runtime.GOOS == "windows" {
+		// Use a directory that exists on Windows
+		expectedDir = os.Getenv("TEMP")
+		if expectedDir == "" {
+			expectedDir = "C:\\Windows\\Temp"
+		}
+		opts.WorkingDir = expectedDir
+		cmd = "cd"
+	} else {
+		expectedDir = "/tmp"
+		opts.WorkingDir = expectedDir
+		cmd = "pwd"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Stdout != "/tmp" {
-		t.Errorf("Expected '/tmp', got %q", result.Stdout)
+	if runtime.GOOS == "windows" {
+		// On Windows, cd returns the current directory, normalize the path
+		if !strings.Contains(result.Stdout, expectedDir) {
+			t.Errorf("Expected output to contain %q, got %q", expectedDir, result.Stdout)
+		}
+	} else {
+		if result.Stdout != expectedDir {
+			t.Errorf("Expected %q, got %q", expectedDir, result.Stdout)
+		}
 	}
 }
 
@@ -150,14 +180,23 @@ func TestExecute_MultilineOutput(t *testing.T) {
 	opts := DefaultOptions()
 	opts.CaptureOutput = true
 
-	result, err := Execute("echo 'line1'; echo 'line2'; echo 'line3'", opts)
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = "echo line1 && echo line2 && echo line3"
+	} else {
+		cmd = "echo 'line1'; echo 'line2'; echo 'line3'"
+	}
+
+	result, err := Execute(cmd, opts)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	// Normalize line endings for cross-platform compatibility
+	normalizedOutput := strings.ReplaceAll(result.Stdout, "\r\n", "\n")
 	expected := "line1\nline2\nline3"
-	if result.Stdout != expected {
-		t.Errorf("Expected %q, got %q", expected, result.Stdout)
+	if normalizedOutput != expected {
+		t.Errorf("Expected %q, got %q (normalized: %q)", expected, result.Stdout, normalizedOutput)
 	}
 }
 
