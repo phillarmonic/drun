@@ -85,7 +85,8 @@ jobs:
       run: |
         echo "Running CI Test Suite..."
         echo "Testing race..."
-        go test -race -cover -coverprofile=coverage.out ./internal/...
+        mkdir -p coverage
+        go test -race -cover -coverprofile=coverage/coverage.out ./internal/...
         echo "Buidling the binary..."
         go build -o bin/drun.exe ./cmd/drun
         echo "Testing the binary..."
