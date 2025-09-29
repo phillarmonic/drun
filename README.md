@@ -23,6 +23,7 @@ A **semantic, English-like** task automation language with intelligent execution
 
 - **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
+- **📞 Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
 - **🌐 HTTP Actions**: Built-in HTTP requests with authentication and response handling
 - **🐳 Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
 - **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
@@ -966,6 +967,7 @@ Explore comprehensive examples in the `examples/` directory:
 - **`examples/08-builtin-functions.drun`** - Built-in function examples
 - **`examples/26-smart-detection.drun`** - Smart tool and environment detection
 - **`examples/38-progress-and-timers.drun`** - Progress indicators and timing operations
+- **`examples/46-task-calling.drun`** - Task calling and modular task design
 
 ### 🎯 **Quick Examples**
 
@@ -985,6 +987,9 @@ drun -f examples/38-progress-and-timers.drun "progress demo"
 # Explore smart detection
 drun -f examples/26-smart-detection.drun "detect project"
 
+# Try task calling and modular design
+drun -f examples/46-task-calling.drun "quick-test"
+
 # See comprehensive features
 drun -f examples/07-final-showcase.drun showcase project_name=MyApp
 ```
@@ -998,7 +1003,7 @@ drun is **production-ready** with enterprise-grade features:
 ### ✅ **Implemented Features**
 
 - **Core Functionality**: .drun semantic language, parameters, variables, control flow
-- **Advanced Features**: Remote includes, matrix execution, secrets management
+- **Advanced Features**: Remote includes, matrix execution, secrets management, task calling
 - **Developer Experience**: 15+ template functions, intelligent caching, rich errors
 - **Performance**: Microsecond-level operations, high test coverage (71-83%)
 - **Quality**: Zero linting issues, comprehensive test suite

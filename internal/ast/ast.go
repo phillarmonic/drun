@@ -234,6 +234,29 @@ func (as *ActionStatement) String() string {
 	return fmt.Sprintf("%s \"%s\"", as.Action, as.Message)
 }
 
+// TaskCallStatement represents calling another task
+type TaskCallStatement struct {
+	Token      lexer.Token       // the CALL token
+	TaskName   string            // name of the task to call
+	Parameters map[string]string // parameters to pass to the task
+}
+
+func (tcs *TaskCallStatement) statementNode() {}
+func (tcs *TaskCallStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("call task \"%s\"", tcs.TaskName))
+
+	// Add parameters if any
+	if len(tcs.Parameters) > 0 {
+		out.WriteString(" with")
+		for key, value := range tcs.Parameters {
+			out.WriteString(fmt.Sprintf(" %s=\"%s\"", key, value))
+		}
+	}
+
+	return out.String()
+}
+
 // ShellStatement represents shell command execution
 type ShellStatement struct {
 	Token        lexer.Token // the shell token (RUN, EXEC, SHELL, CAPTURE)

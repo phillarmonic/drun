@@ -285,6 +285,20 @@ capture from shell as $build_info:
 let $config = when $environment is "production": prod_config else: dev_config
 ```
 
+### Task Calling Syntax
+```drun
+# Basic task call
+call task "task-name"
+
+# Task call with parameters
+call task "task-name" with param1="value1" param2="value2"
+
+# Examples
+call task "setup-environment"
+call task "run-tests" with test_type="unit"
+call task "deploy" with environment="production" replicas="3"
+```
+
 ### Control Flow
 ```drun
 # If statements
@@ -295,12 +309,13 @@ else if $environment is "staging":
 else:
   skip validation
 
-# When statements (pattern matching)
-when $package_manager:
-  is "npm": run "npm ci && npm run build"
-  is "yarn": run "yarn install && yarn build"
-  is "pnpm": run "pnpm install && pnpm build"
-  else: error "Unknown package manager"
+# When statements (individual conditions)
+when $package_manager is "npm":
+  run "npm ci && npm run build"
+when $package_manager is "yarn":
+  run "yarn install && yarn build"
+when $package_manager is "pnpm":
+  run "pnpm install && pnpm build"
 
 # When-otherwise (simplified conditional)
 when $platform is "windows":
@@ -382,7 +397,37 @@ task "ci-pipeline" means "Complete CI/CD pipeline":
   success "Pipeline completed successfully"
 ```
 
-### 5. Matrix Execution
+### 5. Task Calling Pattern
+```drun
+task "setup-environment":
+  info "Setting up development environment"
+  info "Installing dependencies..."
+
+task "run-tests":
+  given $test_type defaults to "unit"
+  info "Running {$test_type} tests"
+  info "All tests passed!"
+
+task "build-application":
+  given $target defaults to "production"
+  info "Building application for {$target}"
+  info "Build completed successfully"
+
+task "full-pipeline":
+  info "Starting full CI/CD pipeline"
+  
+  # Call tasks without parameters
+  call task "setup-environment"
+  
+  # Call tasks with parameters
+  call task "run-tests" with test_type="unit"
+  call task "run-tests" with test_type="integration"
+  call task "build-application" with target="production"
+  
+  success "Full pipeline completed successfully!"
+```
+
+### 6. Matrix Execution
 ```drun
 task "cross-platform-build" means "Build for multiple platforms":
   for each $os in ["linux", "darwin", "windows"]:
@@ -442,16 +487,18 @@ task "cross-platform-build" means "Build for multiple platforms":
 
 ## Variable Operations
 
+**⚠️ Implementation Status**: Variable operations are currently in development. Basic variable interpolation works, but advanced operations like `without prefix`, `filtered by`, etc. may display as literal text rather than being processed.
+
 ### String Operations
 ```drun
 set $version to "v2.1.0-beta"
 set $filename to "my-app.tar.gz"
 
-# Remove prefix/suffix
+# Remove prefix/suffix (Note: May not work in current implementation)
 info "Clean version: {$version without prefix 'v' | without suffix '-beta'}"
 info "App name: {$filename without suffix '.tar.gz'}"
 
-# Split strings
+# Split strings (Note: May not work in current implementation)
 set $docker_image to "nginx:1.21"
 info "Image name: {$docker_image split by ':' | first}"
 info "Version: {$docker_image split by ':' | last}"
@@ -859,14 +906,15 @@ if environment == "production":  # Wrong operator
 # ✅ Correct condition syntax
 if $environment is "production":
 
-# ❌ Missing colon in when statement
-when $package_manager
-  is "npm": run "npm install"
-
-# ✅ Correct when statement
+# ❌ Incorrect when statement syntax
 when $package_manager:
   is "npm": run "npm install"
-  is "yarn": run "yarn install"
+
+# ✅ Correct when statement syntax
+when $package_manager is "npm":
+  run "npm install"
+when $package_manager is "yarn":
+  run "yarn install"
 ```
 
 ### Parameter Validation Errors
@@ -882,6 +930,12 @@ requires $version matching "v\d+\.\d+\.\d+"  # Missing 'pattern' keyword
 
 # ✅ Correct pattern syntax
 requires $version matching pattern "v\d+\.\d+\.\d+"
+
+# ❌ Global variables in constraints (not supported)
+requires $environment from $globals.environments
+
+# ✅ Use literal arrays in constraints
+requires $environment from ["dev", "staging", "production"]
 ```
 
 ---

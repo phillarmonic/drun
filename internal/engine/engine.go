@@ -42,6 +42,7 @@ type ExecutionContext struct {
 	Project     *ProjectContext         // project-level settings and hooks
 	CurrentFile string                  // path to the current drun file being executed
 	CurrentTask string                  // name of the currently executing task
+	Program     *ast.Program            // the AST program being executed
 }
 
 // ProjectContext holds project-level configuration
@@ -127,6 +128,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
 		Project:     e.createProjectContext(program.Project),
 		CurrentFile: currentFile,
+		Program:     program,
 	}
 
 	// Execute drun setup hooks
@@ -404,6 +406,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeConditional(s, ctx)
 	case *ast.LoopStatement:
 		return e.executeLoop(s, ctx)
+	case *ast.TaskCallStatement:
+		return e.executeTaskCall(s, ctx)
 	default:
 		return fmt.Errorf("unknown statement type: %T", stmt)
 	}
@@ -443,6 +447,62 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 		_, _ = fmt.Fprintf(e.output, "%s\n", processedMessage)
 	default:
 		return fmt.Errorf("unknown action: %s", action.Action)
+	}
+
+	return nil
+}
+
+// executeTaskCall executes a task call statement
+func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *ExecutionContext) error {
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would call task: %s\n", callStmt.TaskName)
+		if len(callStmt.Parameters) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] With parameters: %v\n", callStmt.Parameters)
+		}
+		return nil
+	}
+
+	// Find the task to call
+	var targetTask *ast.TaskStatement
+	for _, task := range ctx.Program.Tasks {
+		if task.Name == callStmt.TaskName {
+			targetTask = task
+			break
+		}
+	}
+
+	if targetTask == nil {
+		return fmt.Errorf("task '%s' not found", callStmt.TaskName)
+	}
+
+	// Create a new execution context for the called task
+	callCtx := &ExecutionContext{
+		Parameters:  make(map[string]*types.Value, 8),
+		Variables:   make(map[string]string, 16),
+		Project:     ctx.Project,
+		CurrentFile: ctx.CurrentFile,
+		CurrentTask: callStmt.TaskName,
+		Program:     ctx.Program,
+	}
+
+	// Copy current variables to the new context
+	for k, v := range ctx.Variables {
+		callCtx.Variables[k] = v
+	}
+
+	// Set up parameters for the called task
+	if err := e.setupTaskParameters(targetTask, callStmt.Parameters, callCtx); err != nil {
+		return fmt.Errorf("failed to setup parameters for task '%s': %v", callStmt.TaskName, err)
+	}
+
+	// Execute the called task
+	if err := e.executeTask(targetTask, callCtx); err != nil {
+		return fmt.Errorf("task '%s' failed: %v", callStmt.TaskName, err)
+	}
+
+	// Copy back any new variables that might have been set in the called task
+	for k, v := range callCtx.Variables {
+		ctx.Variables[k] = v
 	}
 
 	return nil

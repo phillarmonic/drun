@@ -1,0 +1,56 @@
+/*
+    Task Calling Example
+    This example demonstrates the new task calling functionality in drun v2
+    
+    Syntax: call task "task_name" [with param="value" param2="value2"]
+*/
+
+version: 2.0
+
+task "setup-environment":
+  info "Setting up development environment"
+  info "Installing dependencies..."
+  info "Environment setup complete"
+
+task "run-tests":
+  given $test_type defaults to "unit"
+  info "Running {$test_type} tests"
+  info "All tests passed!"
+
+task "build-application":
+  given $target defaults to "production"
+  info "Building application for {$target}"
+  info "Build completed successfully"
+
+task "deploy":
+  requires $environment from ["dev", "staging", "production"]
+  info "Deploying to {$environment} environment"
+  info "Deployment successful"
+
+task "full-pipeline":
+  info "🚀 Starting full CI/CD pipeline"
+  
+  # Call tasks without parameters
+  call task "setup-environment"
+  
+  # Call tasks with parameters
+  call task "run-tests" with test_type="unit"
+  call task "run-tests" with test_type="integration"
+  call task "build-application" with target="production"
+  call task "deploy" with environment="production"
+  
+  success "🎉 Full pipeline completed successfully!"
+
+task "development-workflow":
+  info "🔧 Starting development workflow"
+  
+  call task "setup-environment"
+  call task "run-tests" with test_type="unit"
+  call task "build-application" with target="development"
+  
+  info "Development workflow completed"
+
+task "quick-test":
+  info "Running quick tests"
+  call task "run-tests"  # Uses default test_type="unit"
+  success "Quick tests completed"

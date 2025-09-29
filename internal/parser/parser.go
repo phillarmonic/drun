@@ -824,6 +824,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, action)
 				}
 			}
+		} else if p.isCallToken(p.curToken.Type) {
+			call := p.parseTaskCallStatement()
+			if call != nil {
+				stmt.Body = append(stmt.Body, call)
+			}
 		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments in task body
 			continue
@@ -857,6 +862,58 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 	}
 
 	stmt.Message = p.curToken.Literal
+
+	return stmt
+}
+
+// parseTaskCallStatement parses a task call statement (call task "name" with param="value")
+func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
+	stmt := &ast.TaskCallStatement{
+		Token:      p.curToken,
+		Parameters: make(map[string]string),
+	}
+
+	// Expect "task" after "call"
+	if !p.expectPeek(lexer.TASK) {
+		p.addError("expected 'task' after 'call'")
+		return nil
+	}
+
+	// Expect task name as string
+	if !p.expectPeek(lexer.STRING) {
+		p.addError("expected task name as string")
+		return nil
+	}
+
+	stmt.TaskName = p.curToken.Literal
+
+	// Check for optional "with" parameters
+	if p.peekToken.Type == lexer.WITH {
+		p.nextToken() // consume "with"
+
+		// Parse parameters until we hit a newline or end of statement
+		for p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.EOF {
+			p.nextToken()
+
+			if p.curToken.Type == lexer.IDENT {
+				paramName := p.curToken.Literal
+
+				// Expect "="
+				if !p.expectPeek(lexer.EQUALS) {
+					p.addError("expected '=' after parameter name")
+					return nil
+				}
+
+				// Expect parameter value as string
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected parameter value as string")
+					return nil
+				}
+
+				stmt.Parameters[paramName] = p.curToken.Literal
+			}
+		}
+	}
 
 	return stmt
 }
@@ -2712,6 +2769,11 @@ func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	}
 }
 
+// isCallToken checks if a token type represents a task call
+func (p *Parser) isCallToken(tokenType lexer.TokenType) bool {
+	return tokenType == lexer.CALL
+}
+
 // isShellActionToken checks if a token type represents a shell action
 func (p *Parser) isShellActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
@@ -3956,6 +4018,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			errorHandling := p.parseErrorHandlingStatement()
 			if errorHandling != nil {
 				body = append(body, errorHandling)
+			}
+		} else if p.isCallToken(p.curToken.Type) {
+			call := p.parseTaskCallStatement()
+			if call != nil {
+				body = append(body, call)
 			}
 		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments

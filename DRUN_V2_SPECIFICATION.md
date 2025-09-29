@@ -177,7 +177,8 @@ declaration_statement = variable_declaration
 
 action_statement = built_in_action
                  | shell_command
-                 | detection_statement ;
+                 | detection_statement
+                 | task_call_statement ;
 
 (* Control flow *)
 if_statement = "if" condition ":" statement_block
@@ -193,6 +194,13 @@ for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in"
 try_statement = "try" ":" statement_block
                { "catch" identifier ":" statement_block }
                [ "finally" ":" statement_block ] ;
+
+(* Task calls *)
+task_call_statement = "call" "task" string_literal [ "with" parameter_list ] ;
+
+parameter_list = parameter_assignment { parameter_assignment } ;
+
+parameter_assignment = identifier "=" string_literal ;
 
 (* Conditions *)
 condition = logical_expression ;
@@ -702,6 +710,84 @@ task "deploy" means "Deploy application to environment":
   depends on build and test
   
   deploy myapp to kubernetes namespace {$environment}
+```
+
+### Task Calling
+
+Tasks can call other tasks directly using the `call task` statement. This allows for code reuse and modular task design.
+
+#### Basic Syntax
+
+```
+call task "task_name"
+```
+
+#### With Parameters
+
+```
+call task "task_name" with param1="value1" param2="value2"
+```
+
+#### Examples
+
+```drun
+task "setup-environment":
+  info "Setting up development environment"
+  info "Installing dependencies..."
+
+task "run-tests":
+  given $test_type defaults to "unit"
+  info "Running {$test_type} tests"
+  info "All tests passed!"
+
+task "build-application":
+  given $target defaults to "production"
+  info "Building application for {$target}"
+  info "Build completed successfully"
+
+task "full-pipeline":
+  info "Starting full CI/CD pipeline"
+  
+  # Call tasks without parameters
+  call task "setup-environment"
+  
+  # Call tasks with parameters
+  call task "run-tests" with test_type="unit"
+  call task "run-tests" with test_type="integration"
+  call task "build-application" with target="production"
+  
+  success "Full pipeline completed successfully!"
+```
+
+#### Key Features
+
+- **Parameter Passing**: Pass parameters to called tasks using `with param="value"` syntax
+- **Variable Sharing**: Variables set in called tasks are available in the calling task
+- **Error Handling**: If a called task fails, the calling task fails with an appropriate error message
+- **Execution Flow**: Called tasks execute completely before returning control to the calling task
+- **Dry Run Support**: Task calls are properly handled in dry-run mode
+
+#### Parameter Handling
+
+Parameters passed to called tasks override any default values defined in the called task:
+
+```drun
+task "greet":
+  given $name defaults to "World"
+  info "Hello, {$name}!"
+
+task "main":
+  call task "greet"                    # Uses default: "Hello, World!"
+  call task "greet" with name="Alice"  # Uses passed value: "Hello, Alice!"
+```
+
+#### Error Handling
+
+If a called task doesn't exist, the execution fails with a clear error message:
+
+```drun
+task "main":
+  call task "nonexistent"  # Error: task 'nonexistent' not found
 ```
 
 ### Parameter Declarations
