@@ -268,7 +268,7 @@ depends on lint, test, scan        # Parallel dependencies
 ```
 let name be "value"                 # Immutable binding
 set counter to 0                    # Mutable variable
-capture result from "command"       # Capture command output
+capture from shell "command" as $variable       # Capture command output
 
 # Conditional assignment
 let config be:
