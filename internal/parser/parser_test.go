@@ -335,3 +335,52 @@ task "test":
 		t.Errorf("secondIf.Condition wrong. expected='$features is not empty', got=%s", secondIf.Condition)
 	}
 }
+
+func TestParser_EscapedQuotes(t *testing.T) {
+	input := `version: 2.0
+
+task "test with \"escaped\" quotes":
+  info "This has \"quotes\" inside"
+  run "echo \"Hello World\""`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if program == nil {
+		t.Fatalf("ParseProgram() returned nil")
+	}
+
+	// Check that we have one task
+	if len(program.Tasks) != 1 {
+		t.Fatalf("program.Tasks does not contain 1 task. got=%d", len(program.Tasks))
+	}
+
+	task := program.Tasks[0]
+	if task.Name != "test with \"escaped\" quotes" {
+		t.Errorf("task.Name wrong. expected='test with \"escaped\" quotes', got=%s", task.Name)
+	}
+
+	// Check the info statement
+	infoStmt, ok := task.Body[0].(*ast.ActionStatement)
+	if !ok {
+		t.Fatalf("task.Body[0] is not an ActionStatement")
+	}
+	if infoStmt.Action != "info" {
+		t.Errorf("infoStmt.Action wrong. expected=info, got=%s", infoStmt.Action)
+	}
+	if infoStmt.Message != "This has \"quotes\" inside" {
+		t.Errorf("infoStmt.Message wrong. expected='This has \"quotes\" inside', got=%s", infoStmt.Message)
+	}
+
+	// Check the run statement
+	runStmt, ok := task.Body[1].(*ast.ShellStatement)
+	if !ok {
+		t.Fatalf("task.Body[1] is not a ShellStatement, got %T", task.Body[1])
+	}
+	if runStmt.Command != "echo \"Hello World\"" {
+		t.Errorf("runStmt.Command wrong. expected='echo \"Hello World\"', got=%s", runStmt.Command)
+	}
+}

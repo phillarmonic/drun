@@ -123,8 +123,13 @@ func Execute(command string, opts *Options) (*Result, error) {
 				return nil, fmt.Errorf("failed to start command: %w", err)
 			}
 
+			// Use channels to synchronize goroutines
+			stdoutDone := make(chan bool)
+			stderrDone := make(chan bool)
+
 			// Stream stdout
 			go func() {
+				defer close(stdoutDone)
 				scanner := bufio.NewScanner(stdoutPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
@@ -137,6 +142,7 @@ func Execute(command string, opts *Options) (*Result, error) {
 
 			// Stream stderr
 			go func() {
+				defer close(stderrDone)
 				scanner := bufio.NewScanner(stderrPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
@@ -147,8 +153,13 @@ func Execute(command string, opts *Options) (*Result, error) {
 				}
 			}()
 
-			// Wait for completion
+			// Wait for command completion
 			err = cmd.Wait()
+
+			// Wait for both goroutines to complete
+			<-stdoutDone
+			<-stderrDone
+
 			result.Stdout = strings.TrimSuffix(stdoutBuf.String(), "\n")
 			result.Stderr = strings.TrimSuffix(stderrBuf.String(), "\n")
 

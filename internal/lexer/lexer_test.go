@@ -338,3 +338,41 @@ version: 2.0`
 		}
 	}
 }
+
+func TestLexer_EscapedQuotes(t *testing.T) {
+	input := `task "test with \"escaped\" quotes":
+  info "This has \"quotes\" inside"
+  run "echo \"Hello World\""`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test with \"escaped\" quotes"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{INFO, "info"},
+		{STRING, "This has \"quotes\" inside"},
+		{RUN, "run"},
+		{STRING, "echo \"Hello World\""},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

@@ -1,5 +1,7 @@
 package lexer
 
+import "strings"
+
 // No imports needed for basic lexer
 
 // Lexer tokenizes drun v2 source code
@@ -307,15 +309,44 @@ func (l *Lexer) handleIndentation() Token {
 
 // readString reads a string literal
 func (l *Lexer) readString() string {
-	position := l.position + 1
+	var result strings.Builder
+
 	for {
 		l.readChar()
 		if l.ch == '"' || l.ch == 0 {
 			break
 		}
-		// TODO: Handle escape sequences
+		// Handle escape sequences
+		if l.ch == '\\' {
+			l.readChar() // consume the backslash
+			// If we hit EOF after backslash, break
+			if l.ch == 0 {
+				break
+			}
+			// Process the escaped character
+			switch l.ch {
+			case '"':
+				result.WriteByte('"')
+			case '\\':
+				result.WriteByte('\\')
+			case 'n':
+				result.WriteByte('\n')
+			case 't':
+				result.WriteByte('\t')
+			case 'r':
+				result.WriteByte('\r')
+			default:
+				// Unknown escape sequence, keep both characters
+				result.WriteByte('\\')
+				result.WriteByte(l.ch)
+			}
+		} else {
+			result.WriteByte(l.ch)
+		}
 	}
-	return l.input[position:l.position]
+
+	// Return the unescaped string
+	return result.String()
 }
 
 // readComment reads a comment until end of line (but doesn't consume the newline)

@@ -569,8 +569,10 @@ func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *Exec
 
 	// Show execution summary
 	if result.Success {
-		_, _ = fmt.Fprintf(e.output, "✅ Command completed successfully (exit code: %d, duration: %v)\n",
-			result.ExitCode, result.Duration)
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "✅ Command completed successfully (exit code: %d, duration: %v)\n",
+				result.ExitCode, result.Duration)
+		}
 	} else {
 		_, _ = fmt.Fprintf(e.output, "⚠️  Command completed with exit code: %d (duration: %v)\n",
 			result.ExitCode, result.Duration)
@@ -644,8 +646,10 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 
 	// Show execution summary
 	if result.Success {
-		_, _ = fmt.Fprintf(e.output, "✅ Multiline commands completed successfully (exit code: %d, duration: %v)\n",
-			result.ExitCode, result.Duration)
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "✅ Multiline commands completed successfully (exit code: %d, duration: %v)\n",
+				result.ExitCode, result.Duration)
+		}
 	} else {
 		_, _ = fmt.Fprintf(e.output, "⚠️  Multiline commands completed with exit code: %d (duration: %v)\n",
 			result.ExitCode, result.Duration)
