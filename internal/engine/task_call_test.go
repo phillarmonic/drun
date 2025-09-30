@@ -43,7 +43,6 @@ task "main":
 	}
 
 	output := buf.String()
-	t.Logf("Full output: %q", output)
 	expected := []string{
 		"Starting main task",
 		"Hello from hello task",

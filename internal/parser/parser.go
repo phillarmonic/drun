@@ -891,27 +891,30 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 	if p.peekToken.Type == lexer.WITH {
 		p.nextToken() // consume "with"
 
-		// Parse parameters until we hit a newline or end of statement
-		for p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.EOF {
-			p.nextToken()
-
-			if p.curToken.Type == lexer.IDENT {
-				paramName := p.curToken.Literal
-
-				// Expect "="
-				if !p.expectPeek(lexer.EQUALS) {
-					p.addError("expected '=' after parameter name")
-					return nil
-				}
-
-				// Expect parameter value as string
-				if !p.expectPeek(lexer.STRING) {
-					p.addError("expected parameter value as string")
-					return nil
-				}
-
-				stmt.Parameters[paramName] = p.curToken.Literal
+		// Parse parameters - continue while we see parameter names (IDENT or keywords)
+		for {
+			// Check if next token can be a parameter name
+			// We allow both IDENT and keywords as parameter names
+			if p.peekToken.Type != lexer.IDENT && !p.isKeywordToken(p.peekToken.Type) {
+				break
 			}
+
+			p.nextToken() // consume parameter name
+			paramName := p.curToken.Literal
+
+			// Expect "="
+			if !p.expectPeek(lexer.EQUALS) {
+				p.addError("expected '=' after parameter name")
+				return nil
+			}
+
+			// Expect parameter value as string
+			if !p.expectPeek(lexer.STRING) {
+				p.addError("expected parameter value as string")
+				return nil
+			}
+
+			stmt.Parameters[paramName] = p.curToken.Literal
 		}
 	}
 
@@ -2772,6 +2775,35 @@ func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 // isCallToken checks if a token type represents a task call
 func (p *Parser) isCallToken(tokenType lexer.TokenType) bool {
 	return tokenType == lexer.CALL
+}
+
+// isKeywordToken checks if a token type is a keyword (can be used as a parameter name)
+func (p *Parser) isKeywordToken(tokenType lexer.TokenType) bool {
+	// Return false for basic tokens, structural keywords, and statement-starting keywords
+	switch tokenType {
+	case lexer.ILLEGAL, lexer.EOF, lexer.STRING, lexer.NUMBER, lexer.BOOLEAN, lexer.VARIABLE, lexer.IDENT:
+		// Basic tokens
+		return false
+	case lexer.VERSION, lexer.TASK, lexer.PROJECT, lexer.DRUN,
+		lexer.SETUP, lexer.TEARDOWN, lexer.BEFORE, lexer.AFTER,
+		lexer.IF, lexer.ELSE, lexer.WHEN, lexer.OTHERWISE,
+		lexer.FOR, lexer.IN, lexer.PARALLEL,
+		lexer.WITH, lexer.TRY, lexer.CATCH, lexer.FINALLY,
+		lexer.THROW, lexer.IGNORE, lexer.CALL,
+		lexer.COLON, lexer.EQUALS, lexer.COMMA, lexer.LPAREN, lexer.RPAREN,
+		lexer.LBRACE, lexer.RBRACE, lexer.LBRACKET, lexer.RBRACKET,
+		lexer.NEWLINE, lexer.INDENT, lexer.DEDENT,
+		lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL, lexer.ECHO,
+		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
+		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK,
+		lexer.DOCKER, lexer.GIT, lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.PATCH, lexer.HEAD, lexer.OPTIONS,
+		lexer.DETECT, lexer.GIVEN, lexer.REQUIRES, lexer.DEFAULTS, lexer.BREAK, lexer.CONTINUE:
+		// Structural keywords, action keywords, and statement-starting keywords
+		return false
+	default:
+		// Everything else (like ENVIRONMENT, TARGET, etc.) can be a parameter name
+		return true
+	}
 }
 
 // isShellActionToken checks if a token type represents a shell action
