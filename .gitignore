@@ -92,7 +92,6 @@ coverage.xml
 go.work
 
 # drun-specific files
-.drun/
 *.cache
 
 # Temporary files
