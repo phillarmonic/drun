@@ -50,10 +50,20 @@ func TestMemoryStatsCreation(t *testing.T) {
 		Timestamp:    time.Now(),
 	}
 
-	if stats.AllocMB == 0 {
-		t.Error("AllocMB should not be zero")
+	// Check that we can read memory stats - verify raw values are readable
+	if mem.Sys == 0 {
+		t.Error("Unable to read system memory stats")
 	}
 
+	// Verify timestamp is set
+	if stats.Timestamp.IsZero() {
+		t.Error("Timestamp should be set")
+	}
+
+	// Note: AllocMB and TotalAllocMB can be 0 if allocation is < 1MB, which is normal for small programs
+	// The important thing is that we can read the stats without panicking
 	t.Logf("Memory stats: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d",
 		stats.AllocMB, stats.TotalAllocMB, stats.SysMB, stats.NumGC)
+	t.Logf("Raw memory: Alloc=%d bytes, TotalAlloc=%d bytes, Sys=%d bytes",
+		mem.Alloc, mem.TotalAlloc, mem.Sys)
 }
