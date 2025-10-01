@@ -1704,6 +1704,30 @@ drun my-task --allow-undefined-variables
 
 drun v2 provides powerful variable transformation operations that can be chained together for complex data manipulation.
 
+#### Variable Assignment
+
+Both `let` and `set` support variable assignment with optional type declarations:
+
+```drun
+task "variable_assignment":
+  # Simple assignment with let
+  let $name = "value"
+  
+  # Simple assignment with set
+  set $variable to "value"
+  
+  # Array assignment with let
+  let $items as list to ["value1", "value2", "value3"]
+  
+  # Array assignment with set
+  set $platforms as list to ["linux", "darwin", "windows"]
+  
+  # Arrays are stored as comma-separated strings
+  # and can be used in loops
+  for each $platform in $platforms:
+    info "Platform: {$platform}"
+```
+
 #### String Operations
 
 Transform string values with intuitive operations:
