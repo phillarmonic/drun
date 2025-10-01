@@ -489,6 +489,7 @@ task "multi-tool-example" means "Multiple tool alternatives":
 Built-in pattern macros provide common validation patterns without complex regex:
 
 ```drun
+version: 2.0
 project "validation-demo" version "1.0":
 
 task "deploy" means "Deploy with comprehensive validation":
@@ -561,6 +562,8 @@ task "validation-errors-demo" means "Show validation error messages":
 Powerful data transformation operations with intuitive chaining syntax:
 
 ```drun
+version: 2.0
+
 project "data-processing" version "1.0":
 
 task "string_transformations" means "Demonstrate string operations":
