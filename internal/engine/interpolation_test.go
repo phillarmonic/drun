@@ -537,6 +537,23 @@ func TestEngine_FolderEmptyConditions(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
+	// Verify file was created successfully
+	if _, err := os.Stat(testFile); os.IsNotExist(err) {
+		t.Fatalf("Test file was not created: %v", err)
+	}
+
+	// Log directory contents for debugging
+	entries, _ := os.ReadDir(nonEmptyDir)
+	t.Logf("Non-empty directory %s contains %d entries:", nonEmptyDir, len(entries))
+	for _, entry := range entries {
+		t.Logf("  - %s", entry.Name())
+	}
+
+	// On Windows, escape backslashes in paths for drun script strings
+	// Use strings.ReplaceAll to escape backslashes so they're properly handled in string literals
+	emptyDirPath := strings.ReplaceAll(emptyDir, `\`, `\\`)
+	nonEmptyDirPath := strings.ReplaceAll(nonEmptyDir, `\`, `\\`)
+
 	tests := []struct {
 		name        string
 		input       string
@@ -554,7 +571,7 @@ task "test":
     info "Folder is empty"
   
   if folder "%s" is not empty:
-    info "Folder is not empty"`, emptyDir, emptyDir),
+    info "Folder is not empty"`, emptyDirPath, emptyDirPath),
 			taskName:    "test",
 			params:      map[string]string{},
 			expected:    []string{"Folder is empty"},
@@ -569,7 +586,7 @@ task "test":
     info "Folder is empty"
   
   if folder "%s" is not empty:
-    info "Folder is not empty"`, nonEmptyDir, nonEmptyDir),
+    info "Folder is not empty"`, nonEmptyDirPath, nonEmptyDirPath),
 			taskName:    "test",
 			params:      map[string]string{},
 			expected:    []string{"Folder is not empty"},
@@ -584,7 +601,7 @@ task "test":
     info "Directory is empty"
   
   if directory "%s" is not empty:
-    info "Directory is not empty"`, emptyDir, nonEmptyDir),
+    info "Directory is not empty"`, emptyDirPath, nonEmptyDirPath),
 			taskName: "test",
 			params:   map[string]string{},
 			expected: []string{"Directory is empty", "Directory is not empty"},
@@ -598,7 +615,7 @@ task "test":
     info "Dir is empty"
   
   if dir "%s" is not empty:
-    info "Dir is not empty"`, emptyDir, nonEmptyDir),
+    info "Dir is not empty"`, emptyDirPath, nonEmptyDirPath),
 			taskName: "test",
 			params:   map[string]string{},
 			expected: []string{"Dir is empty", "Dir is not empty"},

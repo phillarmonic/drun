@@ -3437,7 +3437,26 @@ func (e *Engine) isDirEmpty(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return len(entries) == 0, nil
+
+	// Count only visible entries (filter out hidden files on Windows)
+	visibleCount := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		// Skip hidden files (those starting with . on Unix, or system files on Windows)
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		// Skip common Windows system files
+		if runtime.GOOS == "windows" {
+			lowerName := strings.ToLower(name)
+			if lowerName == "desktop.ini" || lowerName == "thumbs.db" || lowerName == "$recycle.bin" {
+				continue
+			}
+		}
+		visibleCount++
+	}
+
+	return visibleCount == 0, nil
 }
 
 // evaluateExpression evaluates an AST expression and returns its string value
