@@ -50,3 +50,26 @@ task "process list" means "Process a list of items":
 			info "Completed: {item}"
 
 	success "All items processed!"
+
+task "build docker" means "Build docker images with defaults":
+	requires $image from ["base", "worker", "dev", "all"]
+	requires $dest from ["local", "remote"]
+	requires $cache from ["yes", "no"] defaults to "no"
+	
+	when $dest is "local":
+		info "Building for local use. Will use the OS's architecture."
+	
+	when $dest is "remote":
+		info "Building for remote use. This will use buildx."
+	
+	info "Building image: {$image}"
+	info "Destination: {$dest}"
+	info "Cache enabled: {$cache}"
+
+task "deploy service" means "Deploy with required parameters that have defaults":
+	requires $environment from ["dev", "staging", "production"] defaults to "dev"
+	requires $replicas from ["1", "2", "3", "5"] defaults to "1"
+	
+	info "Deploying to environment: {$environment}"
+	info "Number of replicas: {$replicas}"
+	success "Deployment complete!"
