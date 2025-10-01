@@ -2808,6 +2808,72 @@ error "Failed to connect to database"
 success "Deployment completed successfully"
 ```
 
+**Output Formatting:**
+
+- `step` - Displays message in a box (no line breaks by default):
+  ```
+  ┌────────────────────────────────┐
+  │ Starting deployment process    │
+  └────────────────────────────────┘
+  ```
+- `info` - Displays with ℹ️ emoji prefix: `ℹ️  Configuration loaded successfully`
+- `warn` - Displays with ⚠️ emoji prefix: `⚠️  Using default configuration`
+- `error` - Displays with ❌ emoji prefix: `❌ Failed to connect to database`
+- `success` - Displays with ✅ emoji prefix: `✅ Deployment completed successfully`
+- `fail` - Displays with 💥 emoji prefix and exits with error
+
+**Optional Line Breaks for `step`:**
+
+By default, step boxes have no extra spacing. Add line breaks when you need visual separation:
+
+```
+# Default: no line breaks (compact)
+step "Build phase"
+
+# Line break before only
+step "Build phase" add line break before
+
+# Line break after only
+step "Build phase" add line break after
+
+# Line breaks both before and after
+step "Build phase" add line break before add line break after
+```
+
+**Example Usage:**
+
+```drun
+task "compact":
+  info "Starting deployment"
+  
+  # Compact steps - default behavior
+  step "Phase 1: Build"
+  info "Building application..."
+  
+  step "Phase 2: Test"
+  info "Running tests..."
+  
+  step "Phase 3: Deploy"
+  info "Deploying to production..."
+  
+  success "Deployment complete!"
+
+task "spaced":
+  info "Starting deployment"
+  
+  # Well-spaced sections with line breaks
+  step "Phase 1: Build" add line break before add line break after
+  info "Building application..."
+  
+  step "Phase 2: Test" add line break before add line break after
+  info "Running tests..."
+  
+  step "Phase 3: Deploy" add line break before add line break after
+  info "Deploying to production..."
+  
+  success "Deployment complete!"
+```
+
 #### Process Control
 
 ```

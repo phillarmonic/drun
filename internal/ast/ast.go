@@ -224,14 +224,23 @@ func (ts *TaskStatement) String() string {
 
 // ActionStatement represents an action call (info, step, success, etc.)
 type ActionStatement struct {
-	Token   lexer.Token // the action token (INFO, STEP, SUCCESS, etc.)
-	Action  string      // action name (info, step, success, etc.)
-	Message string      // the message string
+	Token           lexer.Token // the action token (INFO, STEP, SUCCESS, etc.)
+	Action          string      // action name (info, step, success, etc.)
+	Message         string      // the message string
+	LineBreakBefore bool        // add line break before (for step)
+	LineBreakAfter  bool        // add line break after (for step)
 }
 
 func (as *ActionStatement) statementNode() {}
 func (as *ActionStatement) String() string {
-	return fmt.Sprintf("%s \"%s\"", as.Action, as.Message)
+	suffix := ""
+	if as.LineBreakBefore {
+		suffix += " add line break before"
+	}
+	if as.LineBreakAfter {
+		suffix += " add line break after"
+	}
+	return fmt.Sprintf("%s \"%s\"%s", as.Action, as.Message, suffix)
 }
 
 // TaskCallStatement represents calling another task

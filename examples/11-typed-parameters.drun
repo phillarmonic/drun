@@ -64,7 +64,7 @@ task "type inference" means "Demonstrate automatic type inference":
 	info "🏷️  Tags (inferred as list): {$tags}"
 
 	info "Processing tags:"
-	for each item in tags:
+	for each $item in $tags:
 		info "  📌 Tag: {$item}"
 
 	success "Type inference demonstration completed!"

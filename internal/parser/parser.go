@@ -863,6 +863,31 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 
 	stmt.Message = p.curToken.Literal
 
+	// Check for optional "add line break before/after" for step actions
+	if stmt.Action == "step" {
+		for {
+			if p.peekToken.Type == lexer.ADD {
+				p.nextToken() // consume ADD
+				if p.peekToken.Type == lexer.LINE {
+					p.nextToken() // consume LINE
+					if p.peekToken.Type == lexer.BREAK {
+						p.nextToken() // consume BREAK
+						switch p.peekToken.Type {
+						case lexer.BEFORE:
+							p.nextToken() // consume BEFORE
+							stmt.LineBreakBefore = true
+						case lexer.AFTER:
+							p.nextToken() // consume AFTER
+							stmt.LineBreakAfter = true
+						}
+					}
+				}
+			} else {
+				break
+			}
+		}
+	}
+
 	return stmt
 }
 

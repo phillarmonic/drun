@@ -442,7 +442,22 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	case "info":
 		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
-		_, _ = fmt.Fprintf(e.output, "🚀 %s\n", interpolatedMessage)
+		// Optional line breaks - only add if explicitly requested
+		if action.LineBreakBefore {
+			_, _ = fmt.Fprintln(e.output)
+		}
+
+		// Print the box
+		boxWidth := len(interpolatedMessage) + 4
+		topLine := "┌" + strings.Repeat("─", boxWidth-2) + "┐"
+		middleLine := "│ " + interpolatedMessage + " │"
+		bottomLine := "└" + strings.Repeat("─", boxWidth-2) + "┘"
+		_, _ = fmt.Fprintf(e.output, "%s\n%s\n%s\n", topLine, middleLine, bottomLine)
+
+		// Optional line break after
+		if action.LineBreakAfter {
+			_, _ = fmt.Fprintln(e.output)
+		}
 	case "warn":
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
