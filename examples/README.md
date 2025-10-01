@@ -185,33 +185,6 @@ error "Connection failed"
 success "Deployment completed"
 ```
 
-## 🔄 Migration from v1
-
-The v2 language compiles to drun v1 YAML, so you can gradually migrate:
-
-### v1 YAML:
-```yaml
-recipes:
-  deploy:
-    help: "Deploy to environment"
-    positionals:
-      - name: environment
-        required: true
-        one_of: ["dev", "staging", "production"]
-    deps: [build]
-    run: |
-      kubectl set image deployment/myapp myapp=myapp:latest --namespace={{ .environment }}
-```
-
-### v2 Semantic:
-```
-task "deploy" means "Deploy to environment":
-  requires environment from ["dev", "staging", "production"]
-  depends on build
-  
-  deploy myapp:latest to kubernetes namespace {environment}
-```
-
 ## 🛠️ Running Examples
 
 *Note: drun v2 compiler is not yet implemented. These examples show the target syntax.*
@@ -410,7 +383,6 @@ These examples represent the target syntax for drun v2. As we implement the comp
 ## 📚 Learn More
 
 - **[drun v2 Specification](../DRUN_V2_SPECIFICATION.md)** - Complete language specification
-- **[Migration Guide](../docs/v2-migration.md)** - Migrating from v1 to v2
 - **[Language Reference](../docs/v2-reference.md)** - Detailed syntax reference
 
 ---
