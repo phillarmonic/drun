@@ -2119,7 +2119,12 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 }
 
 // parseHTTPStatement parses HTTP operations
-func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
+func (p *Parser) parseHTTPStatement() ast.Statement {
+	// Handle DOWNLOAD as a separate statement type
+	if p.curToken.Type == lexer.DOWNLOAD {
+		return p.parseDownloadStatement()
+	}
+
 	stmt := &ast.HTTPStatement{
 		Token:   p.curToken,
 		Headers: make(map[string]string),
@@ -2299,6 +2304,167 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 	}
 
 	return stmt
+}
+
+// parseDownloadStatement parses download operations
+// Syntax: download "url" to "path" [allow overwrite] [with header "..."] [timeout "..."]
+func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
+	stmt := &ast.DownloadStatement{
+		Token:   p.curToken,
+		Headers: make(map[string]string),
+		Auth:    make(map[string]string),
+		Options: make(map[string]string),
+	}
+
+	// Parse URL
+	if p.peekToken.Type == lexer.STRING {
+		p.nextToken()
+		stmt.URL = p.curToken.Literal
+	} else {
+		p.addError(fmt.Sprintf("expected URL string after 'download', got %s", p.peekToken.Type))
+		return nil
+	}
+
+	// Parse "to path"
+	if p.peekToken.Type == lexer.TO {
+		p.nextToken() // consume TO
+		if p.peekToken.Type == lexer.STRING {
+			p.nextToken()
+			stmt.Path = p.curToken.Literal
+		} else {
+			p.addError(fmt.Sprintf("expected path string after 'to', got %s", p.peekToken.Type))
+			return nil
+		}
+	} else {
+		p.addError(fmt.Sprintf("expected 'to' after URL, got %s", p.peekToken.Type))
+		return nil
+	}
+
+	// Parse optional modifiers (allow overwrite, allow permissions, headers, auth, timeout, etc.)
+	for {
+		switch p.peekToken.Type {
+		case lexer.ALLOW:
+			p.nextToken() // consume ALLOW
+
+			// Handle "overwrite"
+			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "overwrite" {
+				p.nextToken() // consume "overwrite"
+				stmt.AllowOverwrite = true
+			} else if p.peekToken.Type == lexer.PERMISSIONS {
+				// Handle "permissions ["read","write"] to ["user","group","others"]"
+				p.nextToken() // consume PERMISSIONS
+
+				permSpec := ast.PermissionSpec{
+					Permissions: []string{},
+					Targets:     []string{},
+				}
+
+				// Parse permissions array
+				if p.peekToken.Type == lexer.LBRACKET {
+					p.nextToken() // consume [
+
+					for {
+						if p.peekToken.Type == lexer.STRING {
+							p.nextToken()
+							perm := p.curToken.Literal
+							// Validate permission type
+							if perm == "read" || perm == "write" || perm == "execute" {
+								permSpec.Permissions = append(permSpec.Permissions, perm)
+							} else {
+								p.addError(fmt.Sprintf("invalid permission: %s (must be read, write, or execute)", perm))
+							}
+						}
+
+						if p.peekToken.Type == lexer.COMMA {
+							p.nextToken() // consume comma
+							continue
+						} else if p.peekToken.Type == lexer.RBRACKET {
+							p.nextToken() // consume ]
+							break
+						} else {
+							break
+						}
+					}
+				}
+
+				// Parse "to" keyword
+				if p.peekToken.Type == lexer.TO {
+					p.nextToken() // consume TO
+
+					// Parse targets array
+					if p.peekToken.Type == lexer.LBRACKET {
+						p.nextToken() // consume [
+
+						for {
+							if p.peekToken.Type == lexer.STRING {
+								p.nextToken()
+								target := p.curToken.Literal
+								// Validate target type
+								if target == "user" || target == "group" || target == "others" {
+									permSpec.Targets = append(permSpec.Targets, target)
+								} else {
+									p.addError(fmt.Sprintf("invalid permission target: %s (must be user, group, or others)", target))
+								}
+							}
+
+							if p.peekToken.Type == lexer.COMMA {
+								p.nextToken() // consume comma
+								continue
+							} else if p.peekToken.Type == lexer.RBRACKET {
+								p.nextToken() // consume ]
+								break
+							} else {
+								break
+							}
+						}
+					}
+				}
+
+				// Add permission spec to statement
+				stmt.AllowPermissions = append(stmt.AllowPermissions, permSpec)
+			}
+
+		case lexer.WITH:
+			p.nextToken() // consume WITH
+			switch p.peekToken.Type {
+			case lexer.HEADER:
+				p.nextToken() // consume HEADER
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					headerValue := p.curToken.Literal
+					// Parse "key: value" format
+					if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
+						key := strings.TrimSpace(headerValue[:colonIdx])
+						value := strings.TrimSpace(headerValue[colonIdx+1:])
+						stmt.Headers[key] = value
+					}
+				}
+
+			case lexer.AUTH:
+				p.nextToken() // consume AUTH
+				if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
+					p.nextToken()
+					authType := p.curToken.Literal
+					if p.peekToken.Type == lexer.STRING {
+						p.nextToken()
+						stmt.Auth[authType] = p.curToken.Literal
+					}
+				}
+			}
+
+		case lexer.TIMEOUT, lexer.RETRY:
+			p.nextToken() // consume TIMEOUT/RETRY
+			optionKey := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[optionKey] = p.curToken.Literal
+			}
+
+		default:
+			// No more options
+			return stmt
+		}
+	}
 }
 
 // parseDetectionStatement parses smart detection operations
@@ -2710,7 +2876,7 @@ func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 // isHTTPToken checks if a token type represents an HTTP statement
 func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS:
+	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.DOWNLOAD:
 		return true
 	default:
 		return false

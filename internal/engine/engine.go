@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"runtime"
@@ -394,6 +395,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeGit(s, ctx)
 	case *ast.HTTPStatement:
 		return e.executeHTTP(s, ctx)
+	case *ast.DownloadStatement:
+		return e.executeDownload(s, ctx)
 	case *ast.NetworkStatement:
 		return e.executeNetwork(s, ctx)
 	case *ast.DetectionStatement:
@@ -1469,6 +1472,79 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 	// cmd := exec.Command(httpCmd[0], httpCmd[1:]...)
 	// return cmd.Run()
 
+	return nil
+}
+
+// executeDownload executes file download operations using native Go HTTP client
+func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in download statement
+	url := e.interpolateVariables(downloadStmt.URL, ctx)
+	path := e.interpolateVariables(downloadStmt.Path, ctx)
+
+	// Interpolate headers
+	headers := make(map[string]string, len(downloadStmt.Headers))
+	for key, value := range downloadStmt.Headers {
+		headers[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate auth
+	auth := make(map[string]string, len(downloadStmt.Auth))
+	for key, value := range downloadStmt.Auth {
+		auth[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate options
+	options := make(map[string]string, len(downloadStmt.Options))
+	for key, value := range downloadStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Check if file exists and handle overwrite
+	if !downloadStmt.AllowOverwrite && e.fileExists(path) {
+		errMsg := fmt.Sprintf("file already exists: %s (use 'allow overwrite' to replace)", path)
+		_, _ = fmt.Fprintf(e.output, "❌ %s\n", errMsg)
+		return fmt.Errorf("%s", errMsg)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would download %s to %s", url, path)
+		if downloadStmt.AllowOverwrite {
+			_, _ = fmt.Fprintf(e.output, " (overwrite allowed)")
+		}
+		if len(downloadStmt.AllowPermissions) > 0 {
+			_, _ = fmt.Fprintf(e.output, " with permissions: ")
+			for i, perm := range downloadStmt.AllowPermissions {
+				if i > 0 {
+					_, _ = fmt.Fprintf(e.output, ", ")
+				}
+				_, _ = fmt.Fprintf(e.output, "%v to %v", perm.Permissions, perm.Targets)
+			}
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+		return nil
+	}
+
+	// Show what we're about to do
+	_, _ = fmt.Fprintf(e.output, "⬇️  Downloading: %s\n", url)
+	_, _ = fmt.Fprintf(e.output, "   → %s\n", path)
+
+	// Perform the download with progress tracking
+	err := e.downloadFileWithProgress(url, path, headers, auth, options)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌ Download failed: %v\n", err)
+		return fmt.Errorf("download failed: %w", err)
+	}
+
+	// Apply file permissions if specified
+	if len(downloadStmt.AllowPermissions) > 0 {
+		err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
+			// Don't fail the download, just warn
+		}
+	}
+
+	_, _ = fmt.Fprintf(e.output, "✅ Downloaded successfully to: %s\n", path)
 	return nil
 }
 
@@ -3791,4 +3867,254 @@ func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *
 	default:
 		return "", fmt.Errorf("unknown builtin operation type: %s", op.Type)
 	}
+}
+
+// downloadFileWithProgress downloads a file using native Go HTTP client with progress tracking
+func (e *Engine) downloadFileWithProgress(url, filepath string, headers, auth, options map[string]string) error {
+	// Create HTTP client with timeout
+	timeout := 30 * time.Second
+	if timeoutStr, exists := options["timeout"]; exists {
+		if duration, err := time.ParseDuration(timeoutStr); err == nil {
+			timeout = duration
+		}
+	}
+
+	client := &http.Client{
+		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Allow up to 10 redirects
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
+
+	// Create request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	// Add authentication
+	for authType, value := range auth {
+		switch authType {
+		case "bearer":
+			req.Header.Set("Authorization", "Bearer "+value)
+		case "basic":
+			// Basic auth in format "username:password"
+			req.Header.Set("Authorization", "Basic "+value)
+		case "token":
+			req.Header.Set("Authorization", "Token "+value)
+		}
+	}
+
+	// Perform request
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to download: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with status: %s", resp.Status)
+	}
+
+	// Create output file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+
+	// Get content length for progress tracking
+	contentLength := resp.ContentLength
+
+	// Create progress writer
+	startTime := time.Now()
+	var downloaded int64
+	lastUpdate := time.Now()
+
+	// Create a reader that tracks progress
+	reader := io.TeeReader(resp.Body, &progressWriter{
+		total: contentLength,
+		onProgress: func(written int64) {
+			downloaded = written
+			// Update progress every 100ms to avoid overwhelming output
+			if time.Since(lastUpdate) > 100*time.Millisecond || written == contentLength {
+				lastUpdate = time.Now()
+				e.showDownloadProgress(written, contentLength, time.Since(startTime))
+			}
+		},
+	})
+
+	// Copy data
+	_, err = io.Copy(out, reader)
+	if err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	// Final progress update
+	fmt.Fprintf(e.output, "\r\033[K") // Clear line
+
+	// Calculate final stats
+	duration := time.Since(startTime)
+	speed := float64(downloaded) / duration.Seconds()
+	_, _ = fmt.Fprintf(e.output, "   📊 %s in %s (%.2f MB/s)\n",
+		formatBytes(downloaded),
+		duration.Round(time.Millisecond),
+		speed/1024/1024)
+
+	return nil
+}
+
+// progressWriter wraps io.Writer to track progress
+type progressWriter struct {
+	total      int64
+	written    int64
+	onProgress func(int64)
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	pw.written += int64(n)
+	if pw.onProgress != nil {
+		pw.onProgress(pw.written)
+	}
+	return n, nil
+}
+
+// showDownloadProgress displays download progress with speed and ETA
+func (e *Engine) showDownloadProgress(downloaded, total int64, elapsed time.Duration) {
+	if total <= 0 {
+		// Unknown size, just show downloaded amount
+		_, _ = fmt.Fprintf(e.output, "\r   📥 Downloaded: %s", formatBytes(downloaded))
+		return
+	}
+
+	// Calculate progress percentage
+	percent := float64(downloaded) / float64(total) * 100
+
+	// Calculate speed (bytes per second)
+	speed := float64(downloaded) / elapsed.Seconds()
+
+	// Calculate ETA
+	remaining := total - downloaded
+	var eta time.Duration
+	if speed > 0 {
+		eta = time.Duration(float64(remaining)/speed) * time.Second
+	}
+
+	// Create progress bar
+	barWidth := 30
+	filled := int(float64(barWidth) * percent / 100)
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+	// Format output
+	_, _ = fmt.Fprintf(e.output, "\r   📥 [%s] %.1f%% | %s/%s | %.2f MB/s | ETA: %s",
+		bar,
+		percent,
+		formatBytes(downloaded),
+		formatBytes(total),
+		speed/1024/1024,
+		formatDuration(eta))
+}
+
+// formatBytes formats bytes into human-readable string
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// formatDuration formats duration into human-readable string
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return "0s"
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+// applyFilePermissions applies Unix file permissions based on permission specs
+func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpec) error {
+	// Get current file info
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	currentMode := info.Mode()
+	newMode := currentMode
+
+	// Build permission map
+	for _, spec := range permSpecs {
+		for _, perm := range spec.Permissions {
+			for _, target := range spec.Targets {
+				// Map permission and target to Unix file mode bits
+				var permBits os.FileMode
+				switch perm {
+				case "read":
+					switch target {
+					case "user":
+						permBits = 0400
+					case "group":
+						permBits = 0040
+					case "others":
+						permBits = 0004
+					}
+				case "write":
+					switch target {
+					case "user":
+						permBits = 0200
+					case "group":
+						permBits = 0020
+					case "others":
+						permBits = 0002
+					}
+				case "execute":
+					switch target {
+					case "user":
+						permBits = 0100
+					case "group":
+						permBits = 0010
+					case "others":
+						permBits = 0001
+					}
+				}
+
+				// Add permission bits
+				newMode |= permBits
+			}
+		}
+	}
+
+	// Apply new permissions
+	if newMode != currentMode {
+		err = os.Chmod(path, newMode)
+		if err != nil {
+			return fmt.Errorf("failed to chmod: %w", err)
+		}
+		_, _ = fmt.Fprintf(e.output, "   🔒 Set permissions: %s\n", newMode.String())
+	}
+
+	return nil
 }

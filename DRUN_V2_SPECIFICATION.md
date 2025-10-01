@@ -2466,6 +2466,164 @@ get "https://example.com/file.zip" download "downloads/file.zip"
 post "https://api.example.com/upload" upload "local-file.txt"
 ```
 
+#### Download Operations
+
+The `download` statement provides a native Go HTTP client with advanced features including progress tracking, permission management, and authentication.
+
+**Features:**
+- Native Go HTTP client (no external dependencies)
+- Real-time progress bar with speed and ETA
+- Matrix-based permission system
+- Authentication support (Bearer, Basic, Token)
+- Timeout and retry configuration
+- Automatic redirect following
+
+**Basic Syntax:**
+```
+download "<url>" to "<path>"
+```
+
+**Advanced Options:**
+```
+# Simple download with progress tracking
+download "https://example.com/file.zip" to "downloads/file.zip"
+
+# Allow overwriting existing files
+download "https://example.com/data.json" to "data.json" allow overwrite
+
+# Download with authentication
+download "https://api.github.com/user" to "user.json" with auth bearer "token123"
+download "https://private.example.com/file" to "file.dat" with auth basic "user:pass"
+
+# Download with timeout and retry
+download "https://example.com/large-file.zip" to "file.zip" timeout "60s" retry "3"
+
+# Download with custom headers
+download "https://api.example.com/data" to "data.json" with header "Accept: application/json"
+```
+
+**Permission Matrix System:**
+
+The download statement supports granular Unix file permissions using a matrix notation:
+
+```
+# Make downloaded binary executable by user
+download "https://github.com/cli/cli/releases/download/v2.40.0/gh_linux_amd64" to "gh" 
+  allow overwrite 
+  allow permissions ["execute"] to ["user"]
+
+# Read/write for user, read-only for group/others
+download "https://example.com/config.json" to "config.json" 
+  allow overwrite 
+  allow permissions ["read","write"] to ["user"] 
+  allow permissions ["read"] to ["group","others"]
+
+# Multiple permission specifications
+download "https://example.com/script.sh" to "script.sh" 
+  allow overwrite 
+  allow permissions ["read"] to ["user","group","others"]
+  allow permissions ["write","execute"] to ["user"]
+
+# Download and set complete permissions
+download "https://example.com/tool" to "bin/tool" 
+  allow permissions ["execute","read"] to ["user"]
+  allow permissions ["read"] to ["group","others"]
+```
+
+**Permission Types:**
+- `read` - Read permission
+- `write` - Write permission  
+- `execute` - Execute permission
+
+**Permission Targets:**
+- `user` - File owner
+- `group` - Group members
+- `others` - All other users
+
+**Complete Example:**
+```
+task "download_and_install_binary":
+  info "Downloading binary with full configuration"
+  
+  # Download with progress bar, auth, timeout, and permissions
+  download "https://github.com/user/tool/releases/download/v1.0/tool-linux-amd64" 
+    to "bin/tool" 
+    allow overwrite 
+    timeout "120s" 
+    retry "5"
+    with auth bearer "github-token"
+    allow permissions ["execute","read"] to ["user"]
+    allow permissions ["read"] to ["group","others"]
+  
+  success "Binary installed and configured!"
+```
+
+**Progress Display:**
+
+The download statement shows real-time progress with:
+- Progress bar (visual indicator)
+- Percentage complete
+- Downloaded / Total size
+- Download speed (MB/s)
+- Estimated time remaining (ETA)
+
+Example output:
+```
+⬇️  Downloading: https://example.com/large-file.zip
+   → downloads/large-file.zip
+   📥 [████████████████░░░░░░░░░░░░░░] 55.2% | 2.3 GB/4.2 GB | 15.3 MB/s | ETA: 2m15s
+   📊 4.2 GB in 4m32s (15.45 MB/s)
+✅ Downloaded successfully to: downloads/large-file.zip
+   🔒 Set permissions: -rwxr--r--
+```
+
+**Error Handling:**
+
+```
+# Prevent accidental overwrites
+try:
+  download "https://example.com/file.zip" to "existing-file.zip"
+catch:
+  warn "File already exists, use 'allow overwrite' to replace"
+
+# With overwrite allowed
+download "https://example.com/file.zip" to "file.zip" allow overwrite
+```
+
+**Real-World Examples:**
+
+```
+# Download GitHub release binary
+task "install_gh_cli":
+  download "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_linux_amd64.tar.gz"
+    to "gh.tar.gz"
+    allow overwrite
+    timeout "120s"
+    allow permissions ["read","write"] to ["user"]
+
+# Download multiple files in parallel
+task "download_data":
+  for each $file in ["users","posts","comments"] in parallel:
+    download "https://api.example.com/{$file}.json"
+      to "data/{$file}.json"
+      allow overwrite
+      allow permissions ["read","write"] to ["user"]
+      allow permissions ["read"] to ["group"]
+
+# Download with environment-specific permissions
+task "download_config":
+  requires $env from ["dev","prod"]
+  
+  when $env == "prod":
+    download "https://config.example.com/prod.json" to "config.json"
+      allow overwrite
+      allow permissions ["read"] to ["user","group","others"]
+  otherwise:
+    download "https://config.example.com/dev.json" to "config.json"
+      allow overwrite
+      allow permissions ["read","write"] to ["user","group","others"]
+```
+
 #### Network Health Checks and Service Waiting
 
 ```

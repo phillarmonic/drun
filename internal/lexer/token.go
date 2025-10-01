@@ -282,18 +282,20 @@ const (
 	LIST_TYPE    // list
 
 	// File operations
-	CREATE    // create
-	COPY      // copy
-	MOVE      // move
-	DELETE    // delete
-	READ      // read
-	WRITE     // write
-	APPEND    // append
-	DIR       // dir
-	BACKUP    // backup
-	CHECK     // check
-	SIZE      // size
-	DIRECTORY // directory
+	CREATE      // create
+	COPY        // copy
+	MOVE        // move
+	DELETE      // delete
+	READ        // read
+	WRITE       // write
+	APPEND      // append
+	DIR         // dir
+	BACKUP      // backup
+	CHECK       // check
+	SIZE        // size
+	DIRECTORY   // directory
+	ALLOW       // allow
+	PERMISSIONS // permissions
 
 	// Error handling
 	TRY     // try
@@ -844,6 +846,10 @@ func (t TokenType) String() string {
 		return "SIZE"
 	case DIRECTORY:
 		return "DIRECTORY"
+	case ALLOW:
+		return "ALLOW"
+	case PERMISSIONS:
+		return "PERMISSIONS"
 	case TRY:
 		return "TRY"
 	case CATCH:
@@ -1153,6 +1159,8 @@ var keywords = map[string]TokenType{
 	"check":       CHECK,
 	"size":        SIZE,
 	"directory":   DIRECTORY,
+	"allow":       ALLOW,
+	"permissions": PERMISSIONS,
 	"try":         TRY,
 	"catch":       CATCH,
 	"finally":     FINALLY,

@@ -555,6 +555,73 @@ func (hs *HTTPStatement) String() string {
 	return out.String()
 }
 
+// PermissionSpec represents a permission specification for downloaded files
+type PermissionSpec struct {
+	Permissions []string // read, write, execute
+	Targets     []string // user, group, others
+}
+
+// DownloadStatement represents file download operations (like curl/wget)
+type DownloadStatement struct {
+	Token            lexer.Token       // the DOWNLOAD token
+	URL              string            // the URL to download from
+	Path             string            // the local path to save to
+	AllowOverwrite   bool              // whether to allow overwriting existing files
+	AllowPermissions []PermissionSpec  // permission specifications
+	Headers          map[string]string // HTTP headers
+	Auth             map[string]string // authentication options
+	Options          map[string]string // additional options (timeout, retry, etc.)
+}
+
+func (ds *DownloadStatement) statementNode() {}
+func (ds *DownloadStatement) String() string {
+	var out strings.Builder
+	out.WriteString("download \"")
+	out.WriteString(ds.URL)
+	out.WriteString("\" to \"")
+	out.WriteString(ds.Path)
+	out.WriteString("\"")
+
+	if ds.AllowOverwrite {
+		out.WriteString(" allow overwrite")
+	}
+
+	for _, perm := range ds.AllowPermissions {
+		out.WriteString(" allow permissions [")
+		for i, p := range perm.Permissions {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			out.WriteString("\"" + p + "\"")
+		}
+		out.WriteString("] to [")
+		for i, t := range perm.Targets {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			out.WriteString("\"" + t + "\"")
+		}
+		out.WriteString("]")
+	}
+
+	// Add headers
+	for key, value := range ds.Headers {
+		out.WriteString(fmt.Sprintf(" with header \"%s: %s\"", key, value))
+	}
+
+	// Add auth
+	for key, value := range ds.Auth {
+		out.WriteString(fmt.Sprintf(" with %s \"%s\"", key, value))
+	}
+
+	// Add options
+	for key, value := range ds.Options {
+		out.WriteString(fmt.Sprintf(" %s \"%s\"", key, value))
+	}
+
+	return out.String()
+}
+
 // NetworkStatement represents network operations (health checks, port testing, ping)
 type NetworkStatement struct {
 	Token     lexer.Token       // the NETWORK token or action token
