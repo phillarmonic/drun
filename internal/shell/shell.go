@@ -50,7 +50,7 @@ func DefaultOptions() *Options {
 	return &Options{
 		WorkingDir:    "",
 		Environment:   make(map[string]string, 8), // Pre-allocate for typical env var count
-		Timeout:       30 * time.Second,
+		Timeout:       0,                          // No timeout - allow tasks to run as long as necessary
 		CaptureOutput: true,
 		StreamOutput:  false,
 		Output:        os.Stdout,

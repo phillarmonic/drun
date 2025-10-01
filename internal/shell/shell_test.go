@@ -236,8 +236,8 @@ func TestDefaultOptions(t *testing.T) {
 		t.Errorf("Expected platform-appropriate shell (one of %v), got %q", expectedShells, opts.Shell)
 	}
 
-	if opts.Timeout != 30*time.Second {
-		t.Errorf("Expected default timeout 30s, got %v", opts.Timeout)
+	if opts.Timeout != 0 {
+		t.Errorf("Expected default timeout 0 (no timeout), got %v", opts.Timeout)
 	}
 
 	if !opts.CaptureOutput {
