@@ -222,6 +222,8 @@ Once the v2 compiler is ready, you'll run examples like this:
 # Basic examples
 drun -f 01-hello-world.drun hello
 drun -f 02-parameters.drun greet --name=Alice --title=Ms.
+drun -f 02-parameters.drun "build docker" image=base dest=local
+drun -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
 
 # Docker examples  
 drun -f 04-docker-basics.drun build --tag=v1.0.0
