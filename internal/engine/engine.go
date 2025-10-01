@@ -218,8 +218,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 		if providedValue, exists := params[param.Name]; exists {
 			rawValue = providedValue
 			hasValue = true
-		} else if !param.Required {
-			// For optional parameters (given/accepts), use default value (including empty string)
+		} else if param.HasDefault {
+			// For parameters with default values (both required and optional), use the default
 			// Interpolate the default value if it contains braces (for builtin function calls)
 			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
 			hasValue = true

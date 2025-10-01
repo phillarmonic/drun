@@ -101,6 +101,68 @@ task "timing demo":
   info "Total build time: {show elapsed time('build_time')}"
 ```
 
+## Why drun?
+
+### The Problem: Make and Just aren't semantic enough
+
+**Make** has confusing behaviors (`.PHONY` targets, `$$` for variables, cryptic errors) that make it unsuitable as a general task runner.
+
+**Just** improved on Make but is still too technical - it's essentially parameterized shell scripts. Can your project manager understand `{{variable}}` syntax and bash operators?
+
+### The Solution: Truly Semantic Automation
+
+**drun is automation that everyone on your team can read and understand.**
+
+Compare the same deployment task:
+
+**Just version** (technical, shell-centric):
+```just
+deploy env version:
+  #!/bin/bash
+  set -euo pipefail
+  docker build -t app:{{version}} . && \
+  kubectl set image deploy/app app=app:{{version}} || \
+  (kubectl rollout undo deploy/app && exit 1)
+```
+
+**drun version** (semantic, readable):
+```drun
+task "deploy" means "Deploy with automatic rollback":
+  requires $environment from ["dev", "staging", "production"]
+  requires $version as string matching semver
+  
+  docker build image "app:{$version}"
+  kubectl set image deployment/app to "app:{$version}"
+  
+  try:
+    kubectl wait for rollout deployment/app
+    success "Deployment successful!"
+  catch:
+    warn "Deployment failed - rolling back"
+    kubectl rollback deployment/app
+    fail "Deployment rolled back"
+```
+
+### What makes drun different:
+
+- **📖 Readable by Everyone**: Managers, QA, DevOps - everyone understands the automation
+- **🎯 Semantic Actions**: `docker build image`, `kubectl wait for rollout` - reads like English
+- **🔒 Built-in Safety**: Type validation (`matching semver`), constraints (`from ["dev", "prod"]`)
+- **🚀 Native Tool Support**: Docker, Git, Kubernetes, HTTP - drun speaks their language
+- **📊 Self-Documenting**: The `means` clause and clear syntax eliminate documentation drift
+- **🛡️ Smart Detection**: Auto-detect tool variants (`docker compose` vs `docker-compose`)
+
+**When to use drun:**
+- Your automation needs to be reviewed by non-technical stakeholders
+- You want CI/CD pipelines that are actually readable
+- You need built-in validation and type safety
+- You're tired of debugging shell scripts
+- Your team includes product, QA, and management who need to understand deployment flows
+
+**[Read the full story: Why we created drun →](WHY_DRUN.md)**
+
+---
+
 ## Installation
 
 ### Download Pre-built Binaries

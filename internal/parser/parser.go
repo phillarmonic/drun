@@ -1534,6 +1534,73 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			}
 		}
 
+		// Check for optional default value: requires env from ["dev", "staging"] defaults to "dev"
+		if p.peekToken.Type == lexer.DEFAULTS {
+			p.nextToken() // consume DEFAULTS
+			if !p.expectPeek(lexer.TO) {
+				return nil
+			}
+
+			// Parse default value - can be string, number, boolean, empty, or built-in function
+			switch p.peekToken.Type {
+			case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
+				p.nextToken()
+				stmt.DefaultValue = p.curToken.Literal
+				stmt.HasDefault = true
+			case lexer.EMPTY:
+				// Handle "empty" keyword - treat as empty string
+				p.nextToken()
+				stmt.DefaultValue = ""
+				stmt.HasDefault = true
+			case lexer.LBRACE:
+				// Handle "{builtin function}" syntax
+				p.nextToken() // consume LBRACE
+				var funcParts []string
+
+				// Read tokens until RBRACE
+				for p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.EOF {
+					p.nextToken()
+					funcParts = append(funcParts, p.curToken.Literal)
+				}
+
+				if p.peekToken.Type != lexer.RBRACE {
+					p.addError("expected '}' to close builtin function call")
+					return nil
+				}
+				p.nextToken() // consume RBRACE
+
+				// Join the function parts and store as the default value
+				stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
+				stmt.HasDefault = true
+			default:
+				p.addError(fmt.Sprintf("expected default value (string, number, boolean, empty, or built-in function), got %s", p.peekToken.Type))
+				return nil
+			}
+
+			// Validate that the default value is in the constraints list (if constraints exist)
+			if len(stmt.Constraints) > 0 {
+				// Remove quotes from default value for comparison (if it's a string literal)
+				defaultVal := stmt.DefaultValue
+				if len(defaultVal) >= 2 && defaultVal[0] == '"' && defaultVal[len(defaultVal)-1] == '"' {
+					defaultVal = defaultVal[1 : len(defaultVal)-1]
+				}
+
+				found := false
+				for _, constraint := range stmt.Constraints {
+					if constraint == defaultVal {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					p.addError(fmt.Sprintf("default value '%s' must be one of the allowed values: [%s]",
+						defaultVal, strings.Join(stmt.Constraints, ", ")))
+					return nil
+				}
+			}
+		}
+
 	case "given":
 		stmt.Required = false
 		// Expect: given name defaults to "value"
@@ -1549,10 +1616,12 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
 			p.nextToken()
 			stmt.DefaultValue = p.curToken.Literal
+			stmt.HasDefault = true
 		case lexer.EMPTY:
 			// Handle "empty" keyword - treat as empty string
 			p.nextToken()
 			stmt.DefaultValue = ""
+			stmt.HasDefault = true
 		case lexer.LBRACE:
 			// Handle "{builtin function}" syntax
 			p.nextToken() // consume LBRACE
@@ -1572,6 +1641,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 
 			// Join the function parts and store as the default value
 			stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
+			stmt.HasDefault = true
 		case lexer.CURRENT:
 			// Handle legacy "current git commit" built-in function (for backward compatibility)
 			p.nextToken() // consume CURRENT
@@ -1580,6 +1650,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 				if p.peekToken.Type == lexer.COMMIT {
 					p.nextToken() // consume COMMIT
 					stmt.DefaultValue = "current git commit"
+					stmt.HasDefault = true
 				}
 			}
 		default:

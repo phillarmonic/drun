@@ -821,7 +821,8 @@ type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)
 	Type         string      // "requires", "given", "accepts"
 	Name         string      // parameter name
-	DefaultValue string      // default value (for "given")
+	DefaultValue string      // default value (for "given" and optionally for "requires")
+	HasDefault   bool        // true if a default value was explicitly set
 	Constraints  []string    // constraints like ["dev", "staging", "production"]
 	DataType     string      // "string", "number", "boolean", "list", etc.
 	Required     bool        // true for "requires", false for "given"/"accepts"
