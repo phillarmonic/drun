@@ -18,7 +18,16 @@ task "lint" means "Runs the Golang CI Linter":
 	info "Running PHPCS (just kidding)"
 	run "golangci-lint run"
 
+task "sec-strict" means "Security tests":
+	info "Running gosec..."
+	run "gosec ./..."
+
+task "sec" means "Security checks (high)":
+	info "Running gosec (setting to high only)"
+	run "gosec -severity high ./..."
+
 task "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
 	call task test
 	call task lint
+	call task sec
