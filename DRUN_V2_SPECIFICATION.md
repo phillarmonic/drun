@@ -293,9 +293,12 @@ shell_action = "run" | "exec" | "shell" ;
 (* Detection statements *)
 detection_statement = "detect" detection_target
                     | "detect" "available" tool_alternatives [ "as" variable_name ]
-                    | "if" ( tool_name | string_literal ) "is" "available" ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list "is" "available" ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list "is" "not" "available" ":" statement_block [ "else" ":" statement_block ]
                     | "if" ( tool_name | string_literal ) "version" comparison_operator string_literal ":" statement_block [ "else" ":" statement_block ]
                     | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
+
+tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
 
 detection_target = "project" "type"
                  | tool_name [ "version" ] ;
@@ -1315,6 +1318,17 @@ if docker is not available:
 
 if kubernetes is available:
   deploy to cluster
+
+# Multiple tool availability check
+# For "is available": ALL tools must be available (AND logic)
+if docker,"docker-compose" is available:
+  info "Docker and Docker Compose are both available"
+
+# For "is not available": ANY tool must be unavailable (OR logic)
+if docker,"docker-compose",kubectl is not available:
+  error "One or more required tools are missing"
+else:
+  info "All required tools are available"
 
 # File/directory detection
 if file "package.json" exists:
@@ -3036,6 +3050,53 @@ else:
 if kubectl is not available:
     warn "Kubernetes tools not installed"
     info "Skipping Kubernetes deployment"
+```
+
+#### Supported Tool Keywords
+
+The following tools are recognized as built-in keywords and can be used without quotes:
+
+**Package Managers & Runtimes:**
+- `node` - Node.js runtime
+- `npm` - Node Package Manager
+- `yarn` - Yarn package manager
+- `pnpm` - PNPM package manager
+- `bun` - Bun JavaScript runtime and package manager
+- `python` - Python interpreter
+- `pip` - Python package installer
+- `go` / `golang` - Go programming language
+- `cargo` - Rust package manager
+- `java` - Java runtime
+- `maven` - Apache Maven build tool
+- `gradle` - Gradle build tool
+- `ruby` - Ruby interpreter
+- `gem` - RubyGems package manager
+- `php` - PHP interpreter
+- `composer` - PHP dependency manager
+- `rust` - Rust programming language
+- `make` - GNU Make build tool
+
+**Container & Orchestration:**
+- `docker` - Docker container platform
+- `kubectl` - Kubernetes command-line tool
+- `helm` - Kubernetes package manager
+
+**Infrastructure & Cloud:**
+- `terraform` - Infrastructure as Code tool
+- `aws` - AWS CLI
+- `gcp` - Google Cloud CLI
+- `azure` - Azure CLI
+
+**Version Control:**
+- `git` - Git version control system
+
+**Note:** For tools with spaces or tools not in this list, use quoted strings:
+```
+if "docker compose" is available:
+    info "Using Docker Compose v2"
+
+if "docker-compose" is available:
+    info "Using Docker Compose v1"
 ```
 
 ### DRY Tool Detection

@@ -144,14 +144,22 @@ const (
 	NODE        // node
 	NPM         // npm
 	YARN        // yarn
+	PNPM        // pnpm
+	BUN         // bun
 	PYTHON      // python
 	PIP         // pip
 	GO          // go
 	GOLANG      // golang
+	CARGO       // cargo
 	JAVA        // java
+	MAVEN       // maven
+	GRADLE      // gradle
 	RUBY        // ruby
+	GEM         // gem
 	PHP         // php
+	COMPOSER    // composer
 	RUST        // rust
+	MAKE        // make
 	KUBECTL     // kubectl
 	HELM        // helm
 	TERRAFORM   // terraform
@@ -594,6 +602,10 @@ func (t TokenType) String() string {
 		return "NPM"
 	case YARN:
 		return "YARN"
+	case PNPM:
+		return "PNPM"
+	case BUN:
+		return "BUN"
 	case PYTHON:
 		return "PYTHON"
 	case PIP:
@@ -602,14 +614,26 @@ func (t TokenType) String() string {
 		return "GO"
 	case GOLANG:
 		return "GOLANG"
+	case CARGO:
+		return "CARGO"
 	case JAVA:
 		return "JAVA"
+	case MAVEN:
+		return "MAVEN"
+	case GRADLE:
+		return "GRADLE"
 	case RUBY:
 		return "RUBY"
+	case GEM:
+		return "GEM"
 	case PHP:
 		return "PHP"
+	case COMPOSER:
+		return "COMPOSER"
 	case RUST:
 		return "RUST"
+	case MAKE:
+		return "MAKE"
 	case KUBECTL:
 		return "KUBECTL"
 	case HELM:
@@ -1038,14 +1062,22 @@ var keywords = map[string]TokenType{
 	"node":        NODE,
 	"npm":         NPM,
 	"yarn":        YARN,
+	"pnpm":        PNPM,
+	"bun":         BUN,
 	"python":      PYTHON,
 	"pip":         PIP,
 	"go":          GO,
 	"golang":      GOLANG,
+	"cargo":       CARGO,
 	"java":        JAVA,
+	"maven":       MAVEN,
+	"gradle":      GRADLE,
 	"ruby":        RUBY,
+	"gem":         GEM,
 	"php":         PHP,
+	"composer":    COMPOSER,
 	"rust":        RUST,
+	"make":        MAKE,
 	"kubectl":     KUBECTL,
 	"helm":        HELM,
 	"terraform":   TERRAFORM,

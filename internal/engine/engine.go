@@ -1780,30 +1780,59 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 
 // executeIfAvailable executes "if tool is available" and "if tool is not available" conditions
 func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
-	available := detector.IsToolAvailable(stmt.Target)
+	// Build list of all tools to check (primary + alternatives)
+	toolsToCheck := []string{stmt.Target}
+	toolsToCheck = append(toolsToCheck, stmt.Alternatives...)
 
-	// Handle negation for "not available" conditions
+	// Check availability for all tools
 	var conditionMet bool
 	var conditionText string
+
 	if stmt.Condition == "not_available" {
-		conditionMet = !available
-		conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+		// For "not available": condition is true if ANY tool is not available (OR logic)
+		conditionMet = false
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolAvailable(tool) {
+				conditionMet = true
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("any of [%s] is not available", toolNames)
+		}
 	} else {
-		conditionMet = available
-		conditionText = fmt.Sprintf("%s is available", stmt.Target)
+		// For "is available": condition is true if ALL tools are available (AND logic)
+		conditionMet = true
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolAvailable(tool) {
+				conditionMet = false
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is available", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("all of [%s] are available", toolNames)
+		}
 	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s: %t\n", conditionText, conditionMet)
 		if conditionMet {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body for %s\n", stmt.Target)
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body\n")
 			for _, bodyStmt := range stmt.Body {
 				if err := e.executeStatement(bodyStmt, ctx); err != nil {
 					return err
 				}
 			}
 		} else if len(stmt.ElseBody) > 0 {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body for %s\n", stmt.Target)
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body\n")
 			for _, elseStmt := range stmt.ElseBody {
 				if err := e.executeStatement(elseStmt, ctx); err != nil {
 					return err

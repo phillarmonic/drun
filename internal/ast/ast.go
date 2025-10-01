@@ -711,7 +711,12 @@ func (ds *DetectionStatement) String() string {
 			out.WriteString(" as " + ds.CaptureVar)
 		}
 	case "if_available":
-		out.WriteString("if " + ds.Target + " is available")
+		if len(ds.Alternatives) > 0 {
+			tools := append([]string{ds.Target}, ds.Alternatives...)
+			out.WriteString("if " + strings.Join(tools, ",") + " is available")
+		} else {
+			out.WriteString("if " + ds.Target + " is available")
+		}
 	case "when_environment":
 		out.WriteString("when in " + ds.Target + " environment")
 	case "if_version":

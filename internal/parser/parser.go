@@ -2636,12 +2636,25 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	case lexer.IF:
 		// if docker is available:
 		// if "docker buildx" is available:
+		// if docker,"docker-compose" is not available:
 		// if node version >= "16":
 		stmt.Type = "if_available"
 
 		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
+
+			// Parse additional tools separated by commas
+			for p.peekToken.Type == lexer.COMMA {
+				p.nextToken() // consume COMMA
+				if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) {
+					p.nextToken()
+					stmt.Alternatives = append(stmt.Alternatives, p.curToken.Literal)
+				} else {
+					p.errors = append(p.errors, fmt.Sprintf("expected tool name after comma, got %s", p.peekToken.Type))
+					return stmt
+				}
+			}
 
 			switch p.peekToken.Type {
 			case lexer.IS:
@@ -2717,9 +2730,11 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 // isToolToken checks if a token represents a tool name
 func (p *Parser) isToolToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PYTHON, lexer.PIP,
-		lexer.GO, lexer.GOLANG, lexer.JAVA, lexer.RUBY, lexer.PHP, lexer.RUST, lexer.KUBECTL, lexer.HELM,
-		lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
+	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PNPM, lexer.BUN,
+		lexer.PYTHON, lexer.PIP, lexer.GO, lexer.GOLANG, lexer.CARGO,
+		lexer.JAVA, lexer.MAVEN, lexer.GRADLE, lexer.RUBY, lexer.GEM,
+		lexer.PHP, lexer.COMPOSER, lexer.RUST, lexer.MAKE,
+		lexer.KUBECTL, lexer.HELM, lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
 		return true
 	default:
 		return false
