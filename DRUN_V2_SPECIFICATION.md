@@ -2590,6 +2590,69 @@ catch:
 download "https://example.com/file.zip" to "file.zip" allow overwrite
 ```
 
+**Archive Extraction:**
+
+The download statement supports automatic extraction of archives using the pure-Go [github.com/mholt/archives](https://github.com/mholt/archives) library (no external dependencies):
+
+**Supported Formats:**
+- **Archives:** ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, 7Z, RAR
+- **Compression:** GZ, BZ2, XZ, ZSTD, BROTLI, LZ4, SNAPPY, LZW
+
+```
+# Download and extract archive
+download "https://example.com/release.zip" to "release.zip" extract to "release/"
+
+# Download, extract, and remove archive
+download "https://example.com/release.tar.gz" to "release.tar.gz" extract to "bin/" remove archive
+
+# With all options combined
+download "https://github.com/user/tool/releases/download/v1.0/tool.zip"
+  to "tool.zip"
+  extract to "tools/"
+  remove archive
+  timeout "120s"
+  with auth bearer "token"
+```
+
+**Extraction Examples:**
+
+```
+# Extract ZIP archive
+task "install_from_zip":
+  download "https://releases.example.com/app-v1.0.0.zip" 
+    to "app-v1.0.0.zip"
+    extract to "app/" 
+    remove archive
+
+# Extract tarball with compression
+task "install_from_tarball":
+  download "https://releases.example.com/tool-linux-amd64.tar.gz"
+    to "tool.tar.gz"
+    extract to "/usr/local/bin/"
+    remove archive
+
+# Keep archive for backup
+task "extract_but_keep":
+  download "https://releases.example.com/source.tar.gz"
+    to "source.tar.gz"
+    extract to "source/"
+  # Archive stays as source.tar.gz
+
+# Download and extract in parallel
+task "parallel_installs":
+  for each $version in ["v1.0", "v2.0", "v3.0"] in parallel:
+    download "https://releases.example.com/tool-{$version}.zip"
+      to ".downloads/tool-{$version}.zip"
+      extract to "tools/{$version}/"
+      remove archive
+```
+
+**Cross-Platform Benefits:**
+- Pure Go implementation (no external tools like `tar`, `unzip`, `7z` required)
+- Works identically on Windows, Linux, and macOS
+- Automatic format detection from file extension and header
+- Preserves file permissions and directory structure
+
 **Real-World Examples:**
 
 ```

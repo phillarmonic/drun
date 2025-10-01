@@ -2325,7 +2325,7 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 		return nil
 	}
 
-	// Parse "to path"
+	// Parse "to path" (required) then optional "extract to"
 	if p.peekToken.Type == lexer.TO {
 		p.nextToken() // consume TO
 		if p.peekToken.Type == lexer.STRING {
@@ -2338,6 +2338,24 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 	} else {
 		p.addError(fmt.Sprintf("expected 'to' after URL, got %s", p.peekToken.Type))
 		return nil
+	}
+
+	// Check for optional "extract to"
+	if p.peekToken.Type == lexer.EXTRACT {
+		p.nextToken() // consume EXTRACT
+		if p.peekToken.Type == lexer.TO {
+			p.nextToken() // consume TO
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.ExtractTo = p.curToken.Literal
+			} else {
+				p.addError(fmt.Sprintf("expected directory path after 'extract to', got %s", p.peekToken.Type))
+				return nil
+			}
+		} else {
+			p.addError(fmt.Sprintf("expected 'to' after 'extract', got %s", p.peekToken.Type))
+			return nil
+		}
 	}
 
 	// Parse optional modifiers (allow overwrite, allow permissions, headers, auth, timeout, etc.)
@@ -2458,6 +2476,13 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 			if p.peekToken.Type == lexer.STRING {
 				p.nextToken()
 				stmt.Options[optionKey] = p.curToken.Literal
+			}
+
+		case lexer.REMOVE:
+			p.nextToken() // consume REMOVE
+			if p.peekToken.Type == lexer.ARCHIVE {
+				p.nextToken() // consume ARCHIVE
+				stmt.RemoveArchive = true
 			}
 
 		default:

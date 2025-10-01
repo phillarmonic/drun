@@ -93,6 +93,7 @@ go.work
 
 # drun-specific files
 *.cache
+.downloads/
 
 # Temporary files
 *.tmp

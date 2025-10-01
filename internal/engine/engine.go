@@ -1,16 +1,19 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mholt/archives"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/detection"
@@ -1535,12 +1538,37 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 		return fmt.Errorf("download failed: %w", err)
 	}
 
-	// Apply file permissions if specified
-	if len(downloadStmt.AllowPermissions) > 0 {
-		err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+	// Extract archive if requested
+	if downloadStmt.ExtractTo != "" {
+		extractTo := e.interpolateVariables(downloadStmt.ExtractTo, ctx)
+		_, _ = fmt.Fprintf(e.output, "📦 Extracting archive to: %s\n", extractTo)
+
+		err = e.extractArchive(path, extractTo)
 		if err != nil {
-			_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
-			// Don't fail the download, just warn
+			_, _ = fmt.Fprintf(e.output, "❌ Extraction failed: %v\n", err)
+			return fmt.Errorf("extraction failed: %w", err)
+		}
+
+		_, _ = fmt.Fprintf(e.output, "✅ Extraction completed\n")
+
+		// Remove archive if requested
+		if downloadStmt.RemoveArchive {
+			_, _ = fmt.Fprintf(e.output, "🗑️  Removing archive: %s\n", path)
+			err = os.Remove(path)
+			if err != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to remove archive: %v\n", err)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "✅ Archive removed\n")
+			}
+		}
+	} else {
+		// Apply file permissions if specified (only for non-extracted files)
+		if len(downloadStmt.AllowPermissions) > 0 {
+			err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+			if err != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
+				// Don't fail the download, just warn
+			}
 		}
 	}
 
@@ -3870,7 +3898,7 @@ func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *
 }
 
 // downloadFileWithProgress downloads a file using native Go HTTP client with progress tracking
-func (e *Engine) downloadFileWithProgress(url, filepath string, headers, auth, options map[string]string) error {
+func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, options map[string]string) error {
 	// Create HTTP client with timeout
 	timeout := 30 * time.Second
 	if timeoutStr, exists := options["timeout"]; exists {
@@ -3919,19 +3947,26 @@ func (e *Engine) downloadFileWithProgress(url, filepath string, headers, auth, o
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed with status: %s", resp.Status)
 	}
 
+	// Create parent directories if they don't exist
+	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory: %w", err)
+		}
+	}
+
 	// Create output file
-	out, err := os.Create(filepath)
+	out, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	// Get content length for progress tracking
 	contentLength := resp.ContentLength
@@ -3961,7 +3996,7 @@ func (e *Engine) downloadFileWithProgress(url, filepath string, headers, auth, o
 	}
 
 	// Final progress update
-	fmt.Fprintf(e.output, "\r\033[K") // Clear line
+	_, _ = fmt.Fprintf(e.output, "\r\033[K") // Clear line
 
 	// Calculate final stats
 	duration := time.Since(startTime)
@@ -4114,6 +4149,119 @@ func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpe
 			return fmt.Errorf("failed to chmod: %w", err)
 		}
 		_, _ = fmt.Fprintf(e.output, "   🔒 Set permissions: %s\n", newMode.String())
+	}
+
+	return nil
+}
+
+// extractArchive extracts an archive file to the specified directory using the archives library
+func (e *Engine) extractArchive(archivePath, extractTo string) error {
+	// Create extract directory if it doesn't exist
+	err := os.MkdirAll(extractTo, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create extract directory: %w", err)
+	}
+
+	// Open the archive file
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer func() { _ = archiveFile.Close() }()
+
+	// Identify the archive format
+	format, archiveReader, err := archives.Identify(context.Background(), archivePath, archiveFile)
+	if err != nil {
+		return fmt.Errorf("failed to identify archive format: %w", err)
+	}
+
+	// Check if it's an extractor
+	extractor, ok := format.(archives.Extractor)
+	if !ok {
+		// If it's just compressed (not archived), try to decompress it
+		if decompressor, ok := format.(archives.Decompressor); ok {
+			return e.decompressFile(decompressor, archiveReader, archivePath, extractTo)
+		}
+		return fmt.Errorf("format does not support extraction: %s", archivePath)
+	}
+
+	// Extract the archive
+	handler := func(ctx context.Context, f archives.FileInfo) error {
+		// Construct the output path
+		outputPath := filepath.Join(extractTo, f.NameInArchive)
+
+		// Handle directories
+		if f.IsDir() {
+			return os.MkdirAll(outputPath, f.Mode())
+		}
+
+		// Create parent directories
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory: %w", err)
+		}
+
+		// Open the file in the archive
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open file in archive: %w", err)
+		}
+		defer func() { _ = rc.Close() }()
+
+		// Create the output file
+		outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer func() { _ = outFile.Close() }()
+
+		// Copy the contents
+		if _, err := io.Copy(outFile, rc); err != nil {
+			return fmt.Errorf("failed to extract file: %w", err)
+		}
+
+		return nil
+	}
+
+	// Extract all files
+	err = extractor.Extract(context.Background(), archiveReader, handler)
+	if err != nil {
+		return fmt.Errorf("extraction failed: %w", err)
+	}
+
+	return nil
+}
+
+// decompressFile decompresses a single compressed file (not an archive)
+func (e *Engine) decompressFile(decompressor archives.Decompressor, reader io.Reader, archivePath, extractTo string) error {
+	// Open decompression reader
+	rc, err := decompressor.OpenReader(reader)
+	if err != nil {
+		return fmt.Errorf("failed to open decompressor: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	// Determine output filename by removing compression extension
+	baseName := filepath.Base(archivePath)
+	// Remove common compression extensions
+	for _, ext := range []string{".gz", ".bz2", ".xz", ".zst", ".br", ".lz4", ".sz"} {
+		if strings.HasSuffix(strings.ToLower(baseName), ext) {
+			baseName = strings.TrimSuffix(baseName, ext)
+			break
+		}
+	}
+
+	outputPath := filepath.Join(extractTo, baseName)
+
+	// Create output file
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = outFile.Close() }()
+
+	// Decompress
+	if _, err := io.Copy(outFile, rc); err != nil {
+		return fmt.Errorf("decompression failed: %w", err)
 	}
 
 	return nil

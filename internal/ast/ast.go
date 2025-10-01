@@ -568,6 +568,8 @@ type DownloadStatement struct {
 	Path             string            // the local path to save to
 	AllowOverwrite   bool              // whether to allow overwriting existing files
 	AllowPermissions []PermissionSpec  // permission specifications
+	ExtractTo        string            // directory to extract archive to (if set)
+	RemoveArchive    bool              // whether to remove archive after extraction
 	Headers          map[string]string // HTTP headers
 	Auth             map[string]string // authentication options
 	Options          map[string]string // additional options (timeout, retry, etc.)
@@ -578,9 +580,20 @@ func (ds *DownloadStatement) String() string {
 	var out strings.Builder
 	out.WriteString("download \"")
 	out.WriteString(ds.URL)
-	out.WriteString("\" to \"")
-	out.WriteString(ds.Path)
 	out.WriteString("\"")
+
+	if ds.ExtractTo != "" {
+		out.WriteString(" extract to \"")
+		out.WriteString(ds.ExtractTo)
+		out.WriteString("\"")
+		if ds.RemoveArchive {
+			out.WriteString(" remove archive")
+		}
+	} else {
+		out.WriteString(" to \"")
+		out.WriteString(ds.Path)
+		out.WriteString("\"")
+	}
 
 	if ds.AllowOverwrite {
 		out.WriteString(" allow overwrite")

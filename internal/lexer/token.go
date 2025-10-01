@@ -296,6 +296,8 @@ const (
 	DIRECTORY   // directory
 	ALLOW       // allow
 	PERMISSIONS // permissions
+	EXTRACT     // extract
+	ARCHIVE     // archive
 
 	// Error handling
 	TRY     // try
@@ -850,6 +852,10 @@ func (t TokenType) String() string {
 		return "ALLOW"
 	case PERMISSIONS:
 		return "PERMISSIONS"
+	case EXTRACT:
+		return "EXTRACT"
+	case ARCHIVE:
+		return "ARCHIVE"
 	case TRY:
 		return "TRY"
 	case CATCH:
@@ -1161,6 +1167,8 @@ var keywords = map[string]TokenType{
 	"directory":   DIRECTORY,
 	"allow":       ALLOW,
 	"permissions": PERMISSIONS,
+	"extract":     EXTRACT,
+	"archive":     ARCHIVE,
 	"try":         TRY,
 	"catch":       CATCH,
 	"finally":     FINALLY,

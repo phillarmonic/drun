@@ -1,0 +1,11 @@
+version: 2.0
+
+task "test_zip":
+	download "https://github.com/mholt/archives/archive/refs/heads/main.zip" extract to "test-extracted" remove archive
+
+task "test_tarball":
+	download "https://github.com/mholt/archives/archive/refs/tags/v0.1.4.tar.gz" extract to "test-tar-extracted" remove archive
+
+task "test_keep":
+	download "https://github.com/mholt/archives/archive/refs/heads/main.zip" extract to "test-keep"
+

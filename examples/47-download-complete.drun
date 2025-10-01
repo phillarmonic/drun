@@ -9,65 +9,80 @@ project "download-showcase" version "1.0.0":
 	
 	after any task:
 		info "🧹 Cleaning up downloaded files"
-		run "rm -f data.json users.json binary-checksums.txt github-zen.txt data-timeout.json install.sh posts.json comments.json albums.json todos.json config.json setup.sh users-data.json posts-data.json large-photos.json ultimate-test.json"
+		run "rm -rf .downloads"
 
 task "basic_download" means "Simple download with progress tracking":
-	download "https://jsonplaceholder.typicode.com/posts" to "data.json" allow overwrite
+	download "https://jsonplaceholder.typicode.com/posts" to ".downloads/data.json" allow overwrite
 	success "Downloaded with native Go HTTP client and progress bar!"
 
 task "download_with_permissions" means "Download with matrix permission system":
 	info "Using permission matrix: read/write for user, read-only for group/others"
-	download "https://jsonplaceholder.typicode.com/users" to "users.json" allow overwrite allow permissions ["read","write"] to ["user"] allow permissions ["read"] to ["group","others"]
+	download "https://jsonplaceholder.typicode.com/users" to ".downloads/users.json" allow overwrite allow permissions ["read","write"] to ["user"] allow permissions ["read"] to ["group","others"]
 	success "File downloaded with granular permissions!"
 
 task "download_binary" means "Download binary and make executable":
 	info "Downloading binary with execute permissions"
-	download "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_checksums.txt" to "binary-checksums.txt" allow overwrite allow permissions ["execute","read"] to ["user"] allow permissions ["read"] to ["group","others"]
+	download "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_checksums.txt" to ".downloads/binary-checksums.txt" allow overwrite allow permissions ["execute","read"] to ["user"] allow permissions ["read"] to ["group","others"]
 	success "Binary downloaded and made executable for user!"
 
 task "download_with_auth" means "Download with authentication headers":
 	info "Downloading with bearer token authentication"
-	download "https://api.github.com/zen" to "github-zen.txt" with auth bearer "fake-token-for-demo" allow overwrite
+	download "https://api.github.com/zen" to ".downloads/github-zen.txt" with auth bearer "fake-token-for-demo" allow overwrite
 	success "Downloaded with authentication!"
 
 task "download_with_timeout" means "Download with custom timeout":
-	download "https://jsonplaceholder.typicode.com/posts" to "data-timeout.json" allow overwrite timeout "60s"
+	download "https://jsonplaceholder.typicode.com/posts" to ".downloads/data-timeout.json" allow overwrite timeout "60s"
 	success "Downloaded with 60s timeout!"
 
 task "multiple_permission_sets" means "Multiple permission specifications on same file":
 	info "Layering permissions: all can read, only user can write and execute"
-	download "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh" to "install.sh" allow overwrite allow permissions ["read"] to ["user","group","others"] allow permissions ["write","execute"] to ["user"]
+	download "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh" to ".downloads/nvm-installer.sh" allow overwrite allow permissions ["read"] to ["user","group","others"] allow permissions ["write","execute"] to ["user"]
 	success "Script ready: readable by all, writable/executable by user only!"
 
 task "parallel_downloads" means "Parallel downloads with individual permissions":
 	info "Downloading multiple files in parallel"
 	
 	for each $resource in ["posts","users","comments","albums","todos"] in parallel:
-		download "https://jsonplaceholder.typicode.com/{$resource}" to "{$resource}.json" allow overwrite allow permissions ["read","write"] to ["user"] allow permissions ["read"] to ["group"]
+		download "https://jsonplaceholder.typicode.com/{$resource}" to ".downloads/{$resource}.json" allow overwrite allow permissions ["read","write"] to ["user"] allow permissions ["read"] to ["group"]
 	
 	success "All 5 files downloaded in parallel with permissions!"
 
 task "complete_workflow" means "Real-world download workflow":
 	info "Step 1: Download configuration file"
-	download "https://jsonplaceholder.typicode.com/posts/1" to "config.json" allow overwrite allow permissions ["read"] to ["user","group","others"] allow permissions ["write"] to ["user"]
+	download "https://jsonplaceholder.typicode.com/posts/1" to ".downloads/config.json" allow overwrite allow permissions ["read"] to ["user","group","others"] allow permissions ["write"] to ["user"]
 	
 	info "Step 2: Download executable script"
-	download "https://jsonplaceholder.typicode.com/posts/2" to "setup.sh" allow overwrite allow permissions ["execute","read"] to ["user"] allow permissions ["read"] to ["group"]
+	download "https://jsonplaceholder.typicode.com/posts/2" to ".downloads/deploy-script.sh" allow overwrite allow permissions ["execute","read"] to ["user"] allow permissions ["read"] to ["group"]
 	
 	info "Step 3: Download data files"
 	for each $file in ["users","posts"]:
-		download "https://jsonplaceholder.typicode.com/{$file}" to "{$file}-data.json" allow overwrite allow permissions ["read","write"] to ["user"]
+		download "https://jsonplaceholder.typicode.com/{$file}" to ".downloads/{$file}-data.json" allow overwrite allow permissions ["read","write"] to ["user"]
 	
 	success "Complete workflow: config, script, and data files all downloaded!"
 
 task "demonstrate_progress" means "Download larger file to show progress bar":
 	info "Downloading larger file to demonstrate progress tracking"
 	info "Features: Progress bar, speed (MB/s), ETA calculation"
-	download "https://jsonplaceholder.typicode.com/photos" to "large-photos.json" allow overwrite timeout "30s"
+	download "https://jsonplaceholder.typicode.com/photos" to ".downloads/large-photos.json" allow overwrite timeout "30s"
 	success "Progress bar demonstrated successfully!"
 
 task "test_all_features" means "Test all download features together":
 	info "Testing all features in one download statement"
-	download "https://jsonplaceholder.typicode.com/posts" to "ultimate-test.json" allow overwrite timeout "60s" with header "Accept: application/json" allow permissions ["read"] to ["user","group","others"] allow permissions ["write"] to ["user"] allow permissions ["execute"] to ["user"]
+	download "https://jsonplaceholder.typicode.com/posts" to ".downloads/ultimate-test.json" allow overwrite timeout "60s" with header "Accept: application/json" allow permissions ["read"] to ["user","group","others"] allow permissions ["write"] to ["user"] allow permissions ["execute"] to ["user"]
 	success "All features working: native HTTP, progress bar, permissions, headers, timeout!"
+
+task "download_and_extract_zip" means "Download and extract a ZIP archive":
+	info "Downloading and extracting ZIP archive"
+	download "https://github.com/mholt/archives/archive/refs/heads/main.zip" to ".downloads/main.zip" extract to ".downloads/extracted-zip" remove archive
+	success "ZIP archive downloaded and extracted!"
+
+task "download_and_extract_tarball" means "Download and extract a tarball":
+	info "Downloading and extracting tar.gz archive"
+	download "https://github.com/mholt/archives/archive/refs/tags/v0.1.4.tar.gz" to ".downloads/v0.1.4.tar.gz" extract to ".downloads/extracted-tar" remove archive
+	success "Tarball downloaded and extracted!"
+
+task "download_extract_keep_archive" means "Download and extract but keep the archive":
+	info "Extracting archive while keeping the original"
+	download "https://github.com/mholt/archives/archive/refs/heads/main.zip" to ".downloads/archives.zip" extract to ".downloads/extracted-keep"
+	success "Archive extracted and original file kept!"
 
