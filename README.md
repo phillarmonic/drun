@@ -156,7 +156,8 @@ drun --list
 1. **Create a simple task file** (`.drun/spec.drun`):
    
    ```drun
-   project "my-app" version "1.0"
+   version: 2.0 # You need to specify the Drun file version
+   project "my-app" version "1.0" # This is optional, except if you want to customize shell behavior
    
    task "hello" means "Say hello":
      info "Hello from drun v2! 🚀"
