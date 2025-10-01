@@ -54,6 +54,26 @@ task "test":
 			expectedTools: []string{"docker", "docker compose"},
 			condition:     "available",
 		},
+		{
+			name: "two tools with are available",
+			input: `version: 2.0
+
+task "test":
+  if docker,kubectl are available:
+    info "ok"`,
+			expectedTools: []string{"docker", "kubectl"},
+			condition:     "available",
+		},
+		{
+			name: "multiple tools with are not available",
+			input: `version: 2.0
+
+task "test":
+  if docker,kubectl,helm are not available:
+    error "missing"`,
+			expectedTools: []string{"docker", "kubectl", "helm"},
+			condition:     "not_available",
+		},
 	}
 
 	for _, tt := range tests {
