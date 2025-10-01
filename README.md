@@ -292,6 +292,8 @@ task "tabs-example":
 ### Basic Task
 
 ```drun
+version: 2.0
+
 project "my-app" version "1.0"
 
 task "hello" means "Say hello":
