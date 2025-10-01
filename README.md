@@ -1,7 +1,5 @@
 # drun (do run)
 
-#### Deprecation notice: V1 is now deprecated. Please migrate to V2. We'll maintain this standard in future major versions.
-
 A **semantic, English-like** task automation language with intelligent execution, smart detection, and powerful built-in actions. Write automation tasks in natural language that compiles to efficient shell commands.
 
 ## Features
