@@ -25,10 +25,11 @@ type ParallelExecutor struct {
 	failFast   bool
 	output     io.Writer
 	dryRun     bool
+	verbose    bool
 }
 
 // NewParallelExecutor creates a new parallel executor
-func NewParallelExecutor(maxWorkers int, failFast bool, output io.Writer, dryRun bool) *ParallelExecutor {
+func NewParallelExecutor(maxWorkers int, failFast bool, output io.Writer, dryRun bool, verbose bool) *ParallelExecutor {
 	if maxWorkers <= 0 {
 		maxWorkers = 10 // default reasonable limit
 	}
@@ -37,6 +38,7 @@ func NewParallelExecutor(maxWorkers int, failFast bool, output io.Writer, dryRun
 		failFast:   failFast,
 		output:     output,
 		dryRun:     dryRun,
+		verbose:    verbose,
 	}
 }
 
@@ -91,7 +93,9 @@ func (pe *ParallelExecutor) executeParallel(
 		workers = numItems
 	}
 
-	_, _ = fmt.Fprintf(pe.output, "🔄 Starting parallel execution: %d items, %d workers\n", numItems, workers)
+	if pe.verbose {
+		_, _ = fmt.Fprintf(pe.output, "🔄 Starting parallel execution: %d items, %d workers\n", numItems, workers)
+	}
 
 	// Create channels for work distribution and result collection
 	workChan := make(chan workItem, numItems)
@@ -132,14 +136,16 @@ func (pe *ParallelExecutor) executeParallel(
 			completedCount++
 
 			if result.Error != nil {
-				_, _ = fmt.Fprintf(pe.output, "❌ Worker failed on item %d (%s): %v\n",
-					result.Index+1, result.Item, result.Error)
+				if pe.verbose {
+					_, _ = fmt.Fprintf(pe.output, "❌ Worker failed on item %d (%s): %v\n",
+						result.Index+1, result.Item, result.Error)
+				}
 
 				if pe.failFast && firstError == nil {
 					firstError = result.Error
 					cancel() // stop all workers
 				}
-			} else {
+			} else if pe.verbose {
 				_, _ = fmt.Fprintf(pe.output, "✅ Worker completed item %d (%s) in %v\n",
 					result.Index+1, result.Item, result.Duration)
 			}
@@ -165,8 +171,10 @@ collectRemaining:
 		}
 	}
 
-	_, _ = fmt.Fprintf(pe.output, "🏁 Parallel execution completed: %d/%d items processed\n",
-		completedCount, numItems)
+	if pe.verbose {
+		_, _ = fmt.Fprintf(pe.output, "🏁 Parallel execution completed: %d/%d items processed\n",
+			completedCount, numItems)
+	}
 
 	// Count errors
 	errorCount := 0
@@ -177,7 +185,9 @@ collectRemaining:
 	}
 
 	if errorCount > 0 {
-		_, _ = fmt.Fprintf(pe.output, "⚠️  %d items failed during parallel execution\n", errorCount)
+		if pe.verbose {
+			_, _ = fmt.Fprintf(pe.output, "⚠️  %d items failed during parallel execution\n", errorCount)
+		}
 
 		if pe.failFast && firstError != nil {
 			return results, fmt.Errorf("parallel execution failed (fail-fast): %v", firstError)

@@ -2168,7 +2168,9 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+	}
 
 	return nil
 }
@@ -2800,10 +2802,14 @@ func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) err
 
 // executeSequentialLoop executes loop items sequentially
 func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+	}
 
 	for i, item := range items {
-		_, _ = fmt.Fprintf(e.output, "📋 Processing item %d/%d: %s\n", i+1, len(items), item)
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "📋 Processing item %d/%d: %s\n", i+1, len(items), item)
+		}
 
 		// Create a new context with the loop variable
 		loopCtx := e.createLoopContext(ctx, stmt.Variable, item)
@@ -2813,11 +2819,15 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
 				// Check for break/continue control flow
 				if breakErr, ok := err.(BreakError); ok {
-					_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+					}
 					return nil // Break out of the entire loop
 				}
 				if continueErr, ok := err.(ContinueError); ok {
-					_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+					}
 					break // Break out of the body execution, continue to next item
 				}
 				return fmt.Errorf("error processing item '%s': %v", item, err)
@@ -2825,7 +2835,9 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+	}
 	return nil
 }
 
@@ -2840,7 +2852,7 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 	failFast := stmt.FailFast
 
 	// Create parallel executor
-	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun)
+	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun, e.verbose)
 
 	// Define the execution function for each item
 	executeItem := func(body []ast.Statement, variables map[string]string) error {
@@ -2891,8 +2903,10 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 			}
 		}
 
-		_, _ = fmt.Fprintf(e.output, "⚠️  Parallel loop completed with errors: %d/%d successful\n",
-			successCount, len(items))
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Parallel loop completed with errors: %d/%d successful\n",
+				successCount, len(items))
+		}
 		return err
 	}
 
@@ -3038,14 +3052,19 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
 		}
 
-		// Split by space to get items (for our variable operations system)
+		// Check if it's an array literal or a space-separated list
 		iterableStr = strings.TrimSpace(iterableStr)
 		if iterableStr == "" {
 			_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
 			return nil
 		}
 
-		items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		// Check if it's an array literal (starts with '[' and ends with ']')
+		if strings.HasPrefix(iterableStr, "[") && strings.HasSuffix(iterableStr, "]") {
+			items = e.parseArrayLiteralString(iterableStr)
+		} else {
+			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		}
 	} else {
 		// Check if it's a legacy direct project setting access (for backward compatibility)
 		if ctx.Project != nil && ctx.Project.Settings != nil {
@@ -3633,6 +3652,19 @@ func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) 
 			}
 			return "", fmt.Errorf("undefined variable: %s", varName)
 		}
+
+	case *ast.ArrayLiteral:
+		// Convert array literal to bracket-enclosed comma-separated string
+		// This preserves the array format so loops can properly split it
+		var elements []string
+		for _, elem := range ex.Elements {
+			val, err := e.evaluateExpression(elem, ctx)
+			if err != nil {
+				return "", err
+			}
+			elements = append(elements, val)
+		}
+		return "[" + strings.Join(elements, ",") + "]", nil
 
 	case *ast.BinaryExpression:
 		return e.evaluateBinaryExpression(ex, ctx)

@@ -3690,11 +3690,35 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 	// Check if next token is $variable (old syntax) or identifier (new syntax)
 	switch p.peekToken.Type {
 	case lexer.VARIABLE:
-		// Old syntax: "let $variable = value"
+		// Old syntax: "let $variable = value" or "let $variable as type to value"
 		if !p.expectPeekVariableName() {
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
+
+		// Check for optional "as type" syntax
+		if p.peekToken.Type == lexer.AS {
+			p.nextToken() // consume AS
+			// Parse type (list, string, number, etc.)
+			if p.peekToken.Type == lexer.LIST || p.isTypeToken(p.peekToken.Type) {
+				p.nextToken() // consume type
+				// Type information is not currently stored in VariableStatement
+				// but we accept it for syntax compatibility
+			} else {
+				p.addError("expected type after 'as'")
+				return nil
+			}
+
+			// Expect "to" after type
+			if !p.expectPeek(lexer.TO) {
+				return nil
+			}
+
+			// Parse the value
+			p.nextToken()
+			stmt.Value = p.parseExpression()
+			return stmt
+		}
 
 		if !p.expectPeek(lexer.EQUALS) {
 			return nil
@@ -3727,6 +3751,9 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 }
 
 // parseSetVariableStatement parses "set variable to value" statements
+// Supports: set $variable to value
+//
+//	set $variable as list to ["value1", "value2"]
 func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.VariableStatement {
 	stmt.Operation = "set"
 
@@ -3734,6 +3761,20 @@ func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.Var
 		return nil
 	}
 	stmt.Variable = p.curToken.Literal
+
+	// Check for optional "as type" syntax
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		// Parse type (list, string, number, etc.)
+		if p.peekToken.Type == lexer.LIST || p.isTypeToken(p.peekToken.Type) {
+			p.nextToken() // consume type
+			// Type information is not currently stored in VariableStatement
+			// but we accept it for syntax compatibility
+		} else {
+			p.addError("expected type after 'as'")
+			return nil
+		}
+	}
 
 	if !p.expectPeek(lexer.TO) {
 		return nil

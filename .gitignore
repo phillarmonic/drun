@@ -112,3 +112,5 @@ workspace
 drun
 debug-tool
 drun-test
+
+debug.drun
