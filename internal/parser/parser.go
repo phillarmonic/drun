@@ -2657,8 +2657,8 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			}
 
 			switch p.peekToken.Type {
-			case lexer.IS:
-				p.nextToken() // consume IS
+			case lexer.IS, lexer.ARE:
+				p.nextToken() // consume IS or ARE
 				switch p.peekToken.Type {
 				case lexer.AVAILABLE:
 					p.nextToken() // consume AVAILABLE

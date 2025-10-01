@@ -300,6 +300,8 @@ detection_statement = "detect" detection_target
 
 tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
 
+(* Note: Both "is" and "are" are accepted for tool availability checks *)
+
 detection_target = "project" "type"
                  | tool_name [ "version" ] ;
 
@@ -1324,11 +1326,19 @@ if kubernetes is available:
 if docker,"docker-compose" is available:
   info "Docker and Docker Compose are both available"
 
+# Alternative: use 'are' for better readability with multiple tools
+if docker,"docker-compose" are available:
+  info "Docker and Docker Compose are both available"
+
 # For "is not available": ANY tool must be unavailable (OR logic)
 if docker,"docker-compose",kubectl is not available:
   error "One or more required tools are missing"
 else:
   info "All required tools are available"
+
+# Alternative: use 'are not' for better readability
+if docker,"docker-compose",kubectl are not available:
+  error "One or more required tools are missing"
 
 # File/directory detection
 if file "package.json" exists:

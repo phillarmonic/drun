@@ -270,6 +270,7 @@ const (
 	IN        // in
 	PARALLEL  // parallel
 	IS        // is
+	ARE       // are
 
 	// Built-in functions/conditions
 	EXISTS // exists
@@ -826,6 +827,8 @@ func (t TokenType) String() string {
 		return "PARALLEL"
 	case IS:
 		return "IS"
+	case ARE:
+		return "ARE"
 	case EXISTS:
 		return "EXISTS"
 	case RUN:
@@ -1174,6 +1177,7 @@ var keywords = map[string]TokenType{
 	"in":          IN,
 	"parallel":    PARALLEL,
 	"is":          IS,
+	"are":         ARE,
 	"exists":      EXISTS,
 	"empty":       EMPTY,
 	"run":         RUN,
