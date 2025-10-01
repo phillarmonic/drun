@@ -104,6 +104,11 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		return fmt.Errorf("program is nil")
 	}
 
+	// Start memory monitor to detect runaway execution
+	monitor := NewMemoryMonitor(program)
+	monitor.Start()
+	defer monitor.Stop()
+
 	// Create dependency resolver
 	resolver := NewDependencyResolver(program.Tasks)
 

@@ -293,11 +293,30 @@ call task "task-name"
 # Task call with parameters
 call task "task-name" with param1="value1" param2="value2"
 
+# Unquoted task names (when possible)
+call task test
+call task build_app
+call task hello_world
+
 # Examples
-call task "setup-environment"
-call task "run-tests" with test_type="unit"
+call task "setup-environment"  # Kebab-case requires quotes
+call task run_tests with test_type="unit"  # Snake_case can be unquoted
 call task "deploy" with environment="production" replicas="3"
 ```
+
+**Task Name Quoting Rules:**
+
+**Unquoted** (no quotes needed):
+- Single words: `call task test`, `call task build`
+- Snake_case: `call task run_tests`, `call task hello_world`
+- Keywords: `call task test`, `call task ci`, `call task start`
+
+**Quoted** (quotes required):
+- Kebab-case: `call task "hello-world"`, `call task "run-tests"`
+- Multi-word: `call task "hello world"`, `call task "run all tests"`
+- Special characters or spaces
+
+**Why?** Hyphens (`-`) are operators, so `hello-world` is tokenized as three separate tokens. Underscores (`_`) are part of identifiers, so `hello_world` is a single token.
 
 ### Control Flow
 ```drun
@@ -399,6 +418,7 @@ task "ci-pipeline" means "Complete CI/CD pipeline":
 
 ### 5. Task Calling Pattern
 ```drun
+# Tasks with kebab-case names (require quotes when calling)
 task "setup-environment":
   info "Setting up development environment"
   info "Installing dependencies..."
@@ -408,23 +428,26 @@ task "run-tests":
   info "Running {$test_type} tests"
   info "All tests passed!"
 
-task "build-application":
+# Tasks with snake_case or single-word names (can be called unquoted)
+task "test":
+  info "Running tests"
+
+task "build_app":
   given $target defaults to "production"
   info "Building application for {$target}"
-  info "Build completed successfully"
 
-task "full-pipeline":
-  info "Starting full CI/CD pipeline"
+task "ci_pipeline":
+  info "Starting CI/CD pipeline"
   
-  # Call tasks without parameters
+  # Kebab-case requires quotes
   call task "setup-environment"
-  
-  # Call tasks with parameters
   call task "run-tests" with test_type="unit"
-  call task "run-tests" with test_type="integration"
-  call task "build-application" with target="production"
   
-  success "Full pipeline completed successfully!"
+  # Snake_case and single words can be unquoted
+  call task test
+  call task build_app with target="production"
+  
+  success "Pipeline completed successfully!"
 ```
 
 ### 6. Matrix Execution

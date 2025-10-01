@@ -1,0 +1,24 @@
+# Eating your own dog food is good practice
+# And we do it here in Drun team too :)
+
+version: 2.0
+
+project "Drunp" version "2.0":
+
+
+task "default" means "Welcome to drun v2":
+	echo "Drun CI file"
+	info "Welcome to drun v2! 🚀"
+
+task "test" means "Runs unit tests":
+	info "Running PHPUnit (just kidding)"
+	run "go test ./..."
+
+task "lint" means "Runs the Golang CI Linter":
+	info "Running PHPCS (just kidding)"
+	run "golangci-lint run"
+
+task "ci" means "Runs the whole CI pipeline":
+	info "Executing the local CI pipeline..."
+	call task test
+	call task lint

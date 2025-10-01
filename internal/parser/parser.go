@@ -879,12 +879,14 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 		return nil
 	}
 
-	// Expect task name as string
-	if !p.expectPeek(lexer.STRING) {
-		p.addError("expected task name as string")
+	// Expect task name as string, identifier, or valid keyword
+	// Note: Unquoted names must be single tokens (no hyphens unless quoted)
+	if p.peekToken.Type != lexer.STRING && p.peekToken.Type != lexer.IDENT && !p.isValidTaskNameToken(p.peekToken.Type) {
+		p.addError("expected task name as string or identifier (use quotes for names with hyphens or spaces)")
 		return nil
 	}
 
+	p.nextToken() // consume the task name token
 	stmt.TaskName = p.curToken.Literal
 
 	// Check for optional "with" parameters
@@ -892,13 +894,8 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 		p.nextToken() // consume "with"
 
 		// Parse parameters - continue while we see parameter names (IDENT or keywords)
-		for {
-			// Check if next token can be a parameter name
-			// We allow both IDENT and keywords as parameter names
-			if p.peekToken.Type != lexer.IDENT && !p.isKeywordToken(p.peekToken.Type) {
-				break
-			}
-
+		// We allow both IDENT and keywords as parameter names
+		for p.peekToken.Type == lexer.IDENT || p.isKeywordToken(p.peekToken.Type) {
 			p.nextToken() // consume parameter name
 			paramName := p.curToken.Literal
 
@@ -2775,6 +2772,19 @@ func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 // isCallToken checks if a token type represents a task call
 func (p *Parser) isCallToken(tokenType lexer.TokenType) bool {
 	return tokenType == lexer.CALL
+}
+
+// isValidTaskNameToken checks if a token type can be used as a task name without quotes
+func (p *Parser) isValidTaskNameToken(tokenType lexer.TokenType) bool {
+	// Allow common task-related keywords to be used as task names
+	switch tokenType {
+	case lexer.TEST, lexer.BUILD, lexer.CI,
+		lexer.START, lexer.STOP,
+		lexer.BACKUP, lexer.CHECK, lexer.VERIFY:
+		return true
+	default:
+		return false
+	}
 }
 
 // isKeywordToken checks if a token type is a keyword (can be used as a parameter name)

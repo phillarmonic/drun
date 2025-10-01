@@ -722,10 +722,37 @@ Tasks can call other tasks directly using the `call task` statement. This allows
 call task "task_name"
 ```
 
+Task names can be specified with or without quotes, depending on the naming pattern:
+
+**Unquoted task names** (no quotes required):
+- Single words: `call task test`, `call task build`
+- Snake_case: `call task run_tests`, `call task hello_world`
+- Keywords: `call task test`, `call task ci`, `call task build`
+
+**Quoted task names** (quotes required):
+- Kebab-case: `call task "hello-world"`, `call task "run-tests"`
+- Multi-word: `call task "hello world"`, `call task "run tests"`
+- Names with special characters or spaces
+
+**Note**: Hyphens (`-`) are tokenized as operators, so kebab-case names like `my-task` must be quoted. Underscores (`_`) are part of identifiers, so snake_case names like `my_task` can be unquoted.
+
+```drun
+# Valid unquoted forms
+call task test
+call task build_app
+call task hello_world
+
+# Requires quotes
+call task "hello-world"
+call task "build app"
+call task "my-special-task"
+```
+
 #### With Parameters
 
 ```
 call task "task_name" with param1="value1" param2="value2"
+call task task_name with param1="value1" param2="value2"  # Unquoted task name
 ```
 
 #### Examples
