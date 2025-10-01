@@ -1830,6 +1830,35 @@ task "deploy":
   # Usage: drun deploy environment=production version=v1.2.3
 ```
 
+#### Required Parameters with Defaults
+
+Required parameters can have default values. When a default is provided, the parameter becomes optional at the CLI level but still benefits from the validation constraints:
+
+```
+task "build":
+  requires $image from ["base", "worker", "dev", "all"]
+  requires $cache from ["yes", "no"] defaults to "no"
+  
+  # Usage without cache parameter (uses default "no"):
+  # drun build image=base
+  
+  # Usage with cache parameter override:
+  # drun build image=base cache=yes
+```
+
+**Important validation rules:**
+- The default value MUST be one of the values in the constraint list (if constraints are specified)
+- The parser will validate this at parse time and emit an error if the default value is not in the allowed values
+
+```
+# Valid:
+requires $env from ["dev", "staging", "prod"] defaults to "dev"
+
+# Invalid - will cause parse error:
+requires $env from ["dev", "staging", "prod"] defaults to "production"
+# Error: default value 'production' must be one of the allowed values: [dev, staging, prod]
+```
+
 #### CLI Argument Syntax
 
 Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix required):
