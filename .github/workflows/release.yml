@@ -108,11 +108,11 @@ jobs:
       id: binary
       run: |
         if [ "${{ matrix.goos }}" = "windows" ]; then
-          echo "name=drun-${{ matrix.goos }}-${{ matrix.goarch }}.exe" >> $GITHUB_OUTPUT
-          echo "filename=drun.exe" >> $GITHUB_OUTPUT
+          echo "name=drun-cli-${{ matrix.goos }}-${{ matrix.goarch }}.exe" >> $GITHUB_OUTPUT
+          echo "filename=drun-cli.exe" >> $GITHUB_OUTPUT
         else
-          echo "name=drun-${{ matrix.goos }}-${{ matrix.goarch }}" >> $GITHUB_OUTPUT
-          echo "filename=drun" >> $GITHUB_OUTPUT
+          echo "name=drun-cli-${{ matrix.goos }}-${{ matrix.goarch }}" >> $GITHUB_OUTPUT
+          echo "filename=drun-cli" >> $GITHUB_OUTPUT
         fi
 
     - name: Build binary
@@ -273,7 +273,7 @@ jobs:
       if: github.event_name == 'pull_request'
       uses: actions/upload-artifact@v4
       with:
-        name: drun-${{ matrix.goos }}-${{ matrix.goarch }}
+        name: drun-cli-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.name }}
 
     - name: Upload release asset
@@ -302,12 +302,12 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Platform | Architecture | Download |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|--------------|----------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Linux | amd64 | \`drun-linux-amd64\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| Linux | arm64 | \`drun-linux-arm64\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| macOS | amd64 | \`drun-darwin-amd64\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| macOS | arm64 | \`drun-darwin-arm64\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| Windows | amd64 | \`drun-windows-amd64.exe\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| Windows | arm64 | \`drun-windows-arm64.exe\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux | amd64 | \`drun-cli-linux-amd64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux | arm64 | \`drun-cli-linux-arm64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| macOS | amd64 | \`drun-cli-darwin-amd64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| macOS | arm64 | \`drun-cli-darwin-arm64\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows | amd64 | \`drun-cli-windows-amd64.exe\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows | arm64 | \`drun-cli-windows-arm64.exe\` |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### ⚡ Performance Features:" >> $GITHUB_STEP_SUMMARY
         echo "- **Linux & Windows x64**: UPX compressed for minimal size" >> $GITHUB_STEP_SUMMARY

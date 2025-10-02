@@ -193,22 +193,22 @@ Once the v2 compiler is ready, you'll run examples like this:
 
 ```bash
 # Basic examples
-drun -f 01-hello-world.drun hello
-drun -f 02-parameters.drun greet --name=Alice --title=Ms.
-drun -f 02-parameters.drun "build docker" image=base dest=local
-drun -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
+drun-cli -f 01-hello-world.drun hello
+drun-cli -f 02-parameters.drun greet --name=Alice --title=Ms.
+drun-cli -f 02-parameters.drun "build docker" image=base dest=local
+drun-cli -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
 
 # Docker examples  
-drun -f 04-docker-basics.drun build --tag=v1.0.0
-drun -f 04-docker-basics.drun "run local" --port=3000
+drun-cli -f 04-docker-basics.drun build --tag=v1.0.0
+drun-cli -f 04-docker-basics.drun "run local" --port=3000
 
 # Kubernetes examples
-drun -f 05-kubernetes.drun deploy --environment=staging
-drun -f 05-kubernetes.drun scale --environment=production --replica_count=10
+drun-cli -f 05-kubernetes.drun deploy --environment=staging
+drun-cli -f 05-kubernetes.drun scale --environment=production --replica_count=10
 
 # CI/CD pipeline
-drun -f 06-cicd-pipeline.drun "ci pipeline"
-drun -f 06-cicd-pipeline.drun "deploy to staging"
+drun-cli -f 06-cicd-pipeline.drun "ci pipeline"
+drun-cli -f 06-cicd-pipeline.drun "deploy to staging"
 ```
 
 ## 📖 Language Reference

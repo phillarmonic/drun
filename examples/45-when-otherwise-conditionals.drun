@@ -167,7 +167,7 @@ task "comprehensive demo" means "Run all conditional examples":
 	run "drun negation conditionals" 
 	run "drun nested conditionals"
 	run "drun matrix conditionals"
-	run "drun deployment conditionals"
+	run "drun-cli deployment conditionals"
 	run "drun error handling conditionals"
 	
 	success "🌟 All when-otherwise examples completed successfully!"

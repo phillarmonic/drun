@@ -171,12 +171,12 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 | Platform    | Architecture  | Download                                  |
 | ----------- | ------------- | ----------------------------------------- |
-| **Linux**   | x86_64        | `drun-linux-amd64` (UPX compressed)       |
-| **Linux**   | ARM64         | `drun-linux-arm64` (UPX compressed)       |
-| **macOS**   | Intel         | `drun-darwin-amd64`                       |
-| **macOS**   | Apple Silicon | `drun-darwin-arm64`                       |
-| **Windows** | x86_64        | `drun-windows-amd64.exe` (UPX compressed) |
-| **Windows** | ARM64         | `drun-windows-arm64.exe`                  |
+| **Linux**   | x86_64        | `drun-cli-linux-amd64` (UPX compressed)       |
+| **Linux**   | ARM64         | `drun-cli-linux-arm64` (UPX compressed)       |
+| **macOS**   | Intel         | `drun-cli-darwin-amd64`                       |
+| **macOS**   | Apple Silicon | `drun-cli-darwin-arm64`                       |
+| **Windows** | x86_64        | `drun-cli-windows-amd64.exe` (UPX compressed) |
+| **Windows** | ARM64         | `drun-cli-windows-arm64.exe`                  |
 
 All binaries are **statically linked** and have **no dependencies**.
 
@@ -206,10 +206,10 @@ drun uses a simple, predictable file discovery system:
 mv .drun/spec.drun ./my-project.drun
 
 # Update workspace to point to new location
-drun --set-workspace my-project.drun
+drun-cli --set-workspace my-project.drun
 
 # Now drun automatically uses your custom location
-drun --list
+drun-cli --list
 ```
 
 ### 🚀 **Getting Started**
@@ -227,7 +227,7 @@ drun --list
 2. **List available tasks**:
    
    ```bash
-   drun --list
+   drun-cli --list
    ```
 
 3. **Run a task**:
@@ -239,19 +239,19 @@ drun --list
 4. **Use parameters**:
    
    ```bash
-   drun deploy environment=production version=v1.0.0
+   drun-cli deploy environment=production version=v1.0.0
    ```
 
 5. **Explore examples**:
    
    ```bash
-   drun -f examples/01-hello-world.drun hello
+   drun-cli -f examples/01-hello-world.drun hello
    ```
 
 6. **Dry run to see what would execute**:
    
    ```bash
-   drun build --dry-run
+   drun-cli build --dry-run
    ```
 
 ### 🔧 **Variable Scoping**
@@ -308,18 +308,18 @@ drun uses a simple file discovery system:
 
 ### Getting Started
 
-Use `drun --init` to create a starter task file:
+Use `drun-cli --init` to create a starter task file:
 
 ```bash
 # Create default .drun/spec.drun
-drun --init
+drun-cli --init
 
 # Create custom task file and save as workspace default
-drun --init --file=my-project.drun --save-as-default
+drun-cli --init --file=my-project.drun --save-as-default
 
 # Move existing file and update workspace
 mv .drun/spec.drun ./tasks.drun
-drun --set-workspace tasks.drun
+drun-cli --set-workspace tasks.drun
 ```
 
 See the included examples for comprehensive task configurations.
@@ -346,7 +346,7 @@ task "tabs-example":
 - **Tab equivalence**: Each tab equals 4 spaces for indentation level calculation
 - **Consistency**: Use consistent indentation within each file (don't mix tabs and spaces)
 - **Flexibility**: Choose the style that works best for your team or editor
-- **Generated files**: `drun --init` creates files with tab indentation by default
+- **Generated files**: `drun-cli --init` creates files with tab indentation by default
 
 📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
@@ -404,13 +404,13 @@ task "deploy" means "Deploy to environment with version":
 
 ```bash
 # Basic deployment
-drun deploy environment=prod
+drun-cli deploy environment=prod
 
 # With version and features
-drun deploy environment=staging version=v1.1.0 features=auth,ui
+drun-cli deploy environment=staging version=v1.1.0 features=auth,ui
 
 # Force deployment
-drun deploy environment=prod version=v1.2.0 force=true
+drun-cli deploy environment=prod version=v1.2.0 force=true
 ```
 
 ### The `empty` Keyword ⭐ *New*
@@ -758,19 +758,19 @@ drun includes comprehensive debugging capabilities to help you understand how yo
 **Debug Examples:**
 ```bash
 # Show full debug output for a file
-drun --debug -f my-tasks.drun
+drun-cli --debug -f my-tasks.drun
 
 # Show only the lexer tokens
-drun --debug --debug-tokens -f my-tasks.drun
+drun-cli --debug --debug-tokens -f my-tasks.drun
 
 # Debug inline input directly
-drun --debug --debug-input 'task "test": info "hello"'
+drun-cli --debug --debug-input 'task "test": info "hello"'
 
 # Show AST structure only
-drun --debug --debug-ast -f my-tasks.drun
+drun-cli --debug --debug-ast -f my-tasks.drun
 
 # Show AST as JSON for tooling integration
-drun --debug --debug-json -f my-tasks.drun
+drun-cli --debug --debug-json -f my-tasks.drun
 ```
 
 > **Note:** As of v2.0, debug functionality has been integrated into the main `drun` command. The separate debug tool has been removed for a more streamlined experience.
@@ -838,7 +838,7 @@ For **persistent autocompletion** that stays up-to-date with your tasks, add thi
 
 ```bash
 # Add to ~/.zshrc for persistent, always up-to-date completion
-echo 'source <(drun completion zsh)' >> ~/.zshrc
+echo 'source <(drun-cli completion zsh)' >> ~/.zshrc
 
 # Reload your shell
 source ~/.zshrc
@@ -848,7 +848,7 @@ source ~/.zshrc
 
 ```bash
 # Add to ~/.bashrc for persistent, always up-to-date completion  
-echo 'source <(drun completion bash)' >> ~/.bashrc
+echo 'source <(drun-cli completion bash)' >> ~/.bashrc
 
 # Reload your shell
 source ~/.bashrc
@@ -858,7 +858,7 @@ source ~/.bashrc
 
 ```bash
 # Add to Fish config for persistent completion
-echo 'drun completion fish | source' >> ~/.config/fish/config.fish
+echo 'drun-cli completion fish | source' >> ~/.config/fish/config.fish
 
 # Reload Fish
 source ~/.config/fish/config.fish
@@ -872,13 +872,13 @@ If you prefer static completion files (updated less frequently):
 
 ```bash
 # Load completion for current session
-source <(drun completion bash)
+source <(drun-cli completion bash)
 
 # Install permanently (Linux)
-drun completion bash > /etc/bash_completion.d/drun
+drun-cli completion bash > /etc/bash_completion.d/drun
 
 # Install permanently (macOS with Homebrew)
-drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+drun-cli completion bash > $(brew --prefix)/etc/bash_completion.d/drun
 ```
 
 #### Zsh
@@ -888,10 +888,10 @@ drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
 echo "autoload -U compinit; compinit" >> ~/.zshrc
 
 # Load completion for current session
-source <(drun completion zsh)
+source <(drun-cli completion zsh)
 
 # Install permanently
-drun completion zsh > "${fpath[1]}/_drun"
+drun-cli completion zsh > "${fpath[1]}/_drun"
 
 # Restart your shell or source ~/.zshrc
 ```
@@ -900,20 +900,20 @@ drun completion zsh > "${fpath[1]}/_drun"
 
 ```bash
 # Load completion for current session
-drun completion fish | source
+drun-cli completion fish | source
 
 # Install permanently
-drun completion fish > ~/.config/fish/completions/drun.fish
+drun-cli completion fish > ~/.config/fish/completions/drun.fish
 ```
 
 #### PowerShell
 
 ```powershell
 # Load completion for current session
-drun completion powershell | Out-String | Invoke-Expression
+drun-cli completion powershell | Out-String | Invoke-Expression
 
 # Install permanently
-drun completion powershell > drun.ps1
+drun-cli completion powershell > drun.ps1
 # Then source this file from your PowerShell profile
 ```
 
@@ -939,20 +939,20 @@ drun <TAB>
 #   deploy        [task] Deploy application
 
 # Task name completion
-drun hel<TAB>                 # Completes to "hello"
-drun dep<TAB>                 # Completes to "deploy"
+drun-cli hel<TAB>                 # Completes to "hello"
+drun-cli dep<TAB>                 # Completes to "deploy"
 
 # CLI command completion
-drun comp<TAB>                # Completes to "completion"
+drun-cli comp<TAB>                # Completes to "completion"
 
 # Flag completion
-drun --<TAB>                  # Shows all available flags with descriptions
-drun --list                   # Lists all tasks
+drun-cli --<TAB>                  # Shows all available flags with descriptions
+drun-cli --list                   # Lists all tasks
 ```
 
 ### Why Use Dynamic Completion?
 
-**Recommended approach**: `source <(drun completion zsh)` in your shell config
+**Recommended approach**: `source <(drun-cli completion zsh)` in your shell config
 
 **Benefits:**
 - ✅ **Always Current**: Reflects your latest task definitions
@@ -970,7 +970,7 @@ drun includes built-in self-update functionality with intelligent backup managem
 
 ```bash
 # Check for and install updates
-drun --update
+drun-cli --update
 ```
 
 The update process:
@@ -1040,25 +1040,25 @@ Explore comprehensive examples in the `examples/` directory:
 
 ```bash
 # Try the hello world example
-drun -f examples/01-hello-world.drun hello
+drun-cli -f examples/01-hello-world.drun hello
 
 # Test parameters and validation
-drun -f examples/02-parameters.drun "deploy app" environment=dev
+drun-cli -f examples/02-parameters.drun "deploy app" environment=dev
 
 # Explore built-in functions
-drun -f examples/08-builtin-functions.drun "system info"
+drun-cli -f examples/08-builtin-functions.drun "system info"
 
 # Try progress indicators and timers
-drun -f examples/38-progress-and-timers.drun "progress demo"
+drun-cli -f examples/38-progress-and-timers.drun "progress demo"
 
 # Explore smart detection
-drun -f examples/26-smart-detection.drun "detect project"
+drun-cli -f examples/26-smart-detection.drun "detect project"
 
 # Try task calling and modular design
-drun -f examples/46-task-calling.drun "quick-test"
+drun-cli -f examples/46-task-calling.drun "quick-test"
 
 # See comprehensive features
-drun -f examples/07-final-showcase.drun showcase project_name=MyApp
+drun-cli -f examples/07-final-showcase.drun showcase project_name=MyApp
 ```
 
 Each example includes comprehensive documentation and demonstrates best practices for different use cases.
@@ -1111,7 +1111,7 @@ git clone https://github.com/phillarmonic/drun.git
 cd drun
 
 # Build drun
-go build -o bin/drun ./cmd/drun
+go build -o bin/drun-cli ./cmd/drun
 
 # Or use the build script for all platforms
 ./scripts/build.sh

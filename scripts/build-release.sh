@@ -32,11 +32,11 @@ for platform in "${PLATFORMS[@]}"; do
     
     # Set binary name
     if [ "$GOOS" = "windows" ]; then
-        BINARY_NAME="drun-$GOOS-$GOARCH.exe"
-        FILENAME="drun.exe"
+        BINARY_NAME="drun-cli-$GOOS-$GOARCH.exe"
+        FILENAME="drun-cli.exe"
     else
-        BINARY_NAME="drun-$GOOS-$GOARCH"
-        FILENAME="drun"
+        BINARY_NAME="drun-cli-$GOOS-$GOARCH"
+        FILENAME="drun-cli"
     fi
     
     echo "Building $BINARY_NAME..."
@@ -87,15 +87,15 @@ echo ""
 echo "🧪 Testing local binary:"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     if [[ $(uname -m) == "arm64" ]]; then
-        ./dist/drun-darwin-arm64 --version
+        ./dist/drun-cli-darwin-arm64 --version
     else
-        ./dist/drun-darwin-amd64 --version
+        ./dist/drun-cli-darwin-amd64 --version
     fi
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     if [[ $(uname -m) == "aarch64" ]]; then
-        ./dist/drun-linux-arm64 --version
+        ./dist/drun-cli-linux-arm64 --version
     else
-        ./dist/drun-linux-amd64 --version
+        ./dist/drun-cli-linux-amd64 --version
     fi
 else
     echo "  ℹ️  Cannot test on this platform, but binaries are built"

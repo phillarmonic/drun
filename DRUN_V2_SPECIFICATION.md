@@ -523,7 +523,7 @@ task "invalid":
 - **Choose one style**: Use either tabs or spaces consistently throughout your project
 - **Editor configuration**: Configure your editor to show whitespace characters
 - **Team standards**: Establish indentation standards for your team
-- **Generated files**: `drun --init` uses tabs by default
+- **Generated files**: `drun-cli --init` uses tabs by default
 
 ### String Interpolation
 
@@ -1875,7 +1875,7 @@ task "deploy":
   requires $environment from ["dev", "staging", "production"]
   requires $version matching pattern "v\d+\.\d+\.\d+"
   
-  # Usage: drun deploy environment=production version=v1.2.3
+  # Usage: drun-cli deploy environment=production version=v1.2.3
 ```
 
 #### Required Parameters with Defaults
@@ -1888,10 +1888,10 @@ task "build":
   requires $cache from ["yes", "no"] defaults to "no"
   
   # Usage without cache parameter (uses default "no"):
-  # drun build image=base
+  # drun-cli build image=base
   
   # Usage with cache parameter override:
-  # drun build image=base cache=yes
+  # drun-cli build image=base cache=yes
 ```
 
 **Important validation rules:**
@@ -1913,12 +1913,12 @@ Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix r
 
 ```bash
 # Parameter passing examples
-drun deploy environment=production
-drun build tag=v1.2.3 push=true
-drun test suites=unit,integration verbose=true
+drun-cli deploy environment=production
+drun-cli build tag=v1.2.3 push=true
+drun-cli test suites=unit,integration verbose=true
 
 # Multiple parameters
-drun deploy environment=staging replicas=5 timeout=300
+drun-cli deploy environment=staging replicas=5 timeout=300
 ```
 
 #### Optional Parameters
@@ -1929,8 +1929,8 @@ task "build":
   given $push defaults to false
   given $platforms defaults to ["linux/amd64"]
   
-  # Usage: drun build
-  # Usage: drun build tag=custom push=true
+  # Usage: drun-cli build
+  # Usage: drun-cli build tag=custom push=true
 ```
 
 #### Variadic Parameters
@@ -1940,7 +1940,7 @@ task "test":
   accepts $suites as list of strings
   accepts flags as list
   
-  # Usage: drun test --suites=unit,integration --flags=--verbose,--coverage
+  # Usage: drun-cli test --suites=unit,integration --flags=--verbose,--coverage
 ```
 
 ### Parameter Validation

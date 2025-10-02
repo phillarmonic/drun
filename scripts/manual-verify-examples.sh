@@ -65,7 +65,7 @@ run_example() {
     local description="$5"
     
     local filename=$(basename "$file")
-    local command="./drun -f $file"
+    local command="./drun-cli -f $file"
     
     if [ -n "$task" ]; then
         command="$command \"$task\""
@@ -105,7 +105,7 @@ run_example() {
 # Function to get the first task from a file
 get_first_task() {
     local file="$1"
-    local first_task=$(./drun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed 's/  *[A-Z].*//')
+    local first_task=$(./drun-cli -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed 's/  *[A-Z].*//')
     echo "$first_task"
 }
 

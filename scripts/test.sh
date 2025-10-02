@@ -288,12 +288,12 @@ test_build() {
     log_section "Testing Build"
     
     log_info "Building drun binary..."
-    if go build -o bin/drun ./cmd/drun; then
+    if go build -o bin/drun-cli ./cmd/drun; then
         log_success "Build successful"
         
         # Test basic functionality
         log_info "Testing basic functionality..."
-        if ./bin/drun --version >/dev/null 2>&1; then
+        if ./bin/drun-cli --version >/dev/null 2>&1; then
             log_success "Binary works correctly"
         else
             log_error "Binary execution failed"
@@ -301,7 +301,7 @@ test_build() {
         fi
         
         # Clean up
-        rm -f bin/drun
+        rm -f bin/drun-cli
     else
         log_error "Build failed"
         exit 1
@@ -313,7 +313,7 @@ test_examples() {
     log_section "Testing Example Configurations"
     
     # Build binary for example testing
-    if ! go build -o bin/drun ./cmd/drun; then
+    if ! go build -o bin/drun-cli ./cmd/drun; then
         log_error "Failed to build binary for example testing"
         return 1
     fi
@@ -327,7 +327,7 @@ test_examples() {
                 ((example_count++))
                 log_info "Testing $example_file..."
                 
-                if ./bin/drun -f "$example_file" --list >/dev/null 2>&1; then
+                if ./bin/drun-cli -f "$example_file" --list >/dev/null 2>&1; then
                     ((success_count++))
                     echo "  ✅ Valid"
                 else
@@ -351,7 +351,7 @@ test_examples() {
     fi
     
     # Clean up binary
-    rm -f bin/drun
+    rm -f bin/drun-cli
 }
 
 # Main execution

@@ -10,11 +10,11 @@
 #   - Both old and new syntax patterns
 # 
 # Usage:
-#   drun show-env                           # Show loaded environment variables
-#   drun show-env --env=production          # Load production .env files
-#   drun show-env --debug-env               # Show detailed loading info
-#   drun check-exists                       # Check if specific vars exist
-#   drun conditional-deploy                 # Deploy with environment checks
+#   drun-cli show-env                           # Show loaded environment variables
+#   drun-cli show-env --env=production          # Load production .env files
+#   drun-cli show-env --debug-env               # Show detailed loading info
+#   drun-cli check-exists                       # Check if specific vars exist
+#   drun-cli conditional-deploy                 # Deploy with environment checks
 #
 # .env file hierarchy (lowest to highest priority):
 #   1. Host OS environment variables
@@ -405,12 +405,12 @@ task "default" means "Welcome to environment variables demo":
 	echo "  compare-syntax    - Compare old vs new syntax patterns"
 	echo ""
 	echo "💡 Examples:"
-	echo "  drun show-env"
-	echo "  drun show-env --env=production"
-	echo "  drun show-env --debug-env"
-	echo "  drun check-exists"
-	echo "  APP_NAME=MyApp drun check-exists"
-	echo "  DEPLOY_ENV=production DATABASE_URL=postgres://... drun conditional-deploy"
+	echo "  drun-cli show-env"
+	echo "  drun-cli show-env --env=production"
+	echo "  drun-cli show-env --debug-env"
+	echo "  drun-cli check-exists"
+	echo "  APP_NAME=MyApp drun-cli check-exists"
+	echo "  DEPLOY_ENV=production DATABASE_URL=postgres://... drun-cli conditional-deploy"
 	echo ""
 	echo "📖 Documentation:"
 	echo "  See ENV_LOADING.md and ENV_CONDITIONALS.md for details"
