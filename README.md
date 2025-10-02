@@ -875,10 +875,10 @@ If you prefer static completion files (updated less frequently):
 source <(drun-cli completion bash)
 
 # Install permanently (Linux)
-drun-cli completion bash > /etc/bash_completion.d/drun
+drun-cli completion bash > /etc/bash_completion.d/drun-cli
 
 # Install permanently (macOS with Homebrew)
-drun-cli completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+drun-cli completion bash > $(brew --prefix)/etc/bash_completion.d/drun-cli
 ```
 
 #### Zsh
@@ -891,7 +891,7 @@ echo "autoload -U compinit; compinit" >> ~/.zshrc
 source <(drun-cli completion zsh)
 
 # Install permanently
-drun-cli completion zsh > "${fpath[1]}/_drun"
+drun-cli completion zsh > "${fpath[1]}/_drun-cli"
 
 # Restart your shell or source ~/.zshrc
 ```
@@ -903,7 +903,7 @@ drun-cli completion zsh > "${fpath[1]}/_drun"
 drun-cli completion fish | source
 
 # Install permanently
-drun-cli completion fish > ~/.config/fish/completions/drun.fish
+drun-cli completion fish > ~/.config/fish/completions/drun-cli.fish
 ```
 
 #### PowerShell
@@ -913,7 +913,7 @@ drun-cli completion fish > ~/.config/fish/completions/drun.fish
 drun-cli completion powershell | Out-String | Invoke-Expression
 
 # Install permanently
-drun-cli completion powershell > drun.ps1
+drun-cli completion powershell > drun-cli.ps1
 # Then source this file from your PowerShell profile
 ```
 
@@ -928,7 +928,7 @@ The completion system intelligently distinguishes between:
 
 ```bash
 # Task and command completion with prefixes
-drun <TAB>
+drun-cli <TAB>
 # Shows:
 #   completion    [drun CLI cmd] Generate completion script
 #   help          Help about any command  

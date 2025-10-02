@@ -106,13 +106,13 @@ var completionCmd = &cobra.Command{
 
 Bash:
 
-  $ source <(drun completion bash)
+  $ source <(drun-cli completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ drun completion bash > /etc/bash_completion.d/drun
+  $ drun-cli completion bash > /etc/bash_completion.d/drun-cli
   # macOS:
-  $ drun completion bash > $(brew --prefix)/etc/bash_completion.d/drun
+  $ drun-cli completion bash > $(brew --prefix)/etc/bash_completion.d/drun-cli
 
 Zsh:
 
@@ -122,23 +122,23 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ drun completion zsh > "${fpath[1]}/_drun"
+  $ drun-cli completion zsh > "${fpath[1]}/_drun-cli"
 
   # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-  $ drun completion fish | source
+  $ drun-cli completion fish | source
 
   # To load completions for each session, execute once:
-  $ drun completion fish > ~/.config/fish/completions/drun.fish
+  $ drun-cli completion fish > ~/.config/fish/completions/drun-cli.fish
 
 PowerShell:
 
-  PS> drun completion powershell | Out-String | Invoke-Expression
+  PS> drun-cli completion powershell | Out-String | Invoke-Expression
 
   # To load completions for every new session, run:
-  PS> drun completion powershell > drun.ps1
+  PS> drun-cli completion powershell > drun-cli.ps1
   # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,
@@ -166,19 +166,19 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "drun [task] [args...]",
+	Use:   "drun-cli [task] [args...]",
 	Short: "[drun CLI cmd] A semantic task runner with natural language syntax",
-	Long: `drun v2 is a task runner that uses semantic, English-like syntax to define automation tasks.
+	Long: `drun-cli v2 is a task runner that uses semantic, English-like syntax to define automation tasks.
 It supports natural language commands, smart detection, and direct execution without compilation.
 
 Examples:
-  drun hello                    # Run the 'hello' task
-  drun build --env=production   # Run 'build' task with environment
-  drun --list                   # List all available tasks
-  drun --init                   # Create a new drun file
-  drun --debug --tokens         # Debug lexer tokens
-  drun --debug --ast            # Debug AST structure
-  drun --debug --full           # Full debug output`,
+  drun-cli hello                    # Run the 'hello' task
+  drun-cli build --env=production   # Run 'build' task with environment
+  drun-cli --list                   # List all available tasks
+  drun-cli --init                   # Create a new drun file
+  drun-cli --debug --tokens         # Debug lexer tokens
+  drun-cli --debug --ast            # Debug AST structure
+  drun-cli --debug --full           # Full debug output`,
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
@@ -856,7 +856,7 @@ func createBackup(currentExe string) (string, error) {
 
 	// Create timestamped backup filename
 	timestamp := time.Now().Format("20060102_150405")
-	backupFilename := fmt.Sprintf("drun_%s_backup_%s", normalizeVersion(version), timestamp)
+	backupFilename := fmt.Sprintf("drun-cli_%s_backup_%s", normalizeVersion(version), timestamp)
 	if runtime.GOOS == "windows" {
 		backupFilename += ".exe"
 	}
@@ -897,7 +897,7 @@ func downloadAndInstall(version, targetPath string) error {
 	}
 
 	// Construct download URL
-	binaryName := fmt.Sprintf("drun-%s-%s", goos, arch)
+	binaryName := fmt.Sprintf("drun-cli-%s-%s", goos, arch)
 	if goos == "windows" {
 		binaryName += ".exe"
 	}
@@ -1035,7 +1035,7 @@ func restoreBackup(backupPath, targetPath string) error {
 
 // cleanupOldBackups removes old backup files, keeping only the last 5
 func cleanupOldBackups(backupDir string) {
-	files, err := filepath.Glob(filepath.Join(backupDir, "drun*backup*"))
+	files, err := filepath.Glob(filepath.Join(backupDir, "drun-cli*backup*"))
 	if err != nil {
 		return
 	}
