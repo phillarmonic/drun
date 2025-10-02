@@ -1,0 +1,108 @@
+# Environment Variable Interpolation & Conditionals
+# This demonstrates environment variable usage with compound conditions
+
+version: 2.0
+
+task "default" means "Show all environment examples":
+	info "Running environment variable examples..."
+	echo ""
+	call task "basic-interpolation"
+	echo ""
+	call task "api-deployment"
+	echo ""
+	call task "build-configuration"
+
+task "basic-interpolation" means "Basic environment variable interpolation":
+	step "Environment Variable Interpolation"
+	info "User: ${USER:-unknown}"
+	info "Home: ${HOME:-/home/default}"
+	info "Shell: ${SHELL:-/bin/sh}"
+	success "Basic interpolation works!"
+
+task "api-deployment" means "Deploy with API credentials":
+	step "API Deployment with Conditional Credentials"
+	
+	# Check if API token exists and is not empty
+	if env API_TOKEN exists and is not empty:
+		success "✅ API_TOKEN is configured"
+		info "Token length: $(echo ${API_TOKEN} | wc -c) characters"
+		echo "Deploying with authentication..."
+		# In real scenario: run "curl -H 'Authorization: Bearer ${API_TOKEN}' https://api.example.com/deploy"
+		success "Deployment completed with authentication"
+	else:
+		warn "⚠️  API_TOKEN not set or empty"
+		echo "Deploying without authentication (development mode)..."
+		success "Deployment completed in development mode"
+
+task "build-configuration" means "Configure build based on environment":
+	step "Build Configuration"
+	
+	# Check environment type
+	if env BUILD_ENV exists and is "production":
+		warn "⚠️  PRODUCTION BUILD MODE"
+		info "Optimizations: enabled"
+		info "Source maps: disabled"
+		info "Debug logging: disabled"
+		echo "Building optimized production bundle..."
+		
+		# Require additional production variables
+		if env RELEASE_VERSION exists and is not empty:
+			success "✅ Release version: ${RELEASE_VERSION}"
+		else:
+			error "❌ RELEASE_VERSION required for production builds"
+			info "Set it with: export RELEASE_VERSION=1.0.0"
+			fail "Missing required production configuration"
+	else:
+		info "📦 Development Build Mode"
+		info "Optimizations: minimal"
+		info "Source maps: enabled"
+		info "Debug logging: enabled"
+		echo "Building development bundle..."
+		success "Development build configuration complete"
+
+task "docker-build-with-args" means "Build Docker image with optional build args":
+	step "Docker Build with Conditional Build Arguments"
+	
+	# Check if we have a private package token
+	if env NPM_TOKEN exists and is not empty:
+		info "🔑 NPM_TOKEN detected - using authenticated build"
+		echo "Building with private package access..."
+		# In real scenario: run "docker build --build-arg NPM_TOKEN='${NPM_TOKEN}' -t myapp ."
+		success "Built with private package access"
+	else:
+		info "🔓 No NPM_TOKEN - using public packages only"
+		echo "Building with public packages..."
+		# In real scenario: run "docker build -t myapp ."
+		success "Built with public packages"
+
+task "env-validation" means "Validate required environment variables":
+	step "Environment Validation"
+	
+	set $all_valid to "true"
+	
+	# Check DATABASE_URL
+	if env DATABASE_URL exists and is not empty:
+		success "✅ DATABASE_URL is configured"
+	else:
+		error "❌ DATABASE_URL is required"
+		set $all_valid to "false"
+	
+	# Check APP_SECRET
+	if env APP_SECRET exists and is not empty:
+		success "✅ APP_SECRET is configured"
+	else:
+		error "❌ APP_SECRET is required"
+		set $all_valid to "false"
+	
+	# Check PORT (optional with default)
+	if env PORT exists and is not empty:
+		info "✅ PORT is configured: ${PORT}"
+	else:
+		info "ℹ️  PORT not set, will use default: 3000"
+	
+	when $all_valid is "true":
+		success "🎉 All required environment variables are set!"
+		info "Application can start safely"
+	otherwise:
+		error "💥 Missing required environment variables"
+		fail "Please configure required environment variables"

@@ -35,6 +35,7 @@ type Engine struct {
 
 	// Cached regex patterns for performance
 	interpolationRegex *regexp.Regexp
+	envVarRegex        *regexp.Regexp // For ${VAR} and ${VAR:-default} syntax
 	quotedArgRegex     *regexp.Regexp
 	paramArgRegex      *regexp.Regexp
 }
@@ -72,6 +73,7 @@ func NewEngine(output io.Writer) *Engine {
 
 		// Pre-compile regex patterns for performance
 		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
+		envVarRegex:        regexp.MustCompile(`\$\{([^}]+)\}`), // Matches ${VAR} and ${VAR:-default}
 		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
@@ -2418,6 +2420,50 @@ func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) str
 
 // interpolateVariablesWithError replaces {variable} placeholders with actual values and returns any undefined variable errors
 func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionContext) (string, error) {
+	// First pass: resolve ${VAR} environment variables (shell-style)
+	// Quick check: if there are no ${...} patterns, skip this phase
+	if strings.Contains(message, "${") {
+		var envUndefinedVars []string
+		message = e.envVarRegex.ReplaceAllStringFunc(message, func(match string) string {
+			// Extract content (remove ${ and })
+			content := match[2 : len(match)-1]
+
+			// Check if it has a default value (:-syntax)
+			if strings.Contains(content, ":-") {
+				parts := strings.SplitN(content, ":-", 2)
+				varName := strings.TrimSpace(parts[0])
+				defaultValue := strings.TrimSpace(parts[1])
+
+				// Try to get the environment variable
+				if value, exists := os.LookupEnv(varName); exists {
+					return value
+				}
+				// Return default if not found
+				return defaultValue
+			}
+
+			// No default value - must exist or fail
+			if value, exists := os.LookupEnv(content); exists {
+				return value
+			}
+
+			// Variable doesn't exist and no default provided
+			if !e.allowUndefinedVars {
+				envUndefinedVars = append(envUndefinedVars, content)
+			}
+			return match // Keep original if not found
+		})
+
+		// If we found undefined env vars, return error now
+		if len(envUndefinedVars) > 0 {
+			if len(envUndefinedVars) == 1 {
+				return message, fmt.Errorf("undefined environment variable: ${%s}", envUndefinedVars[0])
+			}
+			return message, fmt.Errorf("undefined environment variables: ${%s}", strings.Join(envUndefinedVars, "}, ${"))
+		}
+	}
+
+	// Second pass: resolve {$var} Drun variables
 	var undefinedVars []string
 
 	// Use cached regex for better performance
@@ -3372,10 +3418,97 @@ func (e *Engine) variableExists(varName string, ctx *ExecutionContext) bool {
 	return false
 }
 
+// evaluateEnvCondition evaluates environment variable conditionals
+// Handles: "VARNAME exists", "VARNAME is "value"", "VARNAME is not empty",
+// "VARNAME exists and is not empty", "VARNAME exists and is "value""
+func (e *Engine) evaluateEnvCondition(condition string, ctx *ExecutionContext) bool {
+	condition = strings.TrimSpace(condition)
+
+	// Extract variable name first
+	var varName string
+	var rest string
+
+	// Find the first space to separate var name from the condition
+	spaceIdx := strings.Index(condition, " ")
+	if spaceIdx == -1 {
+		// No space, just the variable name (shouldn't happen in valid syntax)
+		varName = condition
+		rest = ""
+	} else {
+		varName = condition[:spaceIdx]
+		rest = strings.TrimSpace(condition[spaceIdx+1:])
+	}
+
+	// Handle compound conditions with "and" - must come after we have the varName
+	if strings.Contains(rest, " and ") {
+		parts := strings.SplitN(rest, " and ", 2)
+		if len(parts) == 2 {
+			// Evaluate first condition with varName
+			left := e.evaluateEnvConditionWithVar(varName, strings.TrimSpace(parts[0]), ctx)
+			if !left {
+				return false // Short-circuit if first condition fails
+			}
+			// Evaluate second condition with same varName
+			right := e.evaluateEnvConditionWithVar(varName, strings.TrimSpace(parts[1]), ctx)
+			return right
+		}
+	}
+
+	// Single condition evaluation
+	return e.evaluateEnvConditionWithVar(varName, rest, ctx)
+}
+
+// evaluateEnvConditionWithVar evaluates a single env condition for a given variable
+func (e *Engine) evaluateEnvConditionWithVar(varName string, condition string, ctx *ExecutionContext) bool {
+	condition = strings.TrimSpace(condition)
+
+	// Get the environment variable value
+	envValue, envExists := os.LookupEnv(varName)
+
+	// Handle "exists" check
+	if condition == "exists" || condition == "" {
+		return envExists
+	}
+
+	// Handle "is not empty" check
+	if condition == "is not empty" {
+		return envExists && strings.TrimSpace(envValue) != ""
+	}
+
+	// Handle "is empty" check
+	if condition == "is empty" {
+		return !envExists || strings.TrimSpace(envValue) == ""
+	}
+
+	// Handle "is "value"" check
+	if strings.HasPrefix(condition, "is ") && !strings.HasPrefix(condition, "is not ") {
+		expectedValue := strings.TrimSpace(condition[3:])
+		// Remove quotes if present
+		expectedValue = strings.Trim(expectedValue, "\"'")
+		return envExists && envValue == expectedValue
+	}
+
+	// Handle "is not "value"" check
+	if strings.HasPrefix(condition, "is not ") && !strings.HasPrefix(condition, "is not empty") {
+		expectedValue := strings.TrimSpace(condition[7:])
+		// Remove quotes if present
+		expectedValue = strings.Trim(expectedValue, "\"'")
+		return !envExists || envValue != expectedValue
+	}
+
+	// Default: check if environment variable exists
+	return envExists
+}
+
 // evaluateCondition evaluates condition expressions
 func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool {
 	// Simple condition evaluation
 	// Handle various patterns like "variable is value", "variable is not empty", etc.
+
+	// Handle environment variable conditionals
+	if strings.HasPrefix(condition, "env ") {
+		return e.evaluateEnvCondition(strings.TrimPrefix(condition, "env "), ctx)
+	}
 
 	// Handle "folder/directory is not empty" pattern
 	if strings.Contains(condition, " is not empty") {

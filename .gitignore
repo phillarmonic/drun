@@ -79,6 +79,8 @@ dist/
 *.dll
 *.so
 *.dylib
+drun
+debug.drun
 
 # Test binary, built with `go test -c`
 *.test
@@ -86,31 +88,30 @@ dist/
 # Output of the go coverage tool
 *.out
 coverage.html
-coverage.xml
 
 # Go workspace file
 go.work
 
-# drun-specific files
-*.cache
-.downloads/
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# Temporary files
-*.tmp
-*.temp
-*.log
-*.bak
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+bin/
+dist/
 
 # Environment files
-.env
 .env.local
 .env.*.local
+!.env.example
 
-# OS-specific
-workspace
-
-drun
-debug-tool
-drun-test
-
-debug.drun
+# Backup files
+*.bak
+*.backup

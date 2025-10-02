@@ -3265,6 +3265,215 @@ when running on Linux:
   use system package manager
 ```
 
+### Environment Variable Interpolation ⭐ *New*
+
+Drun supports shell-style environment variable interpolation using `${VAR}` syntax:
+
+**Syntax:**
+- `{$var}` - Drun variable (from parameters, captures, etc.)
+- `${VAR:-default}` - Environment variable with default value
+- `${VAR}` - Environment variable without default (fails if not set)
+
+**Examples:**
+
+```drun
+task show-config:
+	# With default values
+	echo "User: ${USER:-unknown}"
+	echo "Home: ${HOME:-/home/default}"
+	echo "Shell: ${SHELL:-/bin/sh}"
+	
+	# Required environment variables (no default - will fail if not set)
+	echo "API URL: ${API_URL}"
+	echo "Database: ${DATABASE_URL}"
+	
+	# Combining with Drun variables
+	capture from shell "date" as $timestamp
+	echo "Timestamp: {$timestamp}"
+	echo "User: ${USER:-unknown}"
+```
+
+**Key Features:**
+- **Shell-style syntax**: Familiar `${VAR:-default}` pattern from bash/sh
+- **Default values**: Use `:-` syntax to provide fallback values
+- **Required variables**: Variables without defaults will fail if not set
+- **OS environment**: Accesses environment variables from the shell
+- **Safe defaults**: Prevents errors when optional config is missing
+- **Integration**: Works seamlessly with `.env` file loading
+
+### Environment Variable Conditionals ⭐ *New*
+
+Check environment variables with clean, semantic syntax for conditional logic:
+
+#### Basic Existence Checks
+
+```drun
+# Check if environment variable exists
+if env HOME exists:
+  success "HOME is set"
+  capture from shell "echo $HOME" as $home
+  echo "Home directory: {$home}"
+else:
+  error "HOME is not set"
+
+# Check multiple environment variables
+if env USER exists:
+  info "User: {env('USER')}"
+
+if env PATH exists:
+  info "PATH is configured"
+```
+
+#### Value Comparison
+
+```drun
+# Check if environment variable equals a specific value
+if env APP_ENV is "production":
+  warn "⚠️  Running in PRODUCTION environment"
+  info "Extra caution advised!"
+else:
+  info "✅ Not in production environment"
+
+# Check if environment variable is NOT equal to a value
+if env DEBUG_MODE is not "true":
+  info "Debug mode is disabled"
+```
+
+#### Empty/Non-Empty Checks
+
+```drun
+# Check if environment variable is not empty
+if env DATABASE_URL is not empty:
+  success "✅ DATABASE_URL is configured"
+  run "python manage.py migrate"
+else:
+  warn "⚠️  DATABASE_URL is not set"
+  info "Set it with: export DATABASE_URL=postgresql://..."
+  fail "Missing required database configuration"
+```
+
+#### Compound Conditions ⭐ *New*
+
+Combine multiple checks with `and` for more precise validation:
+
+```drun
+# Ensure variable exists AND is not empty (rejects empty strings)
+task "secure-deploy":
+  if env API_TOKEN exists and is not empty:
+    success "✅ API_TOKEN is properly configured"
+    run "curl -H 'Authorization: Bearer ${API_TOKEN}' https://api.example.com/deploy"
+  else:
+    error "❌ API_TOKEN must be set and not empty"
+    fail "Missing required credentials"
+
+# Ensure variable exists AND equals specific value
+task "production-check":
+  if env DEPLOY_ENV exists and is "production":
+    warn "⚠️  Confirmed production deployment"
+    info "Running extra validation..."
+    run "npm run test:integration"
+  else:
+    info "✅ Non-production environment"
+
+# Build with optional build arguments
+task "docker-build":
+  if env BUILD_TOKEN exists and is not empty:
+    info "🔑 Using authenticated build"
+    run "docker build --build-arg TOKEN='${BUILD_TOKEN}' -t myapp ."
+  else:
+    info "🔓 Using public build (no authentication)"
+    run "docker build -t myapp ."
+```
+
+#### Practical Examples
+
+```drun
+# Conditional deployment based on environment
+task "deploy":
+  if env DEPLOY_ENV is "production":
+    warn "⚠️  Deploying to PRODUCTION"
+    info "Running production pre-flight checks..."
+    
+    if env DATABASE_URL exists:
+      success "✅ Database configuration found"
+    else:
+      error "❌ DATABASE_URL required for production"
+      fail "Missing required environment variable"
+    
+    if env API_KEY exists:
+      success "✅ API key found"
+    else:
+      error "❌ API_KEY required for production"
+      fail "Missing required API credentials"
+    
+    success "✅ All pre-flight checks passed"
+    info "Deploying to production..."
+  else:
+    info "✅ Deploying to development/staging"
+    info "Skipping production pre-flight checks"
+
+# CI/CD detection
+task "build":
+  if env CI exists:
+    info "🤖 Running in CI environment"
+    set $ci_mode to "true"
+    run "npm run build --ci"
+  else:
+    info "💻 Running locally"
+    set $ci_mode to "false"
+    run "npm run build"
+
+# Configuration based on environment variables
+task "configure":
+  if env LOG_LEVEL is "debug":
+    info "🔧 Using DEBUG log level"
+    set $verbose to "true"
+  else:
+    if env LOG_LEVEL is "info":
+      info "ℹ️  Using INFO log level"
+      set $verbose to "false"
+    else:
+      info "✅ Using default log level"
+      set $verbose to "false"
+
+# Feature flags
+task "start":
+  if env ENABLE_EXPERIMENTAL is "true":
+    info "🧪 Experimental features enabled"
+    run "npm run start:experimental"
+  else:
+    info "✅ Using stable version"
+    run "npm run start"
+```
+
+#### Syntax Variants
+
+```drun
+# OLD SYNTAX (still supported via builtin functions)
+set $var_exists to "{env exists(HOME)}"
+when $var_exists is "true":
+  success "HOME exists"
+
+# NEW SYNTAX (recommended - cleaner and more readable)
+if env HOME exists:
+  success "HOME exists"
+```
+
+**Key Features:**
+- **Clean syntax**: `if env VAR exists` is more readable than function-based checks
+- **Value comparison**: Check if env var equals specific values
+- **Empty checks**: Use `is not empty` to validate required configuration
+- **OS environment**: Checks environment variables available when drun starts
+- **Integration**: Works seamlessly with `.env` file loading (see `.env` loading section)
+
+**Supported Conditions:**
+- `if env VAR exists` - Check if variable is set
+- `if env VAR is "value"` - Check if variable equals value
+- `if env VAR is not "value"` - Check if variable does not equal value
+- `if env VAR is not empty` - Check if variable has a value
+- `if env VAR exists and is not empty` - Check if variable is set AND has a non-empty value
+- `if env VAR exists and is "value"` - Check if variable is set AND equals specific value
+
 ### Framework Detection
 
 ```

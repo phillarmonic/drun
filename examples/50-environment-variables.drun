@@ -1,0 +1,417 @@
+# drun (do-run) a fast, semantic task runner. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+#
+# Example: Environment Variables
+# 
+# This example demonstrates:
+#   - Loading .env files with hierarchical merging
+#   - Checking if environment variables exist
+#   - Conditional logic based on environment values
+#   - Both old and new syntax patterns
+# 
+# Usage:
+#   drun show-env                           # Show loaded environment variables
+#   drun show-env --env=production          # Load production .env files
+#   drun show-env --debug-env               # Show detailed loading info
+#   drun check-exists                       # Check if specific vars exist
+#   drun conditional-deploy                 # Deploy with environment checks
+#
+# .env file hierarchy (lowest to highest priority):
+#   1. Host OS environment variables
+#   2. .env                        (base configuration)
+#   3. .env.local                  (local overrides)
+#   4. .env.{environment}          (environment-specific, e.g., .env.production)
+#   5. .env.{environment}.local    (environment-specific local overrides)
+
+version: 2.0
+
+project "Environment Variables" version "1.0":
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 1: Loading and Displaying Environment Variables
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "show-env" means "Show loaded environment variables":
+	step "Displaying environment variables"
+	
+	# Display common environment variables using capture
+	capture from shell "echo ${APP_NAME:-not set}" as $app_name
+	capture from shell "echo ${APP_ENV:-not set}" as $app_env
+	capture from shell "echo ${DATABASE_URL:-not set}" as $db_url
+	capture from shell "echo ${API_KEY:-not set}" as $api_key
+	capture from shell "echo ${DEBUG_MODE:-not set}" as $debug_mode
+	
+	echo "Current Environment Variables:"
+	echo "  APP_NAME: {$app_name}"
+	echo "  APP_ENV: {$app_env}"
+	echo "  DATABASE_URL: {$db_url}"
+	echo "  API_KEY: {$api_key}"
+	echo "  DEBUG_MODE: {$debug_mode}"
+	
+	success "Environment variables loaded successfully!"
+	info "Use --debug-env flag to see detailed loading information"
+
+task "list-all" means "List all environment variables":
+	step "Displaying all environment variables from .env files"
+	
+	run "printenv | grep -E '^(APP_|DATABASE_|API_|DEBUG_|DEPLOY_|NODE_|LOG_)' | sort || echo 'No matching environment variables found'"
+	
+	success "Environment display complete!"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 2: Checking Environment Variables (New Clean Syntax)
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "check-exists" means "Check if environment variables exist (NEW syntax)":
+	step "Checking environment variables with clean syntax"
+	
+	# Check if HOME exists (should always exist from OS)
+	if env HOME exists:
+		success "✅ HOME environment variable exists"
+		capture from shell "echo $HOME" as $home_value
+		info "HOME: {$home_value}"
+	else:
+		error "❌ HOME environment variable does not exist"
+	
+	# Check if USER exists
+	if env USER exists:
+		success "✅ USER environment variable exists"
+		capture from shell "echo $USER" as $user
+		info "USER: {$user}"
+	else:
+		warn "⚠️  USER environment variable not set"
+	
+	# Check for a custom environment variable
+	if env APP_NAME exists:
+		success "✅ APP_NAME is set"
+		capture from shell "echo $APP_NAME" as $app_name
+		info "APP_NAME: {$app_name}"
+	else:
+		warn "⚠️  APP_NAME not set"
+		info "Set it with: export APP_NAME=MyApp or add to .env file"
+	
+	success "Environment variable existence checks complete!"
+
+task "check-values" means "Check environment variable values":
+	step "Checking environment variable values"
+	
+	# Check if APP_ENV equals "production"
+	if env APP_ENV is "production":
+		warn "⚠️  Running in PRODUCTION environment"
+		info "Extra caution advised!"
+	else:
+		info "✅ Not in production environment"
+	
+	# Check if DEBUG_MODE is enabled
+	if env DEBUG_MODE is "true":
+		info "🔧 Debug mode is enabled"
+	else:
+		info "✅ Debug mode is disabled"
+	
+	# Check if DATABASE_URL is not empty
+	if env DATABASE_URL is not empty:
+		success "✅ DATABASE_URL is configured"
+	else:
+		warn "⚠️  DATABASE_URL is not set"
+		info "Set it with: export DATABASE_URL=postgresql://..."
+	
+	success "Environment variable value checks complete!"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 3: Conditional Deployment & Configuration
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "conditional-deploy" means "Deploy based on environment":
+	step "Checking deployment environment"
+	
+	if env DEPLOY_ENV is "production":
+		warn "⚠️  Deploying to PRODUCTION"
+		info "Running production pre-flight checks..."
+		
+		if env DATABASE_URL exists:
+			success "✅ Database configuration found"
+		else:
+			error "❌ DATABASE_URL required for production deployment"
+			fail "Missing required environment variable"
+		
+		if env API_KEY exists:
+			success "✅ API key found"
+		else:
+			error "❌ API_KEY required for production deployment"
+			fail "Missing required API credentials"
+		
+		success "✅ All pre-flight checks passed"
+		info "Deploying to production..."
+		run "echo 'Deploying to production...'"
+	else:
+		info "✅ Deploying to development/staging"
+		info "Skipping production pre-flight checks"
+		run "echo 'Deploying to dev/staging...'"
+	
+	success "Deployment checks complete!"
+
+task "env-config" means "Configure based on environment variables":
+	step "Determining configuration based on environment"
+	
+	# Check log level
+	if env LOG_LEVEL is "debug":
+		info "🔧 Using DEBUG log level"
+		set $verbose to "true"
+	else:
+		if env LOG_LEVEL is "info":
+			info "ℹ️  Using INFO log level"
+			set $verbose to "false"
+		else:
+			info "✅ Using default log level"
+			set $verbose to "false"
+	
+	# Check if CI environment
+	if env CI exists:
+		info "🤖 Running in CI environment"
+		set $ci_mode to "true"
+	else:
+		info "💻 Running locally"
+		set $ci_mode to "false"
+	
+	echo "Configuration:"
+	echo "  Verbose: {$verbose}"
+	echo "  CI Mode: {$ci_mode}"
+	
+	success "Configuration complete!"
+
+task "require-vars" means "Fail if required environment variables are not set":
+	step "Validating required environment variables"
+	
+	# Check critical environment variables
+	if env DATABASE_URL is not empty:
+		success "✅ DATABASE_URL is set"
+	else:
+		error "❌ DATABASE_URL is required but not set"
+		fail "Missing required environment variable"
+	
+	if env APP_SECRET is not empty:
+		success "✅ APP_SECRET is set"
+	else:
+		error "❌ APP_SECRET is required but not set"
+		fail "Missing required environment variable"
+	
+	success "✅ All required environment variables are set"
+	info "Application can start safely"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 4: Using Environment Variables with Defaults
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "with-defaults" means "Check environment variables with default values":
+	step "Checking environment variables with defaults"
+	
+	# Get environment variable or use default
+	set $app_name to "{env(APP_NAME,DefaultApp)}"
+	set $port to "{env(PORT,3000)}"
+	set $debug to "{env(DEBUG,false)}"
+	
+	echo "Application Configuration:"
+	echo "  APP_NAME: {$app_name}"
+	echo "  PORT: {$port}"
+	echo "  DEBUG: {$debug}"
+	
+	# Check if they were explicitly set
+	if env APP_NAME exists:
+		info "✅ APP_NAME was explicitly set"
+	else:
+		warn "⚠️  APP_NAME using default value"
+	
+	if env PORT exists:
+		info "✅ PORT was explicitly set"
+	else:
+		warn "⚠️  PORT using default value"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 5: Environment Status Report
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "status" means "Show status of common environment variables":
+	step "Environment Variables Status Report"
+	
+	echo "Environment Variables Status:"
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	
+	# Check OS environment variables
+	if env HOME exists:
+		echo "✅ HOME: Set (OS)"
+	else:
+		echo "❌ HOME: Not set"
+	
+	if env USER exists:
+		echo "✅ USER: Set (OS)"
+	else:
+		echo "❌ USER: Not set"
+	
+	if env SHELL exists:
+		echo "✅ SHELL: Set (OS)"
+	else:
+		echo "⚪ SHELL: Not set"
+	
+	# Check application environment variables
+	if env APP_NAME exists:
+		capture from shell "echo $APP_NAME" as $app_name
+		echo "✅ APP_NAME: {$app_name}"
+	else:
+		echo "⚪ APP_NAME: Not set (optional)"
+	
+	if env APP_ENV exists:
+		capture from shell "echo $APP_ENV" as $app_env
+		echo "✅ APP_ENV: {$app_env}"
+	else:
+		echo "⚪ APP_ENV: Not set (optional)"
+	
+	if env DATABASE_URL exists:
+		echo "✅ DATABASE_URL: Set"
+	else:
+		echo "⚪ DATABASE_URL: Not set (optional)"
+	
+	if env NODE_ENV exists:
+		capture from shell "echo $NODE_ENV" as $node_env
+		echo "✅ NODE_ENV: {$node_env}"
+	else:
+		echo "⚪ NODE_ENV: Not set (optional)"
+	
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	success "Environment status check complete"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 6: Syntax Comparison (Old vs New)
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "compare-syntax" means "Compare old vs new syntax":
+	step "Demonstrating syntax differences"
+	
+	info "OLD SYNTAX (still works):"
+	info "  set $var to {env exists(HOME)}"
+	info "  when $var is true:"
+	info "    success 'HOME exists'"
+	
+	info ""
+	info "NEW SYNTAX (cleaner, recommended):"
+	info "  if env HOME exists:"
+	info "    success 'HOME exists'"
+	
+	info ""
+	success "✅ The new syntax is much cleaner and more readable!"
+	
+	# Show both work
+	set $home_exists to "{env exists(HOME)}"
+	when $home_exists is "true":
+		success "✅ Old syntax: HOME exists"
+	
+	if env HOME exists:
+		success "✅ New syntax: HOME exists"
+	
+	info "Both approaches work, but 'if env VAR exists' is preferred!"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 7: Advanced Use Cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "multi-env-deploy" means "Deploy with multiple environment checks":
+	step "Multi-environment deployment validation"
+	
+	if env DEPLOY_ENV exists:
+		capture from shell "echo $DEPLOY_ENV" as $deploy_env
+		info "Target environment: {$deploy_env}"
+		
+		if env DEPLOY_ENV is "production":
+			# Production requires all credentials
+			if env DATABASE_URL exists:
+				if env API_KEY exists:
+					if env APP_SECRET exists:
+						success "✅ All production credentials present"
+						run "echo 'Deploying to production with full credentials'"
+					else:
+						error "❌ APP_SECRET missing for production"
+						fail "Production deployment requires APP_SECRET"
+				else:
+					error "❌ API_KEY missing for production"
+					fail "Production deployment requires API_KEY"
+			else:
+				error "❌ DATABASE_URL missing for production"
+				fail "Production deployment requires DATABASE_URL"
+		else:
+			if env DEPLOY_ENV is "staging":
+				info "✅ Staging environment - relaxed requirements"
+				run "echo 'Deploying to staging'"
+			else:
+				info "✅ Development environment - no credential requirements"
+				run "echo 'Deploying to development'"
+	else:
+		warn "⚠️  DEPLOY_ENV not set, defaulting to development"
+		run "echo 'Deploying to development (default)'"
+
+task "feature-flags" means "Enable features based on environment":
+	step "Checking feature flags"
+	
+	if env ENABLE_EXPERIMENTAL exists:
+		if env ENABLE_EXPERIMENTAL is "true":
+			info "🧪 Experimental features enabled"
+			run "echo 'Loading experimental features...'"
+		else:
+			info "✅ Using stable features only"
+	else:
+		info "✅ Using stable features (default)"
+	
+	if env ENABLE_ANALYTICS exists:
+		if env ENABLE_ANALYTICS is "true":
+			info "📊 Analytics enabled"
+			run "echo 'Initializing analytics...'"
+		else:
+			info "📊 Analytics disabled"
+	else:
+		info "📊 Analytics disabled (default)"
+	
+	if env ENABLE_DEBUG_TOOLS exists:
+		if env ENABLE_DEBUG_TOOLS is "true":
+			info "🔧 Debug tools enabled"
+			run "echo 'Loading debug tools...'"
+	
+	success "Feature flag check complete"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 8: Help & Default
+# ═══════════════════════════════════════════════════════════════════════════
+
+task "default" means "Welcome to environment variables demo":
+	info "╔═══════════════════════════════════════════════╗"
+	info "║  Environment Variables - Complete Examples   ║"
+	info "╚═══════════════════════════════════════════════╝"
+	echo ""
+	echo "📋 Basic Tasks:"
+	echo "  show-env          - Show loaded environment variables"
+	echo "  list-all          - List all matching env vars"
+	echo "  status            - Show status report of all env vars"
+	echo ""
+	echo "✅ Checking & Validation:"
+	echo "  check-exists      - Check if specific env vars exist (NEW syntax)"
+	echo "  check-values      - Check environment variable values"
+	echo "  with-defaults     - Use env vars with default values"
+	echo "  require-vars      - Fail if required vars are missing"
+	echo ""
+	echo "🚀 Deployment & Configuration:"
+	echo "  conditional-deploy - Deploy based on environment"
+	echo "  env-config        - Configure based on env variables"
+	echo "  multi-env-deploy  - Advanced multi-environment deployment"
+	echo "  feature-flags     - Enable features based on env flags"
+	echo ""
+	echo "📚 Learning:"
+	echo "  compare-syntax    - Compare old vs new syntax patterns"
+	echo ""
+	echo "💡 Examples:"
+	echo "  drun show-env"
+	echo "  drun show-env --env=production"
+	echo "  drun show-env --debug-env"
+	echo "  drun check-exists"
+	echo "  APP_NAME=MyApp drun check-exists"
+	echo "  DEPLOY_ENV=production DATABASE_URL=postgres://... drun conditional-deploy"
+	echo ""
+	echo "📖 Documentation:"
+	echo "  See ENV_LOADING.md and ENV_CONDITIONALS.md for details"
+
