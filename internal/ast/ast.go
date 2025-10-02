@@ -224,14 +224,23 @@ func (ts *TaskStatement) String() string {
 
 // ActionStatement represents an action call (info, step, success, etc.)
 type ActionStatement struct {
-	Token   lexer.Token // the action token (INFO, STEP, SUCCESS, etc.)
-	Action  string      // action name (info, step, success, etc.)
-	Message string      // the message string
+	Token           lexer.Token // the action token (INFO, STEP, SUCCESS, etc.)
+	Action          string      // action name (info, step, success, etc.)
+	Message         string      // the message string
+	LineBreakBefore bool        // add line break before (for step)
+	LineBreakAfter  bool        // add line break after (for step)
 }
 
 func (as *ActionStatement) statementNode() {}
 func (as *ActionStatement) String() string {
-	return fmt.Sprintf("%s \"%s\"", as.Action, as.Message)
+	suffix := ""
+	if as.LineBreakBefore {
+		suffix += " add line break before"
+	}
+	if as.LineBreakAfter {
+		suffix += " add line break after"
+	}
+	return fmt.Sprintf("%s \"%s\"%s", as.Action, as.Message, suffix)
 }
 
 // TaskCallStatement represents calling another task
@@ -555,6 +564,86 @@ func (hs *HTTPStatement) String() string {
 	return out.String()
 }
 
+// PermissionSpec represents a permission specification for downloaded files
+type PermissionSpec struct {
+	Permissions []string // read, write, execute
+	Targets     []string // user, group, others
+}
+
+// DownloadStatement represents file download operations (like curl/wget)
+type DownloadStatement struct {
+	Token            lexer.Token       // the DOWNLOAD token
+	URL              string            // the URL to download from
+	Path             string            // the local path to save to
+	AllowOverwrite   bool              // whether to allow overwriting existing files
+	AllowPermissions []PermissionSpec  // permission specifications
+	ExtractTo        string            // directory to extract archive to (if set)
+	RemoveArchive    bool              // whether to remove archive after extraction
+	Headers          map[string]string // HTTP headers
+	Auth             map[string]string // authentication options
+	Options          map[string]string // additional options (timeout, retry, etc.)
+}
+
+func (ds *DownloadStatement) statementNode() {}
+func (ds *DownloadStatement) String() string {
+	var out strings.Builder
+	out.WriteString("download \"")
+	out.WriteString(ds.URL)
+	out.WriteString("\"")
+
+	if ds.ExtractTo != "" {
+		out.WriteString(" extract to \"")
+		out.WriteString(ds.ExtractTo)
+		out.WriteString("\"")
+		if ds.RemoveArchive {
+			out.WriteString(" remove archive")
+		}
+	} else {
+		out.WriteString(" to \"")
+		out.WriteString(ds.Path)
+		out.WriteString("\"")
+	}
+
+	if ds.AllowOverwrite {
+		out.WriteString(" allow overwrite")
+	}
+
+	for _, perm := range ds.AllowPermissions {
+		out.WriteString(" allow permissions [")
+		for i, p := range perm.Permissions {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			out.WriteString("\"" + p + "\"")
+		}
+		out.WriteString("] to [")
+		for i, t := range perm.Targets {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			out.WriteString("\"" + t + "\"")
+		}
+		out.WriteString("]")
+	}
+
+	// Add headers
+	for key, value := range ds.Headers {
+		out.WriteString(fmt.Sprintf(" with header \"%s: %s\"", key, value))
+	}
+
+	// Add auth
+	for key, value := range ds.Auth {
+		out.WriteString(fmt.Sprintf(" with %s \"%s\"", key, value))
+	}
+
+	// Add options
+	for key, value := range ds.Options {
+		out.WriteString(fmt.Sprintf(" %s \"%s\"", key, value))
+	}
+
+	return out.String()
+}
+
 // NetworkStatement represents network operations (health checks, port testing, ping)
 type NetworkStatement struct {
 	Token     lexer.Token       // the NETWORK token or action token
@@ -631,7 +720,12 @@ func (ds *DetectionStatement) String() string {
 			out.WriteString(" as " + ds.CaptureVar)
 		}
 	case "if_available":
-		out.WriteString("if " + ds.Target + " is available")
+		if len(ds.Alternatives) > 0 {
+			tools := append([]string{ds.Target}, ds.Alternatives...)
+			out.WriteString("if " + strings.Join(tools, ",") + " is available")
+		} else {
+			out.WriteString("if " + ds.Target + " is available")
+		}
 	case "when_environment":
 		out.WriteString("when in " + ds.Target + " environment")
 	case "if_version":
@@ -741,7 +835,8 @@ type ParameterStatement struct {
 	Token        lexer.Token // the parameter token (REQUIRES, GIVEN, ACCEPTS)
 	Type         string      // "requires", "given", "accepts"
 	Name         string      // parameter name
-	DefaultValue string      // default value (for "given")
+	DefaultValue string      // default value (for "given" and optionally for "requires")
+	HasDefault   bool        // true if a default value was explicitly set
 	Constraints  []string    // constraints like ["dev", "staging", "production"]
 	DataType     string      // "string", "number", "boolean", "list", etc.
 	Required     bool        // true for "requires", false for "given"/"accepts"

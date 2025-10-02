@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Test script for drun completion functionality
-echo "Testing drun completion functionality..."
+# Test script for drun-cli completion functionality
+echo "Testing drun-cli completion functionality..."
 
 # Source the completion script
 source /tmp/drun_completion.bash

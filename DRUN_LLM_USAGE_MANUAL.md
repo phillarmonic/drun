@@ -44,16 +44,16 @@ To start a new drun project, use the `--init` command:
 
 ```bash
 # Initialize with default .drun/spec.drun file
-drun --init
+drun-cli --init
 
 # Initialize with custom file name
-drun --init --file=my-project.drun
+drun-cli --init --file=my-project.drun
 
 # Initialize and set as workspace default
-drun --init --file=my-project.drun --save-as-default
+drun-cli --init --file=my-project.drun --save-as-default
 
 # Set existing file as workspace default
-drun --set-workspace my-project.drun
+drun-cli --set-workspace my-project.drun
 ```
 
 This creates a starter task file with basic examples and project structure.
@@ -68,13 +68,13 @@ Start by creating a new drun project in your directory:
 
 ```bash
 # Create default task file at .drun/spec.drun
-drun --init
+drun-cli --init
 
 # Or create with custom name
-drun --init --file=my-tasks.drun
+drun-cli --init --file=my-tasks.drun
 
 # Initialize and set as workspace default
-drun --init --file=my-tasks.drun --save-as-default
+drun-cli --init --file=my-tasks.drun --save-as-default
 ```
 
 ### 2. Basic Project Structure
@@ -99,9 +99,9 @@ task "greet" means "Greet someone by name":
 See what tasks are available:
 
 ```bash
-drun --list
+drun-cli --list
 # or
-drun -l
+drun-cli -l
 ```
 
 ### 4. Run Tasks
@@ -117,7 +117,7 @@ drun greet name=Alice
 drun greet name=Bob title=Mr.
 
 # Task with multiple parameters
-drun deploy environment=staging version=v1.2.0
+drun-cli deploy environment=staging version=v1.2.0
 ```
 
 ### 5. Dry Run and Debugging
@@ -126,13 +126,13 @@ Test what would be executed without running:
 
 ```bash
 # See what would be executed
-drun deploy --dry-run
+drun-cli deploy --dry-run
 
 # Show detailed execution plan
-drun deploy --explain
+drun-cli deploy --explain
 
 # Debug parsing and AST
-drun --debug -f my-tasks.drun
+drun-cli --debug -f my-tasks.drun
 ```
 
 ### 6. Workspace Management
@@ -142,10 +142,10 @@ Manage your drun workspace:
 ```bash
 # Move task file and update workspace
 mv .drun/spec.drun ./project-tasks.drun
-drun --set-workspace project-tasks.drun
+drun-cli --set-workspace project-tasks.drun
 
 # Now drun automatically uses your custom location
-drun --list
+drun-cli --list
 ```
 
 ### 7. Example Workflow
@@ -155,7 +155,7 @@ Here's a typical workflow for creating a new automation project:
 ```bash
 # 1. Initialize project
 cd my-project
-drun --init --file=automation.drun
+drun-cli --init --file=automation.drun
 
 # 2. Edit the file to add your tasks
 # automation.drun:
@@ -185,14 +185,14 @@ task "deploy" means "Deploy to environment":
 
 ```bash
 # 3. List available tasks
-drun --list
+drun-cli --list
 
 # 4. Test with dry run
-drun deploy environment=dev --dry-run
+drun-cli deploy environment=dev --dry-run
 
 # 5. Execute tasks
-drun build
-drun deploy environment=dev
+drun-cli build
+drun-cli deploy environment=dev
 ```
 
 ---

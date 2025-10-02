@@ -293,9 +293,14 @@ shell_action = "run" | "exec" | "shell" ;
 (* Detection statements *)
 detection_statement = "detect" detection_target
                     | "detect" "available" tool_alternatives [ "as" variable_name ]
-                    | "if" ( tool_name | string_literal ) "is" "available" ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list "is" "available" ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list "is" "not" "available" ":" statement_block [ "else" ":" statement_block ]
                     | "if" ( tool_name | string_literal ) "version" comparison_operator string_literal ":" statement_block [ "else" ":" statement_block ]
                     | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
+
+tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
+
+(* Note: Both "is" and "are" are accepted for tool availability checks *)
 
 detection_target = "project" "type"
                  | tool_name [ "version" ] ;
@@ -518,7 +523,7 @@ task "invalid":
 - **Choose one style**: Use either tabs or spaces consistently throughout your project
 - **Editor configuration**: Configure your editor to show whitespace characters
 - **Team standards**: Establish indentation standards for your team
-- **Generated files**: `drun --init` uses tabs by default
+- **Generated files**: `drun-cli --init` uses tabs by default
 
 ### String Interpolation
 
@@ -1316,6 +1321,25 @@ if docker is not available:
 if kubernetes is available:
   deploy to cluster
 
+# Multiple tool availability check
+# For "is available": ALL tools must be available (AND logic)
+if docker,"docker-compose" is available:
+  info "Docker and Docker Compose are both available"
+
+# Alternative: use 'are' for better readability with multiple tools
+if docker,"docker-compose" are available:
+  info "Docker and Docker Compose are both available"
+
+# For "is not available": ANY tool must be unavailable (OR logic)
+if docker,"docker-compose",kubectl is not available:
+  error "One or more required tools are missing"
+else:
+  info "All required tools are available"
+
+# Alternative: use 'are not' for better readability
+if docker,"docker-compose",kubectl are not available:
+  error "One or more required tools are missing"
+
 # File/directory detection
 if file "package.json" exists:
   install npm dependencies
@@ -1680,6 +1704,30 @@ drun my-task --allow-undefined-variables
 
 drun v2 provides powerful variable transformation operations that can be chained together for complex data manipulation.
 
+#### Variable Assignment
+
+Both `let` and `set` support variable assignment with optional type declarations:
+
+```drun
+task "variable_assignment":
+  # Simple assignment with let
+  let $name = "value"
+  
+  # Simple assignment with set
+  set $variable to "value"
+  
+  # Array assignment with let
+  let $items as list to ["value1", "value2", "value3"]
+  
+  # Array assignment with set
+  set $platforms as list to ["linux", "darwin", "windows"]
+  
+  # Arrays are stored as comma-separated strings
+  # and can be used in loops
+  for each $platform in $platforms:
+    info "Platform: {$platform}"
+```
+
 #### String Operations
 
 Transform string values with intuitive operations:
@@ -1827,7 +1875,36 @@ task "deploy":
   requires $environment from ["dev", "staging", "production"]
   requires $version matching pattern "v\d+\.\d+\.\d+"
   
-  # Usage: drun deploy environment=production version=v1.2.3
+  # Usage: drun-cli deploy environment=production version=v1.2.3
+```
+
+#### Required Parameters with Defaults
+
+Required parameters can have default values. When a default is provided, the parameter becomes optional at the CLI level but still benefits from the validation constraints:
+
+```
+task "build":
+  requires $image from ["base", "worker", "dev", "all"]
+  requires $cache from ["yes", "no"] defaults to "no"
+  
+  # Usage without cache parameter (uses default "no"):
+  # drun-cli build image=base
+  
+  # Usage with cache parameter override:
+  # drun-cli build image=base cache=yes
+```
+
+**Important validation rules:**
+- The default value MUST be one of the values in the constraint list (if constraints are specified)
+- The parser will validate this at parse time and emit an error if the default value is not in the allowed values
+
+```
+# Valid:
+requires $env from ["dev", "staging", "prod"] defaults to "dev"
+
+# Invalid - will cause parse error:
+requires $env from ["dev", "staging", "prod"] defaults to "production"
+# Error: default value 'production' must be one of the allowed values: [dev, staging, prod]
 ```
 
 #### CLI Argument Syntax
@@ -1836,12 +1913,12 @@ Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix r
 
 ```bash
 # Parameter passing examples
-drun deploy environment=production
-drun build tag=v1.2.3 push=true
-drun test suites=unit,integration verbose=true
+drun-cli deploy environment=production
+drun-cli build tag=v1.2.3 push=true
+drun-cli test suites=unit,integration verbose=true
 
 # Multiple parameters
-drun deploy environment=staging replicas=5 timeout=300
+drun-cli deploy environment=staging replicas=5 timeout=300
 ```
 
 #### Optional Parameters
@@ -1852,8 +1929,8 @@ task "build":
   given $push defaults to false
   given $platforms defaults to ["linux/amd64"]
   
-  # Usage: drun build
-  # Usage: drun build tag=custom push=true
+  # Usage: drun-cli build
+  # Usage: drun-cli build tag=custom push=true
 ```
 
 #### Variadic Parameters
@@ -1863,7 +1940,7 @@ task "test":
   accepts $suites as list of strings
   accepts flags as list
   
-  # Usage: drun test --suites=unit,integration --flags=--verbose,--coverage
+  # Usage: drun-cli test --suites=unit,integration --flags=--verbose,--coverage
 ```
 
 ### Parameter Validation
@@ -2466,6 +2543,227 @@ get "https://example.com/file.zip" download "downloads/file.zip"
 post "https://api.example.com/upload" upload "local-file.txt"
 ```
 
+#### Download Operations
+
+The `download` statement provides a native Go HTTP client with advanced features including progress tracking, permission management, and authentication.
+
+**Features:**
+- Native Go HTTP client (no external dependencies)
+- Real-time progress bar with speed and ETA
+- Matrix-based permission system
+- Authentication support (Bearer, Basic, Token)
+- Timeout and retry configuration
+- Automatic redirect following
+
+**Basic Syntax:**
+```
+download "<url>" to "<path>"
+```
+
+**Advanced Options:**
+```
+# Simple download with progress tracking
+download "https://example.com/file.zip" to "downloads/file.zip"
+
+# Allow overwriting existing files
+download "https://example.com/data.json" to "data.json" allow overwrite
+
+# Download with authentication
+download "https://api.github.com/user" to "user.json" with auth bearer "token123"
+download "https://private.example.com/file" to "file.dat" with auth basic "user:pass"
+
+# Download with timeout and retry
+download "https://example.com/large-file.zip" to "file.zip" timeout "60s" retry "3"
+
+# Download with custom headers
+download "https://api.example.com/data" to "data.json" with header "Accept: application/json"
+```
+
+**Permission Matrix System:**
+
+The download statement supports granular Unix file permissions using a matrix notation:
+
+```
+# Make downloaded binary executable by user
+download "https://github.com/cli/cli/releases/download/v2.40.0/gh_linux_amd64" to "gh" 
+  allow overwrite 
+  allow permissions ["execute"] to ["user"]
+
+# Read/write for user, read-only for group/others
+download "https://example.com/config.json" to "config.json" 
+  allow overwrite 
+  allow permissions ["read","write"] to ["user"] 
+  allow permissions ["read"] to ["group","others"]
+
+# Multiple permission specifications
+download "https://example.com/script.sh" to "script.sh" 
+  allow overwrite 
+  allow permissions ["read"] to ["user","group","others"]
+  allow permissions ["write","execute"] to ["user"]
+
+# Download and set complete permissions
+download "https://example.com/tool" to "bin/tool" 
+  allow permissions ["execute","read"] to ["user"]
+  allow permissions ["read"] to ["group","others"]
+```
+
+**Permission Types:**
+- `read` - Read permission
+- `write` - Write permission  
+- `execute` - Execute permission
+
+**Permission Targets:**
+- `user` - File owner
+- `group` - Group members
+- `others` - All other users
+
+**Complete Example:**
+```
+task "download_and_install_binary":
+  info "Downloading binary with full configuration"
+  
+  # Download with progress bar, auth, timeout, and permissions
+  download "https://github.com/user/tool/releases/download/v1.0/tool-linux-amd64" 
+    to "bin/tool" 
+    allow overwrite 
+    timeout "120s" 
+    retry "5"
+    with auth bearer "github-token"
+    allow permissions ["execute","read"] to ["user"]
+    allow permissions ["read"] to ["group","others"]
+  
+  success "Binary installed and configured!"
+```
+
+**Progress Display:**
+
+The download statement shows real-time progress with:
+- Progress bar (visual indicator)
+- Percentage complete
+- Downloaded / Total size
+- Download speed (MB/s)
+- Estimated time remaining (ETA)
+
+Example output:
+```
+⬇️  Downloading: https://example.com/large-file.zip
+   → downloads/large-file.zip
+   📥 [████████████████░░░░░░░░░░░░░░] 55.2% | 2.3 GB/4.2 GB | 15.3 MB/s | ETA: 2m15s
+   📊 4.2 GB in 4m32s (15.45 MB/s)
+✅ Downloaded successfully to: downloads/large-file.zip
+   🔒 Set permissions: -rwxr--r--
+```
+
+**Error Handling:**
+
+```
+# Prevent accidental overwrites
+try:
+  download "https://example.com/file.zip" to "existing-file.zip"
+catch:
+  warn "File already exists, use 'allow overwrite' to replace"
+
+# With overwrite allowed
+download "https://example.com/file.zip" to "file.zip" allow overwrite
+```
+
+**Archive Extraction:**
+
+The download statement supports automatic extraction of archives using the pure-Go [github.com/mholt/archives](https://github.com/mholt/archives) library (no external dependencies):
+
+**Supported Formats:**
+- **Archives:** ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, 7Z, RAR
+- **Compression:** GZ, BZ2, XZ, ZSTD, BROTLI, LZ4, SNAPPY, LZW
+
+```
+# Download and extract archive
+download "https://example.com/release.zip" to "release.zip" extract to "release/"
+
+# Download, extract, and remove archive
+download "https://example.com/release.tar.gz" to "release.tar.gz" extract to "bin/" remove archive
+
+# With all options combined
+download "https://github.com/user/tool/releases/download/v1.0/tool.zip"
+  to "tool.zip"
+  extract to "tools/"
+  remove archive
+  timeout "120s"
+  with auth bearer "token"
+```
+
+**Extraction Examples:**
+
+```
+# Extract ZIP archive
+task "install_from_zip":
+  download "https://releases.example.com/app-v1.0.0.zip" 
+    to "app-v1.0.0.zip"
+    extract to "app/" 
+    remove archive
+
+# Extract tarball with compression
+task "install_from_tarball":
+  download "https://releases.example.com/tool-linux-amd64.tar.gz"
+    to "tool.tar.gz"
+    extract to "/usr/local/bin/"
+    remove archive
+
+# Keep archive for backup
+task "extract_but_keep":
+  download "https://releases.example.com/source.tar.gz"
+    to "source.tar.gz"
+    extract to "source/"
+  # Archive stays as source.tar.gz
+
+# Download and extract in parallel
+task "parallel_installs":
+  for each $version in ["v1.0", "v2.0", "v3.0"] in parallel:
+    download "https://releases.example.com/tool-{$version}.zip"
+      to ".downloads/tool-{$version}.zip"
+      extract to "tools/{$version}/"
+      remove archive
+```
+
+**Cross-Platform Benefits:**
+- Pure Go implementation (no external tools like `tar`, `unzip`, `7z` required)
+- Works identically on Windows, Linux, and macOS
+- Automatic format detection from file extension and header
+- Preserves file permissions and directory structure
+
+**Real-World Examples:**
+
+```
+# Download GitHub release binary
+task "install_gh_cli":
+  download "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_linux_amd64.tar.gz"
+    to "gh.tar.gz"
+    allow overwrite
+    timeout "120s"
+    allow permissions ["read","write"] to ["user"]
+
+# Download multiple files in parallel
+task "download_data":
+  for each $file in ["users","posts","comments"] in parallel:
+    download "https://api.example.com/{$file}.json"
+      to "data/{$file}.json"
+      allow overwrite
+      allow permissions ["read","write"] to ["user"]
+      allow permissions ["read"] to ["group"]
+
+# Download with environment-specific permissions
+task "download_config":
+  requires $env from ["dev","prod"]
+  
+  when $env == "prod":
+    download "https://config.example.com/prod.json" to "config.json"
+      allow overwrite
+      allow permissions ["read"] to ["user","group","others"]
+  otherwise:
+    download "https://config.example.com/dev.json" to "config.json"
+      allow overwrite
+      allow permissions ["read","write"] to ["user","group","others"]
+```
+
 #### Network Health Checks and Service Waiting
 
 ```
@@ -2532,6 +2830,72 @@ info "Configuration loaded successfully"
 warn "Using default configuration"
 error "Failed to connect to database"
 success "Deployment completed successfully"
+```
+
+**Output Formatting:**
+
+- `step` - Displays message in a box (no line breaks by default):
+  ```
+  ┌────────────────────────────────┐
+  │ Starting deployment process    │
+  └────────────────────────────────┘
+  ```
+- `info` - Displays with ℹ️ emoji prefix: `ℹ️  Configuration loaded successfully`
+- `warn` - Displays with ⚠️ emoji prefix: `⚠️  Using default configuration`
+- `error` - Displays with ❌ emoji prefix: `❌ Failed to connect to database`
+- `success` - Displays with ✅ emoji prefix: `✅ Deployment completed successfully`
+- `fail` - Displays with 💥 emoji prefix and exits with error
+
+**Optional Line Breaks for `step`:**
+
+By default, step boxes have no extra spacing. Add line breaks when you need visual separation:
+
+```
+# Default: no line breaks (compact)
+step "Build phase"
+
+# Line break before only
+step "Build phase" add line break before
+
+# Line break after only
+step "Build phase" add line break after
+
+# Line breaks both before and after
+step "Build phase" add line break before add line break after
+```
+
+**Example Usage:**
+
+```drun
+task "compact":
+  info "Starting deployment"
+  
+  # Compact steps - default behavior
+  step "Phase 1: Build"
+  info "Building application..."
+  
+  step "Phase 2: Test"
+  info "Running tests..."
+  
+  step "Phase 3: Deploy"
+  info "Deploying to production..."
+  
+  success "Deployment complete!"
+
+task "spaced":
+  info "Starting deployment"
+  
+  # Well-spaced sections with line breaks
+  step "Phase 1: Build" add line break before add line break after
+  info "Building application..."
+  
+  step "Phase 2: Test" add line break before add line break after
+  info "Running tests..."
+  
+  step "Phase 3: Deploy" add line break before add line break after
+  info "Deploying to production..."
+  
+  success "Deployment complete!"
 ```
 
 #### Process Control
@@ -2788,6 +3152,53 @@ if kubectl is not available:
     info "Skipping Kubernetes deployment"
 ```
 
+#### Supported Tool Keywords
+
+The following tools are recognized as built-in keywords and can be used without quotes:
+
+**Package Managers & Runtimes:**
+- `node` - Node.js runtime
+- `npm` - Node Package Manager
+- `yarn` - Yarn package manager
+- `pnpm` - PNPM package manager
+- `bun` - Bun JavaScript runtime and package manager
+- `python` - Python interpreter
+- `pip` - Python package installer
+- `go` / `golang` - Go programming language
+- `cargo` - Rust package manager
+- `java` - Java runtime
+- `maven` - Apache Maven build tool
+- `gradle` - Gradle build tool
+- `ruby` - Ruby interpreter
+- `gem` - RubyGems package manager
+- `php` - PHP interpreter
+- `composer` - PHP dependency manager
+- `rust` - Rust programming language
+- `make` - GNU Make build tool
+
+**Container & Orchestration:**
+- `docker` - Docker container platform
+- `kubectl` - Kubernetes command-line tool
+- `helm` - Kubernetes package manager
+
+**Infrastructure & Cloud:**
+- `terraform` - Infrastructure as Code tool
+- `aws` - AWS CLI
+- `gcp` - Google Cloud CLI
+- `azure` - Azure CLI
+
+**Version Control:**
+- `git` - Git version control system
+
+**Note:** For tools with spaces or tools not in this list, use quoted strings:
+```
+if "docker compose" is available:
+    info "Using Docker Compose v2"
+
+if "docker-compose" is available:
+    info "Using Docker Compose v1"
+```
+
 ### DRY Tool Detection
 
 For maximum flexibility and maintainability, drun supports detecting tool variants and capturing the working one in a variable:
@@ -2853,6 +3264,215 @@ when running on macOS:
 when running on Linux:
   use system package manager
 ```
+
+### Environment Variable Interpolation ⭐ *New*
+
+Drun supports shell-style environment variable interpolation using `${VAR}` syntax:
+
+**Syntax:**
+- `{$var}` - Drun variable (from parameters, captures, etc.)
+- `${VAR:-default}` - Environment variable with default value
+- `${VAR}` - Environment variable without default (fails if not set)
+
+**Examples:**
+
+```drun
+task show-config:
+	# With default values
+	echo "User: ${USER:-unknown}"
+	echo "Home: ${HOME:-/home/default}"
+	echo "Shell: ${SHELL:-/bin/sh}"
+	
+	# Required environment variables (no default - will fail if not set)
+	echo "API URL: ${API_URL}"
+	echo "Database: ${DATABASE_URL}"
+	
+	# Combining with Drun variables
+	capture from shell "date" as $timestamp
+	echo "Timestamp: {$timestamp}"
+	echo "User: ${USER:-unknown}"
+```
+
+**Key Features:**
+- **Shell-style syntax**: Familiar `${VAR:-default}` pattern from bash/sh
+- **Default values**: Use `:-` syntax to provide fallback values
+- **Required variables**: Variables without defaults will fail if not set
+- **OS environment**: Accesses environment variables from the shell
+- **Safe defaults**: Prevents errors when optional config is missing
+- **Integration**: Works seamlessly with `.env` file loading
+
+### Environment Variable Conditionals ⭐ *New*
+
+Check environment variables with clean, semantic syntax for conditional logic:
+
+#### Basic Existence Checks
+
+```drun
+# Check if environment variable exists
+if env HOME exists:
+  success "HOME is set"
+  capture from shell "echo $HOME" as $home
+  echo "Home directory: {$home}"
+else:
+  error "HOME is not set"
+
+# Check multiple environment variables
+if env USER exists:
+  info "User: {env('USER')}"
+
+if env PATH exists:
+  info "PATH is configured"
+```
+
+#### Value Comparison
+
+```drun
+# Check if environment variable equals a specific value
+if env APP_ENV is "production":
+  warn "⚠️  Running in PRODUCTION environment"
+  info "Extra caution advised!"
+else:
+  info "✅ Not in production environment"
+
+# Check if environment variable is NOT equal to a value
+if env DEBUG_MODE is not "true":
+  info "Debug mode is disabled"
+```
+
+#### Empty/Non-Empty Checks
+
+```drun
+# Check if environment variable is not empty
+if env DATABASE_URL is not empty:
+  success "✅ DATABASE_URL is configured"
+  run "python manage.py migrate"
+else:
+  warn "⚠️  DATABASE_URL is not set"
+  info "Set it with: export DATABASE_URL=postgresql://..."
+  fail "Missing required database configuration"
+```
+
+#### Compound Conditions ⭐ *New*
+
+Combine multiple checks with `and` for more precise validation:
+
+```drun
+# Ensure variable exists AND is not empty (rejects empty strings)
+task "secure-deploy":
+  if env API_TOKEN exists and is not empty:
+    success "✅ API_TOKEN is properly configured"
+    run "curl -H 'Authorization: Bearer ${API_TOKEN}' https://api.example.com/deploy"
+  else:
+    error "❌ API_TOKEN must be set and not empty"
+    fail "Missing required credentials"
+
+# Ensure variable exists AND equals specific value
+task "production-check":
+  if env DEPLOY_ENV exists and is "production":
+    warn "⚠️  Confirmed production deployment"
+    info "Running extra validation..."
+    run "npm run test:integration"
+  else:
+    info "✅ Non-production environment"
+
+# Build with optional build arguments
+task "docker-build":
+  if env BUILD_TOKEN exists and is not empty:
+    info "🔑 Using authenticated build"
+    run "docker build --build-arg TOKEN='${BUILD_TOKEN}' -t myapp ."
+  else:
+    info "🔓 Using public build (no authentication)"
+    run "docker build -t myapp ."
+```
+
+#### Practical Examples
+
+```drun
+# Conditional deployment based on environment
+task "deploy":
+  if env DEPLOY_ENV is "production":
+    warn "⚠️  Deploying to PRODUCTION"
+    info "Running production pre-flight checks..."
+    
+    if env DATABASE_URL exists:
+      success "✅ Database configuration found"
+    else:
+      error "❌ DATABASE_URL required for production"
+      fail "Missing required environment variable"
+    
+    if env API_KEY exists:
+      success "✅ API key found"
+    else:
+      error "❌ API_KEY required for production"
+      fail "Missing required API credentials"
+    
+    success "✅ All pre-flight checks passed"
+    info "Deploying to production..."
+  else:
+    info "✅ Deploying to development/staging"
+    info "Skipping production pre-flight checks"
+
+# CI/CD detection
+task "build":
+  if env CI exists:
+    info "🤖 Running in CI environment"
+    set $ci_mode to "true"
+    run "npm run build --ci"
+  else:
+    info "💻 Running locally"
+    set $ci_mode to "false"
+    run "npm run build"
+
+# Configuration based on environment variables
+task "configure":
+  if env LOG_LEVEL is "debug":
+    info "🔧 Using DEBUG log level"
+    set $verbose to "true"
+  else:
+    if env LOG_LEVEL is "info":
+      info "ℹ️  Using INFO log level"
+      set $verbose to "false"
+    else:
+      info "✅ Using default log level"
+      set $verbose to "false"
+
+# Feature flags
+task "start":
+  if env ENABLE_EXPERIMENTAL is "true":
+    info "🧪 Experimental features enabled"
+    run "npm run start:experimental"
+  else:
+    info "✅ Using stable version"
+    run "npm run start"
+```
+
+#### Syntax Variants
+
+```drun
+# OLD SYNTAX (still supported via builtin functions)
+set $var_exists to "{env exists(HOME)}"
+when $var_exists is "true":
+  success "HOME exists"
+
+# NEW SYNTAX (recommended - cleaner and more readable)
+if env HOME exists:
+  success "HOME exists"
+```
+
+**Key Features:**
+- **Clean syntax**: `if env VAR exists` is more readable than function-based checks
+- **Value comparison**: Check if env var equals specific values
+- **Empty checks**: Use `is not empty` to validate required configuration
+- **OS environment**: Checks environment variables available when drun starts
+- **Integration**: Works seamlessly with `.env` file loading (see `.env` loading section)
+
+**Supported Conditions:**
+- `if env VAR exists` - Check if variable is set
+- `if env VAR is "value"` - Check if variable equals value
+- `if env VAR is not "value"` - Check if variable does not equal value
+- `if env VAR is not empty` - Check if variable has a value
+- `if env VAR exists and is not empty` - Check if variable is set AND has a non-empty value
+- `if env VAR exists and is "value"` - Check if variable is set AND equals specific value
 
 ### Framework Detection
 

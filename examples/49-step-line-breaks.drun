@@ -1,0 +1,116 @@
+version: 2.0
+
+# ====================================================================
+# Example 49: Step Line Break Control
+# ====================================================================
+#
+# This example demonstrates the optional line break control for step
+# statements, allowing you to fine-tune the visual spacing in your
+# task output.
+#
+# Default behavior: no line breaks (compact)
+# Optional: add line break before, after, or both
+# ====================================================================
+
+task "default-spacing":
+  info "=== Default Step Spacing (Compact) ==="
+  info "Steps have no line breaks by default for compact output"
+  
+  step "First step"
+  info "Some info message"
+  
+  step "Second step"
+  info "Another info message"
+  
+  step "Third step"
+  success "Default spacing demo complete"
+
+task "with-line-breaks":
+  info "=== Adding Line Breaks for Visual Separation ==="
+  info "Use line breaks when you want spacing between sections"
+  
+  step "Phase 1: Initialization" add line break before add line break after
+  info "Initializing system components..."
+  info "Loading configuration files..."
+  
+  step "Phase 2: Processing" add line break before add line break after
+  info "Processing data records..."
+  info "Applying transformations..."
+  
+  step "Phase 3: Finalization" add line break before add line break after
+  info "Saving results..."
+  info "Cleaning up resources..."
+  
+  success "Line breaks demo complete"
+
+task "spaced-sections":
+  info "=== Well-Spaced Sections ==="
+  info "Use both line breaks for clear visual separation"
+  
+  step "Build Section" add line break before add line break after
+  info "Compiling source code..."
+  info "Running build scripts..."
+  info "Creating artifacts..."
+  
+  step "Test Section" add line break before add line break after
+  info "Running unit tests..."
+  info "Running integration tests..."
+  info "Generating coverage reports..."
+  
+  step "Deploy Section" add line break before add line break after
+  info "Pushing to registry..."
+  info "Updating deployment..."
+  info "Verifying health checks..."
+  
+  success "Spaced sections demo complete"
+
+task "mixed-formatting":
+  info "=== Mixed Formatting Example ==="
+  
+  # Normal step with default spacing
+  step "Configuration Check"
+  info "Validating environment..."
+  
+  # Compact step group
+  step "Quick Checks" add line break after
+  info "✓ Docker available"
+  info "✓ Git repository clean"
+  info "✓ Dependencies installed"
+  
+  # Another default step
+  step "Deployment Preparation"
+  info "Building Docker image..."
+  
+  # Compact final steps
+  step "Final Verification" add line break after
+  info "✓ Image built successfully"
+  info "✓ Tests passed"
+  
+  success "Mixed formatting demo complete"
+
+task "pipeline-visualization":
+  info "=== CI/CD Pipeline Visualization ==="
+  
+  step "Stage 1: Build" add line break before add line break after
+  
+  info "→ Checkout code"
+  info "→ Install dependencies"
+  info "→ Compile application"
+  info "→ Create build artifacts"
+  
+  step "Stage 2: Test" add line break before add line break after
+  
+  info "→ Run unit tests"
+  info "→ Run integration tests"
+  info "→ Generate test reports"
+  info "→ Check code coverage"
+  
+  step "Stage 3: Deploy" add line break before add line break after
+  
+  info "→ Build Docker image"
+  info "→ Push to registry"
+  info "→ Update Kubernetes deployment"
+  info "→ Run smoke tests"
+  
+  success "Pipeline completed successfully!"
+

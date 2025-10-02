@@ -1,0 +1,81 @@
+version: 2.0
+
+# ====================================================================
+# Example 48: Multi-Tool Detection with Comma-Separated Lists
+# ====================================================================
+#
+# This example demonstrates checking multiple tools in a single
+# "is available" or "is not available" statement.
+#
+# Logic:
+# - For "is available": ALL tools must be available (AND logic)
+# - For "is not available": ANY tool is unavailable (OR logic)
+# ====================================================================
+
+task "check-docker-ecosystem":
+  info "=== Checking Docker Ecosystem ==="
+  
+  # Check if both Docker and Docker Compose are available
+  # Note: Both 'is' and 'are' work for single or multiple tools
+  if docker,"docker-compose" are available:
+    success "✅ Both Docker and Docker Compose are available"
+  else:
+    warn "❌ One or both Docker tools are missing"
+  
+  # Check if any required tool is missing
+  # Alternative: use 'are not' for better readability with multiple tools
+  if docker,"docker-compose",kubectl are not available:
+    warn "⚠️ At least one tool is missing from the container ecosystem"
+  else:
+    success "✅ All container tools (docker, docker-compose, kubectl) are available"
+
+task "preflight-check":
+  info "=== Running Preflight Check ==="
+  
+  # Example from user's request
+  if docker,"docker-compose" is not available:
+    error "You don't seem to have docker on your machine. Or it is not started if you're on a Mac."
+  else:
+    info "Docker detected."
+
+task "comprehensive-check":
+  info "=== Comprehensive Tool Check ==="
+  
+  # Check development tools (using 'are' for multiple tools)
+  if git,node,npm are available:
+    info "✅ Core development tools (git, node, npm) are available"
+  else:
+    warn "❌ Some core development tools are missing"
+  
+  # Check container orchestration (using 'are' for clarity)
+  if kubectl,helm are available:
+    info "✅ Kubernetes tools (kubectl, helm) are available"
+  else:
+    info "ℹ️ Kubernetes tools not detected (optional)"
+  
+  # Check cloud CLIs (using 'are not' for better readability)
+  if aws,gcp,azure are not available:
+    info "ℹ️ At least one cloud CLI is missing (this is expected in most environments)"
+  
+  # Mixed quoted and unquoted tool names (both 'is' and 'are' work)
+  if git,"docker compose" is available:
+    info "✅ Git and Docker Compose (v2) are available"
+
+task "validate-requirements":
+  info "=== Validating Project Requirements ==="
+  
+  # Require at least git and one package manager
+  if git is not available:
+    error "Git is required for this project"
+  
+  if npm,yarn,pnpm is not available:
+    error "At least one package manager (npm, yarn, or pnpm) is required"
+  else:
+    success "✅ Package manager detected"
+  
+  # Optional but recommended tools
+  if docker,"docker-compose" is available:
+    success "✅ Docker tools available - full development environment ready"
+  else:
+    info "ℹ️ Docker tools not available - some features may be limited"
+

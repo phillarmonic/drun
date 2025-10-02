@@ -94,13 +94,13 @@ jobs:
           exit $LASTEXITCODE
         }
         echo "Building the binary..."
-        go build -o bin/drun.exe ./cmd/drun
+        go build -o bin/drun-cli.exe ./cmd/drun
         if ($LASTEXITCODE -ne 0) {
           echo "❌ Build failed!"
           exit $LASTEXITCODE
         }
         echo "Testing the binary..."
-        ./bin/drun.exe --version
+        ./bin/drun-cli.exe --version
         if ($LASTEXITCODE -ne 0) {
           echo "❌ Binary test failed!"
           exit $LASTEXITCODE
@@ -141,20 +141,20 @@ jobs:
     - name: Build binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/drun ./cmd/drun
-        ./bin/drun --version
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/drun-cli ./cmd/drun
+        ./bin/drun-cli --version
 
     - name: Build binary (Windows)
       if: runner.os == 'Windows'
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" -o bin/drun.exe ./cmd/drun
-        ./bin/drun.exe --version
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" -o bin/drun-cli.exe ./cmd/drun
+        ./bin/drun-cli.exe --version
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: drun-${{ runner.os }}
-        path: bin/drun*
+        name: drun-cli-${{ runner.os }}
+        path: bin/drun-cli*
 
   # Example file testing job - tests parsing and execution of example files
   test-examples:
@@ -194,14 +194,14 @@ jobs:
     - name: Build drun binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -o bin/drun ./cmd/drun
-        ./bin/drun --version
+        go build -o bin/drun-cli ./cmd/drun
+        ./bin/drun-cli --version
 
     - name: Build drun binary (Windows)
       if: runner.os == 'Windows'
       run: |
-        go build -o bin/drun.exe ./cmd/drun
-        ./bin/drun.exe --version
+        go build -o bin/drun-cli.exe ./cmd/drun
+        ./bin/drun-cli.exe --version
 
     - name: Test parsing of all example files
       shell: bash
@@ -210,13 +210,13 @@ jobs:
         
         # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
-          DRUN_BIN="./bin/drun.exe"
+          DRUN_BIN="./bin/drun-cli.exe"
           TIMEOUT_CMD="timeout 60"
         elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          DRUN_BIN="./bin/drun"
+          DRUN_BIN="./bin/drun-cli"
           TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
-          DRUN_BIN="./bin/drun"
+          DRUN_BIN="./bin/drun-cli"
           TIMEOUT_CMD="timeout 60"
         fi
         
@@ -263,13 +263,13 @@ jobs:
         
         # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
-          DRUN_BIN="./bin/drun.exe"
+          DRUN_BIN="./bin/drun-cli.exe"
           TIMEOUT_CMD="timeout 60"
         elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          DRUN_BIN="./bin/drun"
+          DRUN_BIN="./bin/drun-cli"
           TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
-          DRUN_BIN="./bin/drun"
+          DRUN_BIN="./bin/drun-cli"
           TIMEOUT_CMD="timeout 60"
         fi
         
@@ -329,7 +329,7 @@ jobs:
       run: |
         echo "🪟 Testing Windows-specific parsing scenarios..."
         
-        DRUN_BIN="./bin/drun.exe"
+        DRUN_BIN="./bin/drun-cli.exe"
         
         # Helper function for Windows tests with timeout
         test_windows_file() {

@@ -144,14 +144,22 @@ const (
 	NODE        // node
 	NPM         // npm
 	YARN        // yarn
+	PNPM        // pnpm
+	BUN         // bun
 	PYTHON      // python
 	PIP         // pip
 	GO          // go
 	GOLANG      // golang
+	CARGO       // cargo
 	JAVA        // java
+	MAVEN       // maven
+	GRADLE      // gradle
 	RUBY        // ruby
+	GEM         // gem
 	PHP         // php
+	COMPOSER    // composer
 	RUST        // rust
+	MAKE        // make
 	KUBECTL     // kubectl
 	HELM        // helm
 	TERRAFORM   // terraform
@@ -262,6 +270,7 @@ const (
 	IN        // in
 	PARALLEL  // parallel
 	IS        // is
+	ARE       // are
 
 	// Built-in functions/conditions
 	EXISTS // exists
@@ -282,18 +291,22 @@ const (
 	LIST_TYPE    // list
 
 	// File operations
-	CREATE    // create
-	COPY      // copy
-	MOVE      // move
-	DELETE    // delete
-	READ      // read
-	WRITE     // write
-	APPEND    // append
-	DIR       // dir
-	BACKUP    // backup
-	CHECK     // check
-	SIZE      // size
-	DIRECTORY // directory
+	CREATE      // create
+	COPY        // copy
+	MOVE        // move
+	DELETE      // delete
+	READ        // read
+	WRITE       // write
+	APPEND      // append
+	DIR         // dir
+	BACKUP      // backup
+	CHECK       // check
+	SIZE        // size
+	DIRECTORY   // directory
+	ALLOW       // allow
+	PERMISSIONS // permissions
+	EXTRACT     // extract
+	ARCHIVE     // archive
 
 	// Error handling
 	TRY     // try
@@ -590,6 +603,10 @@ func (t TokenType) String() string {
 		return "NPM"
 	case YARN:
 		return "YARN"
+	case PNPM:
+		return "PNPM"
+	case BUN:
+		return "BUN"
 	case PYTHON:
 		return "PYTHON"
 	case PIP:
@@ -598,14 +615,26 @@ func (t TokenType) String() string {
 		return "GO"
 	case GOLANG:
 		return "GOLANG"
+	case CARGO:
+		return "CARGO"
 	case JAVA:
 		return "JAVA"
+	case MAVEN:
+		return "MAVEN"
+	case GRADLE:
+		return "GRADLE"
 	case RUBY:
 		return "RUBY"
+	case GEM:
+		return "GEM"
 	case PHP:
 		return "PHP"
+	case COMPOSER:
+		return "COMPOSER"
 	case RUST:
 		return "RUST"
+	case MAKE:
+		return "MAKE"
 	case KUBECTL:
 		return "KUBECTL"
 	case HELM:
@@ -798,6 +827,8 @@ func (t TokenType) String() string {
 		return "PARALLEL"
 	case IS:
 		return "IS"
+	case ARE:
+		return "ARE"
 	case EXISTS:
 		return "EXISTS"
 	case RUN:
@@ -844,6 +875,14 @@ func (t TokenType) String() string {
 		return "SIZE"
 	case DIRECTORY:
 		return "DIRECTORY"
+	case ALLOW:
+		return "ALLOW"
+	case PERMISSIONS:
+		return "PERMISSIONS"
+	case EXTRACT:
+		return "EXTRACT"
+	case ARCHIVE:
+		return "ARCHIVE"
 	case TRY:
 		return "TRY"
 	case CATCH:
@@ -1026,14 +1065,22 @@ var keywords = map[string]TokenType{
 	"node":        NODE,
 	"npm":         NPM,
 	"yarn":        YARN,
+	"pnpm":        PNPM,
+	"bun":         BUN,
 	"python":      PYTHON,
 	"pip":         PIP,
 	"go":          GO,
 	"golang":      GOLANG,
+	"cargo":       CARGO,
 	"java":        JAVA,
+	"maven":       MAVEN,
+	"gradle":      GRADLE,
 	"ruby":        RUBY,
+	"gem":         GEM,
 	"php":         PHP,
+	"composer":    COMPOSER,
 	"rust":        RUST,
+	"make":        MAKE,
 	"kubectl":     KUBECTL,
 	"helm":        HELM,
 	"terraform":   TERRAFORM,
@@ -1130,6 +1177,7 @@ var keywords = map[string]TokenType{
 	"in":          IN,
 	"parallel":    PARALLEL,
 	"is":          IS,
+	"are":         ARE,
 	"exists":      EXISTS,
 	"empty":       EMPTY,
 	"run":         RUN,
@@ -1153,6 +1201,10 @@ var keywords = map[string]TokenType{
 	"check":       CHECK,
 	"size":        SIZE,
 	"directory":   DIRECTORY,
+	"allow":       ALLOW,
+	"permissions": PERMISSIONS,
+	"extract":     EXTRACT,
+	"archive":     ARCHIVE,
 	"try":         TRY,
 	"catch":       CATCH,
 	"finally":     FINALLY,

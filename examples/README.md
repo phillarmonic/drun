@@ -185,33 +185,6 @@ error "Connection failed"
 success "Deployment completed"
 ```
 
-## 🔄 Migration from v1
-
-The v2 language compiles to drun v1 YAML, so you can gradually migrate:
-
-### v1 YAML:
-```yaml
-recipes:
-  deploy:
-    help: "Deploy to environment"
-    positionals:
-      - name: environment
-        required: true
-        one_of: ["dev", "staging", "production"]
-    deps: [build]
-    run: |
-      kubectl set image deployment/myapp myapp=myapp:latest --namespace={{ .environment }}
-```
-
-### v2 Semantic:
-```
-task "deploy" means "Deploy to environment":
-  requires environment from ["dev", "staging", "production"]
-  depends on build
-  
-  deploy myapp:latest to kubernetes namespace {environment}
-```
-
 ## 🛠️ Running Examples
 
 *Note: drun v2 compiler is not yet implemented. These examples show the target syntax.*
@@ -220,20 +193,22 @@ Once the v2 compiler is ready, you'll run examples like this:
 
 ```bash
 # Basic examples
-drun -f 01-hello-world.drun hello
-drun -f 02-parameters.drun greet --name=Alice --title=Ms.
+drun-cli -f 01-hello-world.drun hello
+drun-cli -f 02-parameters.drun greet --name=Alice --title=Ms.
+drun-cli -f 02-parameters.drun "build docker" image=base dest=local
+drun-cli -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
 
 # Docker examples  
-drun -f 04-docker-basics.drun build --tag=v1.0.0
-drun -f 04-docker-basics.drun "run local" --port=3000
+drun-cli -f 04-docker-basics.drun build --tag=v1.0.0
+drun-cli -f 04-docker-basics.drun "run local" --port=3000
 
 # Kubernetes examples
-drun -f 05-kubernetes.drun deploy --environment=staging
-drun -f 05-kubernetes.drun scale --environment=production --replica_count=10
+drun-cli -f 05-kubernetes.drun deploy --environment=staging
+drun-cli -f 05-kubernetes.drun scale --environment=production --replica_count=10
 
 # CI/CD pipeline
-drun -f 06-cicd-pipeline.drun "ci pipeline"
-drun -f 06-cicd-pipeline.drun "deploy to staging"
+drun-cli -f 06-cicd-pipeline.drun "ci pipeline"
+drun-cli -f 06-cicd-pipeline.drun "deploy to staging"
 ```
 
 ## 📖 Language Reference
@@ -408,7 +383,6 @@ These examples represent the target syntax for drun v2. As we implement the comp
 ## 📚 Learn More
 
 - **[drun v2 Specification](../DRUN_V2_SPECIFICATION.md)** - Complete language specification
-- **[Migration Guide](../docs/v2-migration.md)** - Migrating from v1 to v2
 - **[Language Reference](../docs/v2-reference.md)** - Detailed syntax reference
 
 ---

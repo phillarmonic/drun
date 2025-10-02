@@ -665,7 +665,8 @@ func handleDebugMode() error {
 
 // generateStarterConfig creates a starter drun v2 configuration
 func generateStarterConfig() string {
-	return `# drun (do-run) a fast, semantic task runner. Effortless tasks, serious speed.
+	return `# drun (do-run) CLI is a fast, semantic task runner with 
+# its own powerful automation language. Effortless tasks, serious speed.
 # Learn more at https://github.com/phillarmonic/drun
 
 version: 2.0

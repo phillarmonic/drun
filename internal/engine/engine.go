@@ -1,15 +1,19 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mholt/archives"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/detection"
@@ -31,6 +35,7 @@ type Engine struct {
 
 	// Cached regex patterns for performance
 	interpolationRegex *regexp.Regexp
+	envVarRegex        *regexp.Regexp // For ${VAR} and ${VAR:-default} syntax
 	quotedArgRegex     *regexp.Regexp
 	paramArgRegex      *regexp.Regexp
 }
@@ -68,6 +73,7 @@ func NewEngine(output io.Writer) *Engine {
 
 		// Pre-compile regex patterns for performance
 		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
+		envVarRegex:        regexp.MustCompile(`\$\{([^}]+)\}`), // Matches ${VAR} and ${VAR:-default}
 		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
@@ -214,8 +220,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 		if providedValue, exists := params[param.Name]; exists {
 			rawValue = providedValue
 			hasValue = true
-		} else if !param.Required {
-			// For optional parameters (given/accepts), use default value (including empty string)
+		} else if param.HasDefault {
+			// For parameters with default values (both required and optional), use the default
 			// Interpolate the default value if it contains braces (for builtin function calls)
 			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
 			hasValue = true
@@ -394,6 +400,8 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeGit(s, ctx)
 	case *ast.HTTPStatement:
 		return e.executeHTTP(s, ctx)
+	case *ast.DownloadStatement:
+		return e.executeDownload(s, ctx)
 	case *ast.NetworkStatement:
 		return e.executeNetwork(s, ctx)
 	case *ast.DetectionStatement:
@@ -436,7 +444,22 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 	case "info":
 		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
-		_, _ = fmt.Fprintf(e.output, "🚀 %s\n", interpolatedMessage)
+		// Optional line breaks - only add if explicitly requested
+		if action.LineBreakBefore {
+			_, _ = fmt.Fprintln(e.output)
+		}
+
+		// Print the box
+		boxWidth := len(interpolatedMessage) + 4
+		topLine := "┌" + strings.Repeat("─", boxWidth-2) + "┐"
+		middleLine := "│ " + interpolatedMessage + " │"
+		bottomLine := "└" + strings.Repeat("─", boxWidth-2) + "┘"
+		_, _ = fmt.Fprintf(e.output, "%s\n%s\n%s\n", topLine, middleLine, bottomLine)
+
+		// Optional line break after
+		if action.LineBreakAfter {
+			_, _ = fmt.Fprintln(e.output)
+		}
 	case "warn":
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
@@ -1472,6 +1495,104 @@ func (e *Engine) buildHTTPCommand(method, url, body string, headers, auth, optio
 	return nil
 }
 
+// executeDownload executes file download operations using native Go HTTP client
+func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *ExecutionContext) error {
+	// Interpolate variables in download statement
+	url := e.interpolateVariables(downloadStmt.URL, ctx)
+	path := e.interpolateVariables(downloadStmt.Path, ctx)
+
+	// Interpolate headers
+	headers := make(map[string]string, len(downloadStmt.Headers))
+	for key, value := range downloadStmt.Headers {
+		headers[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate auth
+	auth := make(map[string]string, len(downloadStmt.Auth))
+	for key, value := range downloadStmt.Auth {
+		auth[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Interpolate options
+	options := make(map[string]string, len(downloadStmt.Options))
+	for key, value := range downloadStmt.Options {
+		options[key] = e.interpolateVariables(value, ctx)
+	}
+
+	// Check if file exists and handle overwrite
+	if !downloadStmt.AllowOverwrite && e.fileExists(path) {
+		errMsg := fmt.Sprintf("file already exists: %s (use 'allow overwrite' to replace)", path)
+		_, _ = fmt.Fprintf(e.output, "❌ %s\n", errMsg)
+		return fmt.Errorf("%s", errMsg)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would download %s to %s", url, path)
+		if downloadStmt.AllowOverwrite {
+			_, _ = fmt.Fprintf(e.output, " (overwrite allowed)")
+		}
+		if len(downloadStmt.AllowPermissions) > 0 {
+			_, _ = fmt.Fprintf(e.output, " with permissions: ")
+			for i, perm := range downloadStmt.AllowPermissions {
+				if i > 0 {
+					_, _ = fmt.Fprintf(e.output, ", ")
+				}
+				_, _ = fmt.Fprintf(e.output, "%v to %v", perm.Permissions, perm.Targets)
+			}
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+		return nil
+	}
+
+	// Show what we're about to do
+	_, _ = fmt.Fprintf(e.output, "⬇️  Downloading: %s\n", url)
+	_, _ = fmt.Fprintf(e.output, "   → %s\n", path)
+
+	// Perform the download with progress tracking
+	err := e.downloadFileWithProgress(url, path, headers, auth, options)
+	if err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌ Download failed: %v\n", err)
+		return fmt.Errorf("download failed: %w", err)
+	}
+
+	// Extract archive if requested
+	if downloadStmt.ExtractTo != "" {
+		extractTo := e.interpolateVariables(downloadStmt.ExtractTo, ctx)
+		_, _ = fmt.Fprintf(e.output, "📦 Extracting archive to: %s\n", extractTo)
+
+		err = e.extractArchive(path, extractTo)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "❌ Extraction failed: %v\n", err)
+			return fmt.Errorf("extraction failed: %w", err)
+		}
+
+		_, _ = fmt.Fprintf(e.output, "✅ Extraction completed\n")
+
+		// Remove archive if requested
+		if downloadStmt.RemoveArchive {
+			_, _ = fmt.Fprintf(e.output, "🗑️  Removing archive: %s\n", path)
+			err = os.Remove(path)
+			if err != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to remove archive: %v\n", err)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "✅ Archive removed\n")
+			}
+		}
+	} else {
+		// Apply file permissions if specified (only for non-extracted files)
+		if len(downloadStmt.AllowPermissions) > 0 {
+			err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+			if err != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
+				// Don't fail the download, just warn
+			}
+		}
+	}
+
+	_, _ = fmt.Fprintf(e.output, "✅ Downloaded successfully to: %s\n", path)
+	return nil
+}
+
 // executeNetwork executes network operations (health checks, port testing, ping)
 func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *ExecutionContext) error {
 	// Interpolate variables in network statement
@@ -1676,30 +1797,59 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 
 // executeIfAvailable executes "if tool is available" and "if tool is not available" conditions
 func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
-	available := detector.IsToolAvailable(stmt.Target)
+	// Build list of all tools to check (primary + alternatives)
+	toolsToCheck := []string{stmt.Target}
+	toolsToCheck = append(toolsToCheck, stmt.Alternatives...)
 
-	// Handle negation for "not available" conditions
+	// Check availability for all tools
 	var conditionMet bool
 	var conditionText string
+
 	if stmt.Condition == "not_available" {
-		conditionMet = !available
-		conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+		// For "not available": condition is true if ANY tool is not available (OR logic)
+		conditionMet = false
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolAvailable(tool) {
+				conditionMet = true
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("any of [%s] is not available", toolNames)
+		}
 	} else {
-		conditionMet = available
-		conditionText = fmt.Sprintf("%s is available", stmt.Target)
+		// For "is available": condition is true if ALL tools are available (AND logic)
+		conditionMet = true
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolAvailable(tool) {
+				conditionMet = false
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is available", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("all of [%s] are available", toolNames)
+		}
 	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s: %t\n", conditionText, conditionMet)
 		if conditionMet {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body for %s\n", stmt.Target)
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute if body\n")
 			for _, bodyStmt := range stmt.Body {
 				if err := e.executeStatement(bodyStmt, ctx); err != nil {
 					return err
 				}
 			}
 		} else if len(stmt.ElseBody) > 0 {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body for %s\n", stmt.Target)
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute else body\n")
 			for _, elseStmt := range stmt.ElseBody {
 				if err := e.executeStatement(elseStmt, ctx); err != nil {
 					return err
@@ -2020,7 +2170,9 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+	}
 
 	return nil
 }
@@ -2268,6 +2420,50 @@ func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) str
 
 // interpolateVariablesWithError replaces {variable} placeholders with actual values and returns any undefined variable errors
 func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionContext) (string, error) {
+	// First pass: resolve ${VAR} environment variables (shell-style)
+	// Quick check: if there are no ${...} patterns, skip this phase
+	if strings.Contains(message, "${") {
+		var envUndefinedVars []string
+		message = e.envVarRegex.ReplaceAllStringFunc(message, func(match string) string {
+			// Extract content (remove ${ and })
+			content := match[2 : len(match)-1]
+
+			// Check if it has a default value (:-syntax)
+			if strings.Contains(content, ":-") {
+				parts := strings.SplitN(content, ":-", 2)
+				varName := strings.TrimSpace(parts[0])
+				defaultValue := strings.TrimSpace(parts[1])
+
+				// Try to get the environment variable
+				if value, exists := os.LookupEnv(varName); exists {
+					return value
+				}
+				// Return default if not found
+				return defaultValue
+			}
+
+			// No default value - must exist or fail
+			if value, exists := os.LookupEnv(content); exists {
+				return value
+			}
+
+			// Variable doesn't exist and no default provided
+			if !e.allowUndefinedVars {
+				envUndefinedVars = append(envUndefinedVars, content)
+			}
+			return match // Keep original if not found
+		})
+
+		// If we found undefined env vars, return error now
+		if len(envUndefinedVars) > 0 {
+			if len(envUndefinedVars) == 1 {
+				return message, fmt.Errorf("undefined environment variable: ${%s}", envUndefinedVars[0])
+			}
+			return message, fmt.Errorf("undefined environment variables: ${%s}", strings.Join(envUndefinedVars, "}, ${"))
+		}
+	}
+
+	// Second pass: resolve {$var} Drun variables
 	var undefinedVars []string
 
 	// Use cached regex for better performance
@@ -2652,10 +2848,14 @@ func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) err
 
 // executeSequentialLoop executes loop items sequentially
 func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+	}
 
 	for i, item := range items {
-		_, _ = fmt.Fprintf(e.output, "📋 Processing item %d/%d: %s\n", i+1, len(items), item)
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "📋 Processing item %d/%d: %s\n", i+1, len(items), item)
+		}
 
 		// Create a new context with the loop variable
 		loopCtx := e.createLoopContext(ctx, stmt.Variable, item)
@@ -2665,11 +2865,15 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
 				// Check for break/continue control flow
 				if breakErr, ok := err.(BreakError); ok {
-					_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+					}
 					return nil // Break out of the entire loop
 				}
 				if continueErr, ok := err.(ContinueError); ok {
-					_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+					}
 					break // Break out of the body execution, continue to next item
 				}
 				return fmt.Errorf("error processing item '%s': %v", item, err)
@@ -2677,7 +2881,9 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+	}
 	return nil
 }
 
@@ -2692,7 +2898,7 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 	failFast := stmt.FailFast
 
 	// Create parallel executor
-	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun)
+	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun, e.verbose)
 
 	// Define the execution function for each item
 	executeItem := func(body []ast.Statement, variables map[string]string) error {
@@ -2743,8 +2949,10 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 			}
 		}
 
-		_, _ = fmt.Fprintf(e.output, "⚠️  Parallel loop completed with errors: %d/%d successful\n",
-			successCount, len(items))
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Parallel loop completed with errors: %d/%d successful\n",
+				successCount, len(items))
+		}
 		return err
 	}
 
@@ -2890,14 +3098,19 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
 		}
 
-		// Split by space to get items (for our variable operations system)
+		// Check if it's an array literal or a space-separated list
 		iterableStr = strings.TrimSpace(iterableStr)
 		if iterableStr == "" {
 			_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
 			return nil
 		}
 
-		items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		// Check if it's an array literal (starts with '[' and ends with ']')
+		if strings.HasPrefix(iterableStr, "[") && strings.HasSuffix(iterableStr, "]") {
+			items = e.parseArrayLiteralString(iterableStr)
+		} else {
+			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+		}
 	} else {
 		// Check if it's a legacy direct project setting access (for backward compatibility)
 		if ctx.Project != nil && ctx.Project.Settings != nil {
@@ -3205,10 +3418,97 @@ func (e *Engine) variableExists(varName string, ctx *ExecutionContext) bool {
 	return false
 }
 
+// evaluateEnvCondition evaluates environment variable conditionals
+// Handles: "VARNAME exists", "VARNAME is "value"", "VARNAME is not empty",
+// "VARNAME exists and is not empty", "VARNAME exists and is "value""
+func (e *Engine) evaluateEnvCondition(condition string, ctx *ExecutionContext) bool {
+	condition = strings.TrimSpace(condition)
+
+	// Extract variable name first
+	var varName string
+	var rest string
+
+	// Find the first space to separate var name from the condition
+	spaceIdx := strings.Index(condition, " ")
+	if spaceIdx == -1 {
+		// No space, just the variable name (shouldn't happen in valid syntax)
+		varName = condition
+		rest = ""
+	} else {
+		varName = condition[:spaceIdx]
+		rest = strings.TrimSpace(condition[spaceIdx+1:])
+	}
+
+	// Handle compound conditions with "and" - must come after we have the varName
+	if strings.Contains(rest, " and ") {
+		parts := strings.SplitN(rest, " and ", 2)
+		if len(parts) == 2 {
+			// Evaluate first condition with varName
+			left := e.evaluateEnvConditionWithVar(varName, strings.TrimSpace(parts[0]), ctx)
+			if !left {
+				return false // Short-circuit if first condition fails
+			}
+			// Evaluate second condition with same varName
+			right := e.evaluateEnvConditionWithVar(varName, strings.TrimSpace(parts[1]), ctx)
+			return right
+		}
+	}
+
+	// Single condition evaluation
+	return e.evaluateEnvConditionWithVar(varName, rest, ctx)
+}
+
+// evaluateEnvConditionWithVar evaluates a single env condition for a given variable
+func (e *Engine) evaluateEnvConditionWithVar(varName string, condition string, ctx *ExecutionContext) bool {
+	condition = strings.TrimSpace(condition)
+
+	// Get the environment variable value
+	envValue, envExists := os.LookupEnv(varName)
+
+	// Handle "exists" check
+	if condition == "exists" || condition == "" {
+		return envExists
+	}
+
+	// Handle "is not empty" check
+	if condition == "is not empty" {
+		return envExists && strings.TrimSpace(envValue) != ""
+	}
+
+	// Handle "is empty" check
+	if condition == "is empty" {
+		return !envExists || strings.TrimSpace(envValue) == ""
+	}
+
+	// Handle "is "value"" check
+	if strings.HasPrefix(condition, "is ") && !strings.HasPrefix(condition, "is not ") {
+		expectedValue := strings.TrimSpace(condition[3:])
+		// Remove quotes if present
+		expectedValue = strings.Trim(expectedValue, "\"'")
+		return envExists && envValue == expectedValue
+	}
+
+	// Handle "is not "value"" check
+	if strings.HasPrefix(condition, "is not ") && !strings.HasPrefix(condition, "is not empty") {
+		expectedValue := strings.TrimSpace(condition[7:])
+		// Remove quotes if present
+		expectedValue = strings.Trim(expectedValue, "\"'")
+		return !envExists || envValue != expectedValue
+	}
+
+	// Default: check if environment variable exists
+	return envExists
+}
+
 // evaluateCondition evaluates condition expressions
 func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool {
 	// Simple condition evaluation
 	// Handle various patterns like "variable is value", "variable is not empty", etc.
+
+	// Handle environment variable conditionals
+	if strings.HasPrefix(condition, "env ") {
+		return e.evaluateEnvCondition(strings.TrimPrefix(condition, "env "), ctx)
+	}
 
 	// Handle "folder/directory is not empty" pattern
 	if strings.Contains(condition, " is not empty") {
@@ -3485,6 +3785,19 @@ func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) 
 			}
 			return "", fmt.Errorf("undefined variable: %s", varName)
 		}
+
+	case *ast.ArrayLiteral:
+		// Convert array literal to bracket-enclosed comma-separated string
+		// This preserves the array format so loops can properly split it
+		var elements []string
+		for _, elem := range ex.Elements {
+			val, err := e.evaluateExpression(elem, ctx)
+			if err != nil {
+				return "", err
+			}
+			elements = append(elements, val)
+		}
+		return "[" + strings.Join(elements, ",") + "]", nil
 
 	case *ast.BinaryExpression:
 		return e.evaluateBinaryExpression(ex, ctx)
@@ -3791,4 +4104,374 @@ func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *
 	default:
 		return "", fmt.Errorf("unknown builtin operation type: %s", op.Type)
 	}
+}
+
+// downloadFileWithProgress downloads a file using native Go HTTP client with progress tracking
+func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, options map[string]string) error {
+	// Create HTTP client with timeout
+	timeout := 30 * time.Second
+	if timeoutStr, exists := options["timeout"]; exists {
+		if duration, err := time.ParseDuration(timeoutStr); err == nil {
+			timeout = duration
+		}
+	}
+
+	client := &http.Client{
+		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Allow up to 10 redirects
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
+
+	// Create request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	// Add authentication
+	for authType, value := range auth {
+		switch authType {
+		case "bearer":
+			req.Header.Set("Authorization", "Bearer "+value)
+		case "basic":
+			// Basic auth in format "username:password"
+			req.Header.Set("Authorization", "Basic "+value)
+		case "token":
+			req.Header.Set("Authorization", "Token "+value)
+		}
+	}
+
+	// Perform request
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to download: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with status: %s", resp.Status)
+	}
+
+	// Create parent directories if they don't exist
+	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory: %w", err)
+		}
+	}
+
+	// Create output file
+	out, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer func() { _ = out.Close() }()
+
+	// Get content length for progress tracking
+	contentLength := resp.ContentLength
+
+	// Create progress writer
+	startTime := time.Now()
+	var downloaded int64
+	lastUpdate := time.Now()
+
+	// Create a reader that tracks progress
+	reader := io.TeeReader(resp.Body, &progressWriter{
+		total: contentLength,
+		onProgress: func(written int64) {
+			downloaded = written
+			// Update progress every 100ms to avoid overwhelming output
+			if time.Since(lastUpdate) > 100*time.Millisecond || written == contentLength {
+				lastUpdate = time.Now()
+				e.showDownloadProgress(written, contentLength, time.Since(startTime))
+			}
+		},
+	})
+
+	// Copy data
+	_, err = io.Copy(out, reader)
+	if err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	// Final progress update
+	_, _ = fmt.Fprintf(e.output, "\r\033[K") // Clear line
+
+	// Calculate final stats
+	duration := time.Since(startTime)
+	speed := float64(downloaded) / duration.Seconds()
+	_, _ = fmt.Fprintf(e.output, "   📊 %s in %s (%.2f MB/s)\n",
+		formatBytes(downloaded),
+		duration.Round(time.Millisecond),
+		speed/1024/1024)
+
+	return nil
+}
+
+// progressWriter wraps io.Writer to track progress
+type progressWriter struct {
+	total      int64
+	written    int64
+	onProgress func(int64)
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	pw.written += int64(n)
+	if pw.onProgress != nil {
+		pw.onProgress(pw.written)
+	}
+	return n, nil
+}
+
+// showDownloadProgress displays download progress with speed and ETA
+func (e *Engine) showDownloadProgress(downloaded, total int64, elapsed time.Duration) {
+	if total <= 0 {
+		// Unknown size, just show downloaded amount
+		_, _ = fmt.Fprintf(e.output, "\r   📥 Downloaded: %s", formatBytes(downloaded))
+		return
+	}
+
+	// Calculate progress percentage
+	percent := float64(downloaded) / float64(total) * 100
+
+	// Calculate speed (bytes per second)
+	speed := float64(downloaded) / elapsed.Seconds()
+
+	// Calculate ETA
+	remaining := total - downloaded
+	var eta time.Duration
+	if speed > 0 {
+		eta = time.Duration(float64(remaining)/speed) * time.Second
+	}
+
+	// Create progress bar
+	barWidth := 30
+	filled := int(float64(barWidth) * percent / 100)
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+	// Format output
+	_, _ = fmt.Fprintf(e.output, "\r   📥 [%s] %.1f%% | %s/%s | %.2f MB/s | ETA: %s",
+		bar,
+		percent,
+		formatBytes(downloaded),
+		formatBytes(total),
+		speed/1024/1024,
+		formatDuration(eta))
+}
+
+// formatBytes formats bytes into human-readable string
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// formatDuration formats duration into human-readable string
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return "0s"
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+// applyFilePermissions applies Unix file permissions based on permission specs
+func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpec) error {
+	// Get current file info
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	currentMode := info.Mode()
+	newMode := currentMode
+
+	// Build permission map
+	for _, spec := range permSpecs {
+		for _, perm := range spec.Permissions {
+			for _, target := range spec.Targets {
+				// Map permission and target to Unix file mode bits
+				var permBits os.FileMode
+				switch perm {
+				case "read":
+					switch target {
+					case "user":
+						permBits = 0400
+					case "group":
+						permBits = 0040
+					case "others":
+						permBits = 0004
+					}
+				case "write":
+					switch target {
+					case "user":
+						permBits = 0200
+					case "group":
+						permBits = 0020
+					case "others":
+						permBits = 0002
+					}
+				case "execute":
+					switch target {
+					case "user":
+						permBits = 0100
+					case "group":
+						permBits = 0010
+					case "others":
+						permBits = 0001
+					}
+				}
+
+				// Add permission bits
+				newMode |= permBits
+			}
+		}
+	}
+
+	// Apply new permissions
+	if newMode != currentMode {
+		err = os.Chmod(path, newMode)
+		if err != nil {
+			return fmt.Errorf("failed to chmod: %w", err)
+		}
+		_, _ = fmt.Fprintf(e.output, "   🔒 Set permissions: %s\n", newMode.String())
+	}
+
+	return nil
+}
+
+// extractArchive extracts an archive file to the specified directory using the archives library
+func (e *Engine) extractArchive(archivePath, extractTo string) error {
+	// Create extract directory if it doesn't exist
+	err := os.MkdirAll(extractTo, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create extract directory: %w", err)
+	}
+
+	// Open the archive file
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer func() { _ = archiveFile.Close() }()
+
+	// Identify the archive format
+	format, archiveReader, err := archives.Identify(context.Background(), archivePath, archiveFile)
+	if err != nil {
+		return fmt.Errorf("failed to identify archive format: %w", err)
+	}
+
+	// Check if it's an extractor
+	extractor, ok := format.(archives.Extractor)
+	if !ok {
+		// If it's just compressed (not archived), try to decompress it
+		if decompressor, ok := format.(archives.Decompressor); ok {
+			return e.decompressFile(decompressor, archiveReader, archivePath, extractTo)
+		}
+		return fmt.Errorf("format does not support extraction: %s", archivePath)
+	}
+
+	// Extract the archive
+	handler := func(ctx context.Context, f archives.FileInfo) error {
+		// Construct the output path
+		outputPath := filepath.Join(extractTo, f.NameInArchive)
+
+		// Handle directories
+		if f.IsDir() {
+			return os.MkdirAll(outputPath, f.Mode())
+		}
+
+		// Create parent directories
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent directory: %w", err)
+		}
+
+		// Open the file in the archive
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open file in archive: %w", err)
+		}
+		defer func() { _ = rc.Close() }()
+
+		// Create the output file
+		outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer func() { _ = outFile.Close() }()
+
+		// Copy the contents
+		if _, err := io.Copy(outFile, rc); err != nil {
+			return fmt.Errorf("failed to extract file: %w", err)
+		}
+
+		return nil
+	}
+
+	// Extract all files
+	err = extractor.Extract(context.Background(), archiveReader, handler)
+	if err != nil {
+		return fmt.Errorf("extraction failed: %w", err)
+	}
+
+	return nil
+}
+
+// decompressFile decompresses a single compressed file (not an archive)
+func (e *Engine) decompressFile(decompressor archives.Decompressor, reader io.Reader, archivePath, extractTo string) error {
+	// Open decompression reader
+	rc, err := decompressor.OpenReader(reader)
+	if err != nil {
+		return fmt.Errorf("failed to open decompressor: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	// Determine output filename by removing compression extension
+	baseName := filepath.Base(archivePath)
+	// Remove common compression extensions
+	for _, ext := range []string{".gz", ".bz2", ".xz", ".zst", ".br", ".lz4", ".sz"} {
+		if strings.HasSuffix(strings.ToLower(baseName), ext) {
+			baseName = strings.TrimSuffix(baseName, ext)
+			break
+		}
+	}
+
+	outputPath := filepath.Join(extractTo, baseName)
+
+	// Create output file
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer func() { _ = outFile.Close() }()
+
+	// Decompress
+	if _, err := io.Copy(outFile, rc); err != nil {
+		return fmt.Errorf("decompression failed: %w", err)
+	}
+
+	return nil
 }

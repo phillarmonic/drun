@@ -863,6 +863,31 @@ func (p *Parser) parseActionStatement() *ast.ActionStatement {
 
 	stmt.Message = p.curToken.Literal
 
+	// Check for optional "add line break before/after" for step actions
+	if stmt.Action == "step" {
+		for {
+			if p.peekToken.Type == lexer.ADD {
+				p.nextToken() // consume ADD
+				if p.peekToken.Type == lexer.LINE {
+					p.nextToken() // consume LINE
+					if p.peekToken.Type == lexer.BREAK {
+						p.nextToken() // consume BREAK
+						switch p.peekToken.Type {
+						case lexer.BEFORE:
+							p.nextToken() // consume BEFORE
+							stmt.LineBreakBefore = true
+						case lexer.AFTER:
+							p.nextToken() // consume AFTER
+							stmt.LineBreakAfter = true
+						}
+					}
+				}
+			} else {
+				break
+			}
+		}
+	}
+
 	return stmt
 }
 
@@ -1534,6 +1559,73 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			}
 		}
 
+		// Check for optional default value: requires env from ["dev", "staging"] defaults to "dev"
+		if p.peekToken.Type == lexer.DEFAULTS {
+			p.nextToken() // consume DEFAULTS
+			if !p.expectPeek(lexer.TO) {
+				return nil
+			}
+
+			// Parse default value - can be string, number, boolean, empty, or built-in function
+			switch p.peekToken.Type {
+			case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
+				p.nextToken()
+				stmt.DefaultValue = p.curToken.Literal
+				stmt.HasDefault = true
+			case lexer.EMPTY:
+				// Handle "empty" keyword - treat as empty string
+				p.nextToken()
+				stmt.DefaultValue = ""
+				stmt.HasDefault = true
+			case lexer.LBRACE:
+				// Handle "{builtin function}" syntax
+				p.nextToken() // consume LBRACE
+				var funcParts []string
+
+				// Read tokens until RBRACE
+				for p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.EOF {
+					p.nextToken()
+					funcParts = append(funcParts, p.curToken.Literal)
+				}
+
+				if p.peekToken.Type != lexer.RBRACE {
+					p.addError("expected '}' to close builtin function call")
+					return nil
+				}
+				p.nextToken() // consume RBRACE
+
+				// Join the function parts and store as the default value
+				stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
+				stmt.HasDefault = true
+			default:
+				p.addError(fmt.Sprintf("expected default value (string, number, boolean, empty, or built-in function), got %s", p.peekToken.Type))
+				return nil
+			}
+
+			// Validate that the default value is in the constraints list (if constraints exist)
+			if len(stmt.Constraints) > 0 {
+				// Remove quotes from default value for comparison (if it's a string literal)
+				defaultVal := stmt.DefaultValue
+				if len(defaultVal) >= 2 && defaultVal[0] == '"' && defaultVal[len(defaultVal)-1] == '"' {
+					defaultVal = defaultVal[1 : len(defaultVal)-1]
+				}
+
+				found := false
+				for _, constraint := range stmt.Constraints {
+					if constraint == defaultVal {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					p.addError(fmt.Sprintf("default value '%s' must be one of the allowed values: [%s]",
+						defaultVal, strings.Join(stmt.Constraints, ", ")))
+					return nil
+				}
+			}
+		}
+
 	case "given":
 		stmt.Required = false
 		// Expect: given name defaults to "value"
@@ -1549,10 +1641,12 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
 			p.nextToken()
 			stmt.DefaultValue = p.curToken.Literal
+			stmt.HasDefault = true
 		case lexer.EMPTY:
 			// Handle "empty" keyword - treat as empty string
 			p.nextToken()
 			stmt.DefaultValue = ""
+			stmt.HasDefault = true
 		case lexer.LBRACE:
 			// Handle "{builtin function}" syntax
 			p.nextToken() // consume LBRACE
@@ -1572,6 +1666,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 
 			// Join the function parts and store as the default value
 			stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
+			stmt.HasDefault = true
 		case lexer.CURRENT:
 			// Handle legacy "current git commit" built-in function (for backward compatibility)
 			p.nextToken() // consume CURRENT
@@ -1580,6 +1675,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 				if p.peekToken.Type == lexer.COMMIT {
 					p.nextToken() // consume COMMIT
 					stmt.DefaultValue = "current git commit"
+					stmt.HasDefault = true
 				}
 			}
 		default:
@@ -2119,7 +2215,12 @@ func (p *Parser) parseGitStatement() *ast.GitStatement {
 }
 
 // parseHTTPStatement parses HTTP operations
-func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
+func (p *Parser) parseHTTPStatement() ast.Statement {
+	// Handle DOWNLOAD as a separate statement type
+	if p.curToken.Type == lexer.DOWNLOAD {
+		return p.parseDownloadStatement()
+	}
+
 	stmt := &ast.HTTPStatement{
 		Token:   p.curToken,
 		Headers: make(map[string]string),
@@ -2301,6 +2402,192 @@ func (p *Parser) parseHTTPStatement() *ast.HTTPStatement {
 	return stmt
 }
 
+// parseDownloadStatement parses download operations
+// Syntax: download "url" to "path" [allow overwrite] [with header "..."] [timeout "..."]
+func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
+	stmt := &ast.DownloadStatement{
+		Token:   p.curToken,
+		Headers: make(map[string]string),
+		Auth:    make(map[string]string),
+		Options: make(map[string]string),
+	}
+
+	// Parse URL
+	if p.peekToken.Type == lexer.STRING {
+		p.nextToken()
+		stmt.URL = p.curToken.Literal
+	} else {
+		p.addError(fmt.Sprintf("expected URL string after 'download', got %s", p.peekToken.Type))
+		return nil
+	}
+
+	// Parse "to path" (required) then optional "extract to"
+	if p.peekToken.Type == lexer.TO {
+		p.nextToken() // consume TO
+		if p.peekToken.Type == lexer.STRING {
+			p.nextToken()
+			stmt.Path = p.curToken.Literal
+		} else {
+			p.addError(fmt.Sprintf("expected path string after 'to', got %s", p.peekToken.Type))
+			return nil
+		}
+	} else {
+		p.addError(fmt.Sprintf("expected 'to' after URL, got %s", p.peekToken.Type))
+		return nil
+	}
+
+	// Check for optional "extract to"
+	if p.peekToken.Type == lexer.EXTRACT {
+		p.nextToken() // consume EXTRACT
+		if p.peekToken.Type == lexer.TO {
+			p.nextToken() // consume TO
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.ExtractTo = p.curToken.Literal
+			} else {
+				p.addError(fmt.Sprintf("expected directory path after 'extract to', got %s", p.peekToken.Type))
+				return nil
+			}
+		} else {
+			p.addError(fmt.Sprintf("expected 'to' after 'extract', got %s", p.peekToken.Type))
+			return nil
+		}
+	}
+
+	// Parse optional modifiers (allow overwrite, allow permissions, headers, auth, timeout, etc.)
+	for {
+		switch p.peekToken.Type {
+		case lexer.ALLOW:
+			p.nextToken() // consume ALLOW
+
+			// Handle "overwrite"
+			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "overwrite" {
+				p.nextToken() // consume "overwrite"
+				stmt.AllowOverwrite = true
+			} else if p.peekToken.Type == lexer.PERMISSIONS {
+				// Handle "permissions ["read","write"] to ["user","group","others"]"
+				p.nextToken() // consume PERMISSIONS
+
+				permSpec := ast.PermissionSpec{
+					Permissions: []string{},
+					Targets:     []string{},
+				}
+
+				// Parse permissions array
+				if p.peekToken.Type == lexer.LBRACKET {
+					p.nextToken() // consume [
+
+					for {
+						if p.peekToken.Type == lexer.STRING {
+							p.nextToken()
+							perm := p.curToken.Literal
+							// Validate permission type
+							if perm == "read" || perm == "write" || perm == "execute" {
+								permSpec.Permissions = append(permSpec.Permissions, perm)
+							} else {
+								p.addError(fmt.Sprintf("invalid permission: %s (must be read, write, or execute)", perm))
+							}
+						}
+
+						if p.peekToken.Type == lexer.COMMA {
+							p.nextToken() // consume comma
+							continue
+						} else if p.peekToken.Type == lexer.RBRACKET {
+							p.nextToken() // consume ]
+							break
+						} else {
+							break
+						}
+					}
+				}
+
+				// Parse "to" keyword
+				if p.peekToken.Type == lexer.TO {
+					p.nextToken() // consume TO
+
+					// Parse targets array
+					if p.peekToken.Type == lexer.LBRACKET {
+						p.nextToken() // consume [
+
+						for {
+							if p.peekToken.Type == lexer.STRING {
+								p.nextToken()
+								target := p.curToken.Literal
+								// Validate target type
+								if target == "user" || target == "group" || target == "others" {
+									permSpec.Targets = append(permSpec.Targets, target)
+								} else {
+									p.addError(fmt.Sprintf("invalid permission target: %s (must be user, group, or others)", target))
+								}
+							}
+
+							if p.peekToken.Type == lexer.COMMA {
+								p.nextToken() // consume comma
+								continue
+							} else if p.peekToken.Type == lexer.RBRACKET {
+								p.nextToken() // consume ]
+								break
+							} else {
+								break
+							}
+						}
+					}
+				}
+
+				// Add permission spec to statement
+				stmt.AllowPermissions = append(stmt.AllowPermissions, permSpec)
+			}
+
+		case lexer.WITH:
+			p.nextToken() // consume WITH
+			switch p.peekToken.Type {
+			case lexer.HEADER:
+				p.nextToken() // consume HEADER
+				if p.peekToken.Type == lexer.STRING {
+					p.nextToken()
+					headerValue := p.curToken.Literal
+					// Parse "key: value" format
+					if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
+						key := strings.TrimSpace(headerValue[:colonIdx])
+						value := strings.TrimSpace(headerValue[colonIdx+1:])
+						stmt.Headers[key] = value
+					}
+				}
+
+			case lexer.AUTH:
+				p.nextToken() // consume AUTH
+				if p.peekToken.Type == lexer.BEARER || p.peekToken.Type == lexer.BASIC {
+					p.nextToken()
+					authType := p.curToken.Literal
+					if p.peekToken.Type == lexer.STRING {
+						p.nextToken()
+						stmt.Auth[authType] = p.curToken.Literal
+					}
+				}
+			}
+
+		case lexer.TIMEOUT, lexer.RETRY:
+			p.nextToken() // consume TIMEOUT/RETRY
+			optionKey := p.curToken.Literal
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken()
+				stmt.Options[optionKey] = p.curToken.Literal
+			}
+
+		case lexer.REMOVE:
+			p.nextToken() // consume REMOVE
+			if p.peekToken.Type == lexer.ARCHIVE {
+				p.nextToken() // consume ARCHIVE
+				stmt.RemoveArchive = true
+			}
+
+		default:
+			// No more options
+			return stmt
+		}
+	}
+}
+
 // parseDetectionStatement parses smart detection operations
 func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	stmt := &ast.DetectionStatement{
@@ -2374,6 +2661,7 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	case lexer.IF:
 		// if docker is available:
 		// if "docker buildx" is available:
+		// if docker,"docker-compose" is not available:
 		// if node version >= "16":
 		stmt.Type = "if_available"
 
@@ -2381,9 +2669,21 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
+			// Parse additional tools separated by commas
+			for p.peekToken.Type == lexer.COMMA {
+				p.nextToken() // consume COMMA
+				if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) {
+					p.nextToken()
+					stmt.Alternatives = append(stmt.Alternatives, p.curToken.Literal)
+				} else {
+					p.errors = append(p.errors, fmt.Sprintf("expected tool name after comma, got %s", p.peekToken.Type))
+					return stmt
+				}
+			}
+
 			switch p.peekToken.Type {
-			case lexer.IS:
-				p.nextToken() // consume IS
+			case lexer.IS, lexer.ARE:
+				p.nextToken() // consume IS or ARE
 				switch p.peekToken.Type {
 				case lexer.AVAILABLE:
 					p.nextToken() // consume AVAILABLE
@@ -2455,9 +2755,11 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 // isToolToken checks if a token represents a tool name
 func (p *Parser) isToolToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PYTHON, lexer.PIP,
-		lexer.GO, lexer.GOLANG, lexer.JAVA, lexer.RUBY, lexer.PHP, lexer.RUST, lexer.KUBECTL, lexer.HELM,
-		lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
+	case lexer.DOCKER, lexer.GIT, lexer.NODE, lexer.NPM, lexer.YARN, lexer.PNPM, lexer.BUN,
+		lexer.PYTHON, lexer.PIP, lexer.GO, lexer.GOLANG, lexer.CARGO,
+		lexer.JAVA, lexer.MAVEN, lexer.GRADLE, lexer.RUBY, lexer.GEM,
+		lexer.PHP, lexer.COMPOSER, lexer.RUST, lexer.MAKE,
+		lexer.KUBECTL, lexer.HELM, lexer.TERRAFORM, lexer.AWS, lexer.GCP, lexer.AZURE:
 		return true
 	default:
 		return false
@@ -2710,7 +3012,7 @@ func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 // isHTTPToken checks if a token type represents an HTTP statement
 func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS:
+	case lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.DOWNLOAD:
 		return true
 	default:
 		return false
@@ -3388,11 +3690,35 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 	// Check if next token is $variable (old syntax) or identifier (new syntax)
 	switch p.peekToken.Type {
 	case lexer.VARIABLE:
-		// Old syntax: "let $variable = value"
+		// Old syntax: "let $variable = value" or "let $variable as type to value"
 		if !p.expectPeekVariableName() {
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
+
+		// Check for optional "as type" syntax
+		if p.peekToken.Type == lexer.AS {
+			p.nextToken() // consume AS
+			// Parse type (list, string, number, etc.)
+			if p.peekToken.Type == lexer.LIST || p.isTypeToken(p.peekToken.Type) {
+				p.nextToken() // consume type
+				// Type information is not currently stored in VariableStatement
+				// but we accept it for syntax compatibility
+			} else {
+				p.addError("expected type after 'as'")
+				return nil
+			}
+
+			// Expect "to" after type
+			if !p.expectPeek(lexer.TO) {
+				return nil
+			}
+
+			// Parse the value
+			p.nextToken()
+			stmt.Value = p.parseExpression()
+			return stmt
+		}
 
 		if !p.expectPeek(lexer.EQUALS) {
 			return nil
@@ -3425,6 +3751,9 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 }
 
 // parseSetVariableStatement parses "set variable to value" statements
+// Supports: set $variable to value
+//
+//	set $variable as list to ["value1", "value2"]
 func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.VariableStatement {
 	stmt.Operation = "set"
 
@@ -3432,6 +3761,20 @@ func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.Var
 		return nil
 	}
 	stmt.Variable = p.curToken.Literal
+
+	// Check for optional "as type" syntax
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		// Parse type (list, string, number, etc.)
+		if p.peekToken.Type == lexer.LIST || p.isTypeToken(p.peekToken.Type) {
+			p.nextToken() // consume type
+			// Type information is not currently stored in VariableStatement
+			// but we accept it for syntax compatibility
+		} else {
+			p.addError("expected type after 'as'")
+			return nil
+		}
+	}
 
 	if !p.expectPeek(lexer.TO) {
 		return nil

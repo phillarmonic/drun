@@ -17,11 +17,11 @@ echo "Commit: ${COMMIT}"
 echo "Date: ${DATE}"
 echo
 
-go build -ldflags "${LDFLAGS}" -o bin/drun ./cmd/drun
+go build -ldflags "${LDFLAGS}" -o bin/drun-cli ./cmd/drun
 
-echo "✅ Build complete: bin/drun"
-echo "Test with: ./bin/drun --version"
-echo "Installing to /usr/local/bin/drun"
-sudo cp bin/drun /usr/local/bin/drun
-echo "✅ Installed to /usr/local/bin/drun"
-/usr/local/bin/drun --version
+echo "✅ Build complete: bin/drun-cli"
+echo "Test with: ./bin/drun-cli --version"
+echo "Installing to /usr/local/bin/drun-cli"
+sudo cp bin/drun-cli /usr/local/bin/drun-cli
+echo "✅ Installed to /usr/local/bin/drun-cli"
+/usr/local/bin/drun-cli --version

@@ -33,13 +33,13 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Show coverage summary (like drun test recipe)
+# Show coverage summary (like drun-cli test recipe)
 echo "📊 Coverage Summary:"
 go tool cover -func=coverage/coverage.out | tail -1
 
 # Check build with version info (like GHA)
 echo "🔨 Testing build..."
-go build -ldflags "-X main.version=ci-build -X main.commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/drun ./cmd/drun
+go build -ldflags "-X main.version=ci-build -X main.commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/drun-cli ./cmd/drun
 
 if [ $? -ne 0 ]; then
     echo "❌ Build failed!"
@@ -48,7 +48,7 @@ fi
 
 # Test basic functionality
 echo "🧪 Testing binary..."
-./bin/drun --version
+./bin/drun-cli --version
 
 if [ $? -ne 0 ]; then
     echo "❌ Binary test failed!"
@@ -56,7 +56,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Clean up
-rm -f bin/drun
+rm -f bin/drun-cli
 rm -rf coverage/
 
 echo "✅ CI tests passed!"
