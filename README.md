@@ -1,4 +1,4 @@
-# drun (do run)
+# drun-cli (do run)
 
 A **semantic, English-like** task automation language with intelligent execution, smart detection, and powerful built-in actions. Write automation tasks in natural language that compiles to efficient shell commands.
 
