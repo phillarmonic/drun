@@ -29,7 +29,7 @@ echo "=================================================="
 # Build fresh binary
 echo -e "${BLUE}📦 Building fresh drun binary...${NC}"
 cd /Users/andy/repos/phillarmonic/drun
-go build -o drun ./cmd/drun
+go build -o drun-cli ./cmd/drun
 echo -e "${GREEN}✅ Build completed${NC}"
 echo
 
