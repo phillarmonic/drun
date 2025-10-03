@@ -1,0 +1,19 @@
+version: 2.0
+
+project "include-demo" version "1.0.0":
+	# Import shared snippets and templates from another file
+	include "../shared/docker-snippets.drun"
+	
+	parameter $registry as string defaults to "ghcr.io"
+
+task "test-included-snippet" means "Test using an included snippet":
+	info "Testing included snippets..."
+	use snippet "docker.docker-login-check"
+	use snippet "docker.docker-cleanup"
+	success "Included snippets work!"
+
+task "test-included-template" means "Test using an included template":
+	info "Testing included template..."
+	call task "docker.docker-push" with image="myapp:v1.0.0" registry="{$registry}"
+	success "Included template works!"
+

@@ -232,13 +232,17 @@ func (ss *SetStatement) String() string {
 
 // IncludeStatement represents an include directive
 type IncludeStatement struct {
-	Token lexer.Token // the INCLUDE token
-	Path  string      // path to include
+	Token     lexer.Token // the INCLUDE token
+	Path      string      // path to include
+	Selectors []string    // ["snippets", "templates", "tasks"] or nil for all
 }
 
 func (is *IncludeStatement) statementNode()      {}
 func (is *IncludeStatement) projectSettingNode() {}
 func (is *IncludeStatement) String() string {
+	if len(is.Selectors) > 0 {
+		return fmt.Sprintf("include %s from %s", strings.Join(is.Selectors, ", "), is.Path)
+	}
 	return fmt.Sprintf("include %s", is.Path)
 }
 

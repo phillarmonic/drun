@@ -42,26 +42,31 @@ type Engine struct {
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
-	Parameters  map[string]*types.Value // parameter name -> typed value
-	Variables   map[string]string       // captured variables from shell commands
-	Project     *ProjectContext         // project-level settings and hooks
-	CurrentFile string                  // path to the current drun file being executed
-	CurrentTask string                  // name of the currently executing task
-	Program     *ast.Program            // the AST program being executed
+	Parameters       map[string]*types.Value // parameter name -> typed value
+	Variables        map[string]string       // captured variables from shell commands
+	Project          *ProjectContext         // project-level settings and hooks
+	CurrentFile      string                  // path to the current drun file being executed
+	CurrentTask      string                  // name of the currently executing task
+	CurrentNamespace string                  // namespace of currently executing task/template (for transitive resolution)
+	Program          *ast.Program            // the AST program being executed
 }
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name          string                                    // project name
-	Version       string                                    // project version
-	Settings      map[string]string                         // project settings (set key to value)
-	Parameters    map[string]*ast.ProjectParameterStatement // project-level shared parameters
-	Snippets      map[string]*ast.SnippetStatement          // reusable code snippets
-	BeforeHooks   []ast.Statement                           // before any task hooks
-	AfterHooks    []ast.Statement                           // after any task hooks
-	SetupHooks    []ast.Statement                           // on drun setup hooks
-	TeardownHooks []ast.Statement                           // on drun teardown hooks
-	ShellConfigs  map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
+	Name              string                                    // project name
+	Version           string                                    // project version
+	Settings          map[string]string                         // project settings (set key to value)
+	Parameters        map[string]*ast.ProjectParameterStatement // project-level shared parameters
+	Snippets          map[string]*ast.SnippetStatement          // reusable code snippets
+	BeforeHooks       []ast.Statement                           // before any task hooks
+	AfterHooks        []ast.Statement                           // after any task hooks
+	SetupHooks        []ast.Statement                           // on drun setup hooks
+	TeardownHooks     []ast.Statement                           // on drun teardown hooks
+	ShellConfigs      map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
+	IncludedSnippets  map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
+	IncludedTemplates map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
+	IncludedTasks     map[string]*ast.TaskStatement             // namespaced tasks: "docker.deploy"
+	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
 }
 
 // NewEngine creates a new v2 execution engine
@@ -139,7 +144,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	ctx := &ExecutionContext{
 		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
 		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
-		Project:     e.createProjectContext(program.Project),
+		Project:     e.createProjectContext(program.Project, currentFile),
 		CurrentFile: currentFile,
 		Program:     program,
 	}
@@ -308,22 +313,26 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 }
 
 // createProjectContext creates a project context from the project statement
-func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectContext {
+func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) *ProjectContext {
 	if project == nil {
 		return nil
 	}
 
 	ctx := &ProjectContext{
-		Name:          project.Name,
-		Version:       project.Version,
-		Settings:      make(map[string]string, 8),                         // Pre-allocate for typical settings count
-		Parameters:    make(map[string]*ast.ProjectParameterStatement, 8), // Pre-allocate for project parameters
-		Snippets:      make(map[string]*ast.SnippetStatement, 8),          // Pre-allocate for snippets
-		BeforeHooks:   make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
-		AfterHooks:    make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
-		SetupHooks:    make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
-		TeardownHooks: make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
-		ShellConfigs:  make(map[string]*ast.PlatformShellConfig, 4),       // Pre-allocate for typical platform count
+		Name:              project.Name,
+		Version:           project.Version,
+		Settings:          make(map[string]string, 8),                         // Pre-allocate for typical settings count
+		Parameters:        make(map[string]*ast.ProjectParameterStatement, 8), // Pre-allocate for project parameters
+		Snippets:          make(map[string]*ast.SnippetStatement, 8),          // Pre-allocate for snippets
+		BeforeHooks:       make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
+		AfterHooks:        make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
+		SetupHooks:        make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
+		TeardownHooks:     make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
+		ShellConfigs:      make(map[string]*ast.PlatformShellConfig, 4),       // Pre-allocate for typical platform count
+		IncludedSnippets:  make(map[string]*ast.SnippetStatement, 16),         // Pre-allocate for included snippets
+		IncludedTemplates: make(map[string]*ast.TaskTemplateStatement, 16),    // Pre-allocate for included templates
+		IncludedTasks:     make(map[string]*ast.TaskStatement, 16),            // Pre-allocate for included tasks
+		IncludedFiles:     make(map[string]bool, 4),                           // Pre-allocate for included files
 	}
 
 	// Process project settings
@@ -356,6 +365,9 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 			for platform, config := range s.Platforms {
 				ctx.ShellConfigs[platform] = config
 			}
+		case *ast.IncludeStatement:
+			// Process include statement
+			e.processInclude(ctx, s, currentFile)
 		}
 	}
 
@@ -550,9 +562,16 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 	// Find the task or template to call
 	var targetTask *ast.TaskStatement
 
-	// First check if it's a template
-	for _, template := range ctx.Program.Templates {
-		if template.Name == callStmt.TaskName {
+	var taskNamespace string // Track the namespace for transitive resolution
+
+	// Check if it's a namespaced reference (contains dot)
+	if strings.Contains(callStmt.TaskName, ".") && ctx.Project != nil {
+		// Extract namespace from the task name (e.g., "docker.build" -> "docker")
+		parts := strings.SplitN(callStmt.TaskName, ".", 2)
+		taskNamespace = parts[0]
+
+		// First check included templates
+		if template, exists := ctx.Project.IncludedTemplates[callStmt.TaskName]; exists {
 			// Convert template to task for execution
 			targetTask = &ast.TaskStatement{
 				Token:       template.Token,
@@ -561,16 +580,33 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 				Parameters:  template.Parameters,
 				Body:        template.Body,
 			}
-			break
+		} else if task, exists := ctx.Project.IncludedTasks[callStmt.TaskName]; exists {
+			// Check included tasks
+			targetTask = task
 		}
-	}
-
-	// If not a template, check regular tasks
-	if targetTask == nil {
-		for _, task := range ctx.Program.Tasks {
-			if task.Name == callStmt.TaskName {
-				targetTask = task
+	} else {
+		// Local task/template - check local templates first
+		for _, template := range ctx.Program.Templates {
+			if template.Name == callStmt.TaskName {
+				// Convert template to task for execution
+				targetTask = &ast.TaskStatement{
+					Token:       template.Token,
+					Name:        template.Name,
+					Description: template.Description,
+					Parameters:  template.Parameters,
+					Body:        template.Body,
+				}
 				break
+			}
+		}
+
+		// If not a template, check regular tasks
+		if targetTask == nil {
+			for _, task := range ctx.Program.Tasks {
+				if task.Name == callStmt.TaskName {
+					targetTask = task
+					break
+				}
 			}
 		}
 	}
@@ -581,12 +617,13 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 
 	// Create a new execution context for the called task
 	callCtx := &ExecutionContext{
-		Parameters:  make(map[string]*types.Value, 8),
-		Variables:   make(map[string]string, 16),
-		Project:     ctx.Project,
-		CurrentFile: ctx.CurrentFile,
-		CurrentTask: callStmt.TaskName,
-		Program:     ctx.Program,
+		Parameters:       make(map[string]*types.Value, 8),
+		Variables:        make(map[string]string, 16),
+		Project:          ctx.Project,
+		CurrentFile:      ctx.CurrentFile,
+		CurrentTask:      callStmt.TaskName,
+		CurrentNamespace: taskNamespace, // Set namespace for transitive resolution
+		Program:          ctx.Program,
 	}
 
 	// Copy current variables to the new context
@@ -620,11 +657,30 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 	}
 
 	// Find the snippet in the project context
-	if ctx.Project == nil || ctx.Project.Snippets == nil {
+	if ctx.Project == nil {
 		return fmt.Errorf("snippet '%s' not found: no project context", useStmt.SnippetName)
 	}
 
-	snippet, exists := ctx.Project.Snippets[useStmt.SnippetName]
+	var snippet *ast.SnippetStatement
+	var exists bool
+
+	// Check if it's a namespaced reference (contains dot)
+	if strings.Contains(useStmt.SnippetName, ".") {
+		// Look in included snippets
+		snippet, exists = ctx.Project.IncludedSnippets[useStmt.SnippetName]
+	} else {
+		// Try current namespace first (for transitive resolution)
+		if ctx.CurrentNamespace != "" {
+			namespacedName := ctx.CurrentNamespace + "." + useStmt.SnippetName
+			snippet, exists = ctx.Project.IncludedSnippets[namespacedName]
+		}
+
+		// If not found in namespace, look in local snippets
+		if !exists {
+			snippet, exists = ctx.Project.Snippets[useStmt.SnippetName]
+		}
+	}
+
 	if !exists {
 		return fmt.Errorf("snippet '%s' not found", useStmt.SnippetName)
 	}
@@ -4839,4 +4895,136 @@ func (e *Engine) decompressFile(decompressor archives.Decompressor, reader io.Re
 	}
 
 	return nil
+}
+
+// processInclude loads and merges an included file into the project context
+func (e *Engine) processInclude(ctx *ProjectContext, include *ast.IncludeStatement, currentFile string) {
+	// Resolve the include path relative to the current file
+	includePath := e.resolveIncludePath(include.Path, currentFile)
+
+	// Check for circular includes
+	if ctx.IncludedFiles[includePath] {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Circular include detected: %s (skipping)\n", includePath)
+		}
+		return
+	}
+
+	// Mark this file as included
+	ctx.IncludedFiles[includePath] = true
+
+	// Load and parse the included file
+	content, err := os.ReadFile(includePath)
+	if err != nil {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Failed to read included file %s: %v\n", includePath, err)
+		}
+		return
+	}
+
+	// Parse the included file
+	program, err := ParseStringWithFilename(string(content), includePath)
+	if err != nil {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Failed to parse included file %s: %v\n", includePath, err)
+		}
+		return
+	}
+
+	// Extract the namespace from the included project
+	if program.Project == nil {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Included file %s has no project declaration (skipping)\n", includePath)
+		}
+		return
+	}
+
+	namespace := program.Project.Name
+
+	// Determine what to include based on selectors
+	includeAll := len(include.Selectors) == 0
+	includeSnippets := includeAll
+	includeTemplates := includeAll
+	includeTasks := includeAll
+
+	for _, selector := range include.Selectors {
+		switch selector {
+		case "snippets":
+			includeSnippets = true
+		case "templates":
+			includeTemplates = true
+		case "tasks":
+			includeTasks = true
+		}
+	}
+
+	// Merge snippets from the included project
+	if includeSnippets && program.Project != nil {
+		for _, setting := range program.Project.Settings {
+			if snippet, ok := setting.(*ast.SnippetStatement); ok {
+				namespacedName := namespace + "." + snippet.Name
+				ctx.IncludedSnippets[namespacedName] = snippet
+				if e.verbose {
+					_, _ = fmt.Fprintf(e.output, "  ✓ Loaded snippet: %s\n", namespacedName)
+				}
+			}
+		}
+	}
+
+	// Merge templates
+	if includeTemplates {
+		for _, template := range program.Templates {
+			namespacedName := namespace + "." + template.Name
+			ctx.IncludedTemplates[namespacedName] = template
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "  ✓ Loaded template: %s\n", namespacedName)
+			}
+		}
+	}
+
+	// Merge tasks
+	if includeTasks {
+		for _, task := range program.Tasks {
+			namespacedName := namespace + "." + task.Name
+			ctx.IncludedTasks[namespacedName] = task
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "  ✓ Loaded task: %s\n", namespacedName)
+			}
+		}
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "✓ Included %s as namespace '%s'\n", include.Path, namespace)
+	}
+}
+
+// resolveIncludePath resolves the include path relative to the current file
+func (e *Engine) resolveIncludePath(includePath, currentFile string) string {
+	// If absolute path, use as-is
+	if filepath.IsAbs(includePath) {
+		return includePath
+	}
+
+	// Get the directory of the current file
+	currentDir := filepath.Dir(currentFile)
+
+	// Try relative to current file first
+	resolvedPath := filepath.Join(currentDir, includePath)
+	if _, err := os.Stat(resolvedPath); err == nil {
+		// Make it absolute
+		absPath, _ := filepath.Abs(resolvedPath)
+		return absPath
+	}
+
+	// Try relative to workspace root (current working directory)
+	if cwd, err := os.Getwd(); err == nil {
+		resolvedPath = filepath.Join(cwd, includePath)
+		if _, err := os.Stat(resolvedPath); err == nil {
+			absPath, _ := filepath.Abs(resolvedPath)
+			return absPath
+		}
+	}
+
+	// Fall back to the original path (will likely fail when reading)
+	return includePath
 }

@@ -45,6 +45,11 @@ const (
 	INCLUDES  // includes
 	USE       // use
 
+	// Import selectors (plural forms)
+	SNIPPETS  // snippets
+	TEMPLATES // templates
+	TASKS     // tasks
+
 	// Docker keywords
 	DOCKER    // docker
 	IMAGE     // image
@@ -428,6 +433,12 @@ func (t TokenType) String() string {
 		return "INCLUDES"
 	case USE:
 		return "USE"
+	case SNIPPETS:
+		return "SNIPPETS"
+	case TEMPLATES:
+		return "TEMPLATES"
+	case TASKS:
+		return "TASKS"
 	case DOCKER:
 		return "DOCKER"
 	case IMAGE:
@@ -996,6 +1007,9 @@ var keywords = map[string]TokenType{
 	"uses":        USES,
 	"includes":    INCLUDES,
 	"use":         USE,
+	"snippets":    SNIPPETS,
+	"templates":   TEMPLATES,
+	"tasks":       TASKS,
 	"docker":      DOCKER,
 	"image":       IMAGE,
 	"container":   CONTAINER,

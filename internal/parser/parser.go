@@ -285,8 +285,46 @@ func (p *Parser) parseSetStatement() *ast.SetStatement {
 func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 	stmt := &ast.IncludeStatement{Token: p.curToken}
 
+	p.nextToken() // move past 'include'
+
+	// Check for selective import: include snippets, templates from "path"
+	// or basic import: include "path"
+	if p.curToken.Type == lexer.SNIPPETS || p.curToken.Type == lexer.TEMPLATES || p.curToken.Type == lexer.TASKS {
+		// Parse selectors
+		for {
+			switch p.curToken.Type {
+			case lexer.SNIPPETS:
+				stmt.Selectors = append(stmt.Selectors, "snippets")
+			case lexer.TEMPLATES:
+				stmt.Selectors = append(stmt.Selectors, "templates")
+			case lexer.TASKS:
+				stmt.Selectors = append(stmt.Selectors, "tasks")
+			default:
+				p.addError(fmt.Sprintf("unexpected token in include statement: %s", p.curToken.Type))
+				return nil
+			}
+
+			p.nextToken()
+
+			// Check for comma (more selectors) or FROM
+			if p.curToken.Type == lexer.COMMA {
+				p.nextToken() // skip comma
+				continue
+			}
+			break
+		}
+
+		// Expect FROM keyword
+		if p.curToken.Type != lexer.FROM {
+			p.addError(fmt.Sprintf("expected FROM after selectors, got %s", p.curToken.Type))
+			return nil
+		}
+		p.nextToken()
+	}
+
 	// Expect path (string)
-	if !p.expectPeek(lexer.STRING) {
+	if p.curToken.Type != lexer.STRING {
+		p.addError(fmt.Sprintf("expected string path, got %s", p.curToken.Type))
 		return nil
 	}
 	stmt.Path = p.curToken.Literal

@@ -2611,14 +2611,182 @@ The code reuse features provide several key benefits:
 6. **Type Safety**: Full validation on all parameters
 7. **Composition**: Combine features for powerful workflows
 
+### Namespaced Includes
+
+Namespaced includes allow you to import snippets, templates, and tasks from external `.drun` files, enabling true code sharing across projects. Each included file gets its own namespace (derived from its project name) to prevent naming collisions.
+
+#### Basic Syntax
+
+```drun
+project "myapp":
+    # Include everything from a file
+    include "shared/docker.drun"
+    
+    # Selective includes
+    include snippets from "shared/utils.drun"
+    include templates from "shared/k8s.drun"
+    include tasks from "shared/common.drun"
+    
+    # Multiple selectors
+    include snippets, templates from "shared/helpers.drun"
+```
+
+#### Namespace Resolution
+
+The namespace is automatically derived from the `project` declaration in the included file:
+
+```drun
+# shared/docker.drun
+project "docker":
+    snippet "login-check":
+        if env DOCKER_AUTH exists:
+            info "✓ Docker authenticated"
+        else:
+            warn "⚠ No Docker authentication"
+    
+    template task "build":
+        given $image defaults to "app:latest"
+        info "Building {$image}..."
+
+# main.drun
+project "myapp":
+    include "shared/docker.drun"
+
+task "deploy":
+    use snippet "docker.login-check"    # namespace.element
+    call task "docker.build"             # namespace.task
+```
+
+#### Transitive Resolution
+
+When an included element references another element from the same file, it's automatically resolved within that namespace:
+
+```drun
+# shared/docker.drun
+project "docker":
+    snippet "login-check":
+        info "Checking auth..."
+    
+    template task "push":
+        given $image
+        use snippet "login-check"    # No namespace needed within same file
+        info "Pushing {$image}..."
+
+# main.drun
+project "myapp":
+    include "shared/docker.drun"
+
+task "deploy":
+    call task "docker.push" with image="myapp:v1"
+    # ✓ Works! docker.push automatically finds docker.login-check
+```
+
+#### Path Resolution
+
+Include paths are resolved in the following order:
+
+1. **Relative to current file**: `../shared/docker.drun` 
+2. **Relative to workspace root**: `shared/docker.drun`
+3. **Absolute path**: `/absolute/path/docker.drun`
+
+#### Circular Include Detection
+
+drun automatically detects and prevents circular includes:
+
+```drun
+# main.drun includes docker.drun
+# docker.drun includes utils.drun
+# utils.drun includes docker.drun  ← Circular! Will be skipped
+```
+
+#### Complete Example
+
+```drun
+# shared/docker.drun
+version: 2.0
+
+project "docker":
+    parameter $registry as string defaults to "docker.io"
+    
+    snippet "login-check":
+        if env DOCKER_AUTH exists:
+            info "✓ Authenticated with {$registry}"
+        else:
+            warn "⚠ No authentication for {$registry}"
+    
+    snippet "cleanup":
+        info "Cleaning up Docker resources..."
+    
+    template task "build":
+        given $target defaults to "prod"
+        given $image defaults to "app:latest"
+        
+        step "Building Docker image"
+        use snippet "login-check"
+        info "docker build --target={$target} -t {$image} ."
+        use snippet "cleanup"
+        success "Built {$image}"
+    
+    template task "push":
+        given $image defaults to "app:latest"
+        
+        step "Pushing to registry"
+        use snippet "login-check"
+        info "docker push {$registry}/{$image}"
+        success "Pushed {$image}"
+
+# main.drun
+version: 2.0
+
+project "myapp":
+    include "shared/docker.drun"
+    
+    parameter $version as string defaults to "1.0.0"
+
+task "build:web":
+    call task "docker.build" with target="web" image="myapp:web-{$version}"
+
+task "build:api":
+    call task "docker.build" with target="api" image="myapp:api-{$version}"
+
+task "deploy":
+    call task "build:web"
+    call task "build:api"
+    call task "docker.push" with image="myapp:web-{$version}"
+    call task "docker.push" with image="myapp:api-{$version}"
+```
+
+#### Key Features
+
+- **Namespace Safety**: No naming collisions between included files
+- **Dot Notation**: Clean, familiar syntax for referencing included elements
+- **Selective Imports**: Import only what you need (`snippets`, `templates`, `tasks`)
+- **Transitive Resolution**: Included elements automatically resolve their dependencies
+- **Path Flexibility**: Relative, workspace, and absolute path support
+- **Circular Detection**: Automatic prevention of circular includes
+- **Verbose Logging**: Use `-v` flag to see what's being included
+
+#### Benefits
+
+1. **Code Sharing**: Share common workflows across multiple projects
+2. **Library Pattern**: Create reusable "library" files for different domains (docker, k8s, git, etc.)
+3. **Team Standards**: Enforce consistent patterns across team projects
+4. **DRY at Scale**: Eliminate duplication not just within a project, but across all projects
+5. **Maintainability**: Update shared logic once, affects all users
+6. **Namespace Safety**: Clear ownership and no conflicts
+
 ### Best Practices
 
 1. **Use Project Parameters for Global Config**: Things like registry URLs, environment, cache settings
 2. **Use Snippets for Common Sequences**: Logging, cleanup, environment checks
 3. **Use Templates for Repeated Patterns**: Build tasks, test tasks, deployment tasks
-4. **Meaningful Names**: Choose descriptive names for snippets and templates
-5. **Documentation**: Add comments explaining what each reusable component does
-6. **Defaults**: Always provide sensible defaults for template parameters
+4. **Use Includes for Cross-Project Sharing**: Create shared library files for common domains (Docker, Kubernetes, Git)
+5. **Meaningful Names**: Choose descriptive names for snippets and templates
+6. **Namespace Organization**: Group related snippets/templates in a single file with a clear project name
+7. **Selective Imports**: Use `include snippets from` when you only need specific types of elements
+8. **Documentation**: Add comments explaining what each reusable component does
+9. **Defaults**: Always provide sensible defaults for template parameters
+10. **Library Structure**: Organize shared files in a `shared/` directory for clarity
 
 ---
 

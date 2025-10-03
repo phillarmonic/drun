@@ -52,37 +52,6 @@ task "build:api" means "Build API server image":
 	call task "docker-build" with target="api" tag="myapp:api"
 	use snippet "cleanup"
 
-task "build:worker" means "Build worker image":
-	info "=== Building Worker ==="
-	call task "docker-build" with target="worker" tag="myapp:worker"
-	use snippet "cleanup"
-
-# Task calling template with partial overrides (tag uses default)
-task "build:base" means "Build base image":
-	info "=== Building Base Image ==="
-	call task "docker-build" with target="base"
-
-# Comprehensive build task
-task "build:all" means "Build all Docker images":
-	info "════════════════════════════════════════"
-	info "  Building All Application Images"
-	info "════════════════════════════════════════"
-	info ""
-	
-	call task "build:base"
-	info ""
-	call task "build:web"
-	info ""
-	call task "build:api"
-	info ""
-	call task "build:worker"
-	info ""
-	
-	success "✨ All images built successfully!"
-	info ""
-	info "Try running with custom parameters:"
-	info "  drun build:web environment=prod registry=gcr.io"
-
 task "default" means "Show usage information":
 	info "╔════════════════════════════════════════════╗"
 	info "║  drun Code Reuse Features Demo            ║"
@@ -92,10 +61,6 @@ task "default" means "Show usage information":
 	info "  config        - Show configuration"
 	info "  build:web     - Build web image"
 	info "  build:api     - Build API image"
-	info "  build:worker  - Build worker image"
-	info "  build:base    - Build base image"
-	info "  build:all     - Build all images"
 	info ""
 	info "Example with parameters:"
-	info "  drun build:web environment=prod no_cache=true"
-
+	info "  xdrun build:web environment=prod no_cache=true"

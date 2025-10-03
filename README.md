@@ -40,7 +40,7 @@ task "hello":
 
 ### 🌟 **Advanced Features**
 
-- **♻️ Code Reuse**: Project-level parameters, reusable snippets, and task templates for DRY automation ⭐ *New*
+- **♻️ Code Reuse**: Project-level parameters, reusable snippets, task templates, and namespaced includes for DRY automation ⭐ *New*
 - **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
 - **📞 Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
@@ -92,7 +92,7 @@ drun includes powerful built-in functions for common operations:
 - `{current git commit}` - Get full commit hash
 - `{current git commit('short')}` - Get short commit hash
 
-#### **Progress & Timing** ⭐ *New*
+#### **Progress & Timing** *New*
 
 - `{start progress('message')}` - Start a progress indicator
 - `{update progress('50', 'message')}` - Update progress with percentage and message
@@ -448,7 +448,7 @@ xdrun deploy environment=staging version=v1.1.0 features=auth,ui
 xdrun deploy environment=prod version=v1.2.0 force=true
 ```
 
-### The `empty` Keyword ⭐ *New*
+### The `empty` Keyword
 
 The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
 
@@ -1316,6 +1316,40 @@ task "build:worker":
   call task "docker-build" with target="worker" tag="myapp:worker"
 ```
 
+#### Namespaced Includes ⭐ *New*
+
+Share code across projects with automatic namespace resolution:
+
+```drun
+# shared/docker.drun
+project "docker":
+  snippet "login-check":
+    if env DOCKER_AUTH exists:
+      info "✓ Docker authenticated"
+  
+  template task "push":
+    given $image defaults to "app:latest"
+    use snippet "login-check"    # No namespace needed within same file!
+    info "Pushing {$image}..."
+
+# main.drun
+project "myapp":
+  include "shared/docker.drun"
+
+task "deploy":
+  use snippet "docker.login-check"    # ✨ Elegant dot notation
+  call task "docker.push" with image="myapp:v1"
+```
+
+**Selective imports** for fine-grained control:
+
+```drun
+project "myapp":
+  include snippets from "shared/utils.drun"
+  include templates from "shared/k8s.drun"
+  include snippets, templates from "shared/common.drun"
+```
+
 **Benefits:**
 
 - **♻️ DRY Principle**: Eliminate duplication across tasks
@@ -1323,6 +1357,8 @@ task "build:worker":
 - **🎯 Type-Safe**: Full validation on all parameters
 - **📝 Readable**: Clear, semantic names for reusable components
 - **🔀 Flexible**: Mix and match project parameters, snippets, and templates
+- **🌐 Cross-Project Sharing**: Share workflows across multiple projects with includes
+- **🔒 Namespace Safety**: Dot notation prevents naming collisions
 
 **See it in action:**
 

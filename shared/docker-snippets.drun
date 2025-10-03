@@ -1,0 +1,25 @@
+version: 2.0
+
+# This file contains reusable Docker-related snippets and templates
+# Can be included in other drun files
+
+project "docker":
+	snippet "docker-login-check":
+		if env DOCKER_AUTH exists:
+			info "✓ Docker authentication configured"
+		else:
+			warn "⚠ No Docker authentication found"
+	
+	snippet "docker-cleanup":
+		info "Cleaning up Docker resources..."
+		info "Done with cleanup"
+
+template task "docker-push":
+	given $image defaults to "myapp:latest"
+	given $registry defaults to "docker.io"
+	
+	step "Pushing {$image} to {$registry}"
+	use snippet "docker-login-check"
+	info "docker push {$registry}/{$image}"
+	success "Pushed {$image}"
+
