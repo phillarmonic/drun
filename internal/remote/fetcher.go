@@ -23,7 +23,24 @@ type Fetcher interface {
 //
 //	github:owner/repo/path/file.drun@main -> "github", "owner/repo/path/file.drun", "main"
 //	https://example.com/file.drun -> "https", "https://example.com/file.drun", ""
+//	drunhub:ops/docker -> "drunhub", "ops/docker", ""
 func ParseRemoteURL(url string) (protocol, path, ref string, err error) {
+	// Check for drunhub protocol
+	if strings.HasPrefix(url, "drunhub:") {
+		protocol = "drunhub"
+		rest := strings.TrimPrefix(url, "drunhub:")
+
+		// Check for @ref (optional)
+		if idx := strings.Index(rest, "@"); idx != -1 {
+			path = rest[:idx]
+			ref = rest[idx+1:]
+		} else {
+			path = rest
+			ref = ""
+		}
+		return protocol, path, ref, nil
+	}
+
 	// Check for GitHub protocol
 	if strings.HasPrefix(url, "github:") {
 		protocol = "github"
@@ -58,7 +75,7 @@ func ParseRemoteURL(url string) (protocol, path, ref string, err error) {
 
 // IsRemoteURL checks if a URL is a remote include
 func IsRemoteURL(url string) bool {
-	return strings.HasPrefix(url, "github:") || strings.HasPrefix(url, "https://")
+	return strings.HasPrefix(url, "github:") || strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "drunhub:")
 }
 
 // GitHubFetcher fetches content from GitHub repositories
@@ -282,4 +299,64 @@ func (h *HTTPSFetcher) Fetch(ctx context.Context, url, _ string) ([]byte, error)
 	}
 
 	return content, nil
+}
+
+// DrunhubFetcher fetches content from the drunhub standard library repository
+type DrunhubFetcher struct {
+	githubFetcher  *GitHubFetcher
+	ignoredFolders map[string]bool
+}
+
+// NewDrunhubFetcher creates a new drunhub fetcher
+func NewDrunhubFetcher(githubFetcher *GitHubFetcher) *DrunhubFetcher {
+	// Default ignored folders
+	ignoredFolders := map[string]bool{
+		"docs":    true,
+		".github": true,
+	}
+
+	return &DrunhubFetcher{
+		githubFetcher:  githubFetcher,
+		ignoredFolders: ignoredFolders,
+	}
+}
+
+// SetIgnoredFolders sets the list of folders to ignore from drunhub
+func (d *DrunhubFetcher) SetIgnoredFolders(folders []string) {
+	d.ignoredFolders = make(map[string]bool, len(folders))
+	for _, folder := range folders {
+		d.ignoredFolders[folder] = true
+	}
+}
+
+// AddIgnoredFolder adds a folder to the ignore list
+func (d *DrunhubFetcher) AddIgnoredFolder(folder string) {
+	d.ignoredFolders[folder] = true
+}
+
+// Protocol returns the protocol identifier
+func (d *DrunhubFetcher) Protocol() string {
+	return "drunhub"
+}
+
+// Fetch retrieves content from the drunhub repository
+// path format: "ops/docker" -> translates to phillarmonic/drun-hub/ops/docker.drun
+func (d *DrunhubFetcher) Fetch(ctx context.Context, path, ref string) ([]byte, error) {
+	// Check if the path starts with an ignored folder
+	for ignoredFolder := range d.ignoredFolders {
+		if strings.HasPrefix(path, ignoredFolder+"/") || path == ignoredFolder {
+			return nil, fmt.Errorf("access to folder '%s' is not allowed from drunhub", ignoredFolder)
+		}
+	}
+
+	// Add .drun extension if not present
+	if !strings.HasSuffix(path, ".drun") {
+		path = path + ".drun"
+	}
+
+	// Convert to GitHub path: phillarmonic/drun-hub/{path}
+	githubPath := fmt.Sprintf("phillarmonic/drun-hub/%s", path)
+
+	// Use the GitHub fetcher to retrieve the content
+	return d.githubFetcher.Fetch(ctx, githubPath, ref)
 }

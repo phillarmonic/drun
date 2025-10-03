@@ -2813,6 +2813,67 @@ project "myapp":
     include "https://example.com/shared/tasks.drun"
 ```
 
+#### Drunhub Standard Library
+
+Drunhub is the official standard library repository at `https://github.com/phillarmonic/drun-hub` containing reusable templates, snippets, and tasks organized by category. Import from drunhub using the `drunhub:` protocol:
+
+```drun
+project "myapp":
+    # Import from drunhub - uses project name as namespace
+    include from drunhub "ops/docker"
+    
+    # Import with custom namespace (overrides project name)
+    include from drunhub "ops/kubernetes" as k8s
+    
+    # Import from nested folders
+    include from drunhub "utils/logging/advanced" as log
+    
+    # Import from specific branch/tag
+    include from drunhub "ops/docker@v1.0" as ops
+```
+
+**Key Features**:
+
+- **Automatic `.drun` extension**: No need to add `.drun` extension
+- **Custom namespaces**: Override default project names with `as` clause
+- **Folder protection**: Certain folders like `docs` and `.github` are blocked for security
+- **Same caching**: Uses the same smart caching as other remote includes
+
+**Example Usage**:
+
+```drun
+version: 2.0
+
+project "deploy-app":
+    # Import Docker utilities as "ops" namespace
+    include from drunhub "ops/docker" as ops
+    
+    # Import Kubernetes helpers
+    include from drunhub "ops/kubernetes" as k8s
+
+task "deploy":
+    # Use snippet from ops namespace
+    use snippet "ops.check-docker"
+    
+    # Call task from k8s namespace
+    call task "k8s.deploy" with namespace="production" replicas=3
+    
+    success "✓ Deployed successfully!"
+```
+
+**Custom Namespaces with Traditional Includes**:
+
+The `as` clause also works with regular includes:
+
+```drun
+project "myapp":
+    # Override namespace from included file
+    include "shared/docker-utils.drun" as docker
+    
+    # Now use docker.* instead of the original project name
+    use snippet "docker.build"
+```
+
 #### Smart Caching
 
 Remote includes are automatically cached to `~/.drun/cache.solo` with:

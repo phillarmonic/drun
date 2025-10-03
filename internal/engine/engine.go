@@ -36,10 +36,11 @@ type Engine struct {
 	allowUndefinedVars bool
 
 	// Remote includes support
-	cacheManager  *cache.Manager
-	githubFetcher *remote.GitHubFetcher
-	httpsFetcher  *remote.HTTPSFetcher
-	tempFiles     []string // Track temp files for cleanup
+	cacheManager   *cache.Manager
+	githubFetcher  *remote.GitHubFetcher
+	httpsFetcher   *remote.HTTPSFetcher
+	drunhubFetcher *remote.DrunhubFetcher
+	tempFiles      []string // Track temp files for cleanup
 
 	// Cached regex patterns for performance
 	interpolationRegex *regexp.Regexp
@@ -82,12 +83,14 @@ func NewEngine(output io.Writer) *Engine {
 	if output == nil {
 		output = os.Stdout
 	}
+	githubFetcher := remote.NewGitHubFetcher()
 	return &Engine{
-		output:        output,
-		dryRun:        false,
-		githubFetcher: remote.NewGitHubFetcher(),
-		httpsFetcher:  remote.NewHTTPSFetcher(),
-		tempFiles:     []string{},
+		output:         output,
+		dryRun:         false,
+		githubFetcher:  githubFetcher,
+		httpsFetcher:   remote.NewHTTPSFetcher(),
+		drunhubFetcher: remote.NewDrunhubFetcher(githubFetcher),
+		tempFiles:      []string{},
 
 		// Pre-compile regex patterns for performance
 		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
@@ -4978,7 +4981,11 @@ func (e *Engine) processInclude(ctx *ProjectContext, include *ast.IncludeStateme
 		return
 	}
 
-	namespace := program.Project.Name
+	// Use custom namespace if provided via "as" clause, otherwise use project name
+	namespace := include.Namespace
+	if namespace == "" {
+		namespace = program.Project.Name
+	}
 
 	// Determine what to include based on selectors
 	includeAll := len(include.Selectors) == 0
@@ -5103,6 +5110,8 @@ func (e *Engine) fetchRemoteInclude(url string) (string, error) {
 		fetcher = e.githubFetcher
 	case "https":
 		fetcher = e.httpsFetcher
+	case "drunhub":
+		fetcher = e.drunhubFetcher
 	default:
 		return "", fmt.Errorf("unsupported protocol: %s", protocol)
 	}

@@ -235,15 +235,22 @@ type IncludeStatement struct {
 	Token     lexer.Token // the INCLUDE token
 	Path      string      // path to include
 	Selectors []string    // ["snippets", "templates", "tasks"] or nil for all
+	Namespace string      // custom namespace (from "as" clause), empty if not specified
 }
 
 func (is *IncludeStatement) statementNode()      {}
 func (is *IncludeStatement) projectSettingNode() {}
 func (is *IncludeStatement) String() string {
+	var out strings.Builder
 	if len(is.Selectors) > 0 {
-		return fmt.Sprintf("include %s from %s", strings.Join(is.Selectors, ", "), is.Path)
+		out.WriteString(fmt.Sprintf("include %s from %s", strings.Join(is.Selectors, ", "), is.Path))
+	} else {
+		out.WriteString(fmt.Sprintf("include %s", is.Path))
 	}
-	return fmt.Sprintf("include %s", is.Path)
+	if is.Namespace != "" {
+		out.WriteString(fmt.Sprintf(" as %s", is.Namespace))
+	}
+	return out.String()
 }
 
 // ShellConfigStatement represents shell configuration for different platforms

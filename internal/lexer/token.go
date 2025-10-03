@@ -49,6 +49,7 @@ const (
 	SNIPPETS  // snippets
 	TEMPLATES // templates
 	TASKS     // tasks
+	DRUNHUB   // drunhub
 
 	// Docker keywords
 	DOCKER    // docker
@@ -439,6 +440,8 @@ func (t TokenType) String() string {
 		return "TEMPLATES"
 	case TASKS:
 		return "TASKS"
+	case DRUNHUB:
+		return "DRUNHUB"
 	case DOCKER:
 		return "DOCKER"
 	case IMAGE:
@@ -1010,6 +1013,7 @@ var keywords = map[string]TokenType{
 	"snippets":    SNIPPETS,
 	"templates":   TEMPLATES,
 	"tasks":       TASKS,
+	"drunhub":     DRUNHUB,
 	"docker":      DOCKER,
 	"image":       IMAGE,
 	"container":   CONTAINER,

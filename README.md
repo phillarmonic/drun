@@ -1352,10 +1352,14 @@ project "myapp":
 
 #### Remote Includes
 
-Include workflows directly from GitHub or HTTPS URLs:
+Include workflows directly from GitHub, HTTPS URLs, or the **drunhub standard library**:
 
 ```drun
 project "myapp":
+  # From drunhub standard library (https://github.com/phillarmonic/drun-hub)
+  include from drunhub "ops/docker" as ops
+  include from drunhub "ops/kubernetes" as k8s
+  
   # From GitHub (auto-detects default branch)
   include "github:myorg/drun-workflows/docker.drun@v1.2.0"
   
@@ -1363,11 +1367,15 @@ project "myapp":
   include "https://raw.githubusercontent.com/team/repo/main/ci.drun"
 
 task "deploy":
-  use snippet "docker.security-scan"    # From remote include!
+  use snippet "ops.check-docker"         # From drunhub!
+  use snippet "docker.security-scan"     # From remote include!
+  call task "k8s.deploy" with replicas=3 # From drunhub!
 ```
 
 **Features:**
 
+- 📚 **Drunhub Standard Library**: Official repository of reusable workflows at [github.com/phillarmonic/drun-hub](https://github.com/phillarmonic/drun-hub)
+- 🎭 **Custom Namespaces**: Override project names with `as` clause for cleaner imports
 - 🌐 **GitHub & HTTPS**: Fetch from GitHub repos or any HTTPS source
 - 🎯 **Version Control**: Pin to specific tags, branches, or commits
 - 💾 **Smart Caching**: 1-minute cache with stale fallback for offline use

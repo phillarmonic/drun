@@ -287,6 +287,52 @@ func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 
 	p.nextToken() // move past 'include'
 
+	// Check for "include from drunhub path"
+	if p.curToken.Type == lexer.FROM {
+		p.nextToken() // move past 'from'
+
+		// Check for drunhub keyword
+		if p.curToken.Type == lexer.DRUNHUB {
+			p.nextToken() // move past 'drunhub'
+
+			// Expect path (identifier like ops/docker or string)
+			var drunhubPath string
+			switch p.curToken.Type {
+			case lexer.IDENT, lexer.STRING:
+				drunhubPath = p.curToken.Literal
+			default:
+				p.addError(fmt.Sprintf("expected path after drunhub, got %s", p.curToken.Type))
+				return nil
+			}
+
+			// Convert to drunhub protocol URL
+			stmt.Path = "drunhub:" + drunhubPath
+
+			p.nextToken()
+
+			// Check for optional "as namespace"
+			if p.curToken.Type == lexer.AS {
+				p.nextToken() // move past 'as'
+
+				if p.curToken.Type == lexer.IDENT {
+					stmt.Namespace = p.curToken.Literal
+					p.nextToken()
+				} else {
+					p.addError(fmt.Sprintf("expected namespace identifier after 'as', got %s", p.curToken.Type))
+					return nil
+				}
+			}
+
+			return stmt
+		}
+
+		// If not drunhub, it must be a regular FROM clause (for backward compatibility)
+		// Back up and let the regular parsing handle it
+		// This shouldn't happen in normal parsing flow, but handle it gracefully
+		p.addError("expected 'drunhub' after 'from' or use 'include snippets/templates/tasks from path'")
+		return nil
+	}
+
 	// Check for selective import: include snippets, templates from "path"
 	// or basic import: include "path"
 	if p.curToken.Type == lexer.SNIPPETS || p.curToken.Type == lexer.TEMPLATES || p.curToken.Type == lexer.TASKS {
@@ -330,6 +376,20 @@ func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 	stmt.Path = p.curToken.Literal
 
 	p.nextToken()
+
+	// Check for optional "as namespace"
+	if p.curToken.Type == lexer.AS {
+		p.nextToken() // move past 'as'
+
+		if p.curToken.Type == lexer.IDENT {
+			stmt.Namespace = p.curToken.Literal
+			p.nextToken()
+		} else {
+			p.addError(fmt.Sprintf("expected namespace identifier after 'as', got %s", p.curToken.Type))
+			return nil
+		}
+	}
+
 	return stmt
 }
 

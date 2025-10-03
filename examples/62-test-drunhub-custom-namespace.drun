@@ -1,0 +1,18 @@
+version: 2.0
+
+# Test importing from drunhub with custom namespace
+
+project "test-drunhub-custom-ns":
+  # Import with custom namespace "ops" instead of "docker"
+  include from drunhub "examples/drunhub-example-docker" as ops
+  
+task "test-custom-namespace":
+  info "Testing import from drunhub with custom namespace 'ops'"
+  use snippet "ops.check-docker"
+  success "✓ Successfully used custom namespace!"
+
+task "test-task-with-custom-ns":
+  info "Calling task with custom namespace"
+  call task "ops.deploy" with image_name="myapp" tag="latest"
+  success "✓ Custom namespace works perfectly!"
+

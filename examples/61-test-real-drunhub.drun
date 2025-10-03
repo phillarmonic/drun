@@ -1,0 +1,19 @@
+version: 2.0
+
+# Test importing from the actual drunhub repository
+# This imports from https://github.com/phillarmonic/drun-hub
+
+project "test-real-drunhub":
+  # Import from drunhub - default namespace (will use project name "docker")
+  include from drunhub "examples/drunhub-example-docker"
+  
+task "test-default-namespace":
+  info "Testing import from drunhub with default namespace"
+  use snippet "docker.check-docker"
+  success "✓ Successfully imported and used snippet from drunhub!"
+
+task "test-task-call":
+  info "Testing calling a task from drunhub"
+  call task "docker.deploy" with image_name="testapp" tag="v1.0"
+  success "✓ Successfully called task from drunhub!"
+
