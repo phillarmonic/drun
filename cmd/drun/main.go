@@ -324,12 +324,25 @@ func findConfigFile(filename string) (string, error) {
 		}
 	}
 
-	// Check default file location
-	if _, err := os.Stat(DefaultFilename); err == nil {
-		return DefaultFilename, nil
+	// Try default file locations in order
+	defaultLocations := []string{
+		".drun/spec.drun",
+		".drun",
+		"spec.drun",
+		"ops/drun/spec.drun",
+		"ops/spec.drun",
 	}
 
-	return "", fmt.Errorf("no drun task file found - expected '%s' or use --file to specify location", DefaultFilename)
+	for _, location := range defaultLocations {
+		if fileInfo, err := os.Stat(location); err == nil {
+			// Skip if it's a directory - we only want files
+			if !fileInfo.IsDir() {
+				return location, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no drun task file found - expected one of: %v\nUse --file to specify location or run 'drun --init' to create one", defaultLocations)
 }
 
 // getWorkspaceDefaultFile checks for workspace configuration and returns default file
