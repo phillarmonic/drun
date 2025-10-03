@@ -4,6 +4,25 @@
 
 **xdrun** (eXecute drun) is the CLI interpreter that runs the drun language and executes `.drun` files.
 
+
+
+### Small example of a Drun language script:
+
+```drun
+# Add this file to .drun/spec.drun and see the magic happen
+version: 2.0 # The drun spec version is required
+
+# if you just run xdrun with nothing, this will run
+task "default" means "This action will run by default":
+  step "Welcome to drun v2!"
+  success "Finished"
+
+# Run 'xdrun hello' to run this task
+task "hello":
+  echo "Hello world!"
+
+```
+
 ## Features
 
 ### 🚀 **Core Features**
@@ -49,6 +68,7 @@
 drun includes powerful built-in functions for common operations:
 
 #### **System Information**
+
 - `{hostname}` - Get system hostname
 - `{pwd}` - Get current working directory
 - `{pwd('basename')}` - Get directory name only
@@ -57,18 +77,22 @@ drun includes powerful built-in functions for common operations:
 - `{env('VAR_NAME', 'default')}` - Get environment variable with default
 
 #### **Time & Date**
+
 - `{now.format('2006-01-02 15:04:05')}` - Format current time
 - `{now.format('Monday, January 2, 2006')}` - Custom date formats
 
 #### **File System**
+
 - `{file exists('path/to/file')}` - Check if file exists (returns "true"/"false")
 - `{dir exists('path/to/dir')}` - Check if directory exists (returns "true"/"false")
 
 #### **Git Integration**
+
 - `{current git commit}` - Get full commit hash
 - `{current git commit('short')}` - Get short commit hash
 
 #### **Progress & Timing** ⭐ *New*
+
 - `{start progress('message')}` - Start a progress indicator
 - `{update progress('50', 'message')}` - Update progress with percentage and message
 - `{finish progress('message')}` - Complete progress indicator
@@ -118,6 +142,7 @@ task "timing demo":
 Compare the same deployment task:
 
 **Just version** (technical, shell-centric):
+
 ```just
 deploy env version:
   #!/bin/bash
@@ -128,14 +153,15 @@ deploy env version:
 ```
 
 **drun version** (semantic, readable):
+
 ```drun
 task "deploy" means "Deploy with automatic rollback":
   requires $environment from ["dev", "staging", "production"]
   requires $version as string matching semver
-  
+
   docker build image "app:{$version}"
   kubectl set image deployment/app to "app:{$version}"
-  
+
   try:
     kubectl wait for rollout deployment/app
     success "Deployment successful!"
@@ -155,6 +181,7 @@ task "deploy" means "Deploy with automatic rollback":
 - **🛡️ Smart Detection**: Auto-detect tool variants (`docker compose` vs `docker-compose`)
 
 **When to use drun:**
+
 - Your automation needs to be reviewed by non-technical stakeholders
 - You want CI/CD pipelines that are actually readable
 - You need built-in validation and type safety
@@ -171,8 +198,8 @@ task "deploy" means "Deploy with automatic rollback":
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/phillarmonic/drun/releases):
 
-| Platform    | Architecture  | Download                                  |
-| ----------- | ------------- | ----------------------------------------- |
+| Platform    | Architecture  | Download                                   |
+| ----------- | ------------- | ------------------------------------------ |
 | **Linux**   | x86_64        | `xdrun-linux-amd64` (UPX compressed)       |
 | **Linux**   | ARM64         | `xdrun-linux-arm64` (UPX compressed)       |
 | **macOS**   | Intel         | `xdrun-darwin-amd64`                       |
@@ -203,6 +230,7 @@ drun uses a simple, predictable file discovery system:
 - **Workspace configuration** - `.drun/.drun_workspace` for custom defaults
 
 **Moving your spec file:**
+
 ```bash
 # Move your spec file anywhere
 mv .drun/spec.drun ./my-project.drun
@@ -261,6 +289,7 @@ xdrun --list
 drun v2 uses a clear scoping system with explicit namespaces to prevent naming conflicts:
 
 #### **Project Settings (Global)**
+
 Declared without `$` prefix, accessed via `$globals` namespace:
 
 ```drun
@@ -276,17 +305,19 @@ task "deploy":
 ```
 
 #### **Task Variables (Local)**
+
 Declared with `$` prefix, accessed directly:
 
 ```drun
 task "deploy":
   set $image_tag to "{$globals.registry}/myapp:{$globals.version}"
   set $replicas to 3
-  
+
   info "Deploying {$image_tag} with {$replicas} replicas"
 ```
 
 #### **Avoiding Conflicts**
+
 The `$globals` namespace prevents naming conflicts:
 
 ```drun
@@ -295,7 +326,7 @@ project "myapp":
 
 task "test":
   set $api_url to "https://task-level.com"    # Different variable!
-  
+
   info "Global API: {$globals.api_url}"       # → "https://project-level.com"
   info "Task API: {$api_url}"                 # → "https://task-level.com"
 ```
@@ -339,12 +370,13 @@ task "spaces-example":
 
 # Using tabs
 task "tabs-example":
-	info "Indented with tabs"
-	if true:
-		step "Nested with tabs"
+    info "Indented with tabs"
+    if true:
+        step "Nested with tabs"
 ```
 
 **Key points:**
+
 - **Tab equivalence**: Each tab equals 4 spaces for indentation level calculation
 - **Consistency**: Use consistent indentation within each file (don't mix tabs and spaces)
 - **Flexibility**: Choose the style that works best for your team or editor
@@ -369,7 +401,7 @@ task "hello" means "Say hello":
 task "greet" means "Greet someone":
   requires $name
   given $title defaults to "friend"
-  
+
   info "Hello, {$title} {$name}! 🎉"
 ```
 
@@ -392,12 +424,12 @@ task "deploy" means "Deploy to environment with version":
   given $version defaults to "latest"
   given $features as list defaults to empty  # 🆕 empty keyword
   given $force as boolean defaults to false
-  
+
   info "Deploying {$version} to {$environment}"
-  
+
   if $features is not empty:  # 🆕 semantic empty conditions
     info "Features: {$features}"
-  
+
   if $force is true:
     info "Force deployment enabled"
 ```
@@ -425,20 +457,21 @@ task "example" means "Demonstrate empty keyword usage":
   given $name defaults to empty      # semantic empty
   given $title defaults to ""        # traditional empty string
   given $features as list defaults to empty  # empty list
-  
+
   # Conditions - semantic and readable
   if $name is empty:
     warn "Name is required"
-  
+
   if $features is not empty:
     info "Enabled features: {$features}"
-  
+
   # Works with all parameter types
   if $title is empty:
     info "Using default title"
 ```
 
 **Key Benefits:**
+
 - **Semantic**: More readable than empty quotes in automation contexts
 - **Equivalent**: `empty` is exactly the same as `""` 
 - **Flexible**: Works as default values and in conditions
@@ -449,13 +482,12 @@ task "example" means "Demonstrate empty keyword usage":
 ```drun
 task "test" means "Run tests":
   depends on build
-  
+
   run "go test ./..."
 
 task "build" means "Build the project":
   run "go build ./..."
 ```
-
 
 ## 🌟 Advanced Features Examples
 
@@ -467,7 +499,7 @@ Integrate with APIs, send notifications, and fetch data using semantic HTTP acti
 task "notify slack" means "Send notification to Slack":
   requires $message
   given $channel defaults to "#general"
-  
+
   post "https://hooks.slack.com/services/..." with body {
     "text": "{$message}",
     "channel": "{$channel}"
@@ -475,7 +507,7 @@ task "notify slack" means "Send notification to Slack":
 
 task "check api" means "Check API status":
   let $response = get "https://api.example.com/health"
-  
+
   if $response contains "ok":
     success "API is healthy"
   else:
@@ -499,31 +531,31 @@ project "cross-platform-app" version "1.0":
 
 task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
   info "🐳 Setting up Docker toolchain"
-  
+
   # Detect which Docker Compose variant is available and capture it
   detect available "docker compose" or "docker-compose" as $compose_cmd
-  
+
   # Detect which Docker Buildx variant is available and capture it
   detect available "docker buildx" or "docker-buildx" as $buildx_cmd
-  
+
   info "✅ Detected tools:"
   info "  📦 Compose: {$compose_cmd}"
   info "  🔨 Buildx: {$buildx_cmd}"
-  
+
   # Now use the captured variables consistently throughout the task
   run "{$compose_cmd} version"
   run "{$buildx_cmd} version"
-  
+
   success "Docker toolchain ready!"
 
 task "deploy-app" means "Deploy using detected tools":
   # Reuse the same detection pattern
   detect available "docker compose" or "docker-compose" as $compose_cmd
-  
+
   info "🚀 Deploying with {$compose_cmd}"
   run "{$compose_cmd} up -d"
   run "{$compose_cmd} ps"
-  
+
   success "Application deployed!"
 
 task "multi-tool-example" means "Multiple tool alternatives":
@@ -531,11 +563,11 @@ task "multi-tool-example" means "Multiple tool alternatives":
   detect available "npm" or "yarn" or "pnpm" as $package_manager
   run "{$package_manager} install"
   run "{$package_manager} run build"
-  
+
   # Container runtimes
   detect available "docker" or "podman" as $container_runtime
   run "{$container_runtime} build -t myapp ."
-  
+
   success "Built with {$package_manager} and {$container_runtime}!"
 ```
 
@@ -558,45 +590,45 @@ project "validation-demo" version "1.0":
 task "deploy" means "Deploy with comprehensive validation":
   # Semantic versioning validation
   requires $version as string matching semver
-  
+
   # Extended semantic versioning (with pre-release/build info)
   requires $release as string matching semver_extended
-  
+
   # UUID validation for deployment tracking
   requires $deployment_id as string matching uuid
-  
+
   # URL validation for endpoints
   requires $api_endpoint as string matching url
-  
+
   # IPv4 address validation for servers
   requires $server_ip as string matching ipv4
-  
+
   # Project slug validation (URL-safe names)
   requires $project_slug as string matching slug
-  
+
   # Docker tag validation
   requires $image_tag as string matching docker_tag
-  
+
   # Git branch validation
   requires $branch as string matching git_branch
-  
+
   # Email validation (built-in)
   requires $admin_email as string matching email format
-  
+
   # Custom regex patterns still supported
   requires $custom_id as string matching pattern "^DEPLOY-[0-9]{6}$"
-  
+
   info "🚀 Deploying {version} to {server_ip}"
   info "📦 Project: {project_slug}, Branch: {branch}"
   info "🌐 API: {api_endpoint}"
   info "📧 Admin: {admin_email}"
   info "🆔 Deployment ID: {deployment_id}"
-  
+
   success "Deployment validated and ready!"
 
 task "validation-errors-demo" means "Show validation error messages":
   requires $version as string matching semver
-  
+
   # This will show: Error: parameter 'version': value '1.2.3' does not match 
   # semver pattern (Basic semantic versioning (e.g., v1.2.3))
 ```
@@ -633,12 +665,12 @@ task "string_transformations" means "Demonstrate string operations":
   set $version to "v2.1.0-beta"
   set $filename to "my-app.tar.gz"
   set $docker_image to "nginx:1.21"
-  
+
   info "🔤 String Operations:"
   info "  Clean version: {$version without prefix 'v' | without suffix '-beta'}"
   info "  App name: {$filename without suffix '.tar.gz'}"
   info "  Image name: {$docker_image split by ':' | first}"
-  
+
   # Output:
   # Clean version: 2.1.0
   # App name: my-app
@@ -646,13 +678,13 @@ task "string_transformations" means "Demonstrate string operations":
 
 task "array_operations" means "Demonstrate array manipulation":
   set $files to "src/app.js src/utils.js tests/app.test.js docs/readme.md config.json"
-  
+
   info "📋 Array Operations:"
   info "  JavaScript files: {$files filtered by extension '.js'}"
   info "  Source files (sorted): {$files filtered by prefix 'src/' | sorted by name}"
   info "  First file: {$files first}"
   info "  All files (sorted): {$files sorted by name}"
-  
+
   # Output:
   # JavaScript files: src/app.js src/utils.js tests/app.test.js
   # Source files (sorted): src/app.js src/utils.js
@@ -661,13 +693,13 @@ task "array_operations" means "Demonstrate array manipulation":
 
 task "path_operations" means "Demonstrate path manipulation":
   set $config_file to "/etc/nginx/sites-available/default.conf"
-  
+
   info "📁 Path Operations:"
   info "  Filename: {$config_file basename}"
   info "  Directory: {$config_file dirname}"
   info "  Extension: {$config_file extension}"
   info "  Name without extension: {$config_file basename | without suffix '.conf'}"
-  
+
   # Output:
   # Filename: default.conf
   # Directory: /etc/nginx/sites-available
@@ -677,15 +709,15 @@ task "path_operations" means "Demonstrate path manipulation":
 task "complex_chaining" means "Demonstrate operation chaining":
   set $project_files to "src/app.js src/utils.js tests/app.test.js tests/utils.test.js docs/readme.md"
   set $docker_images to "nginx:1.21 postgres:13 redis:6.2 node:16-alpine"
-  
+
   info "⛓️ Complex Operation Chaining:"
   info "  Source JS files: {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
   info "  Test files: {$project_files filtered by prefix 'tests/' | sorted by name}"
-  
+
   info "🐳 Processing Docker images:"
   for each img in $docker_images:
     info "    {img} -> {img split by ':' | first} (version: {img split by ':' | last})"
-  
+
   # Output:
   # Source JS files: src/app.js src/utils.js
   # Test files: tests/app.test.js tests/utils.test.js
@@ -699,11 +731,13 @@ task "complex_chaining" means "Demonstrate operation chaining":
 **Available Operations:**
 
 **String Operations:**
+
 - **`without prefix "text"`** - Remove prefix from string
 - **`without suffix "text"`** - Remove suffix from string
 - **`split by "delimiter"`** - Split string into space-separated parts
 
 **Array Operations:**
+
 - **`filtered by extension "ext"`** - Filter by file extension
 - **`filtered by prefix "text"`** - Filter by prefix
 - **`filtered by suffix "text"`** - Filter by suffix
@@ -716,6 +750,7 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - **`last`** - Get last item
 
 **Path Operations:**
+
 - **`basename`** - Extract filename from path
 - **`dirname`** - Extract directory from path
 - **`extension`** - Extract file extension (without dot)
@@ -728,7 +763,6 @@ task "complex_chaining" means "Demonstrate operation chaining":
 - **🎯 Type-Aware**: Works seamlessly with strings, arrays, and paths
 - **🔄 Loop Integration**: Perfect integration with `for each` loops
 - **📊 Performance**: Efficient operations with minimal overhead
-
 
 ## Command Line Options
 
@@ -758,6 +792,7 @@ drun includes comprehensive debugging capabilities to help you understand how yo
 - `--debug-input "string"`: Debug input string directly instead of reading from file
 
 **Debug Examples:**
+
 ```bash
 # Show full debug output for a file
 xdrun --debug -f my-tasks.drun
@@ -816,7 +851,7 @@ task "strict example":
     let $name = "world"
     info "Hello {$name}"           # ✅ Works: variable is defined
     info "Hello {$typo_name}"      # ❌ Fails: undefined variable (strict mode)
-    
+
 task "with parameters":
     accepts $target as string
     info "Deploying to {$target}"  # ✅ Works: parameter is defined
@@ -957,6 +992,7 @@ xdrun --list                   # Lists all tasks
 **Recommended approach**: `source <(xdrun completion zsh)` in your shell config
 
 **Benefits:**
+
 - ✅ **Always Current**: Reflects your latest task definitions
 - ✅ **No Maintenance**: No need to regenerate completion files
 - ✅ **Project Aware**: Works with different drun files in different directories
@@ -1018,7 +1054,6 @@ The cleanup command provides:
 - ✅ **Backup preservation** (not auto-deleted)
 - ✅ **Platform detection** (correct binary for your system)
 - ✅ **Version validation** (only update when newer version available)
-
 
 ## Examples
 
@@ -1161,15 +1196,15 @@ drun is engineered for **high performance** and **low resource usage**. Extensiv
 
 Performance benchmarks on Apple M4 (your results may vary):
 
-| Component              | Operation                | Time  | Memory  | Allocations |
-| ---------------------- | ------------------------ | ----- | ------- | ----------- |
-| **Spec Loading**       | Simple spec              | 2.5μs | 704 B   | 5 allocs    |
-| **Spec Loading**       | Large spec (100 tasks) | 8.6μs | 756 B   | 5 allocs    |
-| **Template Rendering** | Basic template           | 29μs  | 3.9 KB  | 113 allocs  |
-| **Template Rendering** | Complex template         | 51μs  | 7.0 KB  | 93 allocs   |
-| **DAG Building**       | Simple dependency graph  | 3.1μs | 10.7 KB | 109 allocs  |
-| **DAG Building**       | Complex dependencies     | 3.9μs | 12.4 KB | 123 allocs  |
-| **Topological Sort**   | 100 nodes                | 2.5μs | 8.0 KB  | 137 allocs  |
+| Component              | Operation               | Time  | Memory  | Allocations |
+| ---------------------- | ----------------------- | ----- | ------- | ----------- |
+| **Spec Loading**       | Simple spec             | 2.5μs | 704 B   | 5 allocs    |
+| **Spec Loading**       | Large spec (100 tasks)  | 8.6μs | 756 B   | 5 allocs    |
+| **Template Rendering** | Basic template          | 29μs  | 3.9 KB  | 113 allocs  |
+| **Template Rendering** | Complex template        | 51μs  | 7.0 KB  | 93 allocs   |
+| **DAG Building**       | Simple dependency graph | 3.1μs | 10.7 KB | 109 allocs  |
+| **DAG Building**       | Complex dependencies    | 3.9μs | 12.4 KB | 123 allocs  |
+| **Topological Sort**   | 100 nodes               | 2.5μs | 8.0 KB  | 137 allocs  |
 
 #### Optimization Impact
 
