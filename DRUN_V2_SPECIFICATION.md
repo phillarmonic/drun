@@ -15,13 +15,14 @@
 7. [Control Flow](#control-flow)
 8. [Variable System](#variable-system)
 9. [Parameter System](#parameter-system)
-10. [Built-in Actions](#built-in-actions)
-11. [Smart Detection](#smart-detection)
-12. [Compilation Model](#compilation-model)
-13. [Error Handling](#error-handling)
-14. [Examples](#examples)
-15. [Migration Path](#migration-path)
-16. [Implementation Notes](#implementation-notes)
+10. [Code Reuse Features](#code-reuse-features)
+11. [Built-in Actions](#built-in-actions)
+12. [Smart Detection](#smart-detection)
+13. [Compilation Model](#compilation-model)
+14. [Error Handling](#error-handling)
+15. [Examples](#examples)
+16. [Migration Path](#migration-path)
+17. [Implementation Notes](#implementation-notes)
 
 ---
 
@@ -2250,6 +2251,374 @@ task "matrix-build":
 ```
 
 This matrix execution system enables comprehensive automation workflows while maintaining drun's natural language philosophy and clear variable scoping.
+
+---
+
+## Code Reuse Features
+
+drun v2 provides powerful mechanisms for code reuse and eliminating duplication in automation workflows. These features enable you to write DRY (Don't Repeat Yourself) task definitions while maintaining readability and maintainability.
+
+### Project-Level Parameters
+
+Project-level parameters are defined once at the project level and shared across all tasks. They can be overridden via CLI, making them perfect for global configuration values.
+
+#### Syntax
+
+```drun
+project "my-app" version "1.0.0":
+  parameter $name as type [from [values]] defaults to "value"
+```
+
+#### Examples
+
+```drun
+version: 2.0
+
+project "docker-automation" version "1.0.0":
+  # Boolean parameter with default
+  parameter $no_cache as boolean defaults to "false"
+  
+  # String parameter with constraint list
+  parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
+  
+  # String parameter with pattern validation
+  parameter $registry as string defaults to "docker.io"
+  
+  # Number parameter with range
+  parameter $timeout as number defaults to 300
+
+task "build" means "Build with project-level configuration":
+  info "Environment: {$environment}"
+  info "Registry: {$registry}"
+  info "No cache: {$no_cache}"
+  info "Timeout: {$timeout}s"
+```
+
+#### Usage
+
+```bash
+# Use defaults
+xdrun build
+
+# Override parameters via CLI
+xdrun build environment=prod no_cache=true registry=gcr.io
+```
+
+#### Key Features
+
+- **Shared Configuration**: Define once, use everywhere
+- **Type Safety**: Full type validation and constraints
+- **CLI Overrides**: Can be overridden at runtime
+- **Default Values**: Always have sensible defaults
+- **Validation**: Same validation rules as task parameters
+
+### Snippets
+
+Snippets are reusable blocks of statements that can be included in any task. They're perfect for common sequences of actions that appear across multiple tasks.
+
+#### Syntax
+
+```drun
+project "my-app" version "1.0.0":
+  snippet "name":
+    # Statements that can be reused
+    statement1
+    statement2
+```
+
+#### Examples
+
+```drun
+version: 2.0
+
+project "my-app" version "1.0.0":
+  # Common logging snippet
+  snippet "log-start":
+    info "═══════════════════════════════════"
+    info "  Starting task execution"
+    info "═══════════════════════════════════"
+  
+  # Environment check snippet
+  snippet "check-env":
+    if env DOCKER_HOST exists:
+      info "Docker: Remote host at ${DOCKER_HOST}"
+    else:
+      info "Docker: Local daemon"
+  
+  # Cleanup snippet
+  snippet "cleanup-temp":
+    info "Cleaning up temporary files..."
+    info "Done"
+
+task "build" means "Build application":
+  use snippet "log-start"
+  use snippet "check-env"
+  
+  info "Building application..."
+  # Build logic here
+  
+  use snippet "cleanup-temp"
+  success "Build complete"
+
+task "deploy" means "Deploy application":
+  use snippet "log-start"
+  use snippet "check-env"
+  
+  info "Deploying application..."
+  # Deploy logic here
+  
+  success "Deploy complete"
+```
+
+#### Key Features
+
+- **Reusability**: Define once, use multiple times
+- **Scoped Access**: Snippets can access project parameters and task variables
+- **Variable Interpolation**: Full support for variable interpolation
+- **Control Flow**: Can contain any valid drun statements including conditionals
+
+### Task Templates
+
+Task templates allow you to define parameterized task structures that can be called like functions. They're perfect for tasks that follow the same pattern but with different parameters.
+
+#### Syntax
+
+```drun
+template task "name":
+  given $param defaults to "value"
+  # Template body
+```
+
+#### Examples
+
+```drun
+version: 2.0
+
+project "docker-builds" version "1.0.0":
+  parameter $no_cache as boolean defaults to "false"
+  parameter $registry as string defaults to "docker.io"
+  
+  snippet "show-config":
+    info "Registry: {$registry}"
+    info "Cache: {$no_cache ? 'disabled' : 'enabled'}"
+
+# Define a reusable template
+template task "docker-build":
+  given $target defaults to "prod"
+  given $tag defaults to "latest"
+  given $platform defaults to "linux/amd64"
+  
+  step "Building Docker image"
+  use snippet "show-config"
+  
+  info "Target: {$target}"
+  info "Tag: {$registry}/{$tag}"
+  info "Platform: {$platform}"
+  info "Building: docker build {$no_cache ? '--no-cache' : ''} --target={$target} --platform={$platform} -t {$registry}/{$tag} ."
+  
+  success "Built {$tag}"
+
+# Use the template with different parameters
+task "build:web" means "Build web application":
+  call task "docker-build" with target="web" tag="myapp:web"
+
+task "build:api" means "Build API server":
+  call task "docker-build" with target="api" tag="myapp:api"
+
+task "build:worker" means "Build background worker":
+  call task "docker-build" with target="worker" tag="myapp:worker" platform="linux/arm64"
+
+# Use the template with all defaults
+task "build:base" means "Build base image":
+  call task "docker-build" with target="base"
+
+# Complex task that calls template multiple times
+task "build:all" means "Build all images":
+  info "Building complete application stack..."
+  
+  call task "build:web"
+  call task "build:api"
+  call task "build:worker"
+  call task "build:base"
+  
+  success "All images built successfully!"
+```
+
+#### Calling Templates
+
+```bash
+# Call regular tasks (which may call templates internally)
+xdrun build:web
+
+# Can override project parameters too
+xdrun build:all no_cache=true registry=ghcr.io
+```
+
+#### Key Features
+
+- **Parameterization**: Accept parameters with defaults
+- **Reusability**: Call the same template with different parameters
+- **Composition**: Templates can call other tasks and use snippets
+- **Type Safety**: Template parameters support all standard validations
+- **Variable Access**: Templates have access to project parameters
+
+### Complete Example: Docker Build System
+
+Here's a comprehensive example combining all code reuse features:
+
+```drun
+version: 2.0
+
+project "microservices" version "1.0.0":
+  # Global configuration
+  parameter $no_cache as boolean defaults to "false"
+  parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
+  parameter $registry as string defaults to "docker.io"
+  parameter $push as boolean defaults to "false"
+  
+  # Reusable configuration display
+  snippet "show-build-config":
+    info "╔════════════════════════════════╗"
+    info "║     Build Configuration        ║"
+    info "╚════════════════════════════════╝"
+    info "Environment: {$environment}"
+    info "Registry: {$registry}"
+    info "Cache: {$no_cache ? 'disabled' : 'enabled'}"
+    info "Push: {$push ? 'yes' : 'no'}"
+    info ""
+  
+  # Reusable Docker login check
+  snippet "check-registry-auth":
+    if $push is true:
+      info "Checking registry authentication..."
+      if env DOCKER_AUTH exists:
+        info "✓ Registry authentication configured"
+      else:
+        warn "⚠ No registry authentication found"
+  
+  # Cleanup snippet
+  snippet "cleanup":
+    info "Cleaning up build artifacts..."
+    info "Done"
+
+# Template for Docker builds
+template task "docker-build":
+  given $service defaults to "app"
+  given $target defaults to "prod"
+  given $tag defaults to "latest"
+  
+  step "Building {$service} image"
+  use snippet "show-build-config"
+  use snippet "check-registry-auth"
+  
+  info "Service: {$service}"
+  info "Target: {$target}"
+  info "Full tag: {$registry}/{$service}:{$tag}"
+  
+  info "Building image..."
+  # Actual Docker build would go here
+  
+  if $push is true:
+    info "Pushing to registry..."
+    # Actual Docker push would go here
+  
+  success "✓ Built {$service}:{$tag}"
+
+# Template for testing services
+template task "test-service":
+  given $service defaults to "app"
+  given $test_suite defaults to "all"
+  
+  step "Testing {$service}"
+  info "Test suite: {$test_suite}"
+  info "Running tests..."
+  # Actual test commands would go here
+  success "✓ Tests passed for {$service}"
+
+# Concrete tasks using templates
+task "build:frontend" means "Build frontend service":
+  call task "docker-build" with service="frontend" target="web" tag="v1.0.0"
+  use snippet "cleanup"
+
+task "build:backend" means "Build backend API":
+  call task "docker-build" with service="backend" target="api" tag="v1.0.0"
+  use snippet "cleanup"
+
+task "build:worker" means "Build background worker":
+  call task "docker-build" with service="worker" target="worker" tag="v1.0.0"
+  use snippet "cleanup"
+
+task "test:frontend" means "Test frontend":
+  call task "test-service" with service="frontend" test_suite="e2e"
+
+task "test:backend" means "Test backend":
+  call task "test-service" with service="backend" test_suite="integration"
+
+# Orchestration tasks
+task "build:all" means "Build all services":
+  info "═══════════════════════════════════════"
+  info "  Building Complete Microservices Stack"
+  info "═══════════════════════════════════════"
+  info ""
+  
+  call task "build:frontend"
+  call task "build:backend"
+  call task "build:worker"
+  
+  success "✨ All services built successfully!"
+
+task "test:all" means "Test all services":
+  call task "test:frontend"
+  call task "test:backend"
+  success "✨ All tests passed!"
+
+task "ci" means "Complete CI pipeline":
+  call task "build:all"
+  call task "test:all"
+  success "✨ CI pipeline completed!"
+```
+
+#### Usage Examples
+
+```bash
+# Build individual services
+xdrun build:frontend
+xdrun build:backend
+
+# Build with custom parameters
+xdrun build:frontend no_cache=true environment=prod push=true
+
+# Build everything
+xdrun build:all
+
+# Test services
+xdrun test:frontend
+xdrun test:all
+
+# Complete CI pipeline
+xdrun ci environment=staging registry=gcr.io
+```
+
+### Benefits
+
+The code reuse features provide several key benefits:
+
+1. **DRY Principle**: Eliminate duplication across tasks
+2. **Maintainability**: Update logic in one place
+3. **Consistency**: Ensure consistent behavior across tasks
+4. **Readability**: Templates and snippets have clear, semantic names
+5. **Flexibility**: Override parameters as needed
+6. **Type Safety**: Full validation on all parameters
+7. **Composition**: Combine features for powerful workflows
+
+### Best Practices
+
+1. **Use Project Parameters for Global Config**: Things like registry URLs, environment, cache settings
+2. **Use Snippets for Common Sequences**: Logging, cleanup, environment checks
+3. **Use Templates for Repeated Patterns**: Build tasks, test tasks, deployment tasks
+4. **Meaningful Names**: Choose descriptive names for snippets and templates
+5. **Documentation**: Add comments explaining what each reusable component does
+6. **Defaults**: Always provide sensible defaults for template parameters
 
 ---
 

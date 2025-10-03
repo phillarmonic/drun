@@ -21,9 +21,10 @@ type Statement interface {
 
 // Program represents the root of the AST
 type Program struct {
-	Version *VersionStatement
-	Project *ProjectStatement
-	Tasks   []*TaskStatement
+	Version   *VersionStatement
+	Project   *ProjectStatement
+	Tasks     []*TaskStatement
+	Templates []*TaskTemplateStatement // task templates
 }
 
 func (p *Program) String() string {
@@ -34,6 +35,10 @@ func (p *Program) String() string {
 	}
 	if p.Project != nil {
 		out.WriteString(p.Project.String())
+		out.WriteString("\n")
+	}
+	for _, template := range p.Templates {
+		out.WriteString(template.String())
 		out.WriteString("\n")
 	}
 	for _, task := range p.Tasks {
@@ -83,6 +88,130 @@ func (ps *ProjectStatement) String() string {
 type ProjectSetting interface {
 	Node
 	projectSettingNode()
+}
+
+// ProjectParameterStatement represents a shared parameter defined at project level
+type ProjectParameterStatement struct {
+	Token        lexer.Token // the PARAMETER token
+	Name         string      // parameter name (without $)
+	DefaultValue string      // default value
+	HasDefault   bool        // true if a default value was explicitly set
+	Constraints  []string    // constraints like ["dev", "staging", "production"]
+	DataType     string      // "string", "number", "boolean", "list", etc.
+	MinValue     *float64    // minimum value for numbers
+	MaxValue     *float64    // maximum value for numbers
+	Pattern      string      // regex pattern for string validation
+	PatternMacro string      // pattern macro name
+	EmailFormat  bool        // true if parameter should validate as email
+}
+
+func (pps *ProjectParameterStatement) statementNode()      {}
+func (pps *ProjectParameterStatement) projectSettingNode() {}
+func (pps *ProjectParameterStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("parameter $%s", pps.Name))
+
+	if pps.DataType != "" {
+		out.WriteString(fmt.Sprintf(" as %s", pps.DataType))
+	}
+
+	if len(pps.Constraints) > 0 {
+		out.WriteString(" from [")
+		for i, c := range pps.Constraints {
+			if i > 0 {
+				out.WriteString(", ")
+			}
+			out.WriteString(fmt.Sprintf("\"%s\"", c))
+		}
+		out.WriteString("]")
+	}
+
+	if pps.HasDefault {
+		out.WriteString(fmt.Sprintf(" defaults to \"%s\"", pps.DefaultValue))
+	}
+
+	return out.String()
+}
+
+// SnippetStatement represents a reusable code block
+type SnippetStatement struct {
+	Token lexer.Token // the SNIPPET token
+	Name  string      // snippet name
+	Body  []Statement // statements in the snippet
+}
+
+func (ss *SnippetStatement) statementNode()      {}
+func (ss *SnippetStatement) projectSettingNode() {}
+func (ss *SnippetStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("snippet \"%s\":", ss.Name))
+	for _, stmt := range ss.Body {
+		out.WriteString("\n  ")
+		out.WriteString(stmt.String())
+	}
+	return out.String()
+}
+
+// UseSnippetStatement represents using a snippet
+type UseSnippetStatement struct {
+	Token       lexer.Token // the USE token
+	SnippetName string      // name of snippet to use
+}
+
+func (uss *UseSnippetStatement) statementNode() {}
+func (uss *UseSnippetStatement) String() string {
+	return fmt.Sprintf("use snippet \"%s\"", uss.SnippetName)
+}
+
+// TaskTemplateStatement represents a task template definition
+type TaskTemplateStatement struct {
+	Token       lexer.Token          // the TEMPLATE token
+	Name        string               // template name
+	Description string               // optional description
+	Parameters  []ParameterStatement // template parameters
+	Body        []Statement          // template body
+}
+
+func (tts *TaskTemplateStatement) statementNode() {}
+func (tts *TaskTemplateStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("template task \"%s\"", tts.Name))
+	if tts.Description != "" {
+		out.WriteString(fmt.Sprintf(" means \"%s\"", tts.Description))
+	}
+	out.WriteString(":\n")
+
+	for _, param := range tts.Parameters {
+		out.WriteString(fmt.Sprintf("  %s\n", param.String()))
+	}
+
+	for _, stmt := range tts.Body {
+		out.WriteString(fmt.Sprintf("  %s\n", stmt.String()))
+	}
+	return out.String()
+}
+
+// TaskFromTemplateStatement represents a task instantiated from a template
+type TaskFromTemplateStatement struct {
+	Token        lexer.Token       // the TASK token
+	Name         string            // task name
+	TemplateName string            // template to instantiate from
+	Overrides    map[string]string // parameter overrides (with clause)
+}
+
+func (tfts *TaskFromTemplateStatement) statementNode() {}
+func (tfts *TaskFromTemplateStatement) String() string {
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("task \"%s\" from template \"%s\"", tfts.Name, tfts.TemplateName))
+
+	if len(tfts.Overrides) > 0 {
+		out.WriteString(":\n  with")
+		for key, value := range tfts.Overrides {
+			out.WriteString(fmt.Sprintf(" %s=\"%s\"", key, value))
+		}
+	}
+
+	return out.String()
 }
 
 // SetStatement represents a project setting (set key to value)

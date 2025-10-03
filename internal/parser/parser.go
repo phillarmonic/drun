@@ -80,9 +80,20 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.skipComments()
 	}
 
-	// Parse task statements
+	// Parse task and template statements
 	for p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
+		case lexer.TEMPLATE:
+			// Check if this is "template task"
+			if p.peekToken.Type == lexer.TASK {
+				template := p.parseTaskTemplateStatement()
+				if template != nil {
+					program.Templates = append(program.Templates, template)
+				}
+			} else {
+				p.addError(fmt.Sprintf("unexpected token after template: %s", p.peekToken.Type))
+				p.nextToken()
+			}
 		case lexer.TASK:
 			task := p.parseTaskStatement()
 			if task != nil {
@@ -155,6 +166,22 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			switch p.curToken.Type {
 			case lexer.SET:
 				setting := p.parseSetStatement()
+				if setting != nil {
+					stmt.Settings = append(stmt.Settings, setting)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
+				}
+			case lexer.PARAMETER:
+				setting := p.parseProjectParameterStatement()
+				if setting != nil {
+					stmt.Settings = append(stmt.Settings, setting)
+				} else {
+					// If parsing failed, advance to avoid infinite loop
+					p.nextToken()
+				}
+			case lexer.SNIPPET:
+				setting := p.parseSnippetStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
 				} else {
@@ -265,6 +292,168 @@ func (p *Parser) parseIncludeStatement() *ast.IncludeStatement {
 	stmt.Path = p.curToken.Literal
 
 	p.nextToken()
+	return stmt
+}
+
+// parseProjectParameterStatement parses a project-level parameter definition
+// Syntax: parameter $name as type defaults to "value"
+func (p *Parser) parseProjectParameterStatement() *ast.ProjectParameterStatement {
+	stmt := &ast.ProjectParameterStatement{Token: p.curToken}
+
+	// Expect variable (parameter name)
+	if !p.expectPeek(lexer.VARIABLE) {
+		return nil
+	}
+
+	// Strip the $ prefix from the variable name
+	paramName := p.curToken.Literal
+	if len(paramName) > 0 && paramName[0] == '$' {
+		paramName = paramName[1:]
+	}
+	stmt.Name = paramName
+
+	// Check for type constraint (as type)
+	if p.peekToken.Type == lexer.AS {
+		p.nextToken() // consume AS
+		p.nextToken() // move to type
+
+		switch p.curToken.Type {
+		case lexer.STRING_TYPE:
+			stmt.DataType = "string"
+		case lexer.NUMBER_TYPE:
+			stmt.DataType = "number"
+		case lexer.BOOLEAN_TYPE:
+			stmt.DataType = "boolean"
+		case lexer.LIST:
+			stmt.DataType = "list"
+		case lexer.IDENT:
+			stmt.DataType = p.curToken.Literal
+		default:
+			p.addError(fmt.Sprintf("expected type, got %s", p.curToken.Type))
+			return nil
+		}
+	}
+
+	// Check for value constraints (from [...])
+	if p.peekToken.Type == lexer.FROM {
+		p.nextToken() // consume FROM
+
+		if !p.expectPeek(lexer.LBRACKET) {
+			return nil
+		}
+
+		// Parse array elements
+		for p.peekToken.Type != lexer.RBRACKET && p.peekToken.Type != lexer.EOF {
+			p.nextToken()
+
+			switch p.curToken.Type {
+			case lexer.STRING, lexer.IDENT:
+				stmt.Constraints = append(stmt.Constraints, p.curToken.Literal)
+			}
+
+			if p.peekToken.Type == lexer.COMMA {
+				p.nextToken()
+			}
+		}
+
+		if !p.expectPeek(lexer.RBRACKET) {
+			return nil
+		}
+	}
+
+	// Check for default value (defaults to "value")
+	if p.peekToken.Type == lexer.DEFAULTS {
+		p.nextToken() // consume DEFAULTS
+
+		if !p.expectPeek(lexer.TO) {
+			return nil
+		}
+
+		p.nextToken() // move to value
+
+		switch p.curToken.Type {
+		case lexer.STRING, lexer.BOOLEAN, lexer.NUMBER:
+			stmt.DefaultValue = p.curToken.Literal
+			stmt.HasDefault = true
+		default:
+			p.addError(fmt.Sprintf("expected default value, got %s", p.curToken.Type))
+			return nil
+		}
+	}
+
+	p.nextToken()
+	return stmt
+}
+
+// parseSnippetStatement parses a snippet definition
+// Syntax: snippet "name": <body>
+func (p *Parser) parseSnippetStatement() *ast.SnippetStatement {
+	stmt := &ast.SnippetStatement{Token: p.curToken}
+
+	// Expect snippet name (string)
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Name = p.curToken.Literal
+
+	// Expect colon
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Parse snippet body - expect INDENT and parse statements (similar to lifecycle hooks)
+	if p.peekToken.Type == lexer.INDENT {
+		p.nextToken() // consume INDENT
+
+		// Parse statements until DEDENT
+		for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+			p.nextToken() // Move to the next token
+
+			// Skip newlines and comments
+			if p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
+				continue
+			}
+
+			// Parse statement based on token type
+			var bodyStmt ast.Statement
+
+			if p.isActionToken(p.curToken.Type) {
+				if p.isShellActionToken(p.curToken.Type) {
+					bodyStmt = p.parseShellStatement()
+				} else {
+					bodyStmt = p.parseActionStatement()
+				}
+			} else if p.isVariableOperationToken(p.curToken.Type) {
+				bodyStmt = p.parseVariableStatement()
+			} else if p.isControlFlowToken(p.curToken.Type) {
+				bodyStmt = p.parseControlFlowStatement()
+			} else if p.curToken.Type == lexer.USE && p.peekToken.Type == lexer.SNIPPET {
+				p.nextToken() // consume SNIPPET
+				if p.expectPeek(lexer.STRING) {
+					bodyStmt = &ast.UseSnippetStatement{
+						Token:       p.curToken,
+						SnippetName: p.curToken.Literal,
+					}
+				}
+			} else if p.isCallToken(p.curToken.Type) {
+				bodyStmt = p.parseTaskCallStatement()
+			} else {
+				p.addError(fmt.Sprintf("unexpected token in snippet body: %s", p.curToken.Type))
+				break
+			}
+
+			if bodyStmt != nil {
+				stmt.Body = append(stmt.Body, bodyStmt)
+			}
+		}
+
+		// Consume DEDENT for snippet body and advance to next token for project parser
+		if p.peekToken.Type == lexer.DEDENT {
+			p.nextToken() // consume DEDENT for snippet body
+			p.nextToken() // advance to next token for project parser to continue
+		}
+	}
+
 	return stmt
 }
 
@@ -824,6 +1013,23 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, action)
 				}
 			}
+		} else if p.curToken.Type == lexer.USE {
+			// Check for USE snippet
+			if p.peekToken.Type == lexer.SNIPPET {
+				p.nextToken() // consume SNIPPET
+
+				if !p.expectPeek(lexer.STRING) {
+					continue
+				}
+
+				useSnippet := &ast.UseSnippetStatement{
+					Token:       p.curToken,
+					SnippetName: p.curToken.Literal,
+				}
+				stmt.Body = append(stmt.Body, useSnippet)
+			} else {
+				p.addError(fmt.Sprintf("expected 'snippet' after 'use', got %s", p.peekToken.Type))
+			}
 		} else if p.isCallToken(p.curToken.Type) {
 			call := p.parseTaskCallStatement()
 			if call != nil {
@@ -848,6 +1054,108 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	}
 
 	return stmt
+}
+
+// parseTaskOrTemplateInstance determines if this is a regular task or a task from template
+// parseTaskTemplateStatement parses a template task definition
+// Syntax: template task "name": <parameters and body>
+func (p *Parser) parseTaskTemplateStatement() *ast.TaskTemplateStatement {
+	stmt := &ast.TaskTemplateStatement{Token: p.curToken}
+
+	// Expect "task"
+	if !p.expectPeek(lexer.TASK) {
+		return nil
+	}
+
+	// Expect template name (string)
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Name = p.curToken.Literal
+
+	// Check for optional "means" clause
+	if p.peekToken.Type == lexer.MEANS {
+		p.nextToken() // consume MEANS
+
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Description = p.curToken.Literal
+	}
+
+	// Expect colon
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	// Expect INDENT to start template body
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+		return nil
+	}
+
+	// Parse template body (parameters and statements)
+	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+		p.nextToken()
+
+		// Skip newlines
+		for p.curToken.Type == lexer.NEWLINE && p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+			p.nextToken()
+		}
+
+		if p.curToken.Type == lexer.DEDENT || p.curToken.Type == lexer.EOF {
+			break
+		}
+
+		if p.isParameterToken(p.curToken.Type) {
+			param := p.parseParameterStatement()
+			if param != nil {
+				stmt.Parameters = append(stmt.Parameters, *param)
+			}
+		} else {
+			// Parse regular statements (delegate to existing statement parsing)
+			// For now, we'll just collect the body statements
+			bodyStmt := p.parseStatementInTaskBody()
+			if bodyStmt != nil {
+				stmt.Body = append(stmt.Body, bodyStmt)
+			}
+		}
+	}
+
+	// Consume DEDENT
+	if p.peekToken.Type == lexer.DEDENT {
+		p.nextToken() // Move to DEDENT
+		p.nextToken() // Move past DEDENT
+	}
+
+	return stmt
+}
+
+// parseStatementInTaskBody is a helper that parses statements within a task or template body
+func (p *Parser) parseStatementInTaskBody() ast.Statement {
+	// Check for USE snippet
+	if p.curToken.Type == lexer.USE {
+		if p.peekToken.Type == lexer.SNIPPET {
+			p.nextToken() // consume SNIPPET
+
+			if !p.expectPeek(lexer.STRING) {
+				return nil
+			}
+
+			return &ast.UseSnippetStatement{
+				Token:       p.curToken,
+				SnippetName: p.curToken.Literal,
+			}
+		}
+	}
+
+	// Delegate to existing statement parsing logic
+	if p.isActionToken(p.curToken.Type) {
+		return p.parseActionStatement()
+	} else if p.isShellActionToken(p.curToken.Type) {
+		return p.parseShellStatement()
+	}
+
+	return nil
 }
 
 // parseActionStatement parses an action statement (info, step, success, etc.)
@@ -920,7 +1228,11 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 
 		// Parse parameters - continue while we see parameter names (IDENT or keywords)
 		// We allow both IDENT and keywords as parameter names
-		for p.peekToken.Type == lexer.IDENT || p.isKeywordToken(p.peekToken.Type) {
+		// Stop when we hit tokens that indicate end of parameters
+		for (p.peekToken.Type == lexer.IDENT || p.isKeywordToken(p.peekToken.Type)) &&
+			p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.COMMENT &&
+			p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+
 			p.nextToken() // consume parameter name
 			paramName := p.curToken.Literal
 
@@ -3109,7 +3421,8 @@ func (p *Parser) isKeywordToken(tokenType lexer.TokenType) bool {
 		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
 		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK,
 		lexer.DOCKER, lexer.GIT, lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.PATCH, lexer.HEAD, lexer.OPTIONS,
-		lexer.DETECT, lexer.GIVEN, lexer.REQUIRES, lexer.DEFAULTS, lexer.BREAK, lexer.CONTINUE:
+		lexer.DETECT, lexer.GIVEN, lexer.REQUIRES, lexer.DEFAULTS, lexer.BREAK, lexer.CONTINUE,
+		lexer.USE, lexer.SNIPPET, lexer.TEMPLATE, lexer.PARAMETER, lexer.MIXIN, lexer.USES, lexer.INCLUDES:
 		// Structural keywords, action keywords, and statement-starting keywords
 		return false
 	default:
@@ -4403,6 +4716,23 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			errorHandling := p.parseErrorHandlingStatement()
 			if errorHandling != nil {
 				body = append(body, errorHandling)
+			}
+		} else if p.curToken.Type == lexer.USE {
+			// Check for USE snippet
+			if p.peekToken.Type == lexer.SNIPPET {
+				p.nextToken() // consume SNIPPET
+
+				if !p.expectPeek(lexer.STRING) {
+					continue
+				}
+
+				useSnippet := &ast.UseSnippetStatement{
+					Token:       p.curToken,
+					SnippetName: p.curToken.Literal,
+				}
+				body = append(body, useSnippet)
+			} else {
+				p.addError(fmt.Sprintf("expected 'snippet' after 'use', got %s", p.peekToken.Type))
 			}
 		} else if p.isCallToken(p.curToken.Type) {
 			call := p.parseTaskCallStatement()

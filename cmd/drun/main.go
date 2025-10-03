@@ -503,7 +503,7 @@ func showVersionInfo() error {
 	figletlib.PrintColoredMsg("dRun CLI", font, 80, font.Settings(), "left", gradientConfig)
 
 	fmt.Println("drun (do-run) automation language")
-	fmt.Println("XDrun (eXecute drun) CLI")
+	fmt.Println("xDrun (eXecute drun) CLI")
 	fmt.Println()
 	fmt.Println("Effortless tasks, serious speed.")
 	fmt.Println("By Phillarmonic Software <https://github.com/phillarmonic/drun>")

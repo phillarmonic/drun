@@ -1,0 +1,101 @@
+# Code Reuse Features Demo
+# This example demonstrates all the new code reuse features in drun v2:
+# - Project-level parameters
+# - Reusable snippets
+# - Task templates
+version: 2.0
+
+project "code-reuse-demo" version "1.0.0":
+	# Project-level parameters are shared across all tasks
+	parameter $no_cache as boolean defaults to "false"
+	parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
+	parameter $registry as string defaults to "docker.io"
+	
+	# Reusable snippets can be included in any task
+	snippet "show-config":
+		info "╔════════════════════════════════╗"
+		info "║     Build Configuration        ║"
+		info "╚════════════════════════════════╝"
+		info "Environment: {$environment}"
+		info "Registry: {$registry}"
+		info "No cache: {$no_cache}"
+		info ""
+	
+	snippet "cleanup":
+		info "Cleaning up build artifacts..."
+		info "Done"
+
+# Task templates allow you to define reusable task structures
+template task "docker-build":
+	given $target defaults to "prod"
+	given $tag defaults to "myapp:latest"
+	
+	step "Building Docker image"
+	use snippet "show-config"
+	info "Target: {$target}"
+	info "Full tag: {$registry}/{$tag}"
+	info "Command: docker build {$no_cache ? '--no-cache' : ''} --target={$target} -t {$registry}/{$tag} ."
+	success "Built {$tag}"
+
+# Regular task using snippet
+task "config" means "Show current configuration":
+	use snippet "show-config"
+
+# Tasks can call templates with custom parameters
+task "build:web" means "Build web application image":
+	info "=== Building Web Application ==="
+	call task "docker-build" with target="web" tag="myapp:web"
+	use snippet "cleanup"
+
+task "build:api" means "Build API server image":
+	info "=== Building API Server ==="
+	call task "docker-build" with target="api" tag="myapp:api"
+	use snippet "cleanup"
+
+task "build:worker" means "Build worker image":
+	info "=== Building Worker ==="
+	call task "docker-build" with target="worker" tag="myapp:worker"
+	use snippet "cleanup"
+
+# Task calling template with partial overrides (tag uses default)
+task "build:base" means "Build base image":
+	info "=== Building Base Image ==="
+	call task "docker-build" with target="base"
+
+# Comprehensive build task
+task "build:all" means "Build all Docker images":
+	info "════════════════════════════════════════"
+	info "  Building All Application Images"
+	info "════════════════════════════════════════"
+	info ""
+	
+	call task "build:base"
+	info ""
+	call task "build:web"
+	info ""
+	call task "build:api"
+	info ""
+	call task "build:worker"
+	info ""
+	
+	success "✨ All images built successfully!"
+	info ""
+	info "Try running with custom parameters:"
+	info "  drun build:web environment=prod registry=gcr.io"
+
+task "default" means "Show usage information":
+	info "╔════════════════════════════════════════════╗"
+	info "║  drun Code Reuse Features Demo            ║"
+	info "╚════════════════════════════════════════════╝"
+	info ""
+	info "Available commands:"
+	info "  config        - Show configuration"
+	info "  build:web     - Build web image"
+	info "  build:api     - Build API image"
+	info "  build:worker  - Build worker image"
+	info "  build:base    - Build base image"
+	info "  build:all     - Build all images"
+	info ""
+	info "Example with parameters:"
+	info "  drun build:web environment=prod no_cache=true"
+

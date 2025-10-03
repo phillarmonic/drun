@@ -52,14 +52,16 @@ type ExecutionContext struct {
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name          string                              // project name
-	Version       string                              // project version
-	Settings      map[string]string                   // project settings (set key to value)
-	BeforeHooks   []ast.Statement                     // before any task hooks
-	AfterHooks    []ast.Statement                     // after any task hooks
-	SetupHooks    []ast.Statement                     // on drun setup hooks
-	TeardownHooks []ast.Statement                     // on drun teardown hooks
-	ShellConfigs  map[string]*ast.PlatformShellConfig // platform-specific shell configurations
+	Name          string                                    // project name
+	Version       string                                    // project version
+	Settings      map[string]string                         // project settings (set key to value)
+	Parameters    map[string]*ast.ProjectParameterStatement // project-level shared parameters
+	Snippets      map[string]*ast.SnippetStatement          // reusable code snippets
+	BeforeHooks   []ast.Statement                           // before any task hooks
+	AfterHooks    []ast.Statement                           // after any task hooks
+	SetupHooks    []ast.Statement                           // on drun setup hooks
+	TeardownHooks []ast.Statement                           // on drun teardown hooks
+	ShellConfigs  map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
 }
 
 // NewEngine creates a new v2 execution engine
@@ -212,7 +214,50 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 // setupTaskParameters sets up parameters for a specific task
 func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]string, ctx *ExecutionContext) error {
-	// Set up parameters with defaults and validation
+	// First, add project-level parameters if they exist
+	if ctx.Project != nil && ctx.Project.Parameters != nil {
+		for paramName, projectParam := range ctx.Project.Parameters {
+			// Check if user provided a value via CLI
+			var rawValue string
+			var hasValue bool
+
+			if providedValue, exists := params[paramName]; exists {
+				rawValue = providedValue
+				hasValue = true
+			} else if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				// Determine parameter type
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				// Create typed value
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': invalid %s value '%s': %v",
+						paramName, paramType, rawValue, err))
+				}
+
+				// Validate constraints
+				if err := typedValue.ValidateConstraints(projectParam.Constraints); err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': %v", paramName, err))
+				}
+
+				if err := typedValue.ValidateAdvancedConstraints(projectParam.MinValue, projectParam.MaxValue, projectParam.Pattern, projectParam.PatternMacro, projectParam.EmailFormat); err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': %v", paramName, err))
+				}
+
+				ctx.Parameters[paramName] = typedValue
+			}
+		}
+	}
+
+	// Set up task-specific parameters with defaults and validation
 	for _, param := range task.Parameters {
 		var rawValue string
 		var hasValue bool
@@ -271,12 +316,14 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 	ctx := &ProjectContext{
 		Name:          project.Name,
 		Version:       project.Version,
-		Settings:      make(map[string]string, 8),                   // Pre-allocate for typical settings count
-		BeforeHooks:   make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
-		AfterHooks:    make([]ast.Statement, 0, 4),                  // Pre-allocate for typical hook count
-		SetupHooks:    make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
-		TeardownHooks: make([]ast.Statement, 0, 2),                  // Pre-allocate for typical hook count
-		ShellConfigs:  make(map[string]*ast.PlatformShellConfig, 4), // Pre-allocate for typical platform count
+		Settings:      make(map[string]string, 8),                         // Pre-allocate for typical settings count
+		Parameters:    make(map[string]*ast.ProjectParameterStatement, 8), // Pre-allocate for project parameters
+		Snippets:      make(map[string]*ast.SnippetStatement, 8),          // Pre-allocate for snippets
+		BeforeHooks:   make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
+		AfterHooks:    make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
+		SetupHooks:    make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
+		TeardownHooks: make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
+		ShellConfigs:  make(map[string]*ast.PlatformShellConfig, 4),       // Pre-allocate for typical platform count
 	}
 
 	// Process project settings
@@ -287,6 +334,12 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement) *ProjectCon
 			if s.Value != nil {
 				ctx.Settings[s.Key] = s.Value.String()
 			}
+		case *ast.ProjectParameterStatement:
+			// Store project-level parameter
+			ctx.Parameters[s.Name] = s
+		case *ast.SnippetStatement:
+			// Store snippet for later use
+			ctx.Snippets[s.Name] = s
 		case *ast.LifecycleHook:
 			switch s.Type {
 			case "before":
@@ -421,6 +474,10 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 		return e.executeLoop(s, ctx)
 	case *ast.TaskCallStatement:
 		return e.executeTaskCall(s, ctx)
+	case *ast.UseSnippetStatement:
+		return e.executeUseSnippet(s, ctx)
+	case *ast.TaskFromTemplateStatement:
+		return e.executeTaskFromTemplate(s, ctx)
 	default:
 		return fmt.Errorf("unknown statement type: %T", stmt)
 	}
@@ -490,12 +547,31 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 		return nil
 	}
 
-	// Find the task to call
+	// Find the task or template to call
 	var targetTask *ast.TaskStatement
-	for _, task := range ctx.Program.Tasks {
-		if task.Name == callStmt.TaskName {
-			targetTask = task
+
+	// First check if it's a template
+	for _, template := range ctx.Program.Templates {
+		if template.Name == callStmt.TaskName {
+			// Convert template to task for execution
+			targetTask = &ast.TaskStatement{
+				Token:       template.Token,
+				Name:        template.Name,
+				Description: template.Description,
+				Parameters:  template.Parameters,
+				Body:        template.Body,
+			}
 			break
+		}
+	}
+
+	// If not a template, check regular tasks
+	if targetTask == nil {
+		for _, task := range ctx.Program.Tasks {
+			if task.Name == callStmt.TaskName {
+				targetTask = task
+				break
+			}
 		}
 	}
 
@@ -530,6 +606,129 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 
 	// Copy back any new variables that might have been set in the called task
 	for k, v := range callCtx.Variables {
+		ctx.Variables[k] = v
+	}
+
+	return nil
+}
+
+// executeUseSnippet executes a snippet by running its body statements
+func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *ExecutionContext) error {
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute snippet: %s\n", useStmt.SnippetName)
+		return nil
+	}
+
+	// Find the snippet in the project context
+	if ctx.Project == nil || ctx.Project.Snippets == nil {
+		return fmt.Errorf("snippet '%s' not found: no project context", useStmt.SnippetName)
+	}
+
+	snippet, exists := ctx.Project.Snippets[useStmt.SnippetName]
+	if !exists {
+		return fmt.Errorf("snippet '%s' not found", useStmt.SnippetName)
+	}
+
+	// Execute all statements in the snippet body
+	for _, stmt := range snippet.Body {
+		if err := e.executeStatement(stmt, ctx); err != nil {
+			return fmt.Errorf("error executing snippet '%s': %w", useStmt.SnippetName, err)
+		}
+	}
+
+	return nil
+}
+
+// executeTaskFromTemplate instantiates and executes a task from a template
+func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ctx *ExecutionContext) error {
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would instantiate task '%s' from template '%s'\n", tfts.Name, tfts.TemplateName)
+		return nil
+	}
+
+	// Find the template in the program
+	if ctx.Program == nil || ctx.Program.Templates == nil {
+		return fmt.Errorf("template '%s' not found: no templates defined", tfts.TemplateName)
+	}
+
+	var template *ast.TaskTemplateStatement
+	for _, tmpl := range ctx.Program.Templates {
+		if tmpl.Name == tfts.TemplateName {
+			template = tmpl
+			break
+		}
+	}
+
+	if template == nil {
+		return fmt.Errorf("template '%s' not found", tfts.TemplateName)
+	}
+
+	// Create a new execution context for the instantiated task
+	taskCtx := &ExecutionContext{
+		Parameters:  make(map[string]*types.Value, 8),
+		Variables:   make(map[string]string, 16),
+		Project:     ctx.Project,
+		CurrentFile: ctx.CurrentFile,
+		CurrentTask: tfts.Name,
+		Program:     ctx.Program,
+	}
+
+	// Copy current variables to the new context
+	for k, v := range ctx.Variables {
+		taskCtx.Variables[k] = v
+	}
+
+	// Set up parameters from the template with overrides from the instantiation
+	for _, param := range template.Parameters {
+		var rawValue string
+		var hasValue bool
+
+		// Check if there's an override value
+		if overrideValue, exists := tfts.Overrides[param.Name]; exists {
+			rawValue = overrideValue
+			hasValue = true
+		} else if param.HasDefault {
+			// Use the template's default value
+			rawValue = e.interpolateVariables(param.DefaultValue, taskCtx)
+			hasValue = true
+		} else if param.Required {
+			return fmt.Errorf("required parameter '%s' not provided for template '%s'", param.Name, tfts.TemplateName)
+		}
+
+		// Create typed value if we have a value
+		if hasValue {
+			paramType, err := types.ParseParameterType(param.DataType)
+			if err != nil {
+				paramType = types.InferType(rawValue)
+			}
+
+			typedValue, err := types.NewValue(paramType, rawValue)
+			if err != nil {
+				return fmt.Errorf("parameter '%s': invalid %s value '%s': %v",
+					param.Name, paramType, rawValue, err)
+			}
+
+			if err := typedValue.ValidateConstraints(param.Constraints); err != nil {
+				return fmt.Errorf("parameter '%s': %v", param.Name, err)
+			}
+
+			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.PatternMacro, param.EmailFormat); err != nil {
+				return fmt.Errorf("parameter '%s': %v", param.Name, err)
+			}
+
+			taskCtx.Parameters[param.Name] = typedValue
+		}
+	}
+
+	// Execute the template body
+	for _, stmt := range template.Body {
+		if err := e.executeStatement(stmt, taskCtx); err != nil {
+			return fmt.Errorf("error executing template task '%s': %w", tfts.Name, err)
+		}
+	}
+
+	// Copy back any new variables that might have been set
+	for k, v := range taskCtx.Variables {
 		ctx.Variables[k] = v
 	}
 

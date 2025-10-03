@@ -40,6 +40,7 @@ task "hello":
 
 ### 🌟 **Advanced Features**
 
+- **♻️ Code Reuse**: Project-level parameters, reusable snippets, and task templates for DRY automation ⭐ *New*
 - **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
 - **📞 Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
@@ -1241,7 +1242,102 @@ Run benchmarks yourself:
 ./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```
 
+### ♻️ **Code Reuse Features** ⭐ *New*
+
+drun v2 now supports powerful code reuse mechanisms to eliminate duplication and maintain DRY principles:
+
+#### Project-Level Parameters
+
+Define shared configuration once at the project level:
+
+```drun
+project "my-app" version "1.0.0":
+  parameter $no_cache as boolean defaults to "false"
+  parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
+  parameter $registry as string defaults to "docker.io"
+
+task "build":
+  info "Building for {$environment}"
+  info "Registry: {$registry}"
+```
+
+```bash
+# Override at runtime
+xdrun build environment=prod registry=gcr.io
+```
+
+#### Reusable Snippets
+
+Define common code blocks that can be reused across tasks:
+
+```drun
+project "my-app" version "1.0.0":
+  snippet "log-header":
+    info "═══════════════════════════════"
+    info "  Starting Task"
+    info "═══════════════════════════════"
+  
+  snippet "cleanup":
+    info "Cleaning up..."
+    info "Done"
+
+task "build":
+  use snippet "log-header"
+  info "Building..."
+  use snippet "cleanup"
+
+task "deploy":
+  use snippet "log-header"
+  info "Deploying..."
+  use snippet "cleanup"
+```
+
+#### Task Templates
+
+Create parameterized task templates that act like functions:
+
+```drun
+# Define a template
+template task "docker-build":
+  given $target defaults to "prod"
+  given $tag defaults to "latest"
+  
+  info "Building {$target} with tag {$tag}"
+  # Build logic here
+
+# Use the template with different parameters
+task "build:web":
+  call task "docker-build" with target="web" tag="myapp:web"
+
+task "build:api":
+  call task "docker-build" with target="api" tag="myapp:api"
+
+task "build:worker":
+  call task "docker-build" with target="worker" tag="myapp:worker"
+```
+
+**Benefits:**
+
+- **♻️ DRY Principle**: Eliminate duplication across tasks
+- **🔧 Maintainable**: Update logic in one place
+- **🎯 Type-Safe**: Full validation on all parameters
+- **📝 Readable**: Clear, semantic names for reusable components
+- **🔀 Flexible**: Mix and match project parameters, snippets, and templates
+
+**See it in action:**
+
+```bash
+# Try the comprehensive code reuse example
+xdrun -f examples/code-reuse-demo.drun build:all
+
+# With custom parameters
+xdrun -f examples/code-reuse-demo.drun build:web environment=prod no_cache=true
+```
+
+---
+
 ## 📚 Documentation
 
-- **[drun v2 Specification](DRUN_V2_SPECIFICATION.md)** - Complete v2 language specification with HTTP actions
+- **[drun v2 Specification](DRUN_V2_SPECIFICATION.md)** - Complete v2 language specification with code reuse features
+- **[Code Reuse Features](DRUN_V2_SPECIFICATION.md#code-reuse-features)** - Detailed documentation on project parameters, snippets, and templates
 - **[Examples Directory](examples/)** - Real-world usage examples and patterns

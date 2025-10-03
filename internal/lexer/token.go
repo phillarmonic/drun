@@ -36,6 +36,15 @@ const (
 	OR       // or
 	CALL     // call
 
+	// Code reuse keywords
+	PARAMETER // parameter
+	SNIPPET   // snippet
+	TEMPLATE  // template
+	MIXIN     // mixin
+	USES      // uses
+	INCLUDES  // includes
+	USE       // use
+
 	// Docker keywords
 	DOCKER    // docker
 	IMAGE     // image
@@ -405,6 +414,20 @@ func (t TokenType) String() string {
 		return "OR"
 	case CALL:
 		return "CALL"
+	case PARAMETER:
+		return "PARAMETER"
+	case SNIPPET:
+		return "SNIPPET"
+	case TEMPLATE:
+		return "TEMPLATE"
+	case MIXIN:
+		return "MIXIN"
+	case USES:
+		return "USES"
+	case INCLUDES:
+		return "INCLUDES"
+	case USE:
+		return "USE"
 	case DOCKER:
 		return "DOCKER"
 	case IMAGE:
@@ -966,6 +989,13 @@ var keywords = map[string]TokenType{
 	"and":         AND,
 	"or":          OR,
 	"call":        CALL,
+	"parameter":   PARAMETER,
+	"snippet":     SNIPPET,
+	"template":    TEMPLATE,
+	"mixin":       MIXIN,
+	"uses":        USES,
+	"includes":    INCLUDES,
+	"use":         USE,
 	"docker":      DOCKER,
 	"image":       IMAGE,
 	"container":   CONTAINER,
