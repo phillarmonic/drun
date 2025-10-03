@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Configuration
 REPO="phillarmonic/drun"
-BINARY_NAME="drun-cli"
+BINARY_NAME="xdrun"
 # Default install directory will be set after platform detection
 INSTALL_DIR="${INSTALL_DIR:-}"
 GITHUB_API="https://api.github.com/repos/${REPO}"
@@ -98,9 +98,9 @@ check_platform() {
     
     # Set binary name with extension for Windows
     if [[ "$os" == "windows" ]]; then
-        RELEASE_BINARY="drun-cli-${os}-${arch}.exe"
+        RELEASE_BINARY="xdrun-${os}-${arch}.exe"
     else
-        RELEASE_BINARY="drun-cli-${os}-${arch}"
+        RELEASE_BINARY="xdrun-${os}-${arch}"
     fi
     
     log_info "Detected platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"
@@ -452,11 +452,11 @@ main() {
     check_path
     
     echo ""
-    log_success "🎉 drun installation completed successfully!"
+    log_success "🎉 xdrun CLI installation completed successfully!"
     echo ""
     log_info "Get started with:"
-    log_info "  drun-cli --help"
-    log_info "  drun-cli --init"
+    log_info "  xdrun --help"
+    log_info "  xdrun --init"
     log_info ""
     log_info "Documentation: https://github.com/${REPO}"
     log_info "Examples: https://github.com/${REPO}/tree/master/examples"

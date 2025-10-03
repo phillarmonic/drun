@@ -17,7 +17,7 @@ echo "Commit: ${COMMIT}"
 echo "Date: ${DATE}"
 echo
 
-go build -ldflags "${LDFLAGS}" -o bin/drun-cli ./cmd/drun
+go build -ldflags "${LDFLAGS}" -o bin/xdrun ./cmd/drun
 
-echo "✅ Build complete: bin/drun-cli"
-echo "Test with: ./bin/drun-cli --version"
+echo "✅ Build complete: bin/xdrun"
+echo "Test with: ./bin/xdrun --version"

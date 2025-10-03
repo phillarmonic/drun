@@ -74,21 +74,21 @@ run_test() {
 
 # Test 1: Basic interpolation with default values
 run_test "Basic interpolation with defaults" \
-    "./drun-cli -f examples/03-interpolation.drun greet name=Andy" \
+    "./xdrun -f examples/03-interpolation.drun greet name=Andy" \
     "Hello, friend Andy!" \
     "Processing greeting for Andy" \
     "Greeting completed for friend Andy!"
 
 # Test 2: Custom parameter values
 run_test "Custom parameter values" \
-    "./drun-cli -f examples/03-interpolation.drun greet name=Bob title=buddy" \
+    "./xdrun -f examples/03-interpolation.drun greet name=Bob title=buddy" \
     "Hello, buddy Bob!" \
     "Processing greeting for Bob" \
     "Greeting completed for buddy Bob!"
 
 # Test 3: Deploy task with constraints
 run_test "Deploy task with constraints" \
-    "./drun-cli -f examples/03-interpolation.drun deploy environment=staging app_version=v1.2.3" \
+    "./xdrun -f examples/03-interpolation.drun deploy environment=staging app_version=v1.2.3" \
     "Deploying version v1.2.3 to staging" \
     "Environment: staging" \
     "Version: v1.2.3" \
@@ -96,7 +96,7 @@ run_test "Deploy task with constraints" \
 
 # Test 4: Deploy with default version
 run_test "Deploy with default version" \
-    "./drun-cli -f examples/03-interpolation.drun deploy environment=dev" \
+    "./xdrun -f examples/03-interpolation.drun deploy environment=dev" \
     "Deploying version latest to dev" \
     "Environment: dev" \
     "Version: latest" \
@@ -104,7 +104,7 @@ run_test "Deploy with default version" \
 
 # Test 5: Backup task with default name
 run_test "Backup with default name" \
-    "./drun-cli -f examples/03-interpolation.drun backup source_path=/home/user/data" \
+    "./xdrun -f examples/03-interpolation.drun backup source_path=/home/user/data" \
     "Creating backup: backup-2024-01-01" \
     "Source: /home/user/data" \
     "Backup: backup-2024-01-01" \
@@ -112,7 +112,7 @@ run_test "Backup with default name" \
 
 # Test 6: Backup with custom name
 run_test "Backup with custom name" \
-    "./drun-cli -f examples/03-interpolation.drun backup source_path=/tmp/data backup_name=my-backup" \
+    "./xdrun -f examples/03-interpolation.drun backup source_path=/tmp/data backup_name=my-backup" \
     "Creating backup: my-backup" \
     "Source: /tmp/data" \
     "Backup: my-backup" \
@@ -131,7 +131,7 @@ task "empty":
 EOF
 
 run_test "Empty parameter values" \
-    "./drun-cli -f /tmp/test-empty.drun empty name=" \
+    "./xdrun -f /tmp/test-empty.drun empty name=" \
     "Name: '', Title: ''"
 
 # Test 8: Edge case - special characters
@@ -146,7 +146,7 @@ task "special":
 EOF
 
 run_test "Special characters in parameters" \
-    "./drun-cli -f /tmp/test-special.drun special \"message=Hello World!\"" \
+    "./xdrun -f /tmp/test-special.drun special \"message=Hello World!\"" \
     "Message: Hello World!"
 
 # Test 9: Multiple same variable in one string
@@ -161,7 +161,7 @@ task "repeat":
 EOF
 
 run_test "Multiple same variable" \
-    "./drun-cli -f /tmp/test-repeat.drun repeat word=echo" \
+    "./xdrun -f /tmp/test-repeat.drun repeat word=echo" \
     "echo echo echo!"
 
 # Test 10: Undefined variable should remain as placeholder
@@ -176,7 +176,7 @@ task "undefined":
 EOF
 
 run_test "Undefined variables remain as placeholders" \
-    "./drun-cli -f /tmp/test-undefined.drun undefined name=Alice" \
+    "./xdrun -f /tmp/test-undefined.drun undefined name=Alice" \
     "Hello Alice, undefined: {\$undefined_var}"
 
 # Clean up temporary files

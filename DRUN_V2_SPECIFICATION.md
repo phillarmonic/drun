@@ -1,4 +1,4 @@
-# drun v2 Semantic Language Specification
+# drun v2 Semantic Language Specification (execute with xdrun CLI)
 
 **Version**: 2.0.0-draft  
 **Date**: 2025-09-17  
@@ -523,7 +523,7 @@ task "invalid":
 - **Choose one style**: Use either tabs or spaces consistently throughout your project
 - **Editor configuration**: Configure your editor to show whitespace characters
 - **Team standards**: Establish indentation standards for your team
-- **Generated files**: `drun-cli --init` uses tabs by default
+- **Generated files**: `xdrun --init` uses tabs by default
 
 ### String Interpolation
 
@@ -1875,7 +1875,7 @@ task "deploy":
   requires $environment from ["dev", "staging", "production"]
   requires $version matching pattern "v\d+\.\d+\.\d+"
   
-  # Usage: drun-cli deploy environment=production version=v1.2.3
+  # Usage: xdrun deploy environment=production version=v1.2.3
 ```
 
 #### Required Parameters with Defaults
@@ -1888,10 +1888,10 @@ task "build":
   requires $cache from ["yes", "no"] defaults to "no"
   
   # Usage without cache parameter (uses default "no"):
-  # drun-cli build image=base
+  # xdrun build image=base
   
   # Usage with cache parameter override:
-  # drun-cli build image=base cache=yes
+  # xdrun build image=base cache=yes
 ```
 
 **Important validation rules:**
@@ -1913,12 +1913,12 @@ Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix r
 
 ```bash
 # Parameter passing examples
-drun-cli deploy environment=production
-drun-cli build tag=v1.2.3 push=true
-drun-cli test suites=unit,integration verbose=true
+xdrun deploy environment=production
+xdrun build tag=v1.2.3 push=true
+xdrun test suites=unit,integration verbose=true
 
 # Multiple parameters
-drun-cli deploy environment=staging replicas=5 timeout=300
+xdrun deploy environment=staging replicas=5 timeout=300
 ```
 
 #### Optional Parameters
@@ -1929,8 +1929,8 @@ task "build":
   given $push defaults to false
   given $platforms defaults to ["linux/amd64"]
   
-  # Usage: drun-cli build
-  # Usage: drun-cli build tag=custom push=true
+  # Usage: xdrun build
+  # Usage: xdrun build tag=custom push=true
 ```
 
 #### Variadic Parameters
@@ -1940,7 +1940,7 @@ task "test":
   accepts $suites as list of strings
   accepts flags as list
   
-  # Usage: drun-cli test --suites=unit,integration --flags=--verbose,--coverage
+  # Usage: xdrun test --suites=unit,integration --flags=--verbose,--coverage
 ```
 
 ### Parameter Validation

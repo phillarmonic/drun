@@ -1,4 +1,4 @@
-# drun v2 Examples
+# drun v2 Examples (execute with xdrun CLI)
 
 Welcome to drun v2! This directory contains examples showcasing the new **semantic, English-like language** for defining automation tasks. The v2 language compiles to shell commands while providing intuitive, readable syntax that anyone can understand.
 
@@ -193,22 +193,22 @@ Once the v2 compiler is ready, you'll run examples like this:
 
 ```bash
 # Basic examples
-drun-cli -f 01-hello-world.drun hello
-drun-cli -f 02-parameters.drun greet --name=Alice --title=Ms.
-drun-cli -f 02-parameters.drun "build docker" image=base dest=local
-drun-cli -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
+xdrun -f 01-hello-world.drun hello
+xdrun -f 02-parameters.drun greet --name=Alice --title=Ms.
+xdrun -f 02-parameters.drun "build docker" image=base dest=local
+xdrun -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
 
 # Docker examples  
-drun-cli -f 04-docker-basics.drun build --tag=v1.0.0
-drun-cli -f 04-docker-basics.drun "run local" --port=3000
+xdrun -f 04-docker-basics.drun build --tag=v1.0.0
+xdrun -f 04-docker-basics.drun "run local" --port=3000
 
 # Kubernetes examples
-drun-cli -f 05-kubernetes.drun deploy --environment=staging
-drun-cli -f 05-kubernetes.drun scale --environment=production --replica_count=10
+xdrun -f 05-kubernetes.drun deploy --environment=staging
+xdrun -f 05-kubernetes.drun scale --environment=production --replica_count=10
 
 # CI/CD pipeline
-drun-cli -f 06-cicd-pipeline.drun "ci pipeline"
-drun-cli -f 06-cicd-pipeline.drun "deploy to staging"
+xdrun -f 06-cicd-pipeline.drun "ci pipeline"
+xdrun -f 06-cicd-pipeline.drun "deploy to staging"
 ```
 
 ## 📖 Language Reference

@@ -101,18 +101,18 @@ func completeTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "[drun CLI cmd] Generate completion script",
+	Short: "[xdrun CLI cmd] Generate completion script",
 	Long: `To load completions:
 
 Bash:
 
-  $ source <(drun-cli completion bash)
+  $ source <(xdrun completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ drun-cli completion bash > /etc/bash_completion.d/drun-cli
+  $ xdrun completion bash > /etc/bash_completion.d/xdrun
   # macOS:
-  $ drun-cli completion bash > $(brew --prefix)/etc/bash_completion.d/drun-cli
+  $ xdrun completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
 
 Zsh:
 
@@ -122,23 +122,23 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ drun-cli completion zsh > "${fpath[1]}/_drun-cli"
+  $ xdrun completion zsh > "${fpath[1]}/_xdrun"
 
   # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-  $ drun-cli completion fish | source
+  $ xdrun completion fish | source
 
   # To load completions for each session, execute once:
-  $ drun-cli completion fish > ~/.config/fish/completions/drun-cli.fish
+  $ xdrun completion fish > ~/.config/fish/completions/xdrun.fish
 
 PowerShell:
 
-  PS> drun-cli completion powershell | Out-String | Invoke-Expression
+  PS> xdrun completion powershell | Out-String | Invoke-Expression
 
   # To load completions for every new session, run:
-  PS> drun-cli completion powershell > drun-cli.ps1
+  PS> xdrun completion powershell > xdrun.ps1
   # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,
@@ -166,19 +166,21 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "drun-cli [task] [args...]",
-	Short: "[drun CLI cmd] A semantic task runner with natural language syntax",
-	Long: `drun-cli v2 is a task runner that uses semantic, English-like syntax to define automation tasks.
+	Use:   "xdrun [task] [args...]",
+	Short: "[xdrun CLI cmd] Execute drun automation language",
+	Long: `xdrun is the CLI interpreter for the drun automation language.
+
+drun uses semantic, English-like syntax to define automation tasks.
 It supports natural language commands, smart detection, and direct execution without compilation.
 
 Examples:
-  drun-cli hello                    # Run the 'hello' task
-  drun-cli build --env=production   # Run 'build' task with environment
-  drun-cli --list                   # List all available tasks
-  drun-cli --init                   # Create a new drun file
-  drun-cli --debug --tokens         # Debug lexer tokens
-  drun-cli --debug --ast            # Debug AST structure
-  drun-cli --debug --full           # Full debug output`,
+  xdrun hello                    # Run the 'hello' task from a .drun file
+  xdrun build --env=production   # Run 'build' task with environment
+  xdrun --list                   # List all available tasks
+  xdrun --init                   # Create a new .drun file
+  xdrun --debug --tokens         # Debug lexer tokens
+  xdrun --debug --ast            # Debug AST structure
+  xdrun --debug --full           # Full debug output`,
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
@@ -186,25 +188,25 @@ Examples:
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "[drun CLI cmd] Task file (default: .drun/spec.drun or workspace configured file)")
-	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "[drun CLI cmd] List available tasks")
-	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "[drun CLI cmd] Show what would be executed without running")
-	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "[drun CLI cmd] Show detailed execution information")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "[drun CLI cmd] Show version information")
-	rootCmd.Flags().BoolVar(&initConfig, "init", false, "[drun CLI cmd] Initialize a new .drun task file")
-	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[drun CLI cmd] Save custom file name as workspace default (use with --init)")
-	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[drun CLI cmd] Set workspace default task file location")
-	rootCmd.Flags().BoolVar(&selfUpdate, "self-update", false, "[drun CLI cmd] Check for updates and update drun to the latest version")
-	rootCmd.Flags().BoolVar(&allowUndefinedVars, "allow-undefined-variables", false, "[drun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
+	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "[xdrun CLI cmd] Task file (default: .drun/spec.drun or workspace configured file)")
+	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "[xdrun CLI cmd] List available tasks")
+	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "[xdrun CLI cmd] Show what would be executed without running")
+	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "[xdrun CLI cmd] Show detailed execution information")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "[xdrun CLI cmd] Show version information")
+	rootCmd.Flags().BoolVar(&initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
+	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init)")
+	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[xdrun CLI cmd] Set workspace default task file location")
+	rootCmd.Flags().BoolVar(&selfUpdate, "self-update", false, "[xdrun CLI cmd] Check for updates and update xdrun to the latest version")
+	rootCmd.Flags().BoolVar(&allowUndefinedVars, "allow-undefined-variables", false, "[xdrun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
 
 	// Debug flags
-	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "[drun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
-	rootCmd.Flags().BoolVar(&debugTokens, "debug-tokens", false, "[drun CLI cmd] Show lexer tokens (requires --debug)")
-	rootCmd.Flags().BoolVar(&debugAST, "debug-ast", false, "[drun CLI cmd] Show AST structure (requires --debug)")
-	rootCmd.Flags().BoolVar(&debugJSON, "debug-json", false, "[drun CLI cmd] Show AST as JSON (requires --debug)")
-	rootCmd.Flags().BoolVar(&debugErrors, "debug-errors", false, "[drun CLI cmd] Show parse errors only (requires --debug)")
-	rootCmd.Flags().BoolVar(&debugFull, "debug-full", false, "[drun CLI cmd] Show full debug output (requires --debug)")
-	rootCmd.Flags().StringVar(&debugInput, "debug-input", "", "[drun CLI cmd] Debug input string directly instead of file (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "[xdrun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
+	rootCmd.Flags().BoolVar(&debugTokens, "debug-tokens", false, "[xdrun CLI cmd] Show lexer tokens (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugAST, "debug-ast", false, "[xdrun CLI cmd] Show AST structure (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugJSON, "debug-json", false, "[xdrun CLI cmd] Show AST as JSON (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugErrors, "debug-errors", false, "[xdrun CLI cmd] Show parse errors only (requires --debug)")
+	rootCmd.Flags().BoolVar(&debugFull, "debug-full", false, "[xdrun CLI cmd] Show full debug output (requires --debug)")
+	rootCmd.Flags().StringVar(&debugInput, "debug-input", "", "[xdrun CLI cmd] Debug input string directly instead of file (requires --debug)")
 
 	// Add completion commands
 	rootCmd.AddCommand(completionCmd)
@@ -545,7 +547,7 @@ func initializeConfig(filename string) error {
 		}
 	}
 
-	fmt.Println("🚀 Get started with: drun --list")
+	fmt.Println("🚀 Get started with: xdrun --list")
 	return nil
 }
 
@@ -856,7 +858,7 @@ func createBackup(currentExe string) (string, error) {
 
 	// Create timestamped backup filename
 	timestamp := time.Now().Format("20060102_150405")
-	backupFilename := fmt.Sprintf("drun-cli_%s_backup_%s", normalizeVersion(version), timestamp)
+	backupFilename := fmt.Sprintf("xdrun_%s_backup_%s", normalizeVersion(version), timestamp)
 	if runtime.GOOS == "windows" {
 		backupFilename += ".exe"
 	}
@@ -897,7 +899,7 @@ func downloadAndInstall(version, targetPath string) error {
 	}
 
 	// Construct download URL
-	binaryName := fmt.Sprintf("drun-cli-%s-%s", goos, arch)
+	binaryName := fmt.Sprintf("xdrun-%s-%s", goos, arch)
 	if goos == "windows" {
 		binaryName += ".exe"
 	}
@@ -1035,7 +1037,7 @@ func restoreBackup(backupPath, targetPath string) error {
 
 // cleanupOldBackups removes old backup files, keeping only the last 5
 func cleanupOldBackups(backupDir string) {
-	files, err := filepath.Glob(filepath.Join(backupDir, "drun-cli*backup*"))
+	files, err := filepath.Glob(filepath.Join(backupDir, "xdrun*backup*"))
 	if err != nil {
 		return
 	}

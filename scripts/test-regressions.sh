@@ -29,7 +29,7 @@ echo "=================================================="
 # Build fresh binary
 echo -e "${BLUE}📦 Building fresh drun binary...${NC}"
 cd /Users/andy/repos/phillarmonic/drun
-go build -o drun-cli ./cmd/drun
+go build -o xdrun ./cmd/drun
 echo -e "${GREEN}✅ Build completed${NC}"
 echo
 
@@ -41,7 +41,7 @@ test_file() {
     echo -e "${BLUE}🔍 Testing: ${filename}${NC}"
     
     # First, try to list tasks to see if file parses
-    if ! ./drun-cli -f "$file" -l > /dev/null 2>&1; then
+    if ! ./xdrun -f "$file" -l > /dev/null 2>&1; then
         echo -e "${RED}❌ FAILED: ${filename} - Parse error${NC}"
         FAILED_FILES+=("$filename (parse error)")
         ((FAILED_TESTS++))
@@ -49,7 +49,7 @@ test_file() {
     fi
     
     # Get the first task from the file
-    local first_task=$(./drun-cli -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | awk '{print $1}' | tr -d ' ')
+    local first_task=$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | awk '{print $1}' | tr -d ' ')
     
     if [ -z "$first_task" ]; then
         echo -e "${YELLOW}⚠️  SKIPPED: ${filename} - No tasks found${NC}"
@@ -61,14 +61,14 @@ test_file() {
     # Handle multi-word task names by trying different approaches
     local task_names=(
         "$first_task"
-        "$(./drun-cli -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed 's/  .*//')"
+        "$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed 's/  .*//')"
     )
     
     local success=false
     for task_name in "${task_names[@]}"; do
         if [ -n "$task_name" ]; then
             # Try to run the task in dry-run mode
-            if ./drun-cli -f "$file" "$task_name" --dry-run > /dev/null 2>&1; then
+            if ./xdrun -f "$file" "$task_name" --dry-run > /dev/null 2>&1; then
                 echo -e "${GREEN}✅ PASSED: ${filename} (task: ${task_name})${NC}"
                 PASSED_FILES+=("$filename")
                 ((PASSED_TESTS++))
@@ -86,7 +86,7 @@ test_file() {
                 )
                 
                 for params in "${param_attempts[@]}"; do
-                    if ./drun-cli -f "$file" "$task_name" $params --dry-run > /dev/null 2>&1; then
+                    if ./xdrun -f "$file" "$task_name" $params --dry-run > /dev/null 2>&1; then
                         echo -e "${GREEN}✅ PASSED: ${filename} (task: ${task_name} with params: ${params})${NC}"
                         PASSED_FILES+=("$filename")
                         ((PASSED_TESTS++))
