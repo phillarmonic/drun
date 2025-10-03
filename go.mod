@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/mholt/archives v0.1.4
-	github.com/phillarmonic/SoloDB v1.0.0
+	github.com/phillarmonic/SoloDB v1.0.1
 	github.com/phillarmonic/figlet v1.2.0
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1
