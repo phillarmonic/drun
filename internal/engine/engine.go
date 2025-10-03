@@ -16,12 +16,14 @@ import (
 	"github.com/mholt/archives"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
+	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/detection"
 	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/fileops"
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parallel"
 	"github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/internal/remote"
 	"github.com/phillarmonic/drun/internal/shell"
 	"github.com/phillarmonic/drun/internal/types"
 )
@@ -32,6 +34,12 @@ type Engine struct {
 	dryRun             bool
 	verbose            bool
 	allowUndefinedVars bool
+
+	// Remote includes support
+	cacheManager  *cache.Manager
+	githubFetcher *remote.GitHubFetcher
+	httpsFetcher  *remote.HTTPSFetcher
+	tempFiles     []string // Track temp files for cleanup
 
 	// Cached regex patterns for performance
 	interpolationRegex *regexp.Regexp
@@ -75,8 +83,11 @@ func NewEngine(output io.Writer) *Engine {
 		output = os.Stdout
 	}
 	return &Engine{
-		output: output,
-		dryRun: false,
+		output:        output,
+		dryRun:        false,
+		githubFetcher: remote.NewGitHubFetcher(),
+		httpsFetcher:  remote.NewHTTPSFetcher(),
+		tempFiles:     []string{},
 
 		// Pre-compile regex patterns for performance
 		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
@@ -99,6 +110,28 @@ func (e *Engine) SetVerbose(verbose bool) {
 // SetAllowUndefinedVars enables or disables strict variable checking
 func (e *Engine) SetAllowUndefinedVars(allow bool) {
 	e.allowUndefinedVars = allow
+}
+
+// SetCacheEnabled enables or disables remote include caching
+func (e *Engine) SetCacheEnabled(enabled bool) error {
+	var err error
+	if enabled {
+		e.cacheManager, err = cache.NewManager(1*time.Minute, false)
+	} else {
+		e.cacheManager, err = cache.NewManager(0, true) // disabled
+	}
+	return err
+}
+
+// Cleanup removes temporary files created during execution
+func (e *Engine) Cleanup() {
+	for _, f := range e.tempFiles {
+		_ = os.Remove(f)
+	}
+	e.tempFiles = nil
+	if e.cacheManager != nil {
+		_ = e.cacheManager.Close()
+	}
 }
 
 // Execute runs a v2 program with no parameters
@@ -4900,7 +4933,13 @@ func (e *Engine) decompressFile(decompressor archives.Decompressor, reader io.Re
 // processInclude loads and merges an included file into the project context
 func (e *Engine) processInclude(ctx *ProjectContext, include *ast.IncludeStatement, currentFile string) {
 	// Resolve the include path relative to the current file
-	includePath := e.resolveIncludePath(include.Path, currentFile)
+	includePath, err := e.resolveIncludePath(include.Path, currentFile)
+	if err != nil {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Failed to resolve include path %s: %v\n", include.Path, err)
+		}
+		return
+	}
 
 	// Check for circular includes
 	if ctx.IncludedFiles[includePath] {
@@ -4999,10 +5038,15 @@ func (e *Engine) processInclude(ctx *ProjectContext, include *ast.IncludeStateme
 }
 
 // resolveIncludePath resolves the include path relative to the current file
-func (e *Engine) resolveIncludePath(includePath, currentFile string) string {
+func (e *Engine) resolveIncludePath(includePath, currentFile string) (string, error) {
+	// Check if remote URL
+	if remote.IsRemoteURL(includePath) {
+		return e.fetchRemoteInclude(includePath)
+	}
+
 	// If absolute path, use as-is
 	if filepath.IsAbs(includePath) {
-		return includePath
+		return includePath, nil
 	}
 
 	// Get the directory of the current file
@@ -5013,7 +5057,7 @@ func (e *Engine) resolveIncludePath(includePath, currentFile string) string {
 	if _, err := os.Stat(resolvedPath); err == nil {
 		// Make it absolute
 		absPath, _ := filepath.Abs(resolvedPath)
-		return absPath
+		return absPath, nil
 	}
 
 	// Try relative to workspace root (current working directory)
@@ -5021,10 +5065,106 @@ func (e *Engine) resolveIncludePath(includePath, currentFile string) string {
 		resolvedPath = filepath.Join(cwd, includePath)
 		if _, err := os.Stat(resolvedPath); err == nil {
 			absPath, _ := filepath.Abs(resolvedPath)
-			return absPath
+			return absPath, nil
 		}
 	}
 
 	// Fall back to the original path (will likely fail when reading)
-	return includePath
+	return includePath, nil
+}
+
+// fetchRemoteInclude fetches a remote include and returns the path to a temp file
+func (e *Engine) fetchRemoteInclude(url string) (string, error) {
+	protocol, path, ref, err := remote.ParseRemoteURL(url)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate cache key
+	cacheKey := cache.GenerateKey(url, ref)
+
+	// Check cache (if enabled)
+	if e.cacheManager != nil {
+		if content, hit, err := e.cacheManager.Get(cacheKey); err == nil && hit {
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "  ✓ Cache hit for %s\n", url)
+			}
+			return e.writeTempFile(content, url)
+		}
+	}
+
+	// Fetch from remote
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var fetcher remote.Fetcher
+	switch protocol {
+	case "github":
+		fetcher = e.githubFetcher
+	case "https":
+		fetcher = e.httpsFetcher
+	default:
+		return "", fmt.Errorf("unsupported protocol: %s", protocol)
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "🌐 Fetching remote include: %s\n", url)
+		if protocol == "github" && ref == "" {
+			_, _ = fmt.Fprintf(e.output, "  ✓ Detecting default branch...\n")
+		}
+	}
+
+	content, err := fetcher.Fetch(ctx, path, ref)
+	if err != nil {
+		// Try stale cache as fallback
+		if e.cacheManager != nil {
+			if stale, ok := e.cacheManager.GetStale(cacheKey); ok {
+				if e.verbose {
+					_, _ = fmt.Fprintf(e.output, "  ⚠️  Network error, using stale cache\n")
+				}
+				return e.writeTempFile(stale, url)
+			}
+		}
+		return "", fmt.Errorf("failed to fetch %s: %w (no cache available)", url, err)
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "  ✓ Downloaded %.1f KB\n", float64(len(content))/1024)
+	}
+
+	// Store in cache
+	if e.cacheManager != nil {
+		if err := e.cacheManager.Set(cacheKey, content, 1*time.Minute); err != nil {
+			// Log but don't fail
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "  ⚠️  Failed to cache: %v\n", err)
+			}
+		} else if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "  ✓ Cached with 1m expiration\n")
+		}
+	}
+
+	return e.writeTempFile(content, url)
+}
+
+// writeTempFile writes content to a temporary file and tracks it for cleanup
+func (e *Engine) writeTempFile(content []byte, sourceURL string) (string, error) {
+	// Create temp file with .drun extension
+	tmpFile, err := os.CreateTemp("", "drun-remote-*.drun")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	// Write content
+	if _, err := tmpFile.Write(content); err != nil {
+		_ = os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	// Track for cleanup
+	e.tempFiles = append(e.tempFiles, tmpFile.Name())
+
+	// Return absolute path
+	return tmpFile.Name(), nil
 }

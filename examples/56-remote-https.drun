@@ -5,12 +5,10 @@ project "https-include-demo":
     include "https://raw.githubusercontent.com/phillarmonic/drun/main/shared/test-remote.drun"
 
 task "demo-https":
-    description "Test HTTPS remote include with namespace"
-    
-    info "Testing HTTPS remote includes..."
-    
-    # Use snippet from remote namespace
-    use snippet remote-test.hello
-    
-    info "✅ HTTPS remote include works!"
+	info "Testing HTTPS remote includes..."
+
+	# Use snippet from remote namespace
+	use snippet "remote-test.hello"
+
+	info "✅ HTTPS remote include works!"
 

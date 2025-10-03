@@ -35,6 +35,7 @@ var (
 	setWorkspace       string
 	selfUpdate         bool
 	allowUndefinedVars bool
+	noDrunCache        bool // Disable remote include caching
 	// Debug flags
 	debugMode   bool
 	debugTokens bool
@@ -192,6 +193,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "[xdrun CLI cmd] List available tasks")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "[xdrun CLI cmd] Show what would be executed without running")
 	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "[xdrun CLI cmd] Show detailed execution information")
+	rootCmd.Flags().BoolVar(&noDrunCache, "no-drun-cache", false, "[xdrun CLI cmd] Disable remote include caching (always fetch)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "[xdrun CLI cmd] Show version information")
 	rootCmd.Flags().BoolVar(&initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init)")
@@ -267,6 +269,14 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	eng.SetDryRun(dryRun)
 	eng.SetVerbose(verbose)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)
+
+	// Initialize cache for remote includes (respect --no-drun-cache flag)
+	if err := eng.SetCacheEnabled(!noDrunCache); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize remote include cache: %v\n", err)
+	}
+
+	// Ensure cleanup of temporary files
+	defer eng.Cleanup()
 
 	// Handle --list flag
 	if listTasks {

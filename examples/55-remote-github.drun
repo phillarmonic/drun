@@ -5,26 +5,21 @@ project "github-include-demo":
     include "github:phillarmonic/drun/shared/test-remote.drun"
 
 task "demo-github":
-    description "Test GitHub remote include with namespace"
-    
-    info "Testing GitHub remote includes..."
-    
-    # Use snippet from remote namespace
-    use snippet remote-test.hello
-    
-    # Call remote task
-    call task remote-test.test-remote
-    
-    info "✅ GitHub remote include works!"
+	info "Testing GitHub remote includes..."
+
+	# Use snippet from remote namespace
+	use snippet "remote-test.hello"
+
+	# Call remote task
+	call task "remote-test.test-remote"
+
+	info "✅ GitHub remote include works!"
 
 task "demo-template":
-    description "Test template from remote include"
-    
-    info "Testing remote template..."
-    
-    # Call template from remote namespace
-    call task remote-test.greet-task with:
-        name = "GitHub"
-    
-    info "✅ Remote template works!"
+	info "Testing remote template..."
+
+	# Call template from remote namespace
+	call task "remote-test.greet-task" with name="GitHub"
+
+	info "✅ Remote template works!"
 
