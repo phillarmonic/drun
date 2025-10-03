@@ -1,22 +1,18 @@
 version: 2.0
 
 project "remote-test":
-    description "Test file for remote includes"
+	snippet "hello":
+		info "Hello from remote include!"
 
-snippet "hello":
-    info "Hello from remote include!"
+	snippet "greeting":
+		info "Greetings from {name}!"
 
-snippet "greeting":
-    info "Greetings from {name}!"
+template task "greet-task":
+	parameter name as string
 
-template "greet-task":
-    parameter name as string
-    
-    use snippet greeting
+	use snippet "greeting"
 
 task "test-remote":
-    description "Test task to verify remote includes work"
-    
-    use snippet hello
-    info "Remote include test successful"
+	use snippet "hello"
+	info "Remote include test successful"
 
