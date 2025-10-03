@@ -1148,6 +1148,22 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		}
 	}
 
+	// Handle control flow and statement keywords
+	switch p.curToken.Type {
+	case lexer.IF:
+		return p.parseIfStatement()
+	case lexer.FOR:
+		return p.parseForStatement()
+	case lexer.WHEN:
+		return p.parseWhenStatement()
+	case lexer.CALL:
+		return p.parseTaskCallStatement()
+	case lexer.SET, lexer.LET:
+		return p.parseVariableStatement()
+	case lexer.TRY:
+		return p.parseErrorHandlingStatement()
+	}
+
 	// Delegate to existing statement parsing logic
 	if p.isActionToken(p.curToken.Type) {
 		return p.parseActionStatement()
