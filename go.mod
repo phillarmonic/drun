@@ -3,6 +3,8 @@ module github.com/phillarmonic/drun
 go 1.25.1
 
 require (
+	github.com/mholt/archives v0.1.4
+	github.com/phillarmonic/SoloDB v1.0.0
 	github.com/phillarmonic/figlet v1.2.0
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -19,7 +21,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
-	github.com/mholt/archives v0.1.4 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/nwaples/rardecode/v2 v2.1.1 // indirect

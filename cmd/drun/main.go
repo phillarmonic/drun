@@ -192,9 +192,9 @@ func init() {
 	rootCmd.Flags().StringVarP(&configFile, "file", "f", "", "[xdrun CLI cmd] Task file (default: .drun/spec.drun or workspace configured file)")
 	rootCmd.Flags().BoolVarP(&listTasks, "list", "l", false, "[xdrun CLI cmd] List available tasks")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "[xdrun CLI cmd] Show what would be executed without running")
-	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "[xdrun CLI cmd] Show detailed execution information")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "[xdrun CLI cmd] Show detailed execution information")
 	rootCmd.Flags().BoolVar(&noDrunCache, "no-drun-cache", false, "[xdrun CLI cmd] Disable remote include caching (always fetch)")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "[xdrun CLI cmd] Show version information")
+	rootCmd.Flags().BoolVar(&showVersion, "version", false, "[xdrun CLI cmd] Show version information")
 	rootCmd.Flags().BoolVar(&initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
 	rootCmd.Flags().BoolVar(&saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init)")
 	rootCmd.Flags().StringVar(&setWorkspace, "set-workspace", "", "[xdrun CLI cmd] Set workspace default task file location")
@@ -246,10 +246,19 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no drun task file found: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 	}
 
+	// Verbose: Show we're starting
+	if verbose {
+		_, _ = fmt.Fprintf(os.Stdout, "📂 Loading: %s\n", actualConfigFile)
+	}
+
 	// Read the drun file
 	content, err := os.ReadFile(actualConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read drun file '%s': %w", actualConfigFile, err)
+	}
+
+	if verbose {
+		_, _ = fmt.Fprintf(os.Stdout, "🔍 Parsing drun file...\n")
 	}
 
 	// Parse the drun file
@@ -264,11 +273,23 @@ func runDrun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse drun file '%s': %w", actualConfigFile, err)
 	}
 
+	if verbose {
+		_, _ = fmt.Fprintf(os.Stdout, "✅ Parsed successfully\n")
+	}
+
 	// Create engine
 	eng := engine.NewEngine(os.Stdout)
 	eng.SetDryRun(dryRun)
 	eng.SetVerbose(verbose)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)
+
+	if verbose {
+		if noDrunCache {
+			_, _ = fmt.Fprintf(os.Stdout, "💾 Remote include caching: disabled\n")
+		} else {
+			_, _ = fmt.Fprintf(os.Stdout, "💾 Remote include caching: enabled (1m expiration)\n")
+		}
+	}
 
 	// Initialize cache for remote includes (respect --no-drun-cache flag)
 	if err := eng.SetCacheEnabled(!noDrunCache); err != nil {

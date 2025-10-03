@@ -5,7 +5,7 @@ project "remote-test":
 		info "Hello from remote include!"
 
 	snippet "greeting":
-		info "Greetings from {name}!"
+		info "Greetings from {$name}!"
 
 template task "greet-task":
 	parameter name as string

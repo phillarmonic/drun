@@ -96,7 +96,7 @@ func (m *Manager) Get(key string) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("cache read error: %w", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	content, err := io.ReadAll(rc)
 	if err != nil {
@@ -125,7 +125,7 @@ func (m *Manager) GetStale(key string) ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	content, err := io.ReadAll(rc)
 	if err != nil {

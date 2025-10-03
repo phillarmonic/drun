@@ -1873,13 +1873,13 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		DataType: "string", // default type
 	}
 
-	// Parse parameter name (expect $variable syntax)
-	if p.peekToken.Type != lexer.VARIABLE {
-		p.addError(fmt.Sprintf("expected parameter name ($variable), got %s instead", p.peekToken.Type))
+	// Parse parameter name (accept both $variable and bare identifier)
+	if p.peekToken.Type != lexer.VARIABLE && p.peekToken.Type != lexer.IDENT {
+		p.addError(fmt.Sprintf("expected parameter name, got %s instead", p.peekToken.Type))
 		return nil
 	}
 	p.nextToken()
-	// Store parameter name without the $ prefix
+	// Store parameter name without the $ prefix if present
 	if strings.HasPrefix(p.curToken.Literal, "$") {
 		stmt.Name = p.curToken.Literal[1:] // Remove the $ prefix
 	} else {
@@ -3408,7 +3408,7 @@ func (p *Parser) isDetectionToken(tokenType lexer.TokenType) bool {
 // isParameterToken checks if a token type represents a parameter declaration
 func (p *Parser) isParameterToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
-	case lexer.REQUIRES, lexer.GIVEN, lexer.ACCEPTS:
+	case lexer.REQUIRES, lexer.GIVEN, lexer.ACCEPTS, lexer.PARAMETER:
 		return true
 	default:
 		return false

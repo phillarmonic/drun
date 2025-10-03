@@ -126,7 +126,7 @@ func (g *GitHubFetcher) Fetch(ctx context.Context, path, ref string) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch from GitHub: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// Check for rate limiting
@@ -176,7 +176,7 @@ func (g *GitHubFetcher) getDefaultBranch(ctx context.Context, owner, repo, fileP
 		// Fallback strategy: try main, then master
 		return g.tryDefaultBranchFallback(ctx, owner, repo, filePath)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return g.tryDefaultBranchFallback(ctx, owner, repo, filePath)
@@ -232,7 +232,7 @@ func (g *GitHubFetcher) fileExists(ctx context.Context, owner, repo, ref, filePa
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == http.StatusOK
 }
@@ -267,7 +267,7 @@ func (h *HTTPSFetcher) Fetch(ctx context.Context, url, _ string) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch from HTTPS: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTPS returned status %d for %s", resp.StatusCode, url)
@@ -283,4 +283,3 @@ func (h *HTTPSFetcher) Fetch(ctx context.Context, url, _ string) ([]byte, error)
 
 	return content, nil
 }
-

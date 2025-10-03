@@ -2775,6 +2775,101 @@ task "deploy":
 5. **Maintainability**: Update shared logic once, affects all users
 6. **Namespace Safety**: Clear ownership and no conflicts
 
+### Remote Includes
+
+Remote includes extend the include system to fetch `.drun` files from external sources like GitHub repositories and HTTPS URLs. This enables sharing workflows across teams, organizations, and the entire community.
+
+#### GitHub Includes
+
+Include files directly from GitHub repositories using the `github:` protocol:
+
+```drun
+project "myapp":
+    # Include from GitHub with auto branch detection
+    include "github:owner/repo/path/to/file.drun"
+    
+    # Include from specific branch
+    include "github:owner/repo/path/to/file.drun@main"
+    
+    # Include from specific tag
+    include "github:owner/repo/path/to/file.drun@v1.0.0"
+    
+    # Include from specific commit
+    include "github:owner/repo/path/to/file.drun@abc123"
+```
+
+**Smart Default Branch Detection**: If no branch/ref is specified, drun automatically detects the repository's default branch (`main` or `master`).
+
+#### HTTPS Includes
+
+Include files from any HTTPS URL:
+
+```drun
+project "myapp":
+    # Include from raw GitHub URL
+    include "https://raw.githubusercontent.com/owner/repo/main/shared/workflow.drun"
+    
+    # Include from any HTTPS source
+    include "https://example.com/shared/tasks.drun"
+```
+
+#### Smart Caching
+
+Remote includes are automatically cached to `~/.drun/cache.solo` with:
+
+- **1-minute expiration** by default
+- **Automatic refresh** when cache expires
+- **Stale cache fallback** for offline resilience (if network fails, uses expired cache)
+- **Content-based keys** (hash of URL + ref)
+
+**Disable caching** when needed:
+
+```bash
+# Bypass cache and always fetch fresh
+xdrun --no-drun-cache -f myfile.drun mytask
+```
+
+#### Example: Community Workflows
+
+```drun
+# my-project.drun
+version: 2.0
+
+project "my-awesome-app":
+    # Include Docker utilities from your organization
+    include "github:myorg/drun-workflows/docker.drun@v1.2.0"
+    
+    # Include Kubernetes helpers from community
+    include "github:drun-community/k8s-workflows/deployment.drun"
+    
+    # Include CI/CD patterns from team repo
+    include "https://raw.githubusercontent.com/myteam/workflows/main/ci.drun"
+
+task "deploy":
+    # Use included snippets and templates
+    use snippet "docker.security-scan"
+    call task "k8s.deploy" with namespace="production"
+    call task "ci.notify-slack" with message="Deployed!"
+```
+
+#### Authentication
+
+For private repositories, set a GitHub token:
+
+```bash
+export GITHUB_TOKEN="ghp_your_token_here"
+xdrun -f myfile.drun deploy
+```
+
+#### Benefits
+
+1. **Community Sharing**: Leverage workflows from the broader drun community
+2. **Organization Libraries**: Share standardized workflows across your organization
+3. **Version Control**: Pin to specific tags/commits for reproducibility
+4. **Offline Resilience**: Stale cache fallback ensures workflows work offline
+5. **Performance**: Smart caching reduces network requests
+6. **Flexibility**: Works with both GitHub and any HTTPS source
+
 ### Best Practices
 
 1. **Use Project Parameters for Global Config**: Things like registry URLs, environment, cache settings

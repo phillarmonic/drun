@@ -5154,7 +5154,7 @@ func (e *Engine) writeTempFile(content []byte, sourceURL string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	// Write content
 	if _, err := tmpFile.Write(content); err != nil {

@@ -40,7 +40,7 @@ task "hello":
 
 ### 🌟 **Advanced Features**
 
-- **♻️ Code Reuse**: Project-level parameters, reusable snippets, task templates, and namespaced includes for DRY automation ⭐ *New*
+- **♻️ Code Reuse**: Project-level parameters, reusable snippets, task templates, and namespaced includes for DRY automation
 - **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
 - **📞 Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
@@ -1242,7 +1242,7 @@ Run benchmarks yourself:
 ./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```
 
-### ♻️ **Code Reuse Features** ⭐ *New*
+### ♻️ **Code Reuse Features**
 
 drun v2 now supports powerful code reuse mechanisms to eliminate duplication and maintain DRY principles:
 
@@ -1316,7 +1316,7 @@ task "build:worker":
   call task "docker-build" with target="worker" tag="myapp:worker"
 ```
 
-#### Namespaced Includes ⭐ *New*
+#### Namespaced Includes
 
 Share code across projects with automatic namespace resolution:
 
@@ -1350,6 +1350,35 @@ project "myapp":
   include snippets, templates from "shared/common.drun"
 ```
 
+#### Remote Includes
+
+Include workflows directly from GitHub or HTTPS URLs:
+
+```drun
+project "myapp":
+  # From GitHub (auto-detects default branch)
+  include "github:myorg/drun-workflows/docker.drun@v1.2.0"
+  
+  # From HTTPS URL
+  include "https://raw.githubusercontent.com/team/repo/main/ci.drun"
+
+task "deploy":
+  use snippet "docker.security-scan"    # From remote include!
+```
+
+**Features:**
+
+- 🌐 **GitHub & HTTPS**: Fetch from GitHub repos or any HTTPS source
+- 🎯 **Version Control**: Pin to specific tags, branches, or commits
+- 💾 **Smart Caching**: 1-minute cache with stale fallback for offline use
+- 🔒 **Private Repos**: Supports `GITHUB_TOKEN` for authentication
+- ⚡ **Fast**: Cached includes load instantly
+
+```bash
+# Disable cache for fresh fetch
+xdrun --no-drun-cache -f myfile.drun deploy
+```
+
 **Benefits:**
 
 - **♻️ DRY Principle**: Eliminate duplication across tasks
@@ -1359,6 +1388,7 @@ project "myapp":
 - **🔀 Flexible**: Mix and match project parameters, snippets, and templates
 - **🌐 Cross-Project Sharing**: Share workflows across multiple projects with includes
 - **🔒 Namespace Safety**: Dot notation prevents naming collisions
+- **🚀 Community Workflows**: Leverage shared workflows from GitHub
 
 **See it in action:**
 
