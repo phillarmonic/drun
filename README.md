@@ -80,7 +80,7 @@ drun includes powerful built-in functions for common operations:
 
 ```drun
 version: 2.0
-project "my-app" version "1.0"
+project "my-app" version "1.0":
 
 task "system info":
   info "🖥️  Running on: {hostname}"
@@ -189,7 +189,7 @@ All binaries are **statically linked** and have **no dependencies**.
 curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
 
 # Install specific version
-curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v1.0.0
+curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v2.10.0
 ```
 
 ## Quick Start
