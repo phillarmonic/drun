@@ -2476,6 +2476,21 @@ func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionCon
 			return resolved
 		}
 
+		// Check for conditional expressions first (they can return empty strings)
+		// Ternary: "$var ? 'true_val' : 'false_val'"
+		if strings.Contains(content, "?") && strings.Contains(content, ":") {
+			if result, matched := e.resolveTernaryExpression(content, ctx); matched {
+				return result // Accept even if empty
+			}
+		}
+
+		// If-then-else: "if $var then 'val1' else 'val2'"
+		if strings.HasPrefix(strings.TrimSpace(content), "if ") && strings.Contains(content, " then ") && strings.Contains(content, " else ") {
+			if result, matched := e.resolveIfThenElse(content, ctx); matched {
+				return result // Accept even if empty
+			}
+		}
+
 		// Fall back to complex expression resolution
 		if resolved := e.resolveExpression(content, ctx); resolved != "" {
 			return resolved
@@ -2588,6 +2603,23 @@ func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionCo
 
 // resolveExpression resolves various types of expressions
 func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
+	// 0. Check for conditional expressions (ternary and if-then-else)
+	// Ternary: "$var ? 'true_val' : 'false_val'"
+	if strings.Contains(expr, "?") && strings.Contains(expr, ":") {
+		result, matched := e.resolveTernaryExpression(expr, ctx)
+		if matched {
+			return result // Return even if empty string
+		}
+	}
+
+	// If-then-else: "if $var then 'val1' else 'val2'" or "if $var is 'value' then 'val1' else 'val2'"
+	if strings.HasPrefix(strings.TrimSpace(expr), "if ") && strings.Contains(expr, " then ") && strings.Contains(expr, " else ") {
+		result, matched := e.resolveIfThenElse(expr, ctx)
+		if matched {
+			return result // Return even if empty string
+		}
+	}
+
 	// 1. Check for variable operations (e.g., "$version without prefix 'v'")
 	if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
 		// Get the base variable value
@@ -2793,6 +2825,140 @@ func (e *Engine) parseQuotedArguments(argsStr string) []string {
 	}
 
 	return args
+}
+
+// resolveTernaryExpression resolves ternary conditional expressions: $var ? 'true_val' : 'false_val'
+// Returns (result, matched) where matched indicates if this was a valid ternary expression
+func (e *Engine) resolveTernaryExpression(expr string, ctx *ExecutionContext) (string, bool) {
+	// Find the ? and : positions
+	questionPos := strings.Index(expr, "?")
+	colonPos := strings.LastIndex(expr, ":")
+
+	if questionPos == -1 || colonPos == -1 || questionPos >= colonPos {
+		return "", false // Invalid ternary expression
+	}
+
+	// Extract parts
+	condition := strings.TrimSpace(expr[:questionPos])
+	trueValue := strings.TrimSpace(expr[questionPos+1 : colonPos])
+	falseValue := strings.TrimSpace(expr[colonPos+1:])
+
+	// Resolve the condition variable
+	conditionValue, found := e.resolveSimpleVariableDirectly(condition, ctx)
+	if !found {
+		// Try resolving as expression
+		conditionValue = e.resolveExpression(condition, ctx)
+	}
+
+	// Evaluate condition as boolean
+	isTrue := e.isTruthy(conditionValue)
+
+	// Return the appropriate value (unquote if needed)
+	if isTrue {
+		return e.unquoteString(trueValue), true
+	}
+	return e.unquoteString(falseValue), true
+}
+
+// resolveIfThenElse resolves if-then-else conditional expressions
+// Supports:
+//   - if $var then 'val1' else 'val2'
+//   - if $var is 'value' then 'val1' else 'val2'
+//   - if $var is not 'value' then 'val1' else 'val2'
+//
+// Returns (result, matched) where matched indicates if this was a valid if-then-else expression
+func (e *Engine) resolveIfThenElse(expr string, ctx *ExecutionContext) (string, bool) {
+	expr = strings.TrimSpace(expr)
+
+	// Must start with "if "
+	if !strings.HasPrefix(expr, "if ") {
+		return "", false
+	}
+
+	// Find " then " and " else "
+	thenPos := strings.Index(expr, " then ")
+	elsePos := strings.LastIndex(expr, " else ")
+
+	if thenPos == -1 || elsePos == -1 || thenPos >= elsePos {
+		return "", false // Invalid if-then-else expression
+	}
+
+	// Extract parts
+	conditionPart := strings.TrimSpace(expr[3:thenPos])       // Skip "if "
+	trueValue := strings.TrimSpace(expr[thenPos+6 : elsePos]) // Skip " then "
+	falseValue := strings.TrimSpace(expr[elsePos+6:])         // Skip " else "
+
+	// Evaluate the condition
+	isTrue := e.evaluateIfCondition(conditionPart, ctx)
+
+	// Return the appropriate value (unquote if needed)
+	if isTrue {
+		return e.unquoteString(trueValue), true
+	}
+	return e.unquoteString(falseValue), true
+}
+
+// evaluateIfCondition evaluates the condition part of an if-then-else expression
+func (e *Engine) evaluateIfCondition(condition string, ctx *ExecutionContext) bool {
+	condition = strings.TrimSpace(condition)
+
+	// Check for "is not" comparison
+	if strings.Contains(condition, " is not ") {
+		parts := strings.SplitN(condition, " is not ", 2)
+		if len(parts) == 2 {
+			leftValue := e.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
+			rightValue := e.unquoteString(strings.TrimSpace(parts[1]))
+			return leftValue != rightValue
+		}
+	}
+
+	// Check for "is" comparison
+	if strings.Contains(condition, " is ") {
+		parts := strings.SplitN(condition, " is ", 2)
+		if len(parts) == 2 {
+			leftValue := e.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
+			rightValue := e.unquoteString(strings.TrimSpace(parts[1]))
+			return leftValue == rightValue
+		}
+	}
+
+	// Simple boolean check - resolve the variable and check if it's truthy
+	value := e.resolveVariableOrValue(condition, ctx)
+	return e.isTruthy(value)
+}
+
+// resolveVariableOrValue resolves a variable or returns the literal value
+func (e *Engine) resolveVariableOrValue(expr string, ctx *ExecutionContext) string {
+	expr = strings.TrimSpace(expr)
+
+	// If it's a variable (starts with $), resolve it
+	if strings.HasPrefix(expr, "$") {
+		if resolved, found := e.resolveSimpleVariableDirectly(expr, ctx); found {
+			return resolved
+		}
+		// Try resolving as expression
+		return e.resolveExpression(expr, ctx)
+	}
+
+	// Otherwise, return as literal value (unquoted if needed)
+	return e.unquoteString(expr)
+}
+
+// isTruthy checks if a value should be considered true
+func (e *Engine) isTruthy(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return value == "true" || value == "yes" || value == "1" || value == "on"
+}
+
+// unquoteString removes single or double quotes from a string if present
+func (e *Engine) unquoteString(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 {
+		if (s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }
 
 // executeConditional executes conditional statements (when, if/else)

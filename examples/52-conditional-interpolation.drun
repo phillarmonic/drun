@@ -1,0 +1,141 @@
+# Conditional Interpolation Examples
+# Demonstrates ternary operators and if-then-else expressions in interpolation
+# Built with drun v2 - https://github.com/phillarmonic/drun
+version: 2.0
+
+project "conditional-interpolation-demo" version "1.0":
+
+task "ternary basics" means "Demonstrate basic ternary operator syntax":
+	info "🔀 Ternary Operator Examples"
+	
+	given $enabled as boolean defaults to "true"
+	given $debug as boolean defaults to "false"
+	given $verbose as boolean defaults to "true"
+	
+	info "Feature enabled: {$enabled ? 'YES' : 'NO'}"
+	info "Debug mode: {$debug ? 'ON' : 'OFF'}"
+	info "Verbosity: {$verbose ? 'ENABLED' : 'DISABLED'}"
+	
+	success "✅ Ternary basics completed!"
+
+task "docker build flags" means "Real-world Docker build example with optional flags":
+	info "🐳 Docker Build with Conditional Flags"
+	
+	given $no_cache as boolean defaults to "false"
+	given $push as boolean defaults to "false"
+	given $platform defaults to "linux/amd64"
+	given $tag defaults to "latest"
+	
+	info "Building Docker image with dynamic flags..."
+	info "docker build {$no_cache ? '--no-cache' : ''} {$push ? '--push' : ''} --platform {$platform} -t myapp:{$tag} ."
+	
+	when $no_cache is "true":
+		warn "⚠️  Building without cache - this may take longer"
+	
+	when $push is "true":
+		warn "📤 Image will be pushed to registry"
+	
+	success "🎉 Docker build command generated!"
+
+task "if-then-else basics" means "Demonstrate if-then-else syntax":
+	info "🔀 If-Then-Else Examples"
+	
+	given $environment defaults to "development"
+	given $replicas as number defaults to "1"
+	
+	info "Config file: {if $environment is 'production' then 'prod.yml' else 'dev.yml'}"
+	info "Log level: {if $environment is 'production' then 'error' else 'debug'}"
+	info "Monitoring: {if $environment is not 'development' then 'enabled' else 'disabled'}"
+	
+	success "✅ If-then-else basics completed!"
+
+task "advanced conditionals" means "Advanced conditional interpolation patterns":
+	info "🚀 Advanced Conditional Patterns"
+	
+	given $cache defaults to "yes"
+	given $optimization defaults to "none"
+	given $security as boolean defaults to "false"
+	
+	# Using ternary with multiple conditions
+	info "Cache: {$cache is 'yes' ? 'enabled' : 'disabled'}"
+	info "Optimization: {if $optimization is 'none' then '--no-opt' else '--optimize'}"
+	info "Security: {if $security then '--security-hardening' else ''}"
+	
+	# Empty string handling for optional flags
+	info "Full command: gcc {$optimization is 'none' ? '' : '-O2'} {$security ? '-fstack-protector' : ''} main.c"
+	
+	success "✅ Advanced patterns completed!"
+
+task "deployment config" means "Generate deployment configuration based on environment":
+	requires $env from ["dev", "staging", "production"]
+	given $monitoring as boolean defaults to "true"
+	
+	info "🚀 Deployment Configuration Generator"
+	info "Environment: {$env}"
+	
+	# Conditional replicas
+	set $replicas to "{if $env is 'production' then '3' else '1'}"
+	info "Replicas: {$replicas}"
+	
+	# Conditional resources
+	set $cpu to "{if $env is 'production' then '2000m' else '500m'}"
+	set $memory to "{if $env is 'production' then '2Gi' else '512Mi'}"
+	info "Resources: CPU={$cpu}, Memory={$memory}"
+	
+	# Conditional features
+	info "Debug logging: {if $env is 'production' then 'disabled' else 'enabled'}"
+	info "Monitoring: {$monitoring ? 'enabled' : 'disabled'}"
+	info "Auto-scaling: {if $env is 'production' then 'enabled' else 'disabled'}"
+	
+	success "🎉 Deployment config generated for {$env}!"
+
+task "build matrix" means "Demonstrate conditional flags in build matrix":
+	info "🔨 Build Matrix with Conditional Flags"
+	
+	given $targets as list defaults to "linux,darwin,windows"
+	given $optimize as boolean defaults to "true"
+	given $static as boolean defaults to "false"
+	
+	for each target in targets:
+		info "Building for {target}..."
+		info "  go build {$optimize ? '-ldflags=\"-s -w\"' : ''} {$static ? '-a' : ''} -o dist/app-{target}"
+	
+	success "✅ Build matrix completed!"
+
+task "ci pipeline flags" means "CI/CD pipeline with conditional flags":
+	info "🔄 CI/CD Pipeline Configuration"
+	
+	given $run_tests as boolean defaults to "true"
+	given $run_lint as boolean defaults to "true"
+	given $coverage as boolean defaults to "false"
+	given $deploy as boolean defaults to "false"
+	
+	info "Pipeline steps:"
+	info "  1. Build: always"
+	info "  2. Test: {$run_tests ? 'YES' : 'SKIP'}"
+	info "  3. Lint: {$run_lint ? 'YES' : 'SKIP'}"
+	info "  4. Coverage: {$coverage ? 'YES' : 'SKIP'}"
+	info "  5. Deploy: {$deploy ? 'YES' : 'SKIP'}"
+	
+	info ""
+	info "Test command: npm test {$coverage ? '--coverage' : ''}"
+	info "Lint command: {if $run_lint then 'npm run lint' else 'echo Skipped'}"
+	
+	success "🎉 Pipeline configured!"
+
+task "comparison demo" means "Demonstrate all comparison operators":
+	info "🔍 Comparison Operators Demo"
+	
+	given $status defaults to "ready"
+	given $level defaults to "high"
+	
+	# is comparison
+	info "Status is ready: {if $status is 'ready' then 'YES' else 'NO'}"
+	info "Status is pending: {if $status is 'pending' then 'YES' else 'NO'}"
+	
+	# is not comparison
+	info "Level is not low: {if $level is not 'low' then 'YES' else 'NO'}"
+	info "Level is not high: {if $level is not 'high' then 'YES' else 'NO'}"
+	
+	success "✅ Comparison demo completed!"
+

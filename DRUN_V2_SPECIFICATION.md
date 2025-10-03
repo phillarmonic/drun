@@ -1464,6 +1464,7 @@ All variables in drun v2 must be prefixed with `$` to distinguish them from keyw
    - Built-in project vars: `{$globals.project}`, `{$globals.version}`
    - Loop variables: `{$variable_name}`
    - Built-in functions: `{now.format()}`, `{pwd}`
+   - Conditional expressions: `{$var ? 'true_val' : 'false_val'}` or `{if $var then 'val1' else 'val2'}`
 
 #### Examples
 
@@ -1534,6 +1535,90 @@ try:
   capture from shell "systemctl status nginx" as $service_status
 catch command_error:
   set $service_status to "unknown"
+```
+
+#### Conditional Interpolation
+
+drun v2 supports conditional expressions within interpolation for dynamic value selection. This is particularly useful for optional command flags and environment-specific configuration.
+
+##### Ternary Operator Syntax
+
+The ternary operator provides a concise way to choose between two values based on a boolean condition:
+
+```
+# Basic ternary: condition ? true_value : false_value
+{$var ? 'true_val' : 'false_val'}
+
+# Examples
+info "Debug mode: {$debug ? 'enabled' : 'disabled'}"
+run "docker build {$no_cache ? '--no-cache' : ''} -t myapp ."
+info "Log level: {$verbose ? 'debug' : 'info'}"
+
+# Truthy values: 'true', 'yes', '1', 'on' (case-insensitive)
+# All other values are considered falsy
+```
+
+##### If-Then-Else Syntax
+
+The if-then-else syntax provides more readable conditional expressions with comparison operators:
+
+```
+# Simple boolean check
+{if $var then 'val1' else 'val2'}
+
+# With 'is' comparison
+{if $var is 'value' then 'val1' else 'val2'}
+
+# With 'is not' comparison
+{if $var is not 'value' then 'val1' else 'val2'}
+
+# Examples
+info "Config: {if $env is 'production' then 'prod.yml' else 'dev.yml'}"
+info "Replicas: {if $env is not 'dev' then '3' else '1'}"
+run "npm test {if $coverage then '--coverage' : ''}"
+```
+
+##### Real-World Examples
+
+**Docker Build with Optional Flags:**
+```
+task "docker-build":
+  given $no_cache as boolean defaults to "false"
+  given $push as boolean defaults to "false"
+  given $platform defaults to "linux/amd64"
+  
+  run "docker build {$no_cache ? '--no-cache' : ''} {$push ? '--push' : ''} --platform {$platform} -t myapp:latest ."
+```
+
+**Environment-Specific Configuration:**
+```
+task "deploy":
+  requires $env from ["dev", "staging", "production"]
+  
+  set $replicas to "{if $env is 'production' then '3' else '1'}"
+  set $cpu to "{if $env is 'production' then '2000m' else '500m'}"
+  set $log_level to "{if $env is 'production' then 'error' else 'debug'}"
+  
+  info "Deploying with {$replicas} replicas, {$cpu} CPU, {$log_level} logging"
+```
+
+**Build Optimization Flags:**
+```
+task "compile":
+  given $optimize as boolean defaults to "true"
+  given $debug as boolean defaults to "false"
+  
+  run "gcc {$optimize ? '-O2' : '-O0'} {$debug ? '-g' : ''} -o app main.c"
+```
+
+**CI/CD Pipeline Flags:**
+```
+task "ci-pipeline":
+  given $run_tests as boolean defaults to "true"
+  given $coverage as boolean defaults to "false"
+  
+  info "Running tests: {$run_tests ? 'YES' : 'SKIP'}"
+  run "npm test {if $coverage then '--coverage' else ''}"
 ```
 
 ### Variable Scoping
