@@ -18,6 +18,7 @@ import (
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/detection"
+	"github.com/phillarmonic/drun/internal/engine/interpolation"
 	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/fileops"
 	"github.com/phillarmonic/drun/internal/lexer"
@@ -30,10 +31,10 @@ import (
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output             io.Writer
-	dryRun             bool
-	verbose            bool
-	allowUndefinedVars bool
+	output       io.Writer
+	dryRun       bool
+	verbose      bool
+	interpolator *interpolation.Interpolator
 
 	// Remote includes support
 	cacheManager   *cache.Manager
@@ -42,41 +43,12 @@ type Engine struct {
 	drunhubFetcher *remote.DrunhubFetcher
 	tempFiles      []string // Track temp files for cleanup
 
-	// Cached regex patterns for performance
-	interpolationRegex *regexp.Regexp
-	envVarRegex        *regexp.Regexp // For ${VAR} and ${VAR:-default} syntax
-	quotedArgRegex     *regexp.Regexp
-	paramArgRegex      *regexp.Regexp
+	// Legacy regex patterns (still used by variable operations)
+	quotedArgRegex *regexp.Regexp
+	paramArgRegex  *regexp.Regexp
 }
 
-// ExecutionContext holds parameter values and other runtime context
-type ExecutionContext struct {
-	Parameters       map[string]*types.Value // parameter name -> typed value
-	Variables        map[string]string       // captured variables from shell commands
-	Project          *ProjectContext         // project-level settings and hooks
-	CurrentFile      string                  // path to the current drun file being executed
-	CurrentTask      string                  // name of the currently executing task
-	CurrentNamespace string                  // namespace of currently executing task/template (for transitive resolution)
-	Program          *ast.Program            // the AST program being executed
-}
-
-// ProjectContext holds project-level configuration
-type ProjectContext struct {
-	Name              string                                    // project name
-	Version           string                                    // project version
-	Settings          map[string]string                         // project settings (set key to value)
-	Parameters        map[string]*ast.ProjectParameterStatement // project-level shared parameters
-	Snippets          map[string]*ast.SnippetStatement          // reusable code snippets
-	BeforeHooks       []ast.Statement                           // before any task hooks
-	AfterHooks        []ast.Statement                           // after any task hooks
-	SetupHooks        []ast.Statement                           // on drun setup hooks
-	TeardownHooks     []ast.Statement                           // on drun teardown hooks
-	ShellConfigs      map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
-	IncludedSnippets  map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
-	IncludedTemplates map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
-	IncludedTasks     map[string]*ast.TaskStatement             // namespaced tasks: "docker.deploy"
-	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
-}
+// ExecutionContext and ProjectContext moved to context.go
 
 // NewEngine creates a new v2 execution engine
 func NewEngine(output io.Writer) *Engine {
@@ -84,20 +56,47 @@ func NewEngine(output io.Writer) *Engine {
 		output = os.Stdout
 	}
 	githubFetcher := remote.NewGitHubFetcher()
-	return &Engine{
+	interp := interpolation.NewInterpolator()
+
+	e := &Engine{
 		output:         output,
 		dryRun:         false,
+		interpolator:   interp,
 		githubFetcher:  githubFetcher,
 		httpsFetcher:   remote.NewHTTPSFetcher(),
 		drunhubFetcher: remote.NewDrunhubFetcher(githubFetcher),
 		tempFiles:      []string{},
 
-		// Pre-compile regex patterns for performance
-		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
-		envVarRegex:        regexp.MustCompile(`\$\{([^}]+)\}`), // Matches ${VAR} and ${VAR:-default}
-		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
-		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
+		// Pre-compile regex patterns for performance (still used by variable operations)
+		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
+		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
+
+	// Set up interpolator callbacks for variable and builtin operations
+	interp.SetResolveVariableOpsCallback(func(expr string, ctx interface{}) string {
+		if execCtx, ok := ctx.(*ExecutionContext); ok {
+			if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
+				baseValue := interp.Interpolate(chain.Variable, execCtx)
+				if result, err := e.applyVariableOperations(baseValue, chain, execCtx); err == nil {
+					return result
+				}
+			}
+		}
+		return ""
+	})
+
+	interp.SetResolveBuiltinOpsCallback(func(funcName string, operations string, ctx interface{}) (string, error) {
+		if execCtx, ok := ctx.(*ExecutionContext); ok {
+			if result, err := builtins.CallBuiltin(funcName); err == nil {
+				if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
+					return e.applyBuiltinOperations(result, chain, execCtx)
+				}
+			}
+		}
+		return "", fmt.Errorf("failed to resolve builtin operations")
+	})
+
+	return e
 }
 
 // SetDryRun enables or disables dry run mode
@@ -112,7 +111,7 @@ func (e *Engine) SetVerbose(verbose bool) {
 
 // SetAllowUndefinedVars enables or disables strict variable checking
 func (e *Engine) SetAllowUndefinedVars(allow bool) {
-	e.allowUndefinedVars = allow
+	e.interpolator.SetAllowUndefined(allow)
 }
 
 // SetCacheEnabled enables or disables remote include caching
@@ -2705,560 +2704,18 @@ func ParseStringWithFilename(input, filename string) (*ast.Program, error) {
 
 // interpolateVariables replaces {variable} placeholders with actual values
 func (e *Engine) interpolateVariables(message string, ctx *ExecutionContext) string {
-	result, _ := e.interpolateVariablesWithError(message, ctx)
-	return result
+	return e.interpolator.Interpolate(message, ctx)
 }
 
 // interpolateVariablesWithError replaces {variable} placeholders with actual values and returns any undefined variable errors
 func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionContext) (string, error) {
-	// First pass: resolve ${VAR} environment variables (shell-style)
-	// Quick check: if there are no ${...} patterns, skip this phase
-	if strings.Contains(message, "${") {
-		var envUndefinedVars []string
-		message = e.envVarRegex.ReplaceAllStringFunc(message, func(match string) string {
-			// Extract content (remove ${ and })
-			content := match[2 : len(match)-1]
-
-			// Check if it has a default value (:-syntax)
-			if strings.Contains(content, ":-") {
-				parts := strings.SplitN(content, ":-", 2)
-				varName := strings.TrimSpace(parts[0])
-				defaultValue := strings.TrimSpace(parts[1])
-
-				// Try to get the environment variable
-				if value, exists := os.LookupEnv(varName); exists {
-					return value
-				}
-				// Return default if not found
-				return defaultValue
-			}
-
-			// No default value - must exist or fail
-			if value, exists := os.LookupEnv(content); exists {
-				return value
-			}
-
-			// Variable doesn't exist and no default provided
-			if !e.allowUndefinedVars {
-				envUndefinedVars = append(envUndefinedVars, content)
-			}
-			return match // Keep original if not found
-		})
-
-		// If we found undefined env vars, return error now
-		if len(envUndefinedVars) > 0 {
-			if len(envUndefinedVars) == 1 {
-				return message, fmt.Errorf("undefined environment variable: ${%s}", envUndefinedVars[0])
-			}
-			return message, fmt.Errorf("undefined environment variables: ${%s}", strings.Join(envUndefinedVars, "}, ${"))
-		}
-	}
-
-	// Second pass: resolve {$var} Drun variables
-	var undefinedVars []string
-
-	// Use cached regex for better performance
-	result := e.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
-		// Extract content (remove { and })
-		content := match[1 : len(match)-1]
-
-		// Try to resolve simple variables first (most common case)
-		if resolved, found := e.resolveSimpleVariableDirectly(content, ctx); found {
-			return resolved
-		}
-
-		// Check for conditional expressions first (they can return empty strings)
-		// Ternary: "$var ? 'true_val' : 'false_val'"
-		if strings.Contains(content, "?") && strings.Contains(content, ":") {
-			if result, matched := e.resolveTernaryExpression(content, ctx); matched {
-				return result // Accept even if empty
-			}
-		}
-
-		// If-then-else: "if $var then 'val1' else 'val2'"
-		if strings.HasPrefix(strings.TrimSpace(content), "if ") && strings.Contains(content, " then ") && strings.Contains(content, " else ") {
-			if result, matched := e.resolveIfThenElse(content, ctx); matched {
-				return result // Accept even if empty
-			}
-		}
-
-		// Fall back to complex expression resolution
-		if resolved := e.resolveExpression(content, ctx); resolved != "" {
-			return resolved
-		}
-
-		// If nothing worked, check if we should be strict about undefined variables
-		if !e.allowUndefinedVars {
-			// For complex expressions, check if the base variable exists
-			if e.isComplexExpression(content) {
-				baseVar := e.extractBaseVariable(content)
-				if baseVar != "" && !e.variableExists(baseVar, ctx) {
-					undefinedVars = append(undefinedVars, baseVar)
-					return match
-				}
-				// If base variable exists but expression failed, allow it (might be a function call or other valid expression)
-			} else {
-				// For simple variables, report as undefined
-				undefinedVars = append(undefinedVars, content)
-			}
-			return match // Return original placeholder for now
-		}
-
-		// If allowing undefined variables, return the original placeholder
-		return match
-	})
-
-	// If we found undefined variables in strict mode, return an error
-	if len(undefinedVars) > 0 {
-		if len(undefinedVars) == 1 {
-			return result, fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
-		}
-		return result, fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
-	}
-
-	return result, nil
+	return e.interpolator.InterpolateWithError(message, ctx)
 }
 
-// resolveSimpleVariableDirectly handles simple variable resolution with proper empty string support
-func (e *Engine) resolveSimpleVariableDirectly(variable string, ctx *ExecutionContext) (string, bool) {
-	if ctx == nil {
-		return "", false
-	}
-
-	// Handle variables with $ prefix (most common case for interpolation)
-	if strings.HasPrefix(variable, "$") {
-		// First try to find the variable with the $ prefix (shell captures)
-		if value, exists := ctx.Variables[variable]; exists {
-			return value, true
-		}
-
-		// Then try without the $ prefix (legacy variables)
-		varName := variable[1:] // Remove the $ prefix
-
-		// Check parameters (stored without $ prefix)
-		if value, exists := ctx.Parameters[varName]; exists {
-			return value.AsString(), true
-		}
-
-		// Check captured variables (stored without $ prefix)
-		if value, exists := ctx.Variables[varName]; exists {
-			return value, true
-		}
-
-		// Check project-level variables for backward compatibility
-		if ctx.Project != nil {
-			// Check built-in project variables
-			if varName == "project" && ctx.Project.Name != "" {
-				return ctx.Project.Name, true
-			}
-			if varName == "version" && ctx.Project.Version != "" {
-				return ctx.Project.Version, true
-			}
-			// Check project settings
-			if ctx.Project.Settings != nil {
-				if value, exists := ctx.Project.Settings[varName]; exists {
-					return value, true
-				}
-			}
-		}
-	} else {
-		// Check parameters (bare identifiers)
-		if value, exists := ctx.Parameters[variable]; exists {
-			return value.AsString(), true
-		}
-		// Check captured variables (bare identifiers)
-		if value, exists := ctx.Variables[variable]; exists {
-			return value, true
-		}
-
-		// Check project-level variables for backward compatibility
-		if ctx.Project != nil {
-			// Check built-in project variables
-			if variable == "project" && ctx.Project.Name != "" {
-				return ctx.Project.Name, true
-			}
-			if variable == "version" && ctx.Project.Version != "" {
-				return ctx.Project.Version, true
-			}
-			// Check project settings
-			if ctx.Project.Settings != nil {
-				if value, exists := ctx.Project.Settings[variable]; exists {
-					return value, true
-				}
-			}
-		}
-	}
-
-	return "", false
-}
-
-// resolveExpression resolves various types of expressions
-func (e *Engine) resolveExpression(expr string, ctx *ExecutionContext) string {
-	// 0. Check for conditional expressions (ternary and if-then-else)
-	// Ternary: "$var ? 'true_val' : 'false_val'"
-	if strings.Contains(expr, "?") && strings.Contains(expr, ":") {
-		result, matched := e.resolveTernaryExpression(expr, ctx)
-		if matched {
-			return result // Return even if empty string
-		}
-	}
-
-	// If-then-else: "if $var then 'val1' else 'val2'" or "if $var is 'value' then 'val1' else 'val2'"
-	if strings.HasPrefix(strings.TrimSpace(expr), "if ") && strings.Contains(expr, " then ") && strings.Contains(expr, " else ") {
-		result, matched := e.resolveIfThenElse(expr, ctx)
-		if matched {
-			return result // Return even if empty string
-		}
-	}
-
-	// 1. Check for variable operations (e.g., "$version without prefix 'v'")
-	if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
-		// Get the base variable value
-		baseValue := e.resolveSimpleVariable(chain.Variable, ctx)
-		if baseValue != "" {
-			// Apply operations chain
-			if result, err := e.applyVariableOperations(baseValue, chain, ctx); err == nil {
-				return result
-			}
-		}
-	}
-
-	// 2. Check for context-aware builtin functions first
-	if expr == "current file" && ctx != nil {
-		if ctx.CurrentFile != "" {
-			return ctx.CurrentFile
-		}
-		return "<no file>"
-	}
-
-	// 3. Check for builtin function with piped operations (e.g., "current git branch | replace '/' by '-'")
-	if strings.Contains(expr, "|") {
-		parts := strings.SplitN(expr, "|", 2)
-		if len(parts) == 2 {
-			funcName := strings.TrimSpace(parts[0])
-			operations := strings.TrimSpace(parts[1])
-
-			// Check if the first part is a builtin function
-			if builtins.IsBuiltin(funcName) {
-				if result, err := builtins.CallBuiltin(funcName); err == nil {
-					// Parse and apply the operations to the result
-					if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
-						if finalResult, err := e.applyBuiltinOperations(result, chain, ctx); err == nil {
-							return finalResult
-						}
-					}
-					// If operations parsing fails, just return the builtin result
-					return result
-				}
-			}
-		}
-	}
-
-	// 4. Check if it's a simple builtin function call (no arguments)
-	if builtins.IsBuiltin(expr) {
-		if result, err := builtins.CallBuiltin(expr); err == nil {
-			return result
-		}
-	}
-
-	// 4. Check for function calls with quoted string arguments
-	// Pattern: "function('arg')" or "function(\"arg\")" or "function('arg1', 'arg2')"
-	if matches := e.quotedArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
-		funcName := strings.TrimSpace(matches[1])
-		argsStr := matches[2]
-
-		// Parse arguments - handle both single and multiple quoted arguments
-		args := e.parseQuotedArguments(argsStr)
-
-		if builtins.IsBuiltin(funcName) && len(args) > 0 {
-			if result, err := builtins.CallBuiltin(funcName, args...); err == nil {
-				return result
-			}
-		}
-	}
-
-	// 5. Check for function calls with parameter arguments
-	// Pattern: "function(param)" where param is a parameter name
-	if matches := e.paramArgRegex.FindStringSubmatch(expr); len(matches) == 3 {
-		funcName := strings.TrimSpace(matches[1])
-		paramName := strings.TrimSpace(matches[2])
-
-		// Resolve the parameter first
-		if ctx != nil {
-			if paramValue, exists := ctx.Parameters[paramName]; exists {
-				if builtins.IsBuiltin(funcName) {
-					if result, err := builtins.CallBuiltin(funcName, paramValue.AsString()); err == nil {
-						return result
-					}
-				}
-			}
-		}
-	}
-
-	// 6. Check for $globals.key syntax for project settings
-	if strings.HasPrefix(expr, "$globals.") {
-		if ctx != nil && ctx.Project != nil {
-			key := expr[9:] // Remove "$globals." prefix
-			if value, exists := ctx.Project.Settings[key]; exists {
-				return value
-			}
-			// Check special project variables
-			if key == "version" && ctx.Project.Version != "" {
-				return ctx.Project.Version
-			}
-			if key == "project" && ctx.Project.Name != "" {
-				return ctx.Project.Name
-			}
-			// Check current task
-			if key == "current_task" && ctx.CurrentTask != "" {
-				return ctx.CurrentTask
-			}
-		}
-		return ""
-	}
-
-	// 6. Check for simple parameter lookup (fallback for complex expressions)
-	if ctx != nil {
-		// Check for variables with $ prefix first (parameters and task-scoped variables)
-		if strings.HasPrefix(expr, "$") {
-			varName := expr[1:] // Remove the $ prefix
-
-			// Check parameters (stored without $ prefix)
-			if value, exists := ctx.Parameters[varName]; exists {
-				return value.AsString()
-			}
-
-			// Check captured variables (stored without $ prefix)
-			if value, exists := ctx.Variables[varName]; exists {
-				return value
-			}
-		} else {
-			// Check parameters (bare identifiers)
-			if value, exists := ctx.Parameters[expr]; exists {
-				return value.AsString()
-			}
-			// Check captured variables (bare identifiers)
-			if value, exists := ctx.Variables[expr]; exists {
-				return value
-			}
-		}
-	}
-
-	return ""
-}
-
-// resolveSimpleVariable resolves a simple variable without operations
-func (e *Engine) resolveSimpleVariable(variable string, ctx *ExecutionContext) string {
-	// Handle $globals.key syntax
-	if strings.HasPrefix(variable, "$globals.") {
-		if ctx != nil && ctx.Project != nil {
-			key := variable[9:] // Remove "$globals." prefix
-			if value, exists := ctx.Project.Settings[key]; exists {
-				return value
-			}
-			// Check special project variables
-			if key == "version" && ctx.Project.Version != "" {
-				return ctx.Project.Version
-			}
-			if key == "project" && ctx.Project.Name != "" {
-				return ctx.Project.Name
-			}
-			// Check current task
-			if key == "current_task" && ctx.CurrentTask != "" {
-				return ctx.CurrentTask
-			}
-		}
-		return ""
-	}
-
-	// Handle regular variables
-	if ctx != nil {
-		// Check for variables with $ prefix first (parameters and task-scoped variables)
-		if strings.HasPrefix(variable, "$") {
-			varName := variable[1:] // Remove the $ prefix
-
-			// Check parameters (stored without $ prefix)
-			if value, exists := ctx.Parameters[varName]; exists {
-				return value.AsString()
-			}
-
-			// Check captured variables (stored without $ prefix)
-			if value, exists := ctx.Variables[varName]; exists {
-				return value
-			}
-		} else {
-			// Check parameters (bare identifiers)
-			if value, exists := ctx.Parameters[variable]; exists {
-				return value.AsString()
-			}
-			// Check captured variables (bare identifiers)
-			if value, exists := ctx.Variables[variable]; exists {
-				return value
-			}
-		}
-	}
-
-	return ""
-}
-
-// parseQuotedArguments parses comma-separated quoted arguments
-func (e *Engine) parseQuotedArguments(argsStr string) []string {
-	var args []string
-
-	// Simple regex to match quoted strings
-	quotedRe := regexp.MustCompile(`['"]([^'"]*?)['"]`)
-	matches := quotedRe.FindAllStringSubmatch(argsStr, -1)
-
-	for _, match := range matches {
-		if len(match) > 1 {
-			args = append(args, match[1])
-		}
-	}
-
-	return args
-}
-
-// resolveTernaryExpression resolves ternary conditional expressions: $var ? 'true_val' : 'false_val'
-// Returns (result, matched) where matched indicates if this was a valid ternary expression
-func (e *Engine) resolveTernaryExpression(expr string, ctx *ExecutionContext) (string, bool) {
-	// Find the ? and : positions
-	questionPos := strings.Index(expr, "?")
-	colonPos := strings.LastIndex(expr, ":")
-
-	if questionPos == -1 || colonPos == -1 || questionPos >= colonPos {
-		return "", false // Invalid ternary expression
-	}
-
-	// Extract parts
-	condition := strings.TrimSpace(expr[:questionPos])
-	trueValue := strings.TrimSpace(expr[questionPos+1 : colonPos])
-	falseValue := strings.TrimSpace(expr[colonPos+1:])
-
-	// Resolve the condition variable
-	conditionValue, found := e.resolveSimpleVariableDirectly(condition, ctx)
-	if !found {
-		// Try resolving as expression
-		conditionValue = e.resolveExpression(condition, ctx)
-	}
-
-	// Evaluate condition as boolean
-	isTrue := e.isTruthy(conditionValue)
-
-	// Return the appropriate value (unquote if needed)
-	if isTrue {
-		return e.unquoteString(trueValue), true
-	}
-	return e.unquoteString(falseValue), true
-}
-
-// resolveIfThenElse resolves if-then-else conditional expressions
-// Supports:
-//   - if $var then 'val1' else 'val2'
-//   - if $var is 'value' then 'val1' else 'val2'
-//   - if $var is not 'value' then 'val1' else 'val2'
-//
-// Returns (result, matched) where matched indicates if this was a valid if-then-else expression
-func (e *Engine) resolveIfThenElse(expr string, ctx *ExecutionContext) (string, bool) {
-	expr = strings.TrimSpace(expr)
-
-	// Must start with "if "
-	if !strings.HasPrefix(expr, "if ") {
-		return "", false
-	}
-
-	// Find " then " and " else "
-	thenPos := strings.Index(expr, " then ")
-	elsePos := strings.LastIndex(expr, " else ")
-
-	if thenPos == -1 || elsePos == -1 || thenPos >= elsePos {
-		return "", false // Invalid if-then-else expression
-	}
-
-	// Extract parts
-	conditionPart := strings.TrimSpace(expr[3:thenPos])       // Skip "if "
-	trueValue := strings.TrimSpace(expr[thenPos+6 : elsePos]) // Skip " then "
-	falseValue := strings.TrimSpace(expr[elsePos+6:])         // Skip " else "
-
-	// Evaluate the condition
-	isTrue := e.evaluateIfCondition(conditionPart, ctx)
-
-	// Return the appropriate value (unquote if needed)
-	if isTrue {
-		return e.unquoteString(trueValue), true
-	}
-	return e.unquoteString(falseValue), true
-}
-
-// evaluateIfCondition evaluates the condition part of an if-then-else expression
-func (e *Engine) evaluateIfCondition(condition string, ctx *ExecutionContext) bool {
-	condition = strings.TrimSpace(condition)
-
-	// Check for "is not" comparison
-	if strings.Contains(condition, " is not ") {
-		parts := strings.SplitN(condition, " is not ", 2)
-		if len(parts) == 2 {
-			leftValue := e.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
-			rightValue := e.unquoteString(strings.TrimSpace(parts[1]))
-			return leftValue != rightValue
-		}
-	}
-
-	// Check for "is" comparison
-	if strings.Contains(condition, " is ") {
-		parts := strings.SplitN(condition, " is ", 2)
-		if len(parts) == 2 {
-			leftValue := e.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
-			rightValue := e.unquoteString(strings.TrimSpace(parts[1]))
-			return leftValue == rightValue
-		}
-	}
-
-	// Simple boolean check - resolve the variable and check if it's truthy
-	value := e.resolveVariableOrValue(condition, ctx)
-	return e.isTruthy(value)
-}
-
-// resolveVariableOrValue resolves a variable or returns the literal value
-func (e *Engine) resolveVariableOrValue(expr string, ctx *ExecutionContext) string {
-	expr = strings.TrimSpace(expr)
-
-	// If it's a variable (starts with $), resolve it
-	if strings.HasPrefix(expr, "$") {
-		if resolved, found := e.resolveSimpleVariableDirectly(expr, ctx); found {
-			return resolved
-		}
-		// Try resolving as expression
-		return e.resolveExpression(expr, ctx)
-	}
-
-	// Otherwise, return as literal value (unquoted if needed)
-	return e.unquoteString(expr)
-}
-
-// isTruthy checks if a value should be considered true
-func (e *Engine) isTruthy(value string) bool {
-	value = strings.ToLower(strings.TrimSpace(value))
-	return value == "true" || value == "yes" || value == "1" || value == "on"
-}
-
-// unquoteString removes single or double quotes from a string if present
-func (e *Engine) unquoteString(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) >= 2 {
-		if (s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"') {
-			return s[1 : len(s)-1]
-		}
-	}
-	return s
-}
-
-// executeConditional executes conditional statements (when, if/else)
 func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
-	// In strict mode, check for undefined variables in the condition
-	if !e.allowUndefinedVars {
-		if err := e.checkConditionForUndefinedVars(stmt.Condition, ctx); err != nil {
-			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
-		}
+	// In strict mode, check for undefined variables in the condition by attempting interpolation
+	if _, err := e.interpolateVariablesWithError(stmt.Condition, ctx); err != nil {
+		return fmt.Errorf("in %s condition: %w", stmt.Type, err)
 	}
 
 	// Evaluate the condition
