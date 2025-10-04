@@ -96,9 +96,9 @@ task "build matrix" means "Demonstrate conditional flags in build matrix":
 	given $optimize as boolean defaults to "true"
 	given $static as boolean defaults to "false"
 	
-	for each target in targets:
-		info "Building for {target}..."
-		info "  go build {$optimize ? '-ldflags=\"-s -w\"' : ''} {$static ? '-a' : ''} -o dist/app-{target}"
+	for each $target in $targets:
+		info "Building for {$target}..."
+		info "  go build {$optimize ? '-ldflags=\"-s -w\"' : ''} {$static ? '-a' : ''} -o dist/app-{$target}"
 	
 	success "✅ Build matrix completed!"
 

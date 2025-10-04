@@ -41,13 +41,13 @@ task "process list" means "Process a list of items":
 
 	if parallel is "true":
 		info "Processing items in parallel"
-		for each item in items in parallel:
-			info "Processing: {item}"
+	for each $item in $items in parallel:
+		info "Processing: {$item}"
 	else:
 		info "Processing items sequentially"
-		for each item in items:
-			step "Processing: {item}"
-			info "Completed: {item}"
+		for each $item in $items:
+			step "Processing: {$item}"
+			info "Completed: {$item}"
 
 	success "All items processed!"
 
