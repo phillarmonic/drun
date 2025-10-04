@@ -3983,7 +3983,7 @@ func (p *Parser) parseFilterExpression() *ast.FilterExpression {
 
 	filter := &ast.FilterExpression{}
 
-	if !p.expectPeek(lexer.IDENT) {
+	if !p.expectPeekIdentifierLike() {
 		return nil
 	}
 	filter.Variable = p.curToken.Literal
@@ -4664,7 +4664,7 @@ func (p *Parser) parseSimpleCondition() string {
 	// This should be something like "item == 'stop'" or "count > 10"
 
 	// Get the variable
-	if p.peekToken.Type == lexer.IDENT {
+	if p.peekToken.Type == lexer.IDENT || p.peekToken.Type == lexer.VARIABLE {
 		p.nextToken()
 		parts = append(parts, p.curToken.Literal)
 	}

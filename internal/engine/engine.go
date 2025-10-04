@@ -3551,6 +3551,9 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 			iterableStr = value
 		} else if value, exists := ctx.Variables[stmt.Iterable[1:]]; exists {
 			iterableStr = value
+		} else if param, exists := ctx.Parameters[stmt.Iterable[1:]]; exists {
+			// Also check parameters (without the $ prefix)
+			iterableStr = param.AsString()
 		} else {
 			return fmt.Errorf("variable '%s' not found", stmt.Iterable)
 		}
