@@ -454,6 +454,12 @@ main() {
     echo ""
     log_success "🎉 xdrun CLI installation completed successfully!"
     echo ""
+    
+    # Display installed version
+    log_info "Installed version:"
+    "${INSTALL_DIR}/${BINARY_NAME}" --version
+    echo ""
+    
     log_info "Get started with:"
     log_info "  xdrun --help"
     log_info "  xdrun --init"
