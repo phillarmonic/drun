@@ -8,18 +8,12 @@ import (
 	"github.com/phillarmonic/drun/internal/lexer"
 )
 
-// Expression represents any expression node
-type Expression interface {
-	Node
-	expressionNode()
-}
-
 // BinaryExpression represents binary operations like {a} + {b}, {x} - {y}
 type BinaryExpression struct {
-	Token    lexer.Token // the operator token
-	Left     Expression  // left operand
-	Operator string      // +, -, *, /, ==, !=, <, >, <=, >=
-	Right    Expression  // right operand
+	Token    lexer.Token
+	Left     Expression
+	Operator string
+	Right    Expression
 }
 
 func (be *BinaryExpression) expressionNode() {}
@@ -29,8 +23,8 @@ func (be *BinaryExpression) String() string {
 
 // IdentifierExpression represents variable references like {variable_name}
 type IdentifierExpression struct {
-	Token lexer.Token // the identifier token
-	Value string      // the variable name
+	Token lexer.Token
+	Value string
 }
 
 func (ie *IdentifierExpression) expressionNode() {}
@@ -40,8 +34,8 @@ func (ie *IdentifierExpression) String() string {
 
 // LiteralExpression represents literal values like "string", 42, true
 type LiteralExpression struct {
-	Token lexer.Token // the literal token
-	Value string      // the literal value
+	Token lexer.Token
+	Value string
 }
 
 func (le *LiteralExpression) expressionNode() {}
@@ -51,9 +45,9 @@ func (le *LiteralExpression) String() string {
 
 // FunctionCallExpression represents function calls like now(), current git branch
 type FunctionCallExpression struct {
-	Token     lexer.Token  // the function name token
-	Function  string       // function name
-	Arguments []Expression // function arguments
+	Token     lexer.Token
+	Function  string
+	Arguments []Expression
 }
 
 func (fce *FunctionCallExpression) expressionNode() {}
@@ -70,8 +64,8 @@ func (fce *FunctionCallExpression) String() string {
 
 // ArrayLiteral represents array literals like ["item1", "item2", "item3"]
 type ArrayLiteral struct {
-	Token    lexer.Token  // the LBRACKET token
-	Elements []Expression // array elements
+	Token    lexer.Token
+	Elements []Expression
 }
 
 func (al *ArrayLiteral) expressionNode() {}
