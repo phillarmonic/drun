@@ -90,3 +90,32 @@ func (pc *ProjectContext) GetSettings() map[string]string {
 	}
 	return pc.Settings
 }
+
+// Implement includes.ProjectContext interface
+func (pc *ProjectContext) GetIncludedFiles() map[string]bool {
+	if pc == nil {
+		return nil
+	}
+	return pc.IncludedFiles
+}
+
+func (pc *ProjectContext) GetIncludedSnippets() map[string]*ast.SnippetStatement {
+	if pc == nil {
+		return nil
+	}
+	return pc.IncludedSnippets
+}
+
+func (pc *ProjectContext) GetIncludedTemplates() map[string]*ast.TaskTemplateStatement {
+	if pc == nil {
+		return nil
+	}
+	return pc.IncludedTemplates
+}
+
+func (pc *ProjectContext) GetIncludedTasks() map[string]*ast.TaskStatement {
+	if pc == nil {
+		return nil
+	}
+	return pc.IncludedTasks
+}
