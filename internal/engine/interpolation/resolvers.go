@@ -244,68 +244,6 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 	return ""
 }
 
-// resolveSimpleVariable resolves a simple variable without operations
-func (i *Interpolator) resolveSimpleVariable(variable string, ctx Context) string {
-	// Handle $globals.key syntax
-	if strings.HasPrefix(variable, "$globals.") {
-		if ctx != nil {
-			project := ctx.GetProject()
-			if project != nil {
-				key := variable[9:] // Remove "$globals." prefix
-				if settings := project.GetSettings(); settings != nil {
-					if value, exists := settings[key]; exists {
-						return value
-					}
-				}
-				// Check special project variables
-				if key == "version" && project.GetVersion() != "" {
-					return project.GetVersion()
-				}
-				if key == "project" && project.GetName() != "" {
-					return project.GetName()
-				}
-				// Check current task
-				if key == "current_task" && ctx.GetCurrentTask() != "" {
-					return ctx.GetCurrentTask()
-				}
-			}
-		}
-		return ""
-	}
-
-	// Handle regular variables
-	if ctx != nil {
-		params := ctx.GetParameters()
-		vars := ctx.GetVariables()
-
-		// Check for variables with $ prefix first (parameters and task-scoped variables)
-		if strings.HasPrefix(variable, "$") {
-			varName := variable[1:] // Remove the $ prefix
-
-			// Check parameters (stored without $ prefix)
-			if value, exists := params[varName]; exists {
-				return value.AsString()
-			}
-
-			// Check captured variables (stored without $ prefix)
-			if value, exists := vars[varName]; exists {
-				return value
-			}
-		} else {
-			// Check parameters (bare identifiers)
-			if value, exists := params[variable]; exists {
-				return value.AsString()
-			}
-			// Check captured variables (bare identifiers)
-			if value, exists := vars[variable]; exists {
-				return value
-			}
-		}
-	}
-
-	return ""
-}
-
 // parseQuotedArguments parses comma-separated quoted arguments
 func (i *Interpolator) parseQuotedArguments(argsStr string) []string {
 	var args []string

@@ -39,6 +39,11 @@ func (i *Interpolator) SetAllowUndefined(allow bool) {
 	i.allowUndefined = allow
 }
 
+// IsStrictMode returns whether strict variable checking is enabled (undefined variables cause errors)
+func (i *Interpolator) IsStrictMode() bool {
+	return !i.allowUndefined
+}
+
 // SetResolveVariableOpsCallback sets the callback for resolving variable operations
 func (i *Interpolator) SetResolveVariableOpsCallback(fn func(expr string, ctx interface{}) string) {
 	i.resolveVariableOps = fn

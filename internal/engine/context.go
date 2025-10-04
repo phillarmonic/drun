@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
 	"github.com/phillarmonic/drun/internal/types"
 )
@@ -60,10 +61,7 @@ type ProjectContext struct {
 	Settings          map[string]string                         // project settings (set key to value)
 	Parameters        map[string]*ast.ProjectParameterStatement // project-level shared parameters
 	Snippets          map[string]*ast.SnippetStatement          // reusable code snippets
-	BeforeHooks       []ast.Statement                           // before any task hooks
-	AfterHooks        []ast.Statement                           // after any task hooks
-	SetupHooks        []ast.Statement                           // on drun setup hooks
-	TeardownHooks     []ast.Statement                           // on drun teardown hooks
+	HookManager       *hooks.Manager                            // lifecycle hooks manager
 	ShellConfigs      map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
 	IncludedSnippets  map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
 	IncludedTemplates map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"

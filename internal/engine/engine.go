@@ -18,6 +18,7 @@ import (
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/detection"
+	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
 	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/fileops"
@@ -185,8 +186,8 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	}
 
 	// Execute drun setup hooks
-	if ctx.Project != nil {
-		for _, hook := range ctx.Project.SetupHooks {
+	if ctx.Project != nil && ctx.Project.HookManager != nil {
+		for _, hook := range ctx.Project.HookManager.GetSetupHooks() {
 			if err := e.executeStatement(hook, ctx); err != nil {
 				return fmt.Errorf("drun setup hook failed: %v", err)
 			}
@@ -217,8 +218,8 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		ctx.CurrentTask = currentTaskName
 
 		// Execute before hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil {
-			for _, hook := range ctx.Project.BeforeHooks {
+		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
+			for _, hook := range ctx.Project.HookManager.GetBeforeHooks() {
 				if err := e.executeStatement(hook, ctx); err != nil {
 					return fmt.Errorf("before hook failed: %v", err)
 				}
@@ -231,8 +232,8 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		}
 
 		// Execute after hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil {
-			for _, hook := range ctx.Project.AfterHooks {
+		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
+			for _, hook := range ctx.Project.HookManager.GetAfterHooks() {
 				if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
 					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
 				}
@@ -241,8 +242,8 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	}
 
 	// Execute drun teardown hooks
-	if ctx.Project != nil {
-		for _, hook := range ctx.Project.TeardownHooks {
+	if ctx.Project != nil && ctx.Project.HookManager != nil {
+		for _, hook := range ctx.Project.HookManager.GetTeardownHooks() {
 			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
 			}
@@ -359,10 +360,7 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		Settings:          make(map[string]string, 8),                         // Pre-allocate for typical settings count
 		Parameters:        make(map[string]*ast.ProjectParameterStatement, 8), // Pre-allocate for project parameters
 		Snippets:          make(map[string]*ast.SnippetStatement, 8),          // Pre-allocate for snippets
-		BeforeHooks:       make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
-		AfterHooks:        make([]ast.Statement, 0, 4),                        // Pre-allocate for typical hook count
-		SetupHooks:        make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
-		TeardownHooks:     make([]ast.Statement, 0, 2),                        // Pre-allocate for typical hook count
+		HookManager:       hooks.NewManager(),                                 // Initialize hooks manager
 		ShellConfigs:      make(map[string]*ast.PlatformShellConfig, 4),       // Pre-allocate for typical platform count
 		IncludedSnippets:  make(map[string]*ast.SnippetStatement, 16),         // Pre-allocate for included snippets
 		IncludedTemplates: make(map[string]*ast.TaskTemplateStatement, 16),    // Pre-allocate for included templates
@@ -387,13 +385,13 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		case *ast.LifecycleHook:
 			switch s.Type {
 			case "before":
-				ctx.BeforeHooks = append(ctx.BeforeHooks, s.Body...)
+				ctx.HookManager.RegisterBeforeHooks(s.Body)
 			case "after":
-				ctx.AfterHooks = append(ctx.AfterHooks, s.Body...)
+				ctx.HookManager.RegisterAfterHooks(s.Body)
 			case "setup":
-				ctx.SetupHooks = append(ctx.SetupHooks, s.Body...)
+				ctx.HookManager.RegisterSetupHooks(s.Body)
 			case "teardown":
-				ctx.TeardownHooks = append(ctx.TeardownHooks, s.Body...)
+				ctx.HookManager.RegisterTeardownHooks(s.Body)
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform
@@ -2713,9 +2711,17 @@ func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionCon
 }
 
 func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
-	// In strict mode, check for undefined variables in the condition by attempting interpolation
-	if _, err := e.interpolateVariablesWithError(stmt.Condition, ctx); err != nil {
-		return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+	// In strict mode, check for undefined variables in the condition
+	// This checks both bare $var references and {var} interpolations
+	if e.interpolator.IsStrictMode() {
+		// Check for undefined variables in {var} interpolations
+		if _, err := e.interpolateVariablesWithError(stmt.Condition, ctx); err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+		}
+		// Check for undefined bare $var references (e.g., "when $var is value")
+		if err := e.checkConditionForUndefinedVars(stmt.Condition, ctx); err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+		}
 	}
 
 	// Evaluate the condition
@@ -3261,78 +3267,6 @@ func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *Execution
 	}
 
 	return nil
-}
-
-// isComplexExpression checks if an expression contains operations or function calls
-func (e *Engine) isComplexExpression(expr string) bool {
-	// Check for variable operations like "without", "with", etc.
-	if strings.Contains(expr, " without ") || strings.Contains(expr, " with ") {
-		return true
-	}
-	// Check for function calls (contains parentheses or dots)
-	if strings.Contains(expr, "(") || strings.Contains(expr, ".") {
-		return true
-	}
-	// Check for pipe operations
-	if strings.Contains(expr, " | ") {
-		return true
-	}
-	return false
-}
-
-// extractBaseVariable extracts the base variable from a complex expression
-func (e *Engine) extractBaseVariable(expr string) string {
-	// For expressions like "$version without prefix 'v'", extract "$version"
-	parts := strings.Fields(expr)
-	if len(parts) > 0 && strings.HasPrefix(parts[0], "$") {
-		return parts[0]
-	}
-	return ""
-}
-
-// variableExists checks if a variable exists in the context
-func (e *Engine) variableExists(varName string, ctx *ExecutionContext) bool {
-	if ctx == nil {
-		return false
-	}
-
-	// Remove $ prefix for checking
-	cleanName := varName
-	if strings.HasPrefix(varName, "$") {
-		cleanName = varName[1:]
-	}
-
-	// Check parameters
-	if _, exists := ctx.Parameters[cleanName]; exists {
-		return true
-	}
-	// Check variables
-	if _, exists := ctx.Variables[cleanName]; exists {
-		return true
-	}
-	// Check variables with $ prefix
-	if _, exists := ctx.Variables[varName]; exists {
-		return true
-	}
-
-	// Check project-level variables for backward compatibility
-	if ctx.Project != nil {
-		// Check built-in project variables
-		if cleanName == "project" && ctx.Project.Name != "" {
-			return true
-		}
-		if cleanName == "version" && ctx.Project.Version != "" {
-			return true
-		}
-		// Check project settings
-		if ctx.Project.Settings != nil {
-			if _, exists := ctx.Project.Settings[cleanName]; exists {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // evaluateEnvCondition evaluates environment variable conditionals
