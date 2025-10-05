@@ -1,18 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
-	"time"
 
+	"github.com/phillarmonic/drun/cmd/drun/app"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/debug"
 	"github.com/phillarmonic/drun/internal/engine"
@@ -21,7 +14,6 @@ import (
 	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/figlet/figletlib"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -142,7 +134,7 @@ Examples:
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
-	ValidArgsFunction: completeTaskNames,
+	ValidArgsFunction: app.CompleteTaskNames,
 }
 
 func init() {
@@ -179,17 +171,17 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Handle --self-update flag
 	if selfUpdate {
-		return handleSelfUpdate()
+		return app.HandleSelfUpdate(version)
 	}
 
 	// Handle --init flag
 	if initConfig {
-		return initializeConfig(configFile)
+		return app.InitializeConfig(configFile, saveAsDefault)
 	}
 
 	// Handle --set-workspace flag
 	if setWorkspace != "" {
-		return setWorkspaceDefault(setWorkspace)
+		return app.SetWorkspaceDefault(setWorkspace)
 	}
 
 	// Handle debug mode
@@ -198,7 +190,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine the config file to use
-	actualConfigFile, err := findConfigFile(configFile)
+	actualConfigFile, err := app.FindConfigFile(configFile)
 	if err != nil {
 		return fmt.Errorf("no drun task file found: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 	}
@@ -386,7 +378,7 @@ func handleDebugMode() error {
 		content = debugInput
 	} else {
 		// Determine the config file to use
-		actualConfigFile, err := findConfigFile(configFile)
+		actualConfigFile, err := app.FindConfigFile(configFile)
 		if err != nil {
 			return fmt.Errorf("no drun task file found for debugging: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 		}

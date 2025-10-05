@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/shell"
 )
 
