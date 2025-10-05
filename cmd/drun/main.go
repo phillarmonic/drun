@@ -1,18 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
-	"time"
 
+	"github.com/phillarmonic/drun/cmd/drun/app"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/debug"
 	"github.com/phillarmonic/drun/internal/engine"
@@ -21,7 +14,6 @@ import (
 	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/figlet/figletlib"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -46,15 +38,6 @@ var (
 	debugInput  string
 )
 
-// WorkspaceConfig represents the workspace configuration
-type WorkspaceConfig struct {
-	DefaultTaskFile string            `yaml:"defaultTaskFile"`
-	ParallelJobs    int               `yaml:"parallelJobs"`
-	Shell           string            `yaml:"shell"`
-	Variables       map[string]string `yaml:"variables"`
-	Defaults        map[string]string `yaml:"defaults"`
-}
-
 // Version information (set at build time)
 var (
 	version = "2.0.0-dev"
@@ -64,40 +47,6 @@ var (
 
 // Default filename for v2 drun files
 var DefaultFilename = ".drun/spec.drun"
-
-// completeTaskNames provides autocompletion for task names
-func completeTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Try to find and parse the drun file
-	actualConfigFile, err := findConfigFile(configFile)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	content, err := os.ReadFile(actualConfigFile)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	program, err := engine.ParseStringWithFilename(string(content), actualConfigFile)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Create engine to get task list
-	eng := engine.NewEngine(os.Stdout)
-	tasks := eng.ListTasks(program)
-
-	var completions []string
-	for _, task := range tasks {
-		completions = append(completions, task.Name+"\t[task] "+task.Description)
-	}
-
-	return completions, cobra.ShellCompDirectiveNoFileComp
-}
 
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
@@ -185,7 +134,7 @@ Examples:
 	RunE: runDrun,
 	// Don't treat unknown arguments as errors
 	Args:              cobra.ArbitraryArgs,
-	ValidArgsFunction: completeTaskNames,
+	ValidArgsFunction: app.CompleteTaskNames,
 }
 
 func init() {
@@ -222,17 +171,17 @@ func runDrun(cmd *cobra.Command, args []string) error {
 
 	// Handle --self-update flag
 	if selfUpdate {
-		return handleSelfUpdate()
+		return app.HandleSelfUpdate(version)
 	}
 
 	// Handle --init flag
 	if initConfig {
-		return initializeConfig(configFile)
+		return app.InitializeConfig(configFile, saveAsDefault)
 	}
 
 	// Handle --set-workspace flag
 	if setWorkspace != "" {
-		return setWorkspaceDefault(setWorkspace)
+		return app.SetWorkspaceDefault(setWorkspace)
 	}
 
 	// Handle debug mode
@@ -241,7 +190,7 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine the config file to use
-	actualConfigFile, err := findConfigFile(configFile)
+	actualConfigFile, err := app.FindConfigFile(configFile)
 	if err != nil {
 		return fmt.Errorf("no drun task file found: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 	}
@@ -336,135 +285,6 @@ func runDrun(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// findConfigFile finds the drun configuration file to use
-func findConfigFile(filename string) (string, error) {
-	if filename != "" {
-		// User specified a file
-		if _, err := os.Stat(filename); err != nil {
-			return "", fmt.Errorf("specified file '%s' not found", filename)
-		}
-		return filename, nil
-	}
-
-	// Check workspace configuration first
-	if workspaceFile := getWorkspaceDefaultFile(); workspaceFile != "" {
-		if _, err := os.Stat(workspaceFile); err == nil {
-			return workspaceFile, nil
-		} else {
-			return "", fmt.Errorf("workspace default file '%s' not found", workspaceFile)
-		}
-	}
-
-	// Try default file locations in order
-	defaultLocations := []string{
-		".drun/spec.drun",
-		".drun",
-		"spec.drun",
-		"ops/drun/spec.drun",
-		"ops/spec.drun",
-	}
-
-	for _, location := range defaultLocations {
-		if fileInfo, err := os.Stat(location); err == nil {
-			// Skip if it's a directory - we only want files
-			if !fileInfo.IsDir() {
-				return location, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no drun task file found - expected one of: %v\nUse --file to specify location or run 'drun --init' to create one", defaultLocations)
-}
-
-// getWorkspaceDefaultFile checks for workspace configuration and returns default file
-func getWorkspaceDefaultFile() string {
-	workspaceConfigPath := ".drun/.drun_workspace.yml"
-	if _, err := os.Stat(workspaceConfigPath); err != nil {
-		return ""
-	}
-
-	// Read and parse workspace configuration
-	data, err := os.ReadFile(workspaceConfigPath)
-	if err != nil {
-		return ""
-	}
-
-	var config WorkspaceConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return ""
-	}
-
-	// Return the default task file if specified
-	if config.DefaultTaskFile != "" {
-		return config.DefaultTaskFile
-	}
-
-	return ""
-}
-
-// saveWorkspaceConfig saves a workspace configuration
-func saveWorkspaceConfig(config WorkspaceConfig) error {
-	workspaceConfigPath := ".drun/.drun_workspace.yml"
-
-	// Create .drun directory if it doesn't exist
-	if err := os.MkdirAll(".drun", 0755); err != nil {
-		return fmt.Errorf("failed to create .drun directory: %w", err)
-	}
-
-	// Marshal configuration to YAML
-	data, err := yaml.Marshal(&config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal workspace config: %w", err)
-	}
-
-	// Write to file
-	if err := os.WriteFile(workspaceConfigPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write workspace config: %w", err)
-	}
-
-	return nil
-}
-
-// loadWorkspaceConfig loads the workspace configuration
-func loadWorkspaceConfig() (*WorkspaceConfig, error) {
-	workspaceConfigPath := ".drun/.drun_workspace.yml"
-	if _, err := os.Stat(workspaceConfigPath); err != nil {
-		// Return default config if file doesn't exist
-		return &WorkspaceConfig{
-			ParallelJobs: 4,
-			Shell:        "/bin/bash",
-			Variables:    make(map[string]string),
-			Defaults:     make(map[string]string),
-		}, nil
-	}
-
-	data, err := os.ReadFile(workspaceConfigPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read workspace config: %w", err)
-	}
-
-	var config WorkspaceConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse workspace config: %w", err)
-	}
-
-	// Set defaults if not specified
-	if config.ParallelJobs == 0 {
-		config.ParallelJobs = 4
-	}
-	if config.Shell == "" {
-		config.Shell = "/bin/bash"
-	}
-	if config.Variables == nil {
-		config.Variables = make(map[string]string)
-	}
-	if config.Defaults == nil {
-		config.Defaults = make(map[string]string)
-	}
-
-	return &config, nil
-}
-
 // listAllTasks lists all available tasks
 func listAllTasks(eng *engine.Engine, program *ast.Program) error {
 	fmt.Println("Available tasks:")
@@ -549,105 +369,6 @@ func showVersionInfo() error {
 	return nil
 }
 
-// initializeConfig creates a new drun configuration file
-func initializeConfig(filename string) error {
-	// Determine the target filename
-	targetFile := ".drun/spec.drun"
-	if filename != "" {
-		targetFile = filename
-	}
-
-	// Check if file already exists
-	if _, err := os.Stat(targetFile); err == nil {
-		return fmt.Errorf("task file '%s' already exists", targetFile)
-	}
-
-	// Check if the directory needs to be created
-	targetDir := filepath.Dir(targetFile)
-	if targetDir != "." && targetDir != "" {
-		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-			// Create the directory
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create directory '%s': %w", targetDir, err)
-			}
-			fmt.Printf("📁 Created directory: %s\n", targetDir)
-		}
-	}
-
-	// Generate starter configuration
-	config := generateStarterConfig()
-
-	// Write the file
-	if err := os.WriteFile(targetFile, []byte(config), 0600); err != nil {
-		return fmt.Errorf("failed to write task file: %w", err)
-	}
-
-	fmt.Printf("✅ Created %s\n", targetFile)
-
-	// Save as workspace default if requested or if using custom filename
-	if saveAsDefault || (filename != "" && filename != ".drun/spec.drun") {
-		if err := saveCustomFileAsDefault(targetFile); err != nil {
-			fmt.Printf("⚠️  Warning: Failed to save as workspace default: %v\n", err)
-		} else {
-			fmt.Printf("💾 Saved '%s' as workspace default\n", targetFile)
-		}
-	}
-
-	fmt.Println("🚀 Get started with: xdrun --list")
-	return nil
-}
-
-// saveCustomFileAsDefault saves a custom file name as the workspace default
-func saveCustomFileAsDefault(filename string) error {
-	// Load existing workspace config or create new one
-	config, err := loadWorkspaceConfig()
-	if err != nil {
-		config = &WorkspaceConfig{
-			ParallelJobs: 4,
-			Shell:        "/bin/bash",
-			Variables:    make(map[string]string),
-			Defaults:     make(map[string]string),
-		}
-	}
-
-	// Set the default task file
-	config.DefaultTaskFile = filename
-
-	// Save the updated configuration
-	return saveWorkspaceConfig(*config)
-}
-
-// setWorkspaceDefault sets the workspace default task file
-func setWorkspaceDefault(filename string) error {
-	// Check if the specified file exists
-	if _, err := os.Stat(filename); err != nil {
-		return fmt.Errorf("specified file '%s' not found", filename)
-	}
-
-	// Load existing workspace config or create new one
-	config, err := loadWorkspaceConfig()
-	if err != nil {
-		config = &WorkspaceConfig{
-			ParallelJobs: 4,
-			Shell:        "/bin/bash",
-			Variables:    make(map[string]string),
-			Defaults:     make(map[string]string),
-		}
-	}
-
-	// Set the default task file
-	config.DefaultTaskFile = filename
-
-	// Save the updated configuration
-	if err := saveWorkspaceConfig(*config); err != nil {
-		return fmt.Errorf("failed to save workspace configuration: %w", err)
-	}
-
-	fmt.Printf("✅ Set workspace default task file to: %s\n", filename)
-	fmt.Printf("💾 Saved to .drun/.drun_workspace.yml\n")
-	return nil
-}
-
 // handleDebugMode handles debug mode execution
 func handleDebugMode() error {
 	var content string
@@ -657,7 +378,7 @@ func handleDebugMode() error {
 		content = debugInput
 	} else {
 		// Determine the config file to use
-		actualConfigFile, err := findConfigFile(configFile)
+		actualConfigFile, err := app.FindConfigFile(configFile)
 		if err != nil {
 			return fmt.Errorf("no drun task file found for debugging: %w\n\nTo get started:\n  drun --init          # Create .drun/spec.drun", err)
 		}
@@ -711,427 +432,9 @@ func handleDebugMode() error {
 	return nil
 }
 
-// generateStarterConfig creates a starter drun v2 configuration
-func generateStarterConfig() string {
-	return `# drun (do-run) CLI is a fast, semantic task runner with 
-# its own powerful automation language. Effortless tasks, serious speed.
-# Learn more at https://github.com/phillarmonic/drun
-
-version: 2.0
-
-project "my-app" version "1.0":
-	/* Cross-platform shell configuration with sensible defaults
-	 These are all default values, you can remove them if you don't intend to change it. */
-
-	shell config:
-		darwin:
-			executable: "/bin/zsh"
-			args:
-				- "-l"
-				- "-i"
-			environment:
-				TERM: "xterm-256color"
-				SHELL_SESSION_HISTORY: "0"
-		
-		linux:
-			executable: "/bin/bash"
-			args:
-				- "--login"
-				- "--interactive"
-			environment:
-				TERM: "xterm-256color"
-				HISTCONTROL: "ignoredups"
-		
-		windows:
-			executable: "powershell.exe"
-			args:
-				- "-NoProfile"
-				- "-ExecutionPolicy"
-				- "Bypass"
-			environment:
-				PSModulePath: ""
-
-task "default" means "Welcome to drun v2":
-	echo "Starting up..."
-	info "Welcome to drun v2! 🚀"
-	step "This is your starter task file"
-	success "Ready to build amazing automation!"
-
-task "hello" means "Say hello":
-	info "Hello from the semantic task runner!"
-
-task "build" means "Build the project":
-	step "Building project..."
-	info "Add your build commands here"
-	success "Build completed!"
-
-task "test" means "Run tests":
-	step "Running tests..."
-	info "Add your test commands here"
-	success "All tests passed!"
-
-task "deploy" means "Deploy application":
-	given $environment defaults to "development"
-	step "Deploying application to {$environment}..."
-	warn "Make sure you're deploying to the right environment!"
-	info "Add your deployment commands here"
-	success "Deployment to {$environment} completed!"
-`
-}
-
 // GitHubRelease represents a GitHub release
 type GitHubRelease struct {
 	TagName string `json:"tag_name"`
 	Name    string `json:"name"`
 	Body    string `json:"body"`
-}
-
-// handleSelfUpdate handles the --self-update flag
-func handleSelfUpdate() error {
-	fmt.Println("🔄 Checking for drun updates...")
-
-	// Get current executable path
-	currentExe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get current executable path: %w", err)
-	}
-
-	// Check for latest version
-	latestVersion, err := getLatestVersion()
-	if err != nil {
-		return fmt.Errorf("failed to check for updates: %w", err)
-	}
-
-	// Compare versions
-	currentVersion := normalizeVersion(version)
-	if currentVersion == latestVersion {
-		fmt.Printf("✅ You're already running the latest version: %s\n", version)
-		return nil
-	}
-
-	fmt.Printf("📦 New version available: %s (current: %s)\n", latestVersion, version)
-
-	// Ask for user confirmation
-	if !askForConfirmation("Do you want to update now?") {
-		fmt.Println("Update cancelled.")
-		return nil
-	}
-
-	// Create backup
-	backupPath, err := createBackup(currentExe)
-	if err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
-	}
-
-	fmt.Printf("💾 Created backup at: %s\n", backupPath)
-
-	// Download and install new version
-	if err := downloadAndInstall(latestVersion, currentExe); err != nil {
-		// Restore backup on failure
-		fmt.Printf("❌ Update failed: %v\n", err)
-		fmt.Println("🔄 Restoring backup...")
-		if restoreErr := restoreBackup(backupPath, currentExe); restoreErr != nil {
-			return fmt.Errorf("update failed and backup restoration failed: %v (original error: %w)", restoreErr, err)
-		}
-		fmt.Println("✅ Backup restored successfully")
-		return err
-	}
-
-	fmt.Printf("🎉 Successfully updated to version %s!\n", latestVersion)
-	fmt.Printf("💾 Backup available at: %s\n", backupPath)
-
-	// Display the actual version from the updated binary
-	fmt.Println("\nVerifying updated binary:")
-	cmd := exec.Command(currentExe, "--version")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("⚠️  Warning: Failed to verify updated binary: %v\n", err)
-	}
-
-	return nil
-}
-
-// getLatestVersion fetches the latest version from GitHub
-func getLatestVersion() (string, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	resp, err := client.Get("https://api.github.com/repos/phillarmonic/drun/releases/latest")
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch release information: %w", err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close response body: %v\n", closeErr)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", fmt.Errorf("failed to parse release information: %w", err)
-	}
-
-	return release.TagName, nil
-}
-
-// normalizeVersion removes 'v' prefix and '-dev' suffix for comparison
-func normalizeVersion(v string) string {
-	v = strings.TrimPrefix(v, "v")
-	v = strings.TrimSuffix(v, "-dev")
-	return v
-}
-
-// askForConfirmation asks the user for yes/no confirmation
-func askForConfirmation(question string) bool {
-	fmt.Printf("%s (y/N): ", question)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	if !scanner.Scan() {
-		return false
-	}
-
-	response := strings.ToLower(strings.TrimSpace(scanner.Text()))
-	return response == "y" || response == "yes"
-}
-
-// createBackup creates a backup of the current executable
-func createBackup(currentExe string) (string, error) {
-	// Create backup directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	backupDir := filepath.Join(homeDir, ".drun")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create backup directory: %w", err)
-	}
-
-	// Create timestamped backup filename
-	timestamp := time.Now().Format("20060102_150405")
-	backupFilename := fmt.Sprintf("xdrun_%s_backup_%s", normalizeVersion(version), timestamp)
-	if runtime.GOOS == "windows" {
-		backupFilename += ".exe"
-	}
-
-	backupPath := filepath.Join(backupDir, backupFilename)
-
-	// Copy current executable to backup location
-	if err := copyFile(currentExe, backupPath); err != nil {
-		return "", fmt.Errorf("failed to copy executable: %w", err)
-	}
-
-	// Make backup executable
-	if err := os.Chmod(backupPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to make backup executable: %w", err)
-	}
-
-	// Clean up old backups (keep last 5)
-	cleanupOldBackups(backupDir)
-
-	return backupPath, nil
-}
-
-// downloadAndInstall downloads and installs the new version
-func downloadAndInstall(version, targetPath string) error {
-	// Determine platform and architecture
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
-
-	// Map Go arch to release arch
-	var arch string
-	switch goarch {
-	case "amd64":
-		arch = "amd64"
-	case "arm64":
-		arch = "arm64"
-	default:
-		return fmt.Errorf("unsupported architecture: %s", goarch)
-	}
-
-	// Construct download URL
-	binaryName := fmt.Sprintf("xdrun-%s-%s", goos, arch)
-	if goos == "windows" {
-		binaryName += ".exe"
-	}
-
-	downloadURL := fmt.Sprintf("https://github.com/phillarmonic/drun/releases/download/%s/%s", version, binaryName)
-
-	fmt.Printf("📥 Downloading %s...\n", binaryName)
-
-	// Download the binary
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(downloadURL)
-	if err != nil {
-		return fmt.Errorf("failed to download binary: %w", err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close response body: %v\n", closeErr)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download binary: HTTP %d", resp.StatusCode)
-	}
-
-	// Create temporary file
-	tempFile, err := os.CreateTemp("", "drun-update-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer func() {
-		if removeErr := os.Remove(tempFile.Name()); removeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to remove temporary file: %v\n", removeErr)
-		}
-	}()
-	defer func() {
-		if closeErr := tempFile.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close temporary file: %v\n", closeErr)
-		}
-	}()
-
-	// Copy downloaded content to temp file
-	if _, err := io.Copy(tempFile, resp.Body); err != nil {
-		return fmt.Errorf("failed to write downloaded binary: %w", err)
-	}
-
-	// Make temp file executable
-	if err := os.Chmod(tempFile.Name(), 0755); err != nil {
-		return fmt.Errorf("failed to make binary executable: %w", err)
-	}
-
-	// Verify the binary works
-	fmt.Println("🔍 Verifying downloaded binary...")
-	cmd := exec.Command(tempFile.Name(), "--version")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("downloaded binary failed verification: %w", err)
-	}
-
-	// Install the binary (may require elevated permissions)
-	fmt.Println("📦 Installing new version...")
-	if err := installBinary(tempFile.Name(), targetPath); err != nil {
-		return fmt.Errorf("failed to install binary: %w", err)
-	}
-
-	return nil
-}
-
-// installBinary installs the binary, handling permissions as needed
-func installBinary(sourcePath, targetPath string) error {
-	// Try direct copy first
-	if err := copyFile(sourcePath, targetPath); err == nil {
-		return nil
-	}
-
-	// If direct copy failed, try with elevated permissions
-	fmt.Println("🔐 Requesting elevated permissions...")
-
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		// Use sudo on Unix-like systems
-		cmd := exec.Command("sudo", "cp", sourcePath, targetPath)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-
-	case "windows":
-		// On Windows, we need to use PowerShell with elevation
-		// This is more complex and might require the user to run as administrator
-		return copyFile(sourcePath, targetPath)
-
-	default:
-		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-}
-
-// copyFile copies a file from source to destination
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := sourceFile.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close source file: %v\n", closeErr)
-		}
-	}()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := destFile.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close destination file: %v\n", closeErr)
-		}
-	}()
-
-	if _, err := io.Copy(destFile, sourceFile); err != nil {
-		return err
-	}
-
-	// Copy permissions
-	sourceInfo, err := sourceFile.Stat()
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, sourceInfo.Mode())
-}
-
-// restoreBackup restores from backup
-func restoreBackup(backupPath, targetPath string) error {
-	return copyFile(backupPath, targetPath)
-}
-
-// cleanupOldBackups removes old backup files, keeping only the last 5
-func cleanupOldBackups(backupDir string) {
-	files, err := filepath.Glob(filepath.Join(backupDir, "xdrun*backup*"))
-	if err != nil {
-		return
-	}
-
-	if len(files) <= 5 {
-		return
-	}
-
-	// Sort files by modification time (newest first)
-	type fileInfo struct {
-		path    string
-		modTime time.Time
-	}
-
-	var fileInfos []fileInfo
-	for _, file := range files {
-		info, err := os.Stat(file)
-		if err != nil {
-			continue
-		}
-		fileInfos = append(fileInfos, fileInfo{
-			path:    file,
-			modTime: info.ModTime(),
-		})
-	}
-
-	// Sort by modification time (newest first)
-	for i := 0; i < len(fileInfos)-1; i++ {
-		for j := i + 1; j < len(fileInfos); j++ {
-			if fileInfos[i].modTime.Before(fileInfos[j].modTime) {
-				fileInfos[i], fileInfos[j] = fileInfos[j], fileInfos[i]
-			}
-		}
-	}
-
-	// Remove old files (keep first 5)
-	for i := 5; i < len(fileInfos); i++ {
-		if removeErr := os.Remove(fileInfos[i].path); removeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to remove old backup %s: %v\n", fileInfos[i].path, removeErr)
-		}
-	}
 }

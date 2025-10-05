@@ -9,24 +9,24 @@ task "showcase_advanced_loops":
 
 	# Range iteration with step
 	info "📊 Range Loop Example:"
-	for i in range 1 to 5 step 2:
-		info "  Processing range item: {i}"
+	for $i in range 1 to 5 step 2:
+		info "  Processing range item: {$i}"
 
 	# Filtered loops with string operations
 	info "🔍 Filtered Loop Examples:"
-	for each item in items where item contains "test":
-		info "  Found test item: {item}"
+	for each $item in $items where $item contains "test":
+		info "  Found test item: {$item}"
 
-	for each item in items where item ends with ".js":
-		info "  Found JavaScript file: {item}"
+	for each $item in $items where $item ends with ".js":
+		info "  Found JavaScript file: {$item}"
 
 	# Break and continue examples
 	info "⏭️ Break/Continue Examples:"
-	for each item in items:
-		continue if item == "skip_item"
-		info "  Processing: {item}"
-		break when item == "item3.js"
-		info "  Completed processing: {item}"
+	for each $item in $items:
+		continue if $item == "skip_item"
+		info "  Processing: {$item}"
+		break when $item == "item3.js"
+		info "  Completed processing: {$item}"
 
 	# Line processing example (simulated)
 	info "📄 Line Processing Example:"
@@ -46,10 +46,10 @@ task "parallel_advanced_loops":
 	info "🚀 Starting Parallel Advanced Control Flow"
 
 	# Parallel filtered processing
-	for each item in items where item ends with ".js" in parallel:
-		info "  Processing JavaScript file in parallel: {item}"
-		step "Analyzing {item}"
-		step "Optimizing {item}"
+	for each $item in $items where $item ends with ".js" in parallel:
+		info "  Processing JavaScript file in parallel: {$item}"
+		step "Analyzing {$item}"
+		step "Optimizing {$item}"
 
 	success "✅ Parallel Advanced Control Flow completed!"
 
@@ -61,15 +61,15 @@ task "conditional_advanced_loops":
 
 	when env == "development":
 		info "🔧 Running in development mode"
-		for each item in items:
-			continue if item == "critical_item"
-			info "  Dev processing: {item}"
-			break when item == "error_item"
+		for each $item in $items:
+			continue if $item == "critical_item"
+			info "  Dev processing: {$item}"
+			break when $item == "error_item"
 
 	when env == "production":
 		warn "⚠️ Running in production mode - being careful"
-		for each item in items where item != "error_item":
-			info "  Prod processing: {item}"
+		for each $item in $items where $item != "error_item":
+			info "  Prod processing: {$item}"
 
 	success "✅ Conditional Advanced Control Flow completed!"
 
@@ -78,19 +78,19 @@ task "range_operations":
 
 	# Simple range
 	info "📊 Simple Range (1 to 3):"
-	for i in range 1 to 3:
-		info "  Item {i}"
+	for $i in range 1 to 3:
+		info "  Item {$i}"
 
 	# Range with step
 	info "📊 Range with Step (0 to 10 step 3):"
-	for i in range 0 to 10 step 3:
-		info "  Item {i}"
+	for $i in range 0 to 10 step 3:
+		info "  Item {$i}"
 
 	# Nested ranges (simulated with break/continue)
 	info "📊 Complex Range Processing:"
-	for i in range 1 to 5:
-		continue if i == 3
-		info "  Processing batch {i}"
-		break when i == 4
+	for $i in range 1 to 5:
+		continue if $i == 3
+		info "  Processing batch {$i}"
+		break when $i == 4
 
 	success "✅ Range Operations completed!"

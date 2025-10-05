@@ -75,7 +75,7 @@ task "variables_in_loops":
 
 	info "🚀 Starting Variables in Loops Demo"
 
-	for each item in items:
+	for each $item in $items:
 		let $processed = $item
 		transform $processed with uppercase
 		transform $processed with concat " (processed)"

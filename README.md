@@ -4,6 +4,8 @@
 
 **xdrun** (eXecute drun) is the CLI interpreter that runs the drun language and executes `.drun` files.
 
+> **For Developers:** Want to contribute or understand the architecture? See the **[Developer Guide](./DEVELOPER_GUIDE.md)** for complete documentation on the codebase, architecture diagrams, and contribution guidelines.
+
 
 
 ### Small example of a Drun language script:
@@ -25,7 +27,7 @@ task "hello":
 
 ## Features
 
-### 🚀 **Core Features**
+### Core Features
 
 - **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
 - **Smart Parameters**: Type-safe parameters with constraints, defaults, and semantic `empty` keyword (`requires $env from ["dev", "prod"]`, `given $features defaults to empty`)
@@ -38,25 +40,25 @@ task "hello":
 - **Dry Run & Explain**: See what would be executed without running it
 - **Type Safety**: Static analysis with runtime validation
 
-### 🌟 **Advanced Features**
+### Advanced Features
 
-- **♻️ Code Reuse**: Project-level parameters, reusable snippets, task templates, and namespaced includes for DRY automation
-- **🔗 Project Declarations**: Define global project settings, includes, and lifecycle hooks
-- **🔄 Dependency System**: Automatic task dependency resolution with parallel execution
-- **📞 Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
-- **🌐 HTTP Actions**: Built-in HTTP requests with authentication and response handling
-- **🐳 Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
-- **☸️ Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
-- **📊 Error Handling**: Comprehensive `try/catch/finally` with custom error types
-- **🔄 Parallel Execution**: True parallel loops with concurrency control and progress tracking
-- **📊 Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
-- **🎯 Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
-- **🔧 DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
-- **📁 File Operations**: Built-in file system operations with path interpolation
-- **🎯 Pattern Macros**: Built-in validation patterns (`matching semver`, `matching uuid`, `matching url`) with descriptive error messages
-- **🔄 Advanced Variable Operations**: Powerful data transformation (`{$files filtered by extension '.js' | sorted by name}`, `{$version without prefix 'v'}`, `{$path basename}`)
+- **Code Reuse**: Project-level parameters, reusable snippets, task templates, and namespaced includes for DRY automation
+- **Project Declarations**: Define global project settings, includes, and lifecycle hooks
+- **Dependency System**: Automatic task dependency resolution with parallel execution
+- **Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
+- **HTTP Actions**: Built-in HTTP requests with authentication and response handling
+- **Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
+- **Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
+- **Error Handling**: Comprehensive `try/catch/finally` with custom error types
+- **Parallel Execution**: True parallel loops with concurrency control and progress tracking
+- **Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
+- **Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
+- **DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
+- **File Operations**: Built-in file system operations with path interpolation
+- **Pattern Macros**: Built-in validation patterns (`matching semver`, `matching uuid`, `matching url`) with descriptive error messages
+- **Advanced Variable Operations**: Powerful data transformation (`{$files filtered by extension '.js' | sorted by name}`, `{$version without prefix 'v'}`, `{$path basename}`)
 
-### 🛠️ **Developer Experience**
+### Developer Experience
 
 - **20+ Template Functions**: Docker detection, Git integration, HTTP calls, status messages, and more
 - **Intelligent Caching**: HTTP and Git includes cached for performance
@@ -64,7 +66,7 @@ task "hello":
 - **Shell Completion**: Intelligent completion for bash, zsh, fish, and PowerShell
 - **Self-Update**: Built-in update mechanism with backup management
 
-### 📋 **Built-in Functions**
+### Built-in Functions
 
 drun includes powerful built-in functions for common operations:
 
@@ -108,11 +110,11 @@ version: 2.0
 project "my-app" version "1.0":
 
 task "system info":
-  info "🖥️  Running on: {hostname}"
-  info "📁 Current directory: {pwd('basename')}"
-  info "📄 Current file: {current file}"
-  info "🕒 Current time: {now.format('2006-01-02 15:04:05')}"
-  info "🔗 Git commit: {current git commit('short')}"
+  info "Running on: {hostname}"
+  info "Current directory: {pwd('basename')}"
+  info "Current file: {current file}"
+  info "Current time: {now.format('2006-01-02 15:04:05')}"
+  info "Git commit: {current git commit('short')}"
 
 task "progress demo":
   info "{start progress('Building application')}"
@@ -174,12 +176,12 @@ task "deploy" means "Deploy with automatic rollback":
 
 ### What makes drun different:
 
-- **📖 Readable by Everyone**: Managers, QA, DevOps - everyone understands the automation
-- **🎯 Semantic Actions**: `docker build image`, `kubectl wait for rollout` - reads like English
-- **🔒 Built-in Safety**: Type validation (`matching semver`), constraints (`from ["dev", "prod"]`)
-- **🚀 Native Tool Support**: Docker, Git, Kubernetes, HTTP - drun speaks their language
-- **📊 Self-Documenting**: The `means` clause and clear syntax eliminate documentation drift
-- **🛡️ Smart Detection**: Auto-detect tool variants (`docker compose` vs `docker-compose`)
+- **Readable by Everyone**: Managers, QA, DevOps - everyone understands the automation
+- **Semantic Actions**: `docker build image`, `kubectl wait for rollout` - reads like English
+- **Built-in Safety**: Type validation (`matching semver`), constraints (`from ["dev", "prod"]`)
+- **Native Tool Support**: Docker, Git, Kubernetes, HTTP - drun speaks their language
+- **Self-Documenting**: The `means` clause and clear syntax eliminate documentation drift
+- **Smart Detection**: Auto-detect tool variants (`docker compose` vs `docker-compose`)
 
 **When to use drun:**
 
@@ -222,7 +224,7 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 
 ## Quick Start
 
-### 📁 **File Structure**
+### File Structure
 
 drun uses a simple, predictable file discovery system:
 
@@ -243,7 +245,7 @@ xdrun --set-workspace my-project.drun
 xdrun --list
 ```
 
-### 🚀 **Getting Started**
+### Getting Started
 
 1. **Create a simple task file** (`.drun/spec.drun`):
    
@@ -252,7 +254,7 @@ xdrun --list
    project "my-app" version "1.0" # This is optional, except if you want to customize shell behavior
    
    task "hello" means "Say hello":
-     info "Hello from drun v2! 🚀"
+     info "Hello from drun v2!"
    ```
 
 2. **List available tasks**:
@@ -285,7 +287,7 @@ xdrun --list
    xdrun build --dry-run
    ```
 
-### 🔧 **Variable Scoping**
+### Variable Scoping
 
 drun v2 uses a clear scoping system with explicit namespaces to prevent naming conflicts:
 
@@ -383,7 +385,7 @@ task "tabs-example":
 - **Flexibility**: Choose the style that works best for your team or editor
 - **Generated files**: `xdrun --init` creates files with tab indentation by default
 
-📖 **For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
+**For complete v2 specification**: See [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md) for detailed language reference and examples.
 
 ### Basic Task
 
@@ -403,7 +405,7 @@ task "greet" means "Greet someone":
   requires $name
   given $title defaults to "friend"
 
-  info "Hello, {$title} {$name}! 🎉"
+  info "Hello, {$title} {$name}! "
 ```
 
 **Usage examples:**
@@ -490,9 +492,9 @@ task "build" means "Build the project":
   run "go build ./..."
 ```
 
-## 🌟 Advanced Features Examples
+## Advanced Features Examples
 
-### 🌐 HTTP Integration
+### HTTP Integration
 
 Integrate with APIs, send notifications, and fetch data using semantic HTTP actions:
 
@@ -517,13 +519,13 @@ task "check api" means "Check API status":
 
 **Key HTTP features:**
 
-- 🌐 **Semantic HTTP Actions**: `get`, `post`, `put`, `delete` with natural syntax
-- 🔗 **Authentication**: Built-in support for bearer tokens, basic auth, API keys
-- 📊 **JSON Support**: Automatic JSON parsing and response handling
-- 🔄 **Error Handling**: Intelligent retry and error management
-- ⚡ **Response Capture**: Store responses in variables for processing
+- **Semantic HTTP Actions**: `get`, `post`, `put`, `delete` with natural syntax
+- **Authentication**: Built-in support for bearer tokens, basic auth, API keys
+- **JSON Support**: Automatic JSON parsing and response handling
+- **Error Handling**: Intelligent retry and error management
+- **Response Capture**: Store responses in variables for processing
 
-### 🔧 DRY Tool Detection
+### DRY Tool Detection
 
 Eliminate repetitive conditional logic with intelligent tool variant detection:
 
@@ -531,7 +533,7 @@ Eliminate repetitive conditional logic with intelligent tool variant detection:
 project "cross-platform-app" version "1.0":
 
 task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
-  info "🐳 Setting up Docker toolchain"
+  info " Setting up Docker toolchain"
 
   # Detect which Docker Compose variant is available and capture it
   detect available "docker compose" or "docker-compose" as $compose_cmd
@@ -539,8 +541,8 @@ task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
   # Detect which Docker Buildx variant is available and capture it
   detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 
-  info "✅ Detected tools:"
-  info "  📦 Compose: {$compose_cmd}"
+  info " Detected tools:"
+  info "   Compose: {$compose_cmd}"
   info "  🔨 Buildx: {$buildx_cmd}"
 
   # Now use the captured variables consistently throughout the task
@@ -553,7 +555,7 @@ task "deploy-app" means "Deploy using detected tools":
   # Reuse the same detection pattern
   detect available "docker compose" or "docker-compose" as $compose_cmd
 
-  info "🚀 Deploying with {$compose_cmd}"
+  info " Deploying with {$compose_cmd}"
   run "{$compose_cmd} up -d"
   run "{$compose_cmd} ps"
 
@@ -574,13 +576,13 @@ task "multi-tool-example" means "Multiple tool alternatives":
 
 **Benefits:**
 
-- **🎯 DRY Principle**: No repetitive `if/else` conditional logic
-- **🌐 Cross-Platform**: Works across different tool installations automatically
-- **🔧 Maintainable**: Single detection point, consistent usage throughout tasks
-- **⚡ Flexible**: Supports any number of tool alternatives with `or` syntax
-- **📝 Clear Intent**: Makes tool compatibility explicit and documented
+- **DRY Principle**: No repetitive `if/else` conditional logic
+- **Cross-Platform**: Works across different tool installations automatically
+- **Maintainable**: Single detection point, consistent usage throughout tasks
+- **Flexible**: Supports any number of tool alternatives with `or` syntax
+- **Clear Intent**: Makes tool compatibility explicit and documented
 
-### 🎯 Pattern Macro Validation
+### Pattern Macro Validation
 
 Built-in pattern macros provide common validation patterns without complex regex:
 
@@ -619,11 +621,11 @@ task "deploy" means "Deploy with comprehensive validation":
   # Custom regex patterns still supported
   requires $custom_id as string matching pattern "^DEPLOY-[0-9]{6}$"
 
-  info "🚀 Deploying {version} to {server_ip}"
-  info "📦 Project: {project_slug}, Branch: {branch}"
-  info "🌐 API: {api_endpoint}"
-  info "📧 Admin: {admin_email}"
-  info "🆔 Deployment ID: {deployment_id}"
+  info " Deploying {version} to {server_ip}"
+  info " Project: {project_slug}, Branch: {branch}"
+  info "API: {api_endpoint}"
+  info " Admin: {admin_email}"
+  info " Deployment ID: {deployment_id}"
 
   success "Deployment validated and ready!"
 
@@ -647,13 +649,13 @@ task "validation-errors-demo" means "Show validation error messages":
 
 **Benefits:**
 
-- **🎯 User-Friendly**: Simple, memorable names instead of complex regex
-- **📚 Self-Documenting**: Built-in descriptions explain validation rules
-- **🔒 Type-Safe**: Clear, descriptive error messages
-- **⚡ Performance**: Efficient validation with minimal overhead
-- **🔄 Extensible**: Easy to add new macros as needed
+- **User-Friendly**: Simple, memorable names instead of complex regex
+- **Self-Documenting**: Built-in descriptions explain validation rules
+- **Type-Safe**: Clear, descriptive error messages
+- **Performance**: Efficient validation with minimal overhead
+- **Extensible**: Easy to add new macros as needed
 
-### 🔄 Advanced Variable Operations
+### Advanced Variable Operations
 
 Powerful data transformation operations with intuitive chaining syntax:
 
@@ -680,7 +682,7 @@ task "string_transformations" means "Demonstrate string operations":
 task "array_operations" means "Demonstrate array manipulation":
   set $files to "src/app.js src/utils.js tests/app.test.js docs/readme.md config.json"
 
-  info "📋 Array Operations:"
+  info " Array Operations:"
   info "  JavaScript files: {$files filtered by extension '.js'}"
   info "  Source files (sorted): {$files filtered by prefix 'src/' | sorted by name}"
   info "  First file: {$files first}"
@@ -695,7 +697,7 @@ task "array_operations" means "Demonstrate array manipulation":
 task "path_operations" means "Demonstrate path manipulation":
   set $config_file to "/etc/nginx/sites-available/default.conf"
 
-  info "📁 Path Operations:"
+  info " Path Operations:"
   info "  Filename: {$config_file basename}"
   info "  Directory: {$config_file dirname}"
   info "  Extension: {$config_file extension}"
@@ -711,11 +713,11 @@ task "complex_chaining" means "Demonstrate operation chaining":
   set $project_files to "src/app.js src/utils.js tests/app.test.js tests/utils.test.js docs/readme.md"
   set $docker_images to "nginx:1.21 postgres:13 redis:6.2 node:16-alpine"
 
-  info "⛓️ Complex Operation Chaining:"
+  info "Complex Operation Chaining:"
   info "  Source JS files: {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
   info "  Test files: {$project_files filtered by prefix 'tests/' | sorted by name}"
 
-  info "🐳 Processing Docker images:"
+  info " Processing Docker images:"
   for each img in $docker_images:
     info "    {img} -> {img split by ':' | first} (version: {img split by ':' | last})"
 
@@ -758,12 +760,12 @@ task "complex_chaining" means "Demonstrate operation chaining":
 
 **Benefits:**
 
-- **🔥 Eliminates Shell Scripting**: No more complex `sed`, `awk`, or `cut` commands
-- **⚡ Intuitive Syntax**: English-like operations that are self-documenting
-- **🔗 Chainable**: Combine operations with pipe (`|`) for complex transformations
-- **🎯 Type-Aware**: Works seamlessly with strings, arrays, and paths
-- **🔄 Loop Integration**: Perfect integration with `for each` loops
-- **📊 Performance**: Efficient operations with minimal overhead
+- ** Eliminates Shell Scripting**: No more complex `sed`, `awk`, or `cut` commands
+- **Intuitive Syntax**: English-like operations that are self-documenting
+- ** Chainable**: Combine operations with pipe (`|`) for complex transformations
+- ** Type-Aware**: Works seamlessly with strings, arrays, and paths
+- **Loop Integration**: Perfect integration with `for each` loops
+- ** Performance**: Efficient operations with minimal overhead
 
 ## Command Line Options
 
@@ -838,10 +840,10 @@ drun my-task --allow-undefined-variables
 
 ### Benefits of Strict Mode
 
-- **🐛 Early Error Detection**: Catch typos and missing variables before execution
-- **🔍 Clear Error Messages**: Precise location and context of undefined variables
-- **🛡️ Prevent Silent Failures**: Avoid unexpected behavior from missing variables
-- **📝 Better Documentation**: Forces explicit variable definitions
+- ** Early Error Detection**: Catch typos and missing variables before execution
+- ** Clear Error Messages**: Precise location and context of undefined variables
+- **Prevent Silent Failures**: Avoid unexpected behavior from missing variables
+- ** Better Documentation**: Forces explicit variable definitions
 
 ### Examples
 
@@ -850,12 +852,12 @@ version: 2.0
 
 task "strict example":
     let $name = "world"
-    info "Hello {$name}"           # ✅ Works: variable is defined
+    info "Hello {$name}"           #  Works: variable is defined
     info "Hello {$typo_name}"      # ❌ Fails: undefined variable (strict mode)
 
 task "with parameters":
     accepts $target as string
-    info "Deploying to {$target}"  # ✅ Works: parameter is defined
+    info "Deploying to {$target}"  #  Works: parameter is defined
     info "Version: {$version}"     # ❌ Fails: undefined variable (strict mode)
 ```
 
@@ -863,10 +865,10 @@ task "with parameters":
 
 drun supports intelligent shell completion for bash, zsh, fish, and PowerShell with smart task and command detection. The completion system provides:
 
-- **🎯 Task Names**: Auto-complete available tasks from your drun file with `[task]` prefix
-- **⚙️ CLI Commands**: Complete drun CLI commands with `[drun CLI cmd]` prefix  
-- **📝 Descriptions**: Show task descriptions alongside completions
-- **🔄 Dynamic Updates**: Completions automatically reflect your current drun file
+- ** Task Names**: Auto-complete available tasks from your drun file with `[task]` prefix
+- **⚙ CLI Commands**: Complete drun CLI commands with `[drun CLI cmd]` prefix  
+- ** Descriptions**: Show task descriptions alongside completions
+- ** Dynamic Updates**: Completions automatically reflect your current drun file
 
 ### Quick Setup (Recommended)
 
@@ -994,10 +996,10 @@ xdrun --list                   # Lists all tasks
 
 **Benefits:**
 
-- ✅ **Always Current**: Reflects your latest task definitions
-- ✅ **No Maintenance**: No need to regenerate completion files
-- ✅ **Project Aware**: Works with different drun files in different directories
-- ✅ **Fast**: Completion generation is highly optimized (microseconds)
+-  **Always Current**: Reflects your latest task definitions
+-  **No Maintenance**: No need to regenerate completion files
+-  **Project Aware**: Works with different drun files in different directories
+-  **Fast**: Completion generation is highly optimized (microseconds)
 
 **Static files** work but require manual updates when you add/remove tasks.
 
@@ -1050,17 +1052,17 @@ The cleanup command provides:
 
 ### Update Safety Features
 
-- ✅ **User-writable backups** (no permission errors)
-- ✅ **Automatic rollback** on update failure
-- ✅ **Backup preservation** (not auto-deleted)
-- ✅ **Platform detection** (correct binary for your system)
-- ✅ **Version validation** (only update when newer version available)
+-  **User-writable backups** (no permission errors)
+-  **Automatic rollback** on update failure
+-  **Backup preservation** (not auto-deleted)
+-  **Platform detection** (correct binary for your system)
+-  **Version validation** (only update when newer version available)
 
 ## Examples
 
 Explore comprehensive examples in the `examples/` directory:
 
-### 📚 **Example Files**
+###  **Example Files**
 
 - **`examples/01-hello-world.drun`** - Basic introduction to drun v2
 - **`examples/02-parameters.drun`** - Parameter handling and validation
@@ -1074,7 +1076,7 @@ Explore comprehensive examples in the `examples/` directory:
 - **`examples/38-progress-and-timers.drun`** - Progress indicators and timing operations
 - **`examples/46-task-calling.drun`** - Task calling and modular task design
 
-### 🎯 **Quick Examples**
+### Quick Examples
 
 ```bash
 # Try the hello world example
@@ -1101,11 +1103,11 @@ xdrun -f examples/07-final-showcase.drun showcase project_name=MyApp
 
 Each example includes comprehensive documentation and demonstrates best practices for different use cases.
 
-## 🚀 Status & Roadmap
+## Status & Roadmap
 
 drun is **production-ready** with enterprise-grade features:
 
-### ✅ **Implemented Features**
+### Implemented Features
 
 - **Core Functionality**: .drun semantic language, parameters, variables, control flow
 - **Advanced Features**: Remote includes, matrix execution, secrets management, task calling
@@ -1113,15 +1115,15 @@ drun is **production-ready** with enterprise-grade features:
 - **Performance**: Microsecond-level operations, high test coverage (71-83%)
 - **Quality**: Zero linting issues, comprehensive test suite
 
-### 🚧 **Coming Soon**
+### Coming Soon
 
-- **📁 File Watching**: Auto-execution on file changes
-- **🔌 Plugin System**: Extensible architecture for custom functionality
-- **🎮 Interactive TUI**: Beautiful terminal interface
-- **🌐 Web UI**: Browser-based task management
-- **🤖 AI Integration**: Natural language task generation
+- **File Watching**: Auto-execution on file changes
+- **Plugin System**: Extensible architecture for custom functionality
+- **Interactive TUI**: Beautiful terminal interface
+- **Web UI**: Browser-based task management
+- **AI Integration**: Natural language task generation
 
-### 🎯 **Enterprise Ready**
+### Enterprise Ready
 
 - **High Performance**: Microsecond-level operations
 - **Scalability**: Handles 100+ tasks efficiently  
@@ -1129,11 +1131,11 @@ drun is **production-ready** with enterprise-grade features:
 - **Reliability**: Comprehensive error handling
 - **Maintainability**: Clean architecture with extensive tests
 
-drun has evolved from a simple task runner into a **comprehensive automation platform** that's ready for production use at any scale! 🏆
+drun has evolved from a simple task runner into a **comprehensive automation platform** that's ready for production use at any scale! 
 
 ---
 
-## 🛠️ Developer Guide
+## Developer Guide
 
 This section contains information for developers who want to build, test, or contribute to drun.
 
@@ -1221,12 +1223,12 @@ Our performance optimizations deliver significant improvements:
 
 #### Performance Features
 
-- **⚡ Template Caching**: Compiled templates cached by hash for instant reuse
-- **🧠 Smart Pre-allocation**: Memory pools and capacity-aware data structures
-- **📊 Spec Caching**: Task specs cached with file modification tracking
-- **🔄 Optimized DAG**: Highly efficient dependency graph construction
-- **💾 Memory Pools**: Reusable objects reduce GC pressure
-- **🎯 Lazy Evaluation**: Only compute what's needed when needed
+- **Template Caching**: Compiled templates cached by hash for instant reuse
+- ** Smart Pre-allocation**: Memory pools and capacity-aware data structures
+- ** Spec Caching**: Task specs cached with file modification tracking
+- **Optimized DAG**: Highly efficient dependency graph construction
+- ** Memory Pools**: Reusable objects reduce GC pressure
+- ** Lazy Evaluation**: Only compute what's needed when needed
 
 #### Real-World Performance
 
@@ -1242,7 +1244,7 @@ Run benchmarks yourself:
 ./scripts/test.sh -b  # Includes comprehensive performance benchmarks
 ```
 
-### ♻️ **Code Reuse Features**
+### Code Reuse Features
 
 drun v2 now supports powerful code reuse mechanisms to eliminate duplication and maintain DRY principles:
 
@@ -1374,13 +1376,13 @@ task "deploy":
 
 **Features:**
 
-- 📚 **Drunhub Standard Library**: Official repository of reusable workflows at [github.com/phillarmonic/drun-hub](https://github.com/phillarmonic/drun-hub)
-- 🎭 **Custom Namespaces**: Override project names with `as` clause for cleaner imports
-- 🌐 **GitHub & HTTPS**: Fetch from GitHub repos or any HTTPS source
-- 🎯 **Version Control**: Pin to specific tags, branches, or commits
-- 💾 **Smart Caching**: 1-minute cache with stale fallback for offline use
-- 🔒 **Private Repos**: Supports `GITHUB_TOKEN` for authentication
-- ⚡ **Fast**: Cached includes load instantly
+-  **Drunhub Standard Library**: Official repository of reusable workflows at [github.com/phillarmonic/drun-hub](https://github.com/phillarmonic/drun-hub)
+-  **Custom Namespaces**: Override project names with `as` clause for cleaner imports
+- **GitHub & HTTPS**: Fetch from GitHub repos or any HTTPS source
+-  **Version Control**: Pin to specific tags, branches, or commits
+-  **Smart Caching**: 1-minute cache with stale fallback for offline use
+- **Private Repos**: Supports `GITHUB_TOKEN` for authentication
+- **Fast**: Cached includes load instantly
 
 ```bash
 # Disable cache for fresh fetch
@@ -1389,14 +1391,14 @@ xdrun --no-drun-cache -f myfile.drun deploy
 
 **Benefits:**
 
-- **♻️ DRY Principle**: Eliminate duplication across tasks
-- **🔧 Maintainable**: Update logic in one place
-- **🎯 Type-Safe**: Full validation on all parameters
-- **📝 Readable**: Clear, semantic names for reusable components
-- **🔀 Flexible**: Mix and match project parameters, snippets, and templates
-- **🌐 Cross-Project Sharing**: Share workflows across multiple projects with includes
-- **🔒 Namespace Safety**: Dot notation prevents naming collisions
-- **🚀 Community Workflows**: Leverage shared workflows from GitHub
+- **DRY Principle**: Eliminate duplication across tasks
+- ** Maintainable**: Update logic in one place
+- ** Type-Safe**: Full validation on all parameters
+- ** Readable**: Clear, semantic names for reusable components
+- ** Flexible**: Mix and match project parameters, snippets, and templates
+- **Cross-Project Sharing**: Share workflows across multiple projects with includes
+- **Namespace Safety**: Dot notation prevents naming collisions
+- ** Community Workflows**: Leverage shared workflows from GitHub
 
 **See it in action:**
 
@@ -1410,8 +1412,41 @@ xdrun -f examples/code-reuse-demo.drun build:web environment=prod no_cache=true
 
 ---
 
-## 📚 Documentation
+##  Documentation
+
+### For Users
 
 - **[drun v2 Specification](DRUN_V2_SPECIFICATION.md)** - Complete v2 language specification with code reuse features
 - **[Code Reuse Features](DRUN_V2_SPECIFICATION.md#code-reuse-features)** - Detailed documentation on project parameters, snippets, and templates
 - **[Examples Directory](examples/)** - Real-world usage examples and patterns
+- **[DRUN_LLM_USAGE_MANUAL.md](./DRUN_LLM_USAGE_MANUAL.md)** - Guide for LLMs to understand and write drun
+
+### For Developers
+
+Contributing to drun or want to understand how it works?
+
+- **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)** - **Start here!** Complete guide to the codebase
+  - Architecture overview and diagrams
+  - Package-by-package navigation
+  - How to add new features
+  - Testing strategies
+  - Code style and best practices
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture with 10 Mermaid diagrams
+  - Execution flow
+  - Component interactions
+  - Design patterns used
+  - Extension points
+
+- **[internal/README.md](./internal/README.md)** - Internal packages guide
+  - Package organization
+  - File structure
+  - Common patterns
+  - Navigation tips
+
+- **[ROADMAP.md](./ROADMAP.md)** - Feature roadmap and implementation status
+
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - How to contribute to drun
+  - Development setup
+  - Code style guidelines
+  - Pull request process

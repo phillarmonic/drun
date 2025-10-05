@@ -23,10 +23,10 @@ task "list operations" means "Demonstrate list parameter types":
 	info "🌍 Target environments: {$environments}"
 	info "🔧 Services to deploy: {$services}"
 
-	for each env in environments:
+	for each $env in $environments:
 		info "📦 Processing environment: {$env}"
 
-		for each service in services:
+		for each $service in $services:
 			info "  🚀 Deploying {$service} to {$env}"
 
 	success "List operations completed!"
@@ -93,7 +93,7 @@ task "complex example" means "Complex typed parameter example":
 			warn "⚠️  Monitoring disabled in production!"
 
 	info "📦 Deploying services:"
-	for each service in services:
+	for each $service in $services:
 		info "  🚀 Deploying {$service}..."
 		info "    📊 Replicas: {$replicas}"
 		info "    💻 CPU Limit: {$cpu_limit}"
