@@ -3,8 +3,6 @@ package engine
 import (
 	"fmt"
 	"strings"
-
-	"github.com/phillarmonic/drun/internal/shell"
 )
 
 // Domain: Command Builders

@@ -1,23 +1,16 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mholt/archives"
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
-	"github.com/phillarmonic/drun/internal/detection"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/includes"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
@@ -25,7 +18,6 @@ import (
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/drun/internal/remote"
-	"github.com/phillarmonic/drun/internal/shell"
 	"github.com/phillarmonic/drun/internal/types"
 )
 
