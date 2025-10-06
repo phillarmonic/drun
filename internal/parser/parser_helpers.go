@@ -265,9 +265,66 @@ func (p *Parser) addError(msg string) {
 	}
 }
 
+// addErrorWithHelp adds an error message with custom help text
+// Uses curToken for position (not peekToken) since errors often relate to what we just parsed
+func (p *Parser) addErrorWithHelp(msg, helpText string) {
+	p.errors = append(p.errors, msg)
+
+	// Also add to new error system if available with help text
+	if p.errorList != nil {
+		p.errorList.AddWithHelp(msg, helpText, p.curToken)
+	}
+}
+
+// addErrorWithHelpAtPeek adds an error message with custom help text, pointing at peekToken
+// Use this when the error is about what comes next, not what we just parsed
+func (p *Parser) addErrorWithHelpAtPeek(msg, helpText string) {
+	p.errors = append(p.errors, msg)
+
+	// Also add to new error system if available with help text
+	if p.errorList != nil {
+		p.errorList.AddWithHelp(msg, helpText, p.peekToken)
+	}
+}
+
 // skipComments skips over comment tokens and newlines
 func (p *Parser) skipComments() {
 	for p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT || p.curToken.Type == lexer.NEWLINE {
+		p.nextToken()
+	}
+}
+
+// synchronize advances the parser to a safe recovery point after a syntax error
+// This prevents infinite loops when parsing fails
+func (p *Parser) synchronize() {
+	// First, advance past the current token to avoid getting stuck
+	p.nextToken()
+
+	// Skip tokens until we find a synchronization point (next task, EOF, etc.)
+	for p.curToken.Type != lexer.EOF {
+		// If we find a TASK token at the beginning of a line, that's a good recovery point
+		if p.curToken.Type == lexer.TASK {
+			return
+		}
+
+		// If we're at a DEDENT, consume it and check what's next
+		if p.curToken.Type == lexer.DEDENT {
+			p.nextToken()
+			// If next token is TASK or EOF, we've found a good recovery point
+			if p.curToken.Type == lexer.TASK || p.curToken.Type == lexer.EOF {
+				return
+			}
+		}
+
+		// Skip newlines and comments while looking for recovery point
+		if p.curToken.Type == lexer.NEWLINE ||
+			p.curToken.Type == lexer.COMMENT ||
+			p.curToken.Type == lexer.MULTILINE_COMMENT {
+			p.nextToken()
+			continue
+		}
+
+		// Advance token
 		p.nextToken()
 	}
 }

@@ -81,6 +81,10 @@ func Execute(command string, opts *Options) (*Result, error) {
 	// Create the command
 	cmd := exec.CommandContext(ctx, opts.Shell, "-c", command)
 
+	// Explicitly set stdin to nil to prevent commands from hanging waiting for input
+	// This is important for non-interactive command execution
+	cmd.Stdin = nil
+
 	// Set working directory
 	if opts.WorkingDir != "" {
 		cmd.Dir = opts.WorkingDir

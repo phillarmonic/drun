@@ -248,3 +248,47 @@ func TestDefaultOptions(t *testing.T) {
 		t.Errorf("Expected StreamOutput to be false by default")
 	}
 }
+
+func TestExecute_ImmediateErrorWithStderr(t *testing.T) {
+	// This test verifies that commands that fail immediately with stderr output
+	// don't hang waiting for stdin (which was the bug causing xdrun to hang)
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+	opts.StreamOutput = true
+	opts.Output = &bytes.Buffer{}
+	opts.IgnoreErrors = true
+	opts.Timeout = 5 * time.Second // Set a timeout to ensure we don't hang forever
+
+	// Simulate a command that writes to stderr and exits immediately (like docker compose exec with invalid user)
+	var cmd string
+	if runtime.GOOS == "windows" {
+		cmd = "Write-Error 'Error response from daemon: unable to find user'; exit 1"
+	} else {
+		cmd = "echo 'Error response from daemon: unable to find user' >&2; exit 1"
+	}
+
+	start := time.Now()
+	result, err := Execute(cmd, opts)
+	duration := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// Should complete quickly, not hang
+	if duration > 2*time.Second {
+		t.Errorf("Command took too long (%v), may be hanging waiting for stdin", duration)
+	}
+
+	if result.Success {
+		t.Errorf("Expected command to fail")
+	}
+
+	if result.ExitCode != 1 {
+		t.Errorf("Expected exit code 1, got %d", result.ExitCode)
+	}
+
+	if !strings.Contains(result.Stderr, "Error response from daemon") && !strings.Contains(result.Stderr, "unable to find user") {
+		t.Errorf("Expected stderr to contain error message, got %q", result.Stderr)
+	}
+}

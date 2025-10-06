@@ -10,9 +10,16 @@ import (
 func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	stmt := &ast.TaskStatement{Token: p.curToken}
 
-	if !p.expectPeek(lexer.STRING) {
+	// Expect task name as a quoted string
+	if p.peekToken.Type != lexer.STRING {
+		// Provide helpful error message for unquoted task names
+		p.addErrorWithHelpAtPeek(
+			fmt.Sprintf("expected task name as quoted string, got %s instead", p.peekToken.Type),
+			"Task names must be quoted. Use: task \""+p.peekToken.Literal+"\" instead of: task "+p.peekToken.Literal,
+		)
 		return nil
 	}
+	p.nextToken()
 
 	stmt.Name = p.curToken.Literal
 
@@ -27,9 +34,16 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 		stmt.Description = p.curToken.Literal
 	}
 
-	if !p.expectPeek(lexer.COLON) {
+	// Expect colon at end of task declaration
+	if p.peekToken.Type != lexer.COLON {
+		// Special error message pointing to end of current line, not next line
+		p.addErrorWithHelp(
+			fmt.Sprintf("expected ':' at end of task declaration, got %s on next line instead", p.peekToken.Type),
+			"Add a ':' at the end of the task declaration line (after the task name or description)",
+		)
 		return nil
 	}
+	p.nextToken() // consume COLON
 
 	// Expect lexer.INDENT to start task body (skip any newlines first)
 	if !p.expectPeekSkipNewlines(lexer.INDENT) {

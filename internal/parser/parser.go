@@ -87,6 +87,9 @@ func (p *Parser) ParseProgram() *ast.Program {
 				template := p.parseTaskTemplateStatement()
 				if template != nil {
 					program.Templates = append(program.Templates, template)
+				} else {
+					// Error recovery: skip to next task or EOF
+					p.synchronize()
 				}
 			} else {
 				p.addError(fmt.Sprintf("unexpected token after template: %s", p.peekToken.Type))
@@ -96,6 +99,9 @@ func (p *Parser) ParseProgram() *ast.Program {
 			task := p.parseTaskStatement()
 			if task != nil {
 				program.Tasks = append(program.Tasks, task)
+			} else {
+				// Error recovery: skip to next task or EOF
+				p.synchronize()
 			}
 		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments

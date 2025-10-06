@@ -14,6 +14,7 @@ type ParseError struct {
 	Token    lexer.Token
 	Filename string
 	Source   string // The original source code
+	HelpText string // Optional custom help text
 }
 
 // Error implements the error interface
@@ -45,7 +46,11 @@ func (e *ParseError) FormatError() string {
 		result.WriteString(fmt.Sprintf("   %s\033[31m^\033[0m\n", spaces))
 
 		// Add helpful suggestions for common errors
-		suggestion := e.getSuggestion()
+		// Use custom help text if provided, otherwise use auto-generated suggestion
+		suggestion := e.HelpText
+		if suggestion == "" {
+			suggestion = e.getSuggestion()
+		}
 		if suggestion != "" {
 			result.WriteString(fmt.Sprintf("   \033[33mHelp:\033[0m %s\n", suggestion))
 		}
@@ -180,6 +185,13 @@ func NewParseErrorList(filename, source string) *ParseErrorList {
 // Add adds a parse error to the list
 func (el *ParseErrorList) Add(message string, token lexer.Token) {
 	err := NewParseError(message, token, el.Filename, el.Source)
+	el.Errors = append(el.Errors, err)
+}
+
+// AddWithHelp adds a parse error with custom help text
+func (el *ParseErrorList) AddWithHelp(message, helpText string, token lexer.Token) {
+	err := NewParseError(message, token, el.Filename, el.Source)
+	err.HelpText = helpText
 	el.Errors = append(el.Errors, err)
 }
 
