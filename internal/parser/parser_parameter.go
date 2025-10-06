@@ -138,6 +138,16 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 
 	case "given":
 		stmt.Required = false
+
+		// Check for constraints BEFORE defaults: given $env from ["dev", "staging"] defaults to "dev"
+		if p.peekToken.Type == lexer.FROM {
+			p.nextToken() // consume FROM
+			if p.peekToken.Type == lexer.LBRACKET {
+				p.nextToken() // consume LBRACKET
+				stmt.Constraints = p.parseStringList()
+			}
+		}
+
 		// Expect: given name defaults to "value"
 		if !p.expectPeek(lexer.DEFAULTS) {
 			return nil
@@ -193,12 +203,35 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			return nil
 		}
 
-		// Check for constraints after default value: given name defaults to "value" from ["list"]
+		// Check for constraints after default value (legacy syntax): given name defaults to "value" from ["list"]
 		if p.peekToken.Type == lexer.FROM {
 			p.nextToken() // consume FROM
 			if p.peekToken.Type == lexer.LBRACKET {
 				p.nextToken() // consume LBRACKET
 				stmt.Constraints = p.parseStringList()
+			}
+		}
+
+		// Validate that the default value is in the constraints list (if constraints exist)
+		if len(stmt.Constraints) > 0 {
+			// Remove quotes from default value for comparison (if it's a string literal)
+			defaultVal := stmt.DefaultValue
+			if len(defaultVal) >= 2 && defaultVal[0] == '"' && defaultVal[len(defaultVal)-1] == '"' {
+				defaultVal = defaultVal[1 : len(defaultVal)-1]
+			}
+
+			found := false
+			for _, constraint := range stmt.Constraints {
+				if constraint == defaultVal {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				p.addError(fmt.Sprintf("default value '%s' must be one of the allowed values: [%s]",
+					defaultVal, strings.Join(stmt.Constraints, ", ")))
+				return nil
 			}
 		}
 
