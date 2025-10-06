@@ -46,9 +46,42 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	p.nextToken() // consume COLON
 
 	// Expect lexer.INDENT to start task body (skip any newlines first)
-	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+	if p.peekToken.Type == lexer.EOF || p.peekToken.Type == lexer.TASK || p.peekToken.Type == lexer.TEMPLATE {
+		// Task has no body
+		p.addErrorWithHelp(
+			"task declaration has no body",
+			"Tasks must contain at least one statement. Add indented statements after the colon, like:\n"+
+				"    task \""+stmt.Name+"\" means \""+stmt.Description+"\":\n"+
+				"        info \"Starting task\"\n"+
+				"        # your task statements here",
+		)
 		return nil
 	}
+
+	if p.peekToken.Type != lexer.INDENT {
+		// Skip newlines first
+		for p.peekToken.Type == lexer.NEWLINE {
+			p.nextToken()
+		}
+
+		// Check again after skipping newlines
+		if p.peekToken.Type == lexer.EOF || p.peekToken.Type == lexer.TASK || p.peekToken.Type == lexer.DEDENT {
+			p.addErrorWithHelp(
+				"task declaration has no body",
+				"Tasks must contain at least one statement. Add indented statements after the colon.",
+			)
+			return nil
+		}
+
+		if p.peekToken.Type != lexer.INDENT {
+			p.addErrorWithHelp(
+				fmt.Sprintf("expected indented task body, got %s instead", p.peekToken.Type),
+				"Task body must be indented. Make sure the statements after ':' are indented (use tabs or spaces consistently).",
+			)
+			return nil
+		}
+	}
+	p.nextToken() // consume INDENT
 
 	// Parse task body (parameters and statements)
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
