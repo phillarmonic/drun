@@ -30,13 +30,19 @@ graph LR
     A[.drun Files] --> B[Lexer]
     B --> C[Parser]
     C --> D[AST]
-    D --> E[Engine]
+    D --> DOM[Domain Layer]
+    DOM --> E[Engine]
     E --> F[Executors]
     F --> G[Shell/Docker/Git/HTTP]
     G --> H[Output]
     
+    DOM -.->|Task Registry| DOM1[Tasks]
+    DOM -.->|Dependency Resolver| DOM2[Deps]
+    DOM -.->|Parameter Validator| DOM3[Params]
+    
     style A fill:#e1f5ff
     style D fill:#fff4e1
+    style DOM fill:#f0e1ff
     style E fill:#ffe1f5
     style H fill:#e1ffe1
 ```
@@ -61,6 +67,17 @@ graph TB
         UPDATE[app/update.go]
         CONFIG[app/config.go]
         COMPLETE[app/completion.go]
+    end
+    
+    subgraph "Domain Layer"
+        TASK_REG[task/registry.go]
+        TASK_DEP[task/dependencies.go]
+        PARAM_VAL[parameter/validation.go]
+        PROJ[project/project.go]
+        
+        style TASK_REG fill:#f0e1ff
+        style TASK_DEP fill:#f0e1ff
+        style PARAM_VAL fill:#f0e1ff
     end
     
     subgraph "Core Engine"
@@ -96,6 +113,11 @@ graph TB
             HELP_UTIL[helpers_utilities.go]
         end
     end
+    
+    CLI --> ENGINE
+    ENGINE --> TASK_REG
+    ENGINE --> TASK_DEP
+    ENGINE --> PARAM_VAL
     
     subgraph "Parser Layer"
         PARSER[parser/parser.go]
@@ -400,12 +422,13 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[User invokes task] --> B{Task exists?}
+    A[User invokes task] --> REG[Register tasks in Domain Registry]
+    REG --> B{Task exists in Registry?}
     B -->|No| C[Error: Task not found]
-    B -->|Yes| D[Resolve dependencies]
+    B -->|Yes| D[Domain: Resolve dependencies]
     
     D --> E{Has dependencies?}
-    E -->|No| F[Validate parameters]
+    E -->|No| F[Domain: Validate parameters]
     E -->|Yes| G[Execute dependencies first]
     
     G --> H{Dependency success?}
@@ -414,13 +437,16 @@ flowchart TD
     
     F --> J{Parameters valid?}
     J -->|No| K[Error: Invalid params]
-    J -->|Yes| L[Execute before hooks]
+    J -->|Yes| L[Engine: Execute before hooks]
     
-    L --> M[Execute task statements]
-    M --> N[Execute after hooks]
+    L --> M[Engine: Execute task statements]
+    M --> N[Engine: Execute after hooks]
     N --> O[Return result]
     
     style A fill:#e1f5ff
+    style REG fill:#f0e1ff
+    style D fill:#f0e1ff
+    style F fill:#f0e1ff
     style M fill:#ffe1f5
     style O fill:#e1ffe1
 ```

@@ -317,12 +317,24 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 						paramName, paramType, rawValue, err))
 				}
 
-				// Validate constraints
-				if err := typedValue.ValidateConstraints(projectParam.Constraints); err != nil {
-					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': %v", paramName, err))
+				// Convert AST project parameter to domain parameter and validate using domain validator
+				domainParam := &parameter.Parameter{
+					Name:         paramName,
+					Type:         "given", // project parameters are "given" type
+					DefaultValue: projectParam.DefaultValue,
+					HasDefault:   projectParam.HasDefault,
+					Required:     false, // project parameters always have defaults
+					DataType:     projectParam.DataType,
+					Constraints:  projectParam.Constraints,
+					MinValue:     projectParam.MinValue,
+					MaxValue:     projectParam.MaxValue,
+					Pattern:      projectParam.Pattern,
+					PatternMacro: projectParam.PatternMacro,
+					EmailFormat:  projectParam.EmailFormat,
 				}
 
-				if err := typedValue.ValidateAdvancedConstraints(projectParam.MinValue, projectParam.MaxValue, projectParam.Pattern, projectParam.PatternMacro, projectParam.EmailFormat); err != nil {
+				// Use domain validator
+				if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
 					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': %v", paramName, err))
 				}
 
@@ -364,13 +376,25 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 					param.Name, paramType, rawValue, err))
 			}
 
-			// Validate basic constraints (list constraints)
-			if err := typedValue.ValidateConstraints(param.Constraints); err != nil {
-				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
+			// Convert AST parameter to domain parameter and validate using domain validator
+			domainParam := &parameter.Parameter{
+				Name:         param.Name,
+				Type:         param.Type,
+				DefaultValue: param.DefaultValue,
+				HasDefault:   param.HasDefault,
+				Required:     param.Required,
+				DataType:     param.DataType,
+				Constraints:  param.Constraints,
+				MinValue:     param.MinValue,
+				MaxValue:     param.MaxValue,
+				Pattern:      param.Pattern,
+				PatternMacro: param.PatternMacro,
+				EmailFormat:  param.EmailFormat,
+				Variadic:     param.Variadic,
 			}
 
-			// Validate advanced constraints
-			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.PatternMacro, param.EmailFormat); err != nil {
+			// Use domain validator
+			if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
 				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
 			}
 
@@ -784,11 +808,25 @@ func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ct
 					param.Name, paramType, rawValue, err)
 			}
 
-			if err := typedValue.ValidateConstraints(param.Constraints); err != nil {
-				return fmt.Errorf("parameter '%s': %v", param.Name, err)
+			// Convert AST parameter to domain parameter and validate using domain validator
+			domainParam := &parameter.Parameter{
+				Name:         param.Name,
+				Type:         param.Type,
+				DefaultValue: param.DefaultValue,
+				HasDefault:   param.HasDefault,
+				Required:     param.Required,
+				DataType:     param.DataType,
+				Constraints:  param.Constraints,
+				MinValue:     param.MinValue,
+				MaxValue:     param.MaxValue,
+				Pattern:      param.Pattern,
+				PatternMacro: param.PatternMacro,
+				EmailFormat:  param.EmailFormat,
+				Variadic:     param.Variadic,
 			}
 
-			if err := typedValue.ValidateAdvancedConstraints(param.MinValue, param.MaxValue, param.Pattern, param.PatternMacro, param.EmailFormat); err != nil {
+			// Use domain validator
+			if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
 				return fmt.Errorf("parameter '%s': %v", param.Name, err)
 			}
 

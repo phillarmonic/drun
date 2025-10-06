@@ -112,12 +112,6 @@ Read these in order:
 2. [internal/README.md](./internal/README.md) - Package organization
 3. [CONTRIBUTING.md](./CONTRIBUTING.md) - How to contribute
 
-**Refactoring results:**
-- AST refactored (1,133 lines → 15 focused files)
-- Parser refactored (4,874 lines → 26 focused files)
-- Engine refactored (5,179 lines → 36 focused files)
-- CLI refactored (1,137 lines → 24 lines + 7 modules)
-- Domain layer created (839 lines across 7 focused files)
 
 ---
 
@@ -158,6 +152,67 @@ internal/
 ├── domain/            # 7 files - Domain layer (NEW!)
 │   ├── task/          # Task entities & business logic
 │   ├── parameter/     # Parameter validation & constraints
+
+### Domain Layer Integration
+
+The domain layer contains business logic separated from execution concerns:
+
+**Domain Services (fully integrated with engine):**
+
+1. **Task Registry** (`internal/domain/task/registry.go`)
+   - Manages task registration and lookup
+   - Preserves task insertion order
+   - Thread-safe operations
+   - **Used by**: Task listing, dependency resolution
+
+2. **Dependency Resolver** (`internal/domain/task/dependencies.go`)
+   - Resolves task execution order
+   - Detects circular dependencies
+   - Supports parallel/sequential execution groups
+   - **Used by**: Task execution planning
+
+3. **Parameter Validator** (`internal/domain/parameter/validation.go`)
+   - Validates parameter types and constraints
+   - Checks range constraints (min/max)
+   - Validates patterns (regex, email, semver, etc.)
+   - **Used by**: All parameter validation (task, project, template)
+
+**Engine Integration Points:**
+
+```go
+// Engine uses all 3 domain services
+type Engine struct {
+    taskRegistry   *task.Registry          // Task management
+    paramValidator *parameter.Validator    // Parameter validation
+    depResolver    *task.DependencyResolver // Dependency resolution
+    // ... other fields
+}
+
+// Example: Task execution flow
+func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string, params map[string]string, currentFile string) error {
+    // 1. Register tasks with domain registry
+    e.taskRegistry.Clear()
+    e.registerTasks(program.Tasks, currentFile)
+    
+    // 2. Resolve dependencies using domain resolver
+    domainTasks, err := e.depResolver.Resolve(taskName)
+    
+    // 3. Validate parameters using domain validator
+    domainParam := convertASTToDomainParameter(param)
+    e.paramValidator.Validate(domainParam, typedValue)
+    
+    // 4. Execute in resolved order
+    // ...
+}
+```
+
+**Benefits:**
+- Clear separation of business logic from execution
+- Testable in isolation
+- Reusable across different execution contexts
+- Thread-safe operations
+- Consistent validation logic
+
 │   └── project/       # Project configuration
 ├── lexer/             # 6 files - Tokenization
 └── (support packages) # builtins, shell, detection, etc.
@@ -166,6 +221,309 @@ internal/
 **For detailed breakdown:** See [internal/README.md](./internal/README.md)
 
 ---
+
+
+---
+
+## Adding New Features with Domain Layer
+
+This example shows how to add a new feature using proper domain layer separation.
+
+### Example: Adding Task Priority System
+
+Let's add a priority system to tasks (low, medium, high) with validation and sorting.
+
+#### Step 1: Add Domain Entity Field
+
+**File: `internal/domain/task/task.go`**
+
+```go
+// Task represents a domain task entity
+type Task struct {
+    Name         string
+    Description  string
+    Priority     string      // NEW: Add priority field
+    Parameters   []Parameter
+    Dependencies []Dependency
+    Body         []ast.Statement
+    Namespace    string
+    Source       string
+}
+
+// Priority constants
+const (
+    PriorityLow    = "low"
+    PriorityMedium = "medium"
+    PriorityHigh   = "high"
+)
+
+// ValidPriorities lists all valid priority values
+var ValidPriorities = []string{PriorityLow, PriorityMedium, PriorityHigh}
+```
+
+#### Step 2: Add Domain Validation Logic
+
+**File: `internal/domain/task/task.go`** (add to `Validate` method)
+
+```go
+// Validate validates the task
+func (t *Task) Validate() error {
+    if t.Name == "" {
+        return &TaskError{
+            Task:    t.Name,
+            Message: "task name cannot be empty",
+        }
+    }
+
+    // NEW: Validate priority
+    if t.Priority != "" {
+        valid := false
+        for _, p := range ValidPriorities {
+            if t.Priority == p {
+                valid = true
+                break
+            }
+        }
+        if !valid {
+            return &TaskError{
+                Task:    t.Name,
+                Message: fmt.Sprintf("invalid priority '%s', must be one of: %v", 
+                    t.Priority, ValidPriorities),
+            }
+        }
+    }
+
+    // ... existing validation
+    return nil
+}
+```
+
+#### Step 3: Add Domain Service Method
+
+**File: `internal/domain/task/registry.go`**
+
+```go
+// ListByPriority returns tasks sorted by priority (high -> medium -> low)
+func (r *Registry) ListByPriority() []*Task {
+    r.mu.RLock()
+    defer r.mu.RUnlock()
+
+    // Group by priority
+    high := make([]*Task, 0)
+    medium := make([]*Task, 0)
+    low := make([]*Task, 0)
+    unspecified := make([]*Task, 0)
+
+    for _, name := range r.taskOrder {
+        if task, exists := r.tasks[name]; exists {
+            switch task.Priority {
+            case PriorityHigh:
+                high = append(high, task)
+            case PriorityMedium:
+                medium = append(medium, task)
+            case PriorityLow:
+                low = append(low, task)
+            default:
+                unspecified = append(unspecified, task)
+            }
+        }
+    }
+
+    // Combine in priority order
+    result := make([]*Task, 0, len(r.taskOrder))
+    result = append(result, high...)
+    result = append(result, medium...)
+    result = append(result, low...)
+    result = append(result, unspecified...)
+    
+    return result
+}
+```
+
+#### Step 4: Parse from AST
+
+**File: `internal/domain/task/task.go`** (update `NewTask`)
+
+```go
+// NewTask creates a new task from AST
+func NewTask(stmt *ast.TaskStatement, namespace, source string) *Task {
+    task := &Task{
+        Name:        stmt.Name,
+        Description: stmt.Description,
+        Priority:    stmt.Priority, // NEW: Read from AST
+        Namespace:   namespace,
+        Source:      source,
+        Body:        stmt.Body,
+    }
+    
+    // ... rest of conversion
+    return task
+}
+```
+
+#### Step 5: Update AST (if needed)
+
+**File: `internal/ast/statements/task_statement.go`**
+
+```go
+type TaskStatement struct {
+    Token        lexer.Token
+    Name         string
+    Description  string
+    Priority     string      // NEW: Add priority field
+    Parameters   []ParameterStatement
+    Dependencies []DependencyGroup
+    Body         []ast.Statement
+}
+```
+
+#### Step 6: Integrate with Engine
+
+**File: `internal/engine/engine.go`**
+
+```go
+// ListTasksByPriority returns tasks ordered by priority
+func (e *Engine) ListTasksByPriority(program *ast.Program) []TaskInfo {
+    // Register tasks with domain registry
+    e.taskRegistry.Clear()
+    _ = e.registerTasks(program.Tasks, "")
+
+    // Get tasks from domain registry sorted by priority
+    domainTasks := e.taskRegistry.ListByPriority()
+    
+    tasks := make([]TaskInfo, 0, len(domainTasks))
+    for _, domainTask := range domainTasks {
+        info := TaskInfo{
+            Name:        domainTask.Name,
+            Description: domainTask.Description,
+            Priority:    domainTask.Priority, // NEW
+        }
+        if info.Description == "" {
+            info.Description = "No description"
+        }
+        tasks = append(tasks, info)
+    }
+    return tasks
+}
+```
+
+#### Step 7: Add CLI Support (Optional)
+
+**File: `cmd/drun/app/cli.go`**
+
+```go
+// Add new flag
+flags.BoolVar(&a.listByPriority, "list-priority", false, "List tasks sorted by priority")
+
+// Handle in run method
+if a.listByPriority {
+    return ListTasksByPriority(a.configFile)
+}
+```
+
+### Key Principles Demonstrated
+
+1. **Domain First**: Define the concept in the domain layer (`Task.Priority`)
+2. **Domain Validation**: Business rules stay in domain (`ValidPriorities`, `Validate()`)
+3. **Domain Services**: Logic operates on domain entities (`ListByPriority()`)
+4. **Clean Integration**: Engine orchestrates, doesn't contain business logic
+5. **Separation**: AST → Domain → Engine → CLI (clear boundaries)
+
+### Why This Pattern Works
+
+```
+┌─────────────────────────────────────────────────┐
+│ CLI Layer: User interaction                     │
+│  - Flags, commands, output formatting           │
+└────────────────┬────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────┐
+│ Engine Layer: Orchestration                     │
+│  - Converts AST → Domain                        │
+│  - Calls domain services                        │
+│  - Manages execution flow                       │
+└────────────────┬────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────┐
+│ Domain Layer: Business Logic                    │
+│  - Task priority validation                     │
+│  - Priority-based sorting                       │
+│  - Domain rules and constraints                 │
+└─────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- ✅ Easy to test (domain logic isolated)
+- ✅ Reusable (priority logic works anywhere)
+- ✅ Maintainable (change priority rules in one place)
+- ✅ Clear (each layer has single responsibility)
+
+### Testing the Domain Layer
+
+**File: `internal/domain/task/task_test.go`**
+
+```go
+func TestTaskPriorityValidation(t *testing.T) {
+    tests := []struct {
+        name     string
+        priority string
+        wantErr  bool
+    }{
+        {"valid high", "high", false},
+        {"valid medium", "medium", false},
+        {"valid low", "low", false},
+        {"invalid priority", "critical", true},
+        {"empty priority", "", false}, // Optional field
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            task := &Task{
+                Name:     "test",
+                Priority: tt.priority,
+            }
+            err := task.Validate()
+            if (err != nil) != tt.wantErr {
+                t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
+}
+
+func TestRegistryListByPriority(t *testing.T) {
+    registry := NewRegistry()
+    
+    // Register tasks with different priorities
+    registry.Register(&Task{Name: "task1", Priority: "low"})
+    registry.Register(&Task{Name: "task2", Priority: "high"})
+    registry.Register(&Task{Name: "task3", Priority: "medium"})
+    
+    tasks := registry.ListByPriority()
+    
+    // Should be ordered: high, medium, low
+    if tasks[0].Name != "task2" || tasks[0].Priority != "high" {
+        t.Error("Expected high priority task first")
+    }
+    if tasks[1].Name != "task3" || tasks[1].Priority != "medium" {
+        t.Error("Expected medium priority task second")
+    }
+    if tasks[2].Name != "task1" || tasks[2].Priority != "low" {
+        t.Error("Expected low priority task third")
+    }
+}
+```
+
+### Summary: Domain-Driven Development Flow
+
+When adding any new feature:
+
+1. **Think Domain First**: What's the business concept?
+2. **Add to Domain Layer**: Entities, validation, services
+3. **Test Domain Logic**: Unit tests without dependencies
+4. **Integrate with Engine**: Orchestrate domain operations
+5. **Expose via CLI**: User-facing interface
+
+This keeps your codebase clean, testable, and maintainable! 🎯
 
 ## Testing
 
