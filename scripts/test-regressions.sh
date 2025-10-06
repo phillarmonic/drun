@@ -48,8 +48,10 @@ test_file() {
         return 1
     fi
     
-    # Get the first task from the file
-    local first_task=$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | awk '{print $1}' | tr -d ' ')
+    # Get the first task from the file (handle multi-word task names)
+    # Task list format: "  task_name           description"
+    # We need to extract everything before the description (2+ spaces separator)
+    local first_task=$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed -E 's/  +.*//' | xargs)
     
     if [ -z "$first_task" ]; then
         echo -e "${YELLOW}⚠️  SKIPPED: ${filename} - No tasks found${NC}"
@@ -58,10 +60,9 @@ test_file() {
         return 0
     fi
     
-    # Handle multi-word task names by trying different approaches
+    # Store task name for execution
     local task_names=(
         "$first_task"
-        "$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed 's/  .*//')"
     )
     
     local success=false

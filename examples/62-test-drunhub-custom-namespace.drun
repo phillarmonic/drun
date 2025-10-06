@@ -1,18 +1,36 @@
 version: 2.0
 
-# Test importing from drunhub with custom namespace
+# Test importing from drunhub with custom namespace and engine validation
 
 project "test-drunhub-custom-ns":
   # Import with custom namespace "ops" instead of "docker"
   include from drunhub "examples/drunhub-example-docker" as ops
+  
+  # Import engine validation suite
+  include from drunhub "examples/drunhub-engine-validation" as validation
   
 task "test-custom-namespace":
   info "Testing import from drunhub with custom namespace 'ops'"
   use snippet "ops.check-docker"
   success "✓ Successfully used custom namespace!"
 
-task "test-task-with-custom-ns":
-  info "Calling task with custom namespace"
-  call task "ops.deploy" with image_name="myapp" tag="latest"
-  success "✓ Custom namespace works perfectly!"
+task "test-validation-suite":
+  info "Testing engine validation suite from drunhub"
+  info "Running validation.test-validation..."
+  call task "validation.test-validation" with environment="production" replica_count="5" log_level="debug" port="3000"
+  success "✓ Validation suite from drunhub works!"
+
+task "test-all-drunhub":
+  info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  info "🧪 Testing DrunHub Imports"
+  info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  info ""
+  info "1. Testing Docker snippets with custom namespace 'ops'..."
+  call task "test-custom-namespace"
+  info ""
+  info "2. Testing Engine Validation Suite..."
+  call task "test-validation-suite"
+  info ""
+  
+  success "🎉 All DrunHub imports working perfectly!"
 

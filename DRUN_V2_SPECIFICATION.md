@@ -28,7 +28,7 @@
 
 ## Overview
 
-drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. Unlike v1 which uses YAML configuration, v2 features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
+drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. It features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
 
 ### Key Features
 
@@ -37,6 +37,7 @@ drun v2 introduces a semantic, English-like domain-specific language (DSL) for d
 - **Shell Backend**: All constructs execute as shell commands when needed
 - **Smart Inference**: Automatic detection of tools, environments, and patterns
 - **Type Safety**: Static analysis with runtime validation
+- **Simple CLI**: Parameters use `key=value` syntax (no `--` dashes needed for task params)
 
 ### Architecture
 
@@ -46,6 +47,14 @@ drun v2 uses a **new execution engine** with the following components:
 2. **Parser**: Builds an Abstract Syntax Tree (AST) from tokens
 3. **Engine**: Directly executes the AST without intermediate compilation
 4. **Runtime**: Provides built-in actions, smart detection, and shell integration
+5. **CLI (xdrun)**: Command-line interface that accepts tasks and parameters using `key=value` syntax
+
+### CLI Usage Pattern
+
+```bash
+xdrun [task_name] [param1=value1] [param2=value2] [--cli-flags]
+      └─ task     └─ task parameters (no dashes) ─┘ └─ xdrun flags ─┘
+```
 
 ### Design Goals
 
@@ -534,9 +543,9 @@ Strings support variable interpolation using `{$variable}` syntax for declared v
 let $name = "world"
 info "Hello, {$name}!"  # Outputs: Hello, world!
 
-# Loop variables use bare identifiers
-for each item in items:
-  info "Processing {item}"  # Loop variable without $
+# Loop variables use $ prefix
+for each $item in $items:
+  info "Processing {$item}"  # Loop variable with $
 
 # Complex expressions in interpolation
 info "Current time: {now.format('HH:mm:ss')}"
@@ -825,36 +834,102 @@ task "main":
 
 ### Parameter Declarations
 
-#### Required Parameters
+drun has two types of parameters with distinct semantic meanings:
+
+#### `requires` - Mandatory Parameters
+
+**Semantic Intent:** "This parameter is essential for the task to execute correctly."
+
+Parameters declared with `requires` **MUST** be provided by the user (unless a default is specified).
 
 ```
-requires <name> [constraints]
+requires <name> [constraints] [defaults to <value>]
 
 # Examples:
 requires $environment from ["dev", "staging", "production"]
 requires $version matching pattern "v\d+\.\d+\.\d+"
 requires $port as number between 1000 and 9999
 requires $email matching email format
-requires files as list of strings
+requires $files as list of strings
+
+# Optional required parameter (validated with safe default):
+requires $environment from ["dev", "staging", "production"] defaults to "dev"
 ```
 
-#### Optional Parameters with Defaults
+**Key Characteristics:**
+- Must be provided by user (if no default)
+- Often used with validation constraints (enums, patterns, ranges)
+- Emphasizes importance and criticality
+- Can have defaults for convenience while maintaining validation
+
+#### `given` - Optional Parameters with Defaults
+
+**Semantic Intent:** "This parameter is configurable but has a sensible default."
+
+Parameters declared with `given` **ALWAYS** have a default value and are completely optional.
 
 ```
 given <name> defaults to <value> [constraints]
 
 # Examples:
-given replicas defaults to 3
-given timeout defaults to "5m"
-given force defaults to false
-given tags defaults to [] as list of strings
-given features defaults to empty  # equivalent to ""
+given $replicas defaults to "3"
+given $timeout defaults to "5m"
+given $force defaults to "false"
+given $tags defaults to [] as list of strings
+given $features defaults to empty  # equivalent to ""
 
-# Built-in function defaults
-given version defaults to "{current git commit}"
-given branch defaults to "{current git branch}"
-given safe_branch defaults to "{current git branch | replace '/' by '-'}"
-given timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+# Optional with enum validation (NEW!):
+given $log_level from ["error", "warn", "info", "debug"] defaults to "info"
+
+# Built-in function defaults:
+given $version defaults to "{current git commit}"
+given $branch defaults to "{current git branch}"
+given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
+given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+```
+
+**Key Characteristics:**
+- Default value is **mandatory**
+- User can override but doesn't have to
+- Used for configuration, feature flags, optional overrides
+- Can also have validation constraints (enums, types)
+
+#### Comparison Table
+
+| Feature | `requires` | `given` |
+|---------|------------|---------|
+| **Must provide value?** | Yes (unless has default) | No (always optional) |
+| **Default value** | Optional | **Mandatory** |
+| **Semantic meaning** | Essential/Critical | Configurable/Optional |
+| **Validation** | Recommended | Optional |
+| **Use case** | Core parameters | Configuration options |
+
+#### Usage Examples
+
+```drun
+task "deploy":
+  # Critical parameter - must be provided
+  requires $name
+  
+  # Validated required parameter with safe default
+  requires $environment from ["dev", "staging", "production"] defaults to "dev"
+  
+  # Optional configuration with default
+  given $replicas defaults to "3"
+  given $timeout defaults to "30s"
+  
+  info "Deploying {$name} to {$environment} with {$replicas} replicas"
+```
+
+**CLI Usage:**
+```bash
+# Must provide 'name', others use defaults
+xdrun deploy name=myapp
+# Output: Deploying myapp to dev with 3 replicas
+
+# Override defaults
+xdrun deploy name=myapp environment=production replicas=5
+# Output: Deploying myapp to production with 5 replicas
 ```
 
 #### The `empty` Keyword
@@ -1376,7 +1451,7 @@ if (environment is "production" and git repo is clean) or force_deploy:
 #### Simple Iteration
 
 ```
-for each item in collection:
+for each $item in $collection:
   process item
 
 # With index
@@ -1428,7 +1503,7 @@ for each container in docker containers where status is "running":
 ### Loop Control
 
 ```
-for each service in services:
+for each $service in $services:
   if service is healthy:
     continue
   
@@ -1484,7 +1559,7 @@ let $commit = current git commit
 set $counter to 0
 
 # Loop variables (with $ prefix)
-for each $item in items:
+for each $item in $items:
   info "Processing {$item}"  # Loop variable interpolation
 
 for $i in range 1 to 5:
@@ -1918,7 +1993,7 @@ Variable operations work seamlessly with for each loops:
 task "loop_with_operations":
   set $docker_images to "nginx:1.21 postgres:13 redis:6.2"
   
-  for each img in $docker_images:
+  for each $img in $docker_images:
     info "Processing: {img}"
     info "Image name: {img split by ':' | first}"
     info "Version: {img split by ':' | last}"
@@ -1995,17 +2070,26 @@ requires $env from ["dev", "staging", "prod"] defaults to "production"
 
 #### CLI Argument Syntax
 
-Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix required):
+**Important:** Task parameters use simple `key=value` syntax **without `--` dashes**. This is different from typical CLI tools!
 
 ```bash
-# Parameter passing examples
-xdrun deploy environment=production
+# ✅ CORRECT: Task parameters (no dashes)
+xdrun deploy environment=production replicas=5
 xdrun build tag=v1.2.3 push=true
 xdrun test suites=unit,integration verbose=true
 
-# Multiple parameters
-xdrun deploy environment=staging replicas=5 timeout=300
+# ❌ WRONG: Do NOT use dashes for task parameters
+xdrun deploy --environment=production --replicas=5  # This won't work!
+
+# ✅ CLI flags use dashes (they control xdrun behavior)
+xdrun deploy environment=prod --dry-run --verbose
+xdrun build --list
 ```
+
+**Why no dashes?**
+- Task parameters are part of the drun language (semantic parameters)
+- CLI flags control the xdrun interpreter itself (operational flags)
+- This distinction keeps the language clean and consistent
 
 #### Optional Parameters
 
@@ -2144,7 +2228,7 @@ for each $platform in $globals.platforms:
   info "Building for {$platform}"
 
 # ❌ Deprecated: Direct access (will show deprecation warning)
-for each $platform in platforms:
+for each $platform in $platforms:
   info "Building for {$platform}"
 ```
 

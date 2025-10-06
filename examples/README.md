@@ -38,6 +38,21 @@ drun v2 introduces a revolutionary approach to task automation:
 
 ## 🚀 Quick Start
 
+### Running Examples
+
+```bash
+# Run a task
+xdrun -f examples/01-hello-world.drun hello
+
+# Pass parameters using key=value syntax (NO dashes!)
+xdrun -f examples/02-parameters.drun greet name=Alice title=Dr.
+
+# List available tasks
+xdrun -f examples/01-hello-world.drun --list
+```
+
+**Important:** Task parameters use simple `key=value` syntax without `--` dashes. CLI flags (like `--list`, `--dry-run`) use `--` as they control xdrun behavior, not task parameters.
+
 ### Hello World
 ```
 task "hello":
@@ -122,8 +137,8 @@ project "MyApp" version "1.0":
   set architectures as list to ["amd64", "arm64"]
 
 # Sequential matrix execution
-for each $platform in platforms:
-  for each $arch in architectures:
+for each $platform in $platforms:
+  for each $arch in $architectures:
     build for {$platform}/{$arch}
 
 # Parallel matrix execution  
@@ -277,7 +292,7 @@ info "Source JS files: {$source_files filtered by prefix 'src/' | filtered by ex
 # Output: src/app.js src/utils.js
 
 # Loop integration
-for each img in $docker_images:
+for each $img in $docker_images:
   info "Processing: {img split by ':' | first}"
 ```
 
@@ -298,7 +313,7 @@ when expression:
   else: statements
 
 # Loops
-for each item in collection:
+for each $item in $collection:
   process item
 
 for i from 1 to 10:

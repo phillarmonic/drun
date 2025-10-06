@@ -24,9 +24,9 @@ task "parallel deployment" means "Deploy services to multiple regions in paralle
 	info "🌍 Starting parallel multi-region deployment"
 	
 	# Deploy to regions in parallel, services sequentially within each region
-	for each $region in cloud_regions in parallel:
+	for each $region in $cloud_regions in parallel:
 		info "📍 Deploying to region: {$region} (parallel)"
-		for each $service in microservices:
+		for each $service in $microservices:
 			info "  📦 Deploying {$service} to {$region}"
 			step "Building {$service} image for {$region}"
 			step "Pushing to {$region} registry"

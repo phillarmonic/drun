@@ -77,8 +77,8 @@ task "chained_operations" means "Demonstrate complex operation chaining":
 
 	info "  Docker images: {$docker_images}"
 	info "  Processing each image:"
-	for each img in $docker_images:
-		info "    Image: {img} -> Name: {img without suffix ':*'}"
+	for each $img in $docker_images:
+		info "    Image: {$img} -> Name: {$img without suffix ':*'}"
 
 	info "  Unique file extensions:"
 	set $all_extensions to "js js test.js md json json"
@@ -101,8 +101,8 @@ task "real_world_example" means "Real-world deployment scenario":
 	# Simulate file processing
 	set $deployment_files to "deployment.yaml service.yaml ingress.yaml configmap.yaml"
 	info "  Processing deployment files:"
-	for each file in $deployment_files:
-		info "    📄 {file} -> {file without suffix '.yaml'} configuration"
+	for each $file in $deployment_files:
+		info "    📄 {$file} -> {$file without suffix '.yaml'} configuration"
 
 	# Simulate environment-specific processing
 	if $environment == "production":
