@@ -320,6 +320,7 @@ func (p *Parser) validateVariableName(name string) bool {
 	// Reserved variable names that cannot be user-defined
 	reservedNames := []string{
 		"$globals", // Used to access project settings
+		"$params",  // Used to access project parameters
 	}
 
 	for _, reserved := range reservedNames {

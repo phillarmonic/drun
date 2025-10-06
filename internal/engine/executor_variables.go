@@ -43,15 +43,22 @@ func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *Execut
 	// Interpolate the value if it contains braces (for builtin function calls)
 	interpolatedValue := e.interpolateVariables(value, ctx)
 
+	// Determine the variable name (namespace it if in an included snippet/task)
+	varName := varStmt.Variable
+	if ctx.CurrentNamespace != "" {
+		// Namespace the variable (e.g., docker.image)
+		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+	}
+
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = interpolatedValue
+	ctx.Variables[varName] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varStmt.Variable, interpolatedValue)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s = %s\n", varName, interpolatedValue)
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varStmt.Variable, interpolatedValue)
+	_, _ = fmt.Fprintf(e.output, "📝 Set variable %s = %s\n", varName, interpolatedValue)
 
 	return nil
 }
@@ -66,16 +73,23 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 	// Interpolate the value if it contains braces (for builtin function calls)
 	interpolatedValue := e.interpolateVariables(value, ctx)
 
+	// Determine the variable name (namespace it if in an included snippet/task)
+	varName := varStmt.Variable
+	if ctx.CurrentNamespace != "" {
+		// Namespace the variable (e.g., docker.image)
+		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+	}
+
 	// Store the variable in the context even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = interpolatedValue
+	ctx.Variables[varName] = interpolatedValue
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would set variable %s to %s\n", varName, interpolatedValue)
 		return nil
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varStmt.Variable, interpolatedValue)
+		_, _ = fmt.Fprintf(e.output, "📝 Set variable %s to %s\n", varName, interpolatedValue)
 	}
 
 	return nil
@@ -83,10 +97,16 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 
 // executeTransformStatement executes "transform variable with function args" statements
 func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+	// Determine the variable name (namespace it if in an included snippet/task)
+	varName := varStmt.Variable
+	if ctx.CurrentNamespace != "" {
+		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+	}
+
 	// Get the current value of the variable
-	currentValue, exists := ctx.Variables[varStmt.Variable]
+	currentValue, exists := ctx.Variables[varName]
 	if !exists {
-		return fmt.Errorf("variable '%s' not found", varStmt.Variable)
+		return fmt.Errorf("variable '%s' not found", varName)
 	}
 
 	// Apply the transformation function
@@ -96,15 +116,15 @@ func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *
 	}
 
 	// Update the variable with the transformed value even in dry run for interpolation
-	ctx.Variables[varStmt.Variable] = newValue
+	ctx.Variables[varName] = newValue
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would transform variable %s with %s: %s -> %s\n",
-			varStmt.Variable, varStmt.Function, currentValue, newValue)
+			varName, varStmt.Function, currentValue, newValue)
 		return nil
 	}
 	_, _ = fmt.Fprintf(e.output, "🔄 Transformed variable %s with %s: %s -> %s\n",
-		varStmt.Variable, varStmt.Function, currentValue, newValue)
+		varName, varStmt.Function, currentValue, newValue)
 
 	return nil
 }
@@ -119,18 +139,24 @@ func (e *Engine) executeCaptureStatement(varStmt *ast.VariableStatement, ctx *Ex
 	// The expression is already evaluated, so we can use it directly as the value
 	value := expression
 
+	// Determine the variable name (namespace it if in an included snippet/task)
+	varName := varStmt.Variable
+	if ctx.CurrentNamespace != "" {
+		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+	}
+
 	// Store the captured value in the context
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varName] = value
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s: %s\n",
-			varStmt.Variable, value)
+			varName, value)
 		return nil
 	}
 
 	if e.verbose {
 		_, _ = fmt.Fprintf(e.output, "📥 Captured %s: %s\n",
-			varStmt.Variable, value)
+			varName, value)
 	}
 
 	return nil
@@ -154,19 +180,25 @@ func (e *Engine) executeCaptureShellStatement(varStmt *ast.VariableStatement, ct
 		return fmt.Errorf("failed to capture from shell command '%s': %v", command, err)
 	}
 
+	// Determine the variable name (namespace it if in an included snippet/task)
+	varName := varStmt.Variable
+	if ctx.CurrentNamespace != "" {
+		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+	}
+
 	// Store the captured output (trimmed)
 	value := strings.TrimSpace(result.Stdout)
-	ctx.Variables[varStmt.Variable] = value
+	ctx.Variables[varName] = value
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture %s from shell: %s\n",
-			varStmt.Variable, value)
+			varName, value)
 		return nil
 	}
 
 	if e.verbose {
 		_, _ = fmt.Fprintf(e.output, "📥 Captured %s from shell: %s\n",
-			varStmt.Variable, value)
+			varName, value)
 	}
 
 	return nil

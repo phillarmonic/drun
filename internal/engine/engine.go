@@ -288,7 +288,41 @@ func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) e
 
 // setupTaskParameters sets up parameters for a specific task
 func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]string, ctx *ExecutionContext) error {
-	// First, add project-level parameters if they exist
+	// First, add included/namespaced parameters from includes (e.g., docker.registry)
+	if ctx.Project != nil && ctx.Project.IncludedParams != nil {
+		for namespacedName, projectParam := range ctx.Project.IncludedParams {
+			// Use the namespaced name as the key (e.g., "docker.registry")
+			// Check if user provided a value via CLI (they won't, but check anyway)
+			var rawValue string
+			var hasValue bool
+
+			// Included params won't be provided via CLI, so just use defaults
+			if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				// Determine parameter type
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				// Create typed value
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("included parameter '%s': invalid %s value '%s': %v",
+						namespacedName, paramType, rawValue, err))
+				}
+
+				// Store with namespaced key so it can be accessed as $params.docker.registry
+				ctx.Parameters[namespacedName] = typedValue
+			}
+		}
+	}
+
+	// Then, add project-level parameters if they exist
 	if ctx.Project != nil && ctx.Project.Parameters != nil {
 		for paramName, projectParam := range ctx.Project.Parameters {
 			// Check if user provided a value via CLI
@@ -414,15 +448,17 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 	ctx := &ProjectContext{
 		Name:              project.Name,
 		Version:           project.Version,
-		Settings:          make(map[string]string, 8),                         // Pre-allocate for typical settings count
-		Parameters:        make(map[string]*ast.ProjectParameterStatement, 8), // Pre-allocate for project parameters
-		Snippets:          make(map[string]*ast.SnippetStatement, 8),          // Pre-allocate for snippets
-		HookManager:       hooks.NewManager(),                                 // Initialize hooks manager
-		ShellConfigs:      make(map[string]*ast.PlatformShellConfig, 4),       // Pre-allocate for typical platform count
-		IncludedSnippets:  make(map[string]*ast.SnippetStatement, 16),         // Pre-allocate for included snippets
-		IncludedTemplates: make(map[string]*ast.TaskTemplateStatement, 16),    // Pre-allocate for included templates
-		IncludedTasks:     make(map[string]*ast.TaskStatement, 16),            // Pre-allocate for included tasks
-		IncludedFiles:     make(map[string]bool, 4),                           // Pre-allocate for included files
+		Settings:          make(map[string]string, 8),                          // Pre-allocate for typical settings count
+		Parameters:        make(map[string]*ast.ProjectParameterStatement, 8),  // Pre-allocate for project parameters
+		Snippets:          make(map[string]*ast.SnippetStatement, 8),           // Pre-allocate for snippets
+		HookManager:       hooks.NewManager(),                                  // Initialize hooks manager
+		ShellConfigs:      make(map[string]*ast.PlatformShellConfig, 4),        // Pre-allocate for typical platform count
+		IncludedSnippets:  make(map[string]*ast.SnippetStatement, 16),          // Pre-allocate for included snippets
+		IncludedTemplates: make(map[string]*ast.TaskTemplateStatement, 16),     // Pre-allocate for included templates
+		IncludedTasks:     make(map[string]*ast.TaskStatement, 16),             // Pre-allocate for included tasks
+		IncludedSettings:  make(map[string]string, 16),                         // Pre-allocate for included settings
+		IncludedParams:    make(map[string]*ast.ProjectParameterStatement, 16), // Pre-allocate for included parameters
+		IncludedFiles:     make(map[string]bool, 4),                            // Pre-allocate for included files
 	}
 
 	// Process project settings
@@ -708,15 +744,27 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 	var snippet *ast.SnippetStatement
 	var exists bool
 
+	var snippetNamespace string // Track if snippet is from an included project
+
 	// Check if it's a namespaced reference (contains dot)
 	if strings.Contains(useStmt.SnippetName, ".") {
 		// Look in included snippets
 		snippet, exists = ctx.Project.IncludedSnippets[useStmt.SnippetName]
+		// Extract namespace (everything before the last dot)
+		if exists {
+			parts := strings.Split(useStmt.SnippetName, ".")
+			if len(parts) > 1 {
+				snippetNamespace = parts[0]
+			}
+		}
 	} else {
 		// Try current namespace first (for transitive resolution)
 		if ctx.CurrentNamespace != "" {
 			namespacedName := ctx.CurrentNamespace + "." + useStmt.SnippetName
 			snippet, exists = ctx.Project.IncludedSnippets[namespacedName]
+			if exists {
+				snippetNamespace = ctx.CurrentNamespace
+			}
 		}
 
 		// If not found in namespace, look in local snippets
@@ -728,6 +776,15 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 	if !exists {
 		return fmt.Errorf("snippet '%s' not found", useStmt.SnippetName)
 	}
+
+	// Save the current namespace and set new one if snippet is from included project
+	oldNamespace := ctx.CurrentNamespace
+	if snippetNamespace != "" {
+		ctx.CurrentNamespace = snippetNamespace
+	}
+	defer func() {
+		ctx.CurrentNamespace = oldNamespace
+	}()
 
 	// Execute all statements in the snippet body
 	for _, stmt := range snippet.Body {

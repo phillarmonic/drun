@@ -68,6 +68,7 @@ type ProjectContext interface {
 	GetName() string
 	GetVersion() string
 	GetSettings() map[string]string
+	GetParameters() interface{} // Returns map[string]*ast.ProjectParameterStatement
 }
 
 // Interpolate performs variable and environment variable interpolation

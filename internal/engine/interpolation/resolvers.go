@@ -184,17 +184,27 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 		}
 	}
 
-	// 7. Check for $globals.key syntax for project settings
+	// 7. Check for $globals.key or $globals.namespace.key syntax for project settings
 	if strings.HasPrefix(expr, "$globals.") {
 		if ctx != nil {
 			project := ctx.GetProject()
 			if project != nil {
 				key := expr[9:] // Remove "$globals." prefix
+
+				// First check local project settings
 				if settings := project.GetSettings(); settings != nil {
 					if value, exists := settings[key]; exists {
 						return value
 					}
 				}
+
+				// Then check included/namespaced settings (e.g., $globals.docker.api_url)
+				if includedSettings := getIncludedSettings(project); includedSettings != nil {
+					if value, exists := includedSettings[key]; exists {
+						return value
+					}
+				}
+
 				// Check special project variables
 				if key == "version" && project.GetVersion() != "" {
 					return project.GetVersion()
@@ -211,7 +221,29 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 		return ""
 	}
 
-	// 8. Check for simple parameter lookup (fallback for complex expressions)
+	// 8. Check for $params.key or $params.namespace.key syntax for project parameters
+	// Project parameters are loaded into ctx.Parameters by the engine,
+	// but $params.key makes it explicit that we're accessing a project-level parameter
+	if strings.HasPrefix(expr, "$params.") {
+		if ctx != nil {
+			key := expr[8:] // Remove "$params." prefix
+
+			// First check ctx.Parameters (loaded from local project params)
+			params := ctx.GetParameters()
+			if params != nil {
+				if value, exists := params[key]; exists {
+					return value.AsString()
+				}
+			}
+
+			// Namespaced parameters (e.g., $params.docker.registry) are loaded into
+			// ctx.Parameters by setupTaskParameters with their full namespaced keys,
+			// so they're already handled by the check above
+		}
+		return ""
+	}
+
+	// 9. Check for simple parameter lookup (fallback for complex expressions)
 	if ctx != nil {
 		params := ctx.GetParameters()
 		vars := ctx.GetVariables()
@@ -242,6 +274,51 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 	}
 
 	return ""
+}
+
+// Helper functions to safely get included settings/params from project context
+// We need these because ProjectContext.GetIncludedSettings/Params might not be available
+// in all implementations of the interface (to avoid circular dependencies)
+
+func getIncludedSettings(project ProjectContext) map[string]string {
+	// Use type assertion to access the concrete implementation
+	type settingsProvider interface {
+		GetIncludedSettings() map[string]string
+	}
+	if provider, ok := project.(settingsProvider); ok {
+		return provider.GetIncludedSettings()
+	}
+	return nil
+}
+
+func getIncludedParams(project ProjectContext) interface{} {
+	// Use type assertion to access the concrete implementation
+	// This returns map[string]*ast.ProjectParameterStatement
+	type paramsProvider interface {
+		GetIncludedParams() interface{}
+	}
+	if provider, ok := project.(paramsProvider); ok {
+		return provider.GetIncludedParams()
+	}
+	return nil
+}
+
+// Helper to extract default value from a parameter stored in interface{}
+func getParamDefaultValue(paramInterface interface{}) (string, bool) {
+	// Try to access as ProjectParameterStatement fields
+	// We use reflection-style access since we can't import ast here
+	if paramMap, ok := paramInterface.(interface {
+		GetDefaultValue() string
+		GetHasDefault() bool
+	}); ok {
+		if paramMap.GetHasDefault() {
+			return paramMap.GetDefaultValue(), true
+		}
+	}
+
+	// Fallback: try struct field access via reflection
+	// The parameter is *ast.ProjectParameterStatement which has HasDefault and DefaultValue fields
+	return "", false
 }
 
 // parseQuotedArguments parses comma-separated quoted arguments

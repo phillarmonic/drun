@@ -34,6 +34,8 @@ type ProjectContext interface {
 	GetIncludedSnippets() map[string]*ast.SnippetStatement
 	GetIncludedTemplates() map[string]*ast.TaskTemplateStatement
 	GetIncludedTasks() map[string]*ast.TaskStatement
+	GetIncludedSettings() map[string]string
+	GetIncludedParams() map[string]*ast.ProjectParameterStatement
 }
 
 // NewResolver creates a new include resolver
@@ -127,14 +129,34 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 		}
 	}
 
-	// Merge snippets from the included project
-	if includeSnippets && program.Project != nil {
+	// Merge settings, parameters, and snippets from the included project
+	if program.Project != nil {
 		for _, setting := range program.Project.Settings {
-			if snippet, ok := setting.(*ast.SnippetStatement); ok {
-				namespacedName := namespace + "." + snippet.Name
-				ctx.GetIncludedSnippets()[namespacedName] = snippet
+			switch s := setting.(type) {
+			case *ast.SetStatement:
+				// Namespace project settings
+				namespacedKey := namespace + "." + s.Key
+				if s.Value != nil {
+					ctx.GetIncludedSettings()[namespacedKey] = s.Value.String()
+					if r.verbose {
+						_, _ = fmt.Fprintf(r.output, "  ✓ Loaded setting: %s\n", namespacedKey)
+					}
+				}
+			case *ast.ProjectParameterStatement:
+				// Namespace project parameters
+				namespacedName := namespace + "." + s.Name
+				ctx.GetIncludedParams()[namespacedName] = s
 				if r.verbose {
-					_, _ = fmt.Fprintf(r.output, "  ✓ Loaded snippet: %s\n", namespacedName)
+					_, _ = fmt.Fprintf(r.output, "  ✓ Loaded parameter: %s\n", namespacedName)
+				}
+			case *ast.SnippetStatement:
+				// Namespace snippets (only if includeSnippets is true)
+				if includeSnippets {
+					namespacedName := namespace + "." + s.Name
+					ctx.GetIncludedSnippets()[namespacedName] = s
+					if r.verbose {
+						_, _ = fmt.Fprintf(r.output, "  ✓ Loaded snippet: %s\n", namespacedName)
+					}
 				}
 			}
 		}
