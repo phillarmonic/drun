@@ -79,7 +79,7 @@ dist/
 *.dll
 *.so
 *.dylib
-drun
+/drun
 debug.drun
 
 # Test binary, built with `go test -c`
