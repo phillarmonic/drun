@@ -51,7 +51,6 @@ jobs:
       with:
         version: latest
         args: --timeout=5m
-        skip-cache: true
 
   # Test job depends on successful lint
   test:
