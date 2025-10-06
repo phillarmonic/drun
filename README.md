@@ -46,7 +46,10 @@ task "hello":
 ### Core Features
 
 - **Semantic Language**: Write tasks in English-like syntax that's intuitive and readable
-- **Smart Parameters**: Type-safe parameters with constraints, defaults, and semantic `empty` keyword (`requires $env from ["dev", "prod"]`, `given $features defaults to empty`)
+- **Smart Parameters**: Two types of parameters with clear semantics:
+  - `requires` - Mandatory parameters (must be provided unless default specified)
+  - `given` - Optional parameters (always have defaults)
+  - Type-safe with constraints, enums, and validation
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
 - **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands (soon)
@@ -175,8 +178,13 @@ deploy env version:
 
 ```drun
 task "deploy" means "Deploy with automatic rollback":
+  # Critical parameters (must provide)
   requires $environment from ["dev", "staging", "production"]
   requires $version as string matching semver
+  
+  # Optional configuration (has defaults)
+  given $replicas defaults to "3"
+  given $timeout defaults to "5m"
 
   docker build image "app:{$version}"
   kubectl set image deployment/app to "app:{$version}"
@@ -416,10 +424,14 @@ task "hello" means "Say hello":
 
 ### Task with Parameters
 
+**Two parameter types with clear semantics:**
+- **`requires`** - Mandatory parameters (user must provide)
+- **`given`** - Optional parameters (always have defaults)
+
 ```drun
 task "greet" means "Greet someone":
-  requires $name
-  given $title defaults to "friend"
+  requires $name                        # Must provide (mandatory)
+  given $title defaults to "friend"     # Optional (has default)
 
   info "Hello, {$title} {$name}! "
 ```
@@ -427,11 +439,13 @@ task "greet" means "Greet someone":
 **Usage examples:**
 
 ```bash
-# Simple parameter passing
+# Provide only required parameter (uses default for $title)
 drun greet name=Alice
+
+# Override optional parameter
 drun greet name=Bob title=Mr.
 
-# All parameters
+# Provide all parameters
 drun greet name=Alice title=Ms.
 ```
 

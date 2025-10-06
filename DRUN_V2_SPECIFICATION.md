@@ -834,36 +834,102 @@ task "main":
 
 ### Parameter Declarations
 
-#### Required Parameters
+drun has two types of parameters with distinct semantic meanings:
+
+#### `requires` - Mandatory Parameters
+
+**Semantic Intent:** "This parameter is essential for the task to execute correctly."
+
+Parameters declared with `requires` **MUST** be provided by the user (unless a default is specified).
 
 ```
-requires <name> [constraints]
+requires <name> [constraints] [defaults to <value>]
 
 # Examples:
 requires $environment from ["dev", "staging", "production"]
 requires $version matching pattern "v\d+\.\d+\.\d+"
 requires $port as number between 1000 and 9999
 requires $email matching email format
-requires files as list of strings
+requires $files as list of strings
+
+# Optional required parameter (validated with safe default):
+requires $environment from ["dev", "staging", "production"] defaults to "dev"
 ```
 
-#### Optional Parameters with Defaults
+**Key Characteristics:**
+- Must be provided by user (if no default)
+- Often used with validation constraints (enums, patterns, ranges)
+- Emphasizes importance and criticality
+- Can have defaults for convenience while maintaining validation
+
+#### `given` - Optional Parameters with Defaults
+
+**Semantic Intent:** "This parameter is configurable but has a sensible default."
+
+Parameters declared with `given` **ALWAYS** have a default value and are completely optional.
 
 ```
 given <name> defaults to <value> [constraints]
 
 # Examples:
-given replicas defaults to 3
-given timeout defaults to "5m"
-given force defaults to false
-given tags defaults to [] as list of strings
-given features defaults to empty  # equivalent to ""
+given $replicas defaults to "3"
+given $timeout defaults to "5m"
+given $force defaults to "false"
+given $tags defaults to [] as list of strings
+given $features defaults to empty  # equivalent to ""
 
-# Built-in function defaults
-given version defaults to "{current git commit}"
-given branch defaults to "{current git branch}"
-given safe_branch defaults to "{current git branch | replace '/' by '-'}"
-given timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+# Optional with enum validation (NEW!):
+given $log_level from ["error", "warn", "info", "debug"] defaults to "info"
+
+# Built-in function defaults:
+given $version defaults to "{current git commit}"
+given $branch defaults to "{current git branch}"
+given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
+given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
+```
+
+**Key Characteristics:**
+- Default value is **mandatory**
+- User can override but doesn't have to
+- Used for configuration, feature flags, optional overrides
+- Can also have validation constraints (enums, types)
+
+#### Comparison Table
+
+| Feature | `requires` | `given` |
+|---------|------------|---------|
+| **Must provide value?** | Yes (unless has default) | No (always optional) |
+| **Default value** | Optional | **Mandatory** |
+| **Semantic meaning** | Essential/Critical | Configurable/Optional |
+| **Validation** | Recommended | Optional |
+| **Use case** | Core parameters | Configuration options |
+
+#### Usage Examples
+
+```drun
+task "deploy":
+  # Critical parameter - must be provided
+  requires $name
+  
+  # Validated required parameter with safe default
+  requires $environment from ["dev", "staging", "production"] defaults to "dev"
+  
+  # Optional configuration with default
+  given $replicas defaults to "3"
+  given $timeout defaults to "30s"
+  
+  info "Deploying {$name} to {$environment} with {$replicas} replicas"
+```
+
+**CLI Usage:**
+```bash
+# Must provide 'name', others use defaults
+xdrun deploy name=myapp
+# Output: Deploying myapp to dev with 3 replicas
+
+# Override defaults
+xdrun deploy name=myapp environment=production replicas=5
+# Output: Deploying myapp to production with 5 replicas
 ```
 
 #### The `empty` Keyword
