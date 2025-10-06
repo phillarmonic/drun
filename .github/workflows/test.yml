@@ -88,47 +88,42 @@ jobs:
 
     - name: Run tests (Windows)
       if: runner.os == 'Windows'
+      shell: bash
       run: |
         echo "Running CI Test Suite..."
         echo "Cleaning up any .out files..."
-        Get-ChildItem -Path . -Name "*.out" -File | Remove-Item -Force -ErrorAction SilentlyContinue
+        find . -name "*.out" -type f -delete 2>/dev/null || true
         echo "Testing race..."
-        New-Item -ItemType Directory -Force -Path coverage
+        mkdir -p coverage
         
         # Run race tests with timeout (10 minutes max)
-        $timeout = 600  # 10 minutes in seconds
-        $job = Start-Job -ScriptBlock {
-          go test -race -cover -coverprofile="coverage\coverage.cov" github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
-        }
+        echo "⏱️  Running race condition tests with 10-minute timeout..."
+        if timeout 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
+          echo "✅ Race condition tests completed successfully"
+        else
+          exit_code=$?
+          if [ $exit_code -eq 124 ]; then
+            echo "❌ Race condition tests timed out after 10 minutes!"
+            echo "This may indicate a deadlock or infinite loop in the code."
+            exit 1
+          else
+            echo "❌ Race condition tests failed with exit code $exit_code"
+            exit $exit_code
+          fi
+        fi
         
-        # Wait for job completion or timeout
-        $completed = Wait-Job -Job $job -Timeout $timeout
-        
-        if ($completed) {
-          $result = Receive-Job -Job $job
-          Remove-Job -Job $job
-          if ($LASTEXITCODE -ne 0) {
-            echo "❌ Tests failed!"
-            exit $LASTEXITCODE
-          }
-        } else {
-          echo "❌ Tests timed out after $timeout seconds!"
-          Stop-Job -Job $job
-          Remove-Job -Job $job
-          exit 1
-        }
         echo "Building the binary..."
         go build -o bin/xdrun.exe ./cmd/drun
-        if ($LASTEXITCODE -ne 0) {
+        if [ $? -ne 0 ]; then
           echo "❌ Build failed!"
-          exit $LASTEXITCODE
-        }
+          exit 1
+        fi
         echo "Testing the binary..."
         ./bin/xdrun.exe --version
-        if ($LASTEXITCODE -ne 0) {
+        if [ $? -ne 0 ]; then
           echo "❌ Binary test failed!"
-          exit $LASTEXITCODE
-        }
+          exit 1
+        fi
         echo "CI tests passed!"
 
     - name: Upload coverage to Codecov
@@ -170,8 +165,9 @@ jobs:
 
     - name: Build binary (Windows)
       if: runner.os == 'Windows'
+      shell: bash
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')" -o bin/xdrun.exe ./cmd/drun
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun.exe ./cmd/drun
         ./bin/xdrun.exe --version
 
     - name: Upload artifacts
