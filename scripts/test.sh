@@ -208,7 +208,17 @@ run_unit_tests() {
     # Run tests for internal packages
     if [[ "$RACE" == true ]]; then
         log_info "Running with race detection and 10-minute timeout..."
-        if timeout 600 eval "go test $test_flags ./internal/..."; then
+        
+        # Determine the appropriate timeout command based on OS
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS - use gtimeout from coreutils
+            TIMEOUT_CMD="gtimeout"
+        else
+            # Linux and other Unix systems - use timeout
+            TIMEOUT_CMD="timeout"
+        fi
+        
+        if $TIMEOUT_CMD 600 eval "go test $test_flags ./internal/..."; then
             log_success "Unit tests passed"
         else
             exit_code=$?
@@ -243,7 +253,17 @@ run_integration_tests() {
         
         if [[ "$RACE" == true ]]; then
             log_info "Running integration tests with race detection and 10-minute timeout..."
-            if timeout 600 eval "go test $test_flags -tags=integration ./..."; then
+            
+            # Determine the appropriate timeout command based on OS
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS - use gtimeout from coreutils
+                TIMEOUT_CMD="gtimeout"
+            else
+                # Linux and other Unix systems - use timeout
+                TIMEOUT_CMD="timeout"
+            fi
+            
+            if $TIMEOUT_CMD 600 eval "go test $test_flags -tags=integration ./..."; then
                 log_success "Integration tests passed"
             else
                 exit_code=$?

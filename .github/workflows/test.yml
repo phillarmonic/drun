@@ -76,6 +76,12 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Install coreutils on macOS (for timeout command)
+      if: runner.os == 'macOS'
+      run: |
+        echo "Installing coreutils for gtimeout command..."
+        brew install coreutils
+
     - name: Run tests (Unix)
       if: runner.os != 'Windows'
       run: ./scripts/test-ci.sh
