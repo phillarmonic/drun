@@ -51,6 +51,7 @@ task "hello":
   - `given` - Optional parameters (always have defaults)
   - Type-safe with constraints, enums, and validation
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
+- **Multi-line Strings**: Write complex shell commands across multiple lines with line continuation (`\`), escaped quotes (`\"`), and full interpolation support
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
 - **Built-in Actions**: Docker, Kubernetes (soon), Git, HTTP operations with semantic commands
 - **Smart Detection**: Auto-detect project types, tools, and environments
@@ -556,6 +557,54 @@ task "build" means "Build the project":
 ```
 
 ## Advanced Features Examples
+
+### Multi-line Strings
+
+Write complex shell commands across multiple lines with full support for line continuation, escaped quotes, and interpolation:
+
+```drun
+task "run tests" means "Execute test suite with coverage":
+  let $app_env = "test"
+  let $coverage_file = "coverage.xml"
+  
+  step "Running test suite with coverage"
+  
+  # Multi-line string with line continuation for readability
+  run "docker compose exec \
+      -e APP_ENV={$app_env} \
+      -e XDEBUG_MODE=coverage \
+      -u=www-data \
+      php vendor/bin/phpunit --coverage-clover ./{$coverage_file}"
+  
+  # Multi-line string with natural line breaks
+  run "echo \"Test Results:\"
+echo \"Environment: {$app_env}\"
+echo \"Coverage: {$coverage_file}\"
+cat {$coverage_file}"
+  
+  success "Tests completed with coverage"
+
+task "build script" means "Complex build with multiple commands":
+  # Preserve line breaks for sequential commands
+  run "echo 'Building frontend...'
+cd frontend
+npm install
+npm run build
+cd ..
+echo 'Building backend...'
+cd backend
+go build -o app
+cd ..
+echo 'Build complete!'"
+```
+
+**Key Features:**
+
+- **Line Continuation**: Use `\` before newline to join lines without a break
+- **Natural Line Breaks**: Preserve newlines for multi-command scripts
+- **Escaped Quotes**: Use `\"` for literal quotes in commands
+- **Full Interpolation**: Variables and expressions work seamlessly
+- **Readability**: Write maintainable, well-formatted shell scripts
 
 ### HTTP Integration
 

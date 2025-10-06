@@ -551,6 +551,103 @@ for each $item in $items:
 info "Current time: {now.format('HH:mm:ss')}"
 ```
 
+### Multi-line Strings
+
+drun v2 supports multi-line strings enclosed in quotes, allowing you to write commands that span multiple lines while maintaining readability and supporting all string features like interpolation and escape sequences.
+
+#### Basic Multi-line Strings
+
+Strings can span multiple lines, preserving line breaks:
+
+```
+task "example":
+  run "echo Line 1
+echo Line 2
+echo Line 3"
+```
+
+This will execute as three separate echo commands, preserving the newlines.
+
+#### Line Continuation
+
+Use a backslash `\` before a newline to continue a command on the next line without inserting a line break:
+
+```
+task "docker build":
+  run "docker run --rm \
+      -v $(pwd):/workspace \
+      -e ENV=production \
+      -e DEBUG=false \
+      myimage:latest"
+```
+
+The backslash-newline combination is removed, joining the lines together.
+
+#### Escaped Quotes
+
+Use `\"` to include literal quotes within strings:
+
+```
+task "with quotes":
+  run "echo \"Hello, World!\"
+echo \"Status: \\\"Running\\\"\"
+echo Done"
+```
+
+#### Multi-line Strings with Interpolation
+
+Interpolation works seamlessly within multi-line strings:
+
+```
+task "deploy":
+  let $environment = "production"
+  let $version = "1.2.3"
+  
+  run "echo Deploying to: {$environment}
+echo Version: {$version}
+echo Status: Ready
+./deploy.sh {$environment} {$version}"
+```
+
+#### Complex Real-World Example
+
+Combining all features for readable, maintainable scripts:
+
+```
+task "test coverage" means "Run tests and generate coverage report":
+  let $app_env = "test"
+  let $coverage_file = "coverage.xml"
+  
+  step "Running test suite with coverage"
+  run "rm -f {$coverage_file}
+docker compose exec \
+    -e APP_ENV={$app_env} \
+    -e XDEBUG_MODE=coverage \
+    -u=www-data \
+    php vendor/bin/phpunit --coverage-clover ./{$coverage_file}
+docker compose exec \
+    -e APP_ENV={$app_env} \
+    -u=www-data \
+    php bin/console tests:probe-coverage {$coverage_file}"
+  
+  success "Coverage report generated: {$coverage_file}"
+```
+
+#### Key Features
+
+- **Preserve Line Breaks**: Newlines within strings are preserved in the output
+- **Line Continuation**: Use `\` before newline to join lines without a break
+- **Escape Sequences**: Support for `\"`, `\\`, `\n`, `\t`, `\r`
+- **Interpolation**: Full support for variable and expression interpolation
+- **Readability**: Write complex shell scripts in a clean, maintainable format
+
+#### Best Practices
+
+1. **Use line continuation** for long command lines to improve readability
+2. **Preserve natural line breaks** for multi-command scripts
+3. **Combine with interpolation** for dynamic, reusable command templates
+4. **Escape quotes** when passing quoted strings to shell commands
+
 ---
 
 ## Syntax Specification
