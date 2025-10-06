@@ -457,5 +457,3 @@ func (p *Parser) parseSimpleCondition() string {
 
 	return strings.Join(parts, " ")
 }
-
-// parseControlFlowBody parses the body of control flow statements
