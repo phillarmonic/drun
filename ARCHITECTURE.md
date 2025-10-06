@@ -433,7 +433,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[Source: {$var}] --> B[Interpolator]
+    A["Source: &#123;$var&#125;"] --> B[Interpolator]
     
     B --> C{Variable type?}
     
