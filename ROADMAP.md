@@ -117,7 +117,7 @@ This roadmap tracks the implementation progress of features documented in the [D
 - Environment-based conditionals
 
 ### ✅ Completed: Loop Statements
-- For each loops (`for each item in items`)
+- For each loops (`for each $item in $items`)
 - Range loops (`for i in range 1 to 10`)
 - Matrix execution (parallel loops)
 - Parallel execution (`in parallel`)

@@ -110,11 +110,11 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 	switch p.peekToken.Type {
 	case lexer.EACH:
 		return p.parseForEachStatement(stmt)
-	case lexer.IDENT, lexer.VARIABLE:
-		// This could be "for i in range" or "for variable in iterable"
+	case lexer.VARIABLE:
+		// This could be "for $i in range" or "for $variable in iterable"
 		return p.parseForVariableStatement(stmt)
 	default:
-		p.addError(fmt.Sprintf("unexpected token after for: %s", p.peekToken.Type))
+		p.addError(fmt.Sprintf("unexpected token after for: %s (variables must start with $)", p.peekToken.Type))
 		return nil
 	}
 }
@@ -174,8 +174,9 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 		stmt.Iterable = p.curToken.Literal
 
 	default:
-		// Regular "for each variable in iterable"
-		if !p.expectPeekIdentifierLike() {
+		// Regular "for each $variable in $iterable"
+		if !p.expectPeek(lexer.VARIABLE) {
+			p.addError("expected variable (with $ prefix) after 'each'")
 			return nil
 		}
 		stmt.Variable = p.curToken.Literal
@@ -184,9 +185,9 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 			return nil
 		}
 
-		// Accept IDENT, VARIABLE, and array literals for iterable
+		// Accept VARIABLE and array literals for iterable
 		switch p.peekToken.Type {
-		case lexer.IDENT, lexer.VARIABLE:
+		case lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
 		case lexer.LBRACKET:
@@ -199,7 +200,7 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 				return nil
 			}
 		default:
-			p.addError(fmt.Sprintf("expected identifier, variable, or array literal for iterable, got %s", p.peekToken.Type))
+			p.addError(fmt.Sprintf("expected variable (with $ prefix) or array literal for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
 	}
@@ -228,15 +229,15 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 	return stmt
 }
 
-// parseForVariableStatement parses "for variable in range" or "for variable in iterable"
+// parseForVariableStatement parses "for $variable in range" or "for $variable in iterable"
 func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
-	// Accept both IDENT and VARIABLE tokens
+	// Accept only VARIABLE tokens (must have $ prefix)
 	switch p.peekToken.Type {
-	case lexer.IDENT, lexer.VARIABLE:
+	case lexer.VARIABLE:
 		p.nextToken()
 		stmt.Variable = p.curToken.Literal
 	default:
-		p.addError(fmt.Sprintf("expected identifier or variable, got %s instead", p.peekToken.Type))
+		p.addError(fmt.Sprintf("expected variable (with $ prefix), got %s instead", p.peekToken.Type))
 		return nil
 	}
 
@@ -274,11 +275,11 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 		}
 
 	} else {
-		// Regular "for variable in iterable"
+		// Regular "for $variable in iterable"
 		stmt.Type = "each"
-		// Accept IDENT, VARIABLE, and array literals for iterable
+		// Accept VARIABLE and array literals for iterable
 		switch p.peekToken.Type {
-		case lexer.IDENT, lexer.VARIABLE:
+		case lexer.VARIABLE:
 			p.nextToken()
 			stmt.Iterable = p.curToken.Literal
 		case lexer.LBRACKET:
@@ -291,7 +292,7 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 				return nil
 			}
 		default:
-			p.addError(fmt.Sprintf("expected identifier, variable, or array literal for iterable, got %s", p.peekToken.Type))
+			p.addError(fmt.Sprintf("expected variable (with $ prefix) or array literal for iterable, got %s", p.peekToken.Type))
 			return nil
 		}
 	}

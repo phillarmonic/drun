@@ -534,9 +534,9 @@ Strings support variable interpolation using `{$variable}` syntax for declared v
 let $name = "world"
 info "Hello, {$name}!"  # Outputs: Hello, world!
 
-# Loop variables use bare identifiers
-for each item in items:
-  info "Processing {item}"  # Loop variable without $
+# Loop variables use $ prefix
+for each $item in $items:
+  info "Processing {$item}"  # Loop variable with $
 
 # Complex expressions in interpolation
 info "Current time: {now.format('HH:mm:ss')}"
@@ -1376,7 +1376,7 @@ if (environment is "production" and git repo is clean) or force_deploy:
 #### Simple Iteration
 
 ```
-for each item in collection:
+for each $item in $collection:
   process item
 
 # With index
@@ -1428,7 +1428,7 @@ for each container in docker containers where status is "running":
 ### Loop Control
 
 ```
-for each service in services:
+for each $service in $services:
   if service is healthy:
     continue
   
@@ -1484,7 +1484,7 @@ let $commit = current git commit
 set $counter to 0
 
 # Loop variables (with $ prefix)
-for each $item in items:
+for each $item in $items:
   info "Processing {$item}"  # Loop variable interpolation
 
 for $i in range 1 to 5:
@@ -1918,7 +1918,7 @@ Variable operations work seamlessly with for each loops:
 task "loop_with_operations":
   set $docker_images to "nginx:1.21 postgres:13 redis:6.2"
   
-  for each img in $docker_images:
+  for each $img in $docker_images:
     info "Processing: {img}"
     info "Image name: {img split by ':' | first}"
     info "Version: {img split by ':' | last}"
@@ -2144,7 +2144,7 @@ for each $platform in $globals.platforms:
   info "Building for {$platform}"
 
 # ❌ Deprecated: Direct access (will show deprecation warning)
-for each $platform in platforms:
+for each $platform in $platforms:
   info "Building for {$platform}"
 ```
 

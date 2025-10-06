@@ -562,7 +562,7 @@ set $project_files to "src/app.js src/utils.js tests/app.test.js docs/readme.md"
 info "Source JS files: {$project_files filtered by prefix 'src/' | filtered by extension '.js' | sorted by name}"
 
 # Loop integration
-for each img in $docker_images:
+for each $img in $docker_images:
   info "Processing: {img split by ':' | first}"
 ```
 
@@ -994,7 +994,7 @@ when $variable:
   is "value2": action2
   else: default_action
 
-for each $item in collection:
+for each $item in $collection:
   process {$item}
 
 try:

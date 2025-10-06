@@ -122,8 +122,8 @@ project "MyApp" version "1.0":
   set architectures as list to ["amd64", "arm64"]
 
 # Sequential matrix execution
-for each $platform in platforms:
-  for each $arch in architectures:
+for each $platform in $platforms:
+  for each $arch in $architectures:
     build for {$platform}/{$arch}
 
 # Parallel matrix execution  
@@ -277,7 +277,7 @@ info "Source JS files: {$source_files filtered by prefix 'src/' | filtered by ex
 # Output: src/app.js src/utils.js
 
 # Loop integration
-for each img in $docker_images:
+for each $img in $docker_images:
   info "Processing: {img split by ':' | first}"
 ```
 
@@ -298,7 +298,7 @@ when expression:
   else: statements
 
 # Loops
-for each item in collection:
+for each $item in $collection:
   process item
 
 for i from 1 to 10:

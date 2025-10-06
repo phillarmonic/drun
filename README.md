@@ -718,7 +718,7 @@ task "complex_chaining" means "Demonstrate operation chaining":
   info "  Test files: {$project_files filtered by prefix 'tests/' | sorted by name}"
 
   info " Processing Docker images:"
-  for each img in $docker_images:
+  for each $img in $docker_images:
     info "    {img} -> {img split by ':' | first} (version: {img split by ':' | last})"
 
   # Output:

@@ -107,7 +107,7 @@ when variable:
   is "value2": action2
   else: default_action
 
-for each item in collection:
+for each $item in $collection:
   process item
 ```
 

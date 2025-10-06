@@ -11,8 +11,8 @@ func TestParser_RangeLoop(t *testing.T) {
 	input := `version: 2.0
 
 task "range_test":
-  for i in range 1 to 10:
-    info "Processing item {i}"
+  for $i in range 1 to 10:
+    info "Processing item {$i}"
     
   success "Range loop completed!"`
 
@@ -45,8 +45,8 @@ task "range_test":
 		t.Errorf("loop type not 'range'. got=%q", loopStmt.Type)
 	}
 
-	if loopStmt.Variable != "i" {
-		t.Errorf("loop variable not 'i'. got=%q", loopStmt.Variable)
+	if loopStmt.Variable != "$i" {
+		t.Errorf("loop variable not '$i'. got=%q", loopStmt.Variable)
 	}
 
 	if loopStmt.RangeStart != "1" {
@@ -62,8 +62,8 @@ func TestParser_RangeLoopWithStep(t *testing.T) {
 	input := `version: 2.0
 
 task "range_step_test":
-  for i in range 0 to 100 step 5:
-    info "Processing item {i}"
+  for $i in range 0 to 100 step 5:
+    info "Processing item {$i}"
     
   success "Range loop with step completed!"`
 
@@ -104,8 +104,8 @@ func TestParser_FilteredLoop(t *testing.T) {
 	input := `version: 2.0
 
 task "filtered_test":
-  for each item in items where item contains "test":
-    info "Processing test item: {item}"
+  for each $item in $items where $item contains "test":
+    info "Processing test item: {$item}"
     
   success "Filtered loop completed!"`
 
@@ -129,20 +129,20 @@ task "filtered_test":
 		t.Errorf("loop type not 'each'. got=%q", loopStmt.Type)
 	}
 
-	if loopStmt.Variable != "item" {
-		t.Errorf("loop variable not 'item'. got=%q", loopStmt.Variable)
+	if loopStmt.Variable != "$item" {
+		t.Errorf("loop variable not '$item'. got=%q", loopStmt.Variable)
 	}
 
-	if loopStmt.Iterable != "items" {
-		t.Errorf("loop iterable not 'items'. got=%q", loopStmt.Iterable)
+	if loopStmt.Iterable != "$items" {
+		t.Errorf("loop iterable not '$items'. got=%q", loopStmt.Iterable)
 	}
 
 	if loopStmt.Filter == nil {
 		t.Fatalf("filter should not be nil")
 	}
 
-	if loopStmt.Filter.Variable != "item" {
-		t.Errorf("filter variable not 'item'. got=%q", loopStmt.Filter.Variable)
+	if loopStmt.Filter.Variable != "$item" {
+		t.Errorf("filter variable not '$item'. got=%q", loopStmt.Filter.Variable)
 	}
 
 	if loopStmt.Filter.Operator != "contains" {
@@ -234,10 +234,10 @@ func TestParser_BreakStatement(t *testing.T) {
 	input := `version: 2.0
 
 task "break_test":
-  for each item in items:
-    if item == "stop":
+  for each $item in $items:
+    if $item == "stop":
       break
-    info "Processing: {item}"
+    info "Processing: {$item}"
     
   success "Break test completed!"`
 
@@ -285,9 +285,9 @@ func TestParser_ConditionalBreak(t *testing.T) {
 	input := `version: 2.0
 
 task "conditional_break_test":
-  for each item in items:
-    break when item == "stop"
-    info "Processing: {item}"
+  for each $item in $items:
+    break when $item == "stop"
+    info "Processing: {$item}"
     
   success "Conditional break test completed!"`
 
@@ -329,9 +329,9 @@ func TestParser_ContinueStatement(t *testing.T) {
 	input := `version: 2.0
 
 task "continue_test":
-  for each item in items:
-    continue if item == "skip"
-    info "Processing: {item}"
+  for each $item in $items:
+    continue if $item == "skip"
+    info "Processing: {$item}"
     
   success "Continue test completed!"`
 
@@ -369,10 +369,10 @@ func TestParser_ComplexAdvancedLoop(t *testing.T) {
 	input := `version: 2.0
 
 task "complex_loop_test":
-  for each item in items where item ends with ".js" in parallel:
-    continue if item contains "test"
-    info "Processing JavaScript file: {item}"
-    break when item == "stop.js"
+  for each $item in $items where $item ends with ".js" in parallel:
+    continue if $item contains "test"
+    info "Processing JavaScript file: {$item}"
+    break when $item == "stop.js"
     
   success "Complex loop test completed!"`
 
