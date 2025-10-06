@@ -116,7 +116,8 @@ Read these in order:
 - AST refactored (1,133 lines → 15 focused files)
 - Parser refactored (4,874 lines → 26 focused files)
 - Engine refactored (5,179 lines → 36 focused files)
-- CLI refactored (1,137 lines → 440 lines + 4 modules)
+- CLI refactored (1,137 lines → 24 lines + 7 modules)
+- Domain layer created (839 lines across 7 focused files)
 
 ---
 
@@ -127,6 +128,8 @@ Read these in order:
 ```
 ┌─────────────────────────────────────┐
 │  CLI Layer (cmd/drun/)              │  User interaction
+├─────────────────────────────────────┤
+│  Domain Layer (internal/domain/)    │  Business logic
 ├─────────────────────────────────────┤
 │  Engine Layer (internal/engine/)    │  Execution orchestration
 ├─────────────────────────────────────┤
@@ -152,6 +155,10 @@ internal/
 │   ├── interpolation/ # Variable interpolation
 │   ├── hooks/         # Lifecycle hooks
 │   └── includes/      # Include resolution
+├── domain/            # 7 files - Domain layer (NEW!)
+│   ├── task/          # Task entities & business logic
+│   ├── parameter/     # Parameter validation & constraints
+│   └── project/       # Project configuration
 ├── lexer/             # 6 files - Tokenization
 └── (support packages) # builtins, shell, detection, etc.
 ```
