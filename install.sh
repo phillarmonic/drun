@@ -241,6 +241,12 @@ install_binary() {
         fi
     fi
     
+    # Remove quarantine attributes on macOS (prevents "signal: killed" errors)
+    if [[ "$PLATFORM_OS" == "darwin" ]]; then
+        log_info "Removing quarantine attributes..."
+        xattr -d com.apple.quarantine "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
+    fi
+    
     log_success "Installed ${BINARY_NAME} to ${INSTALL_DIR}/${BINARY_NAME}"
 }
 
