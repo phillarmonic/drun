@@ -26,11 +26,21 @@ fi
 # Run unit tests with coverage
 echo "🧪 Running unit tests..."
 mkdir -p coverage
-go test -race -cover -coverprofile=coverage/coverage.out ./internal/...
 
-if [ $? -ne 0 ]; then
-    echo "❌ Tests failed!"
-    exit 1
+# Run race tests with timeout (10 minutes max)
+echo "⏱️  Running race condition tests with 10-minute timeout..."
+if timeout 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
+    echo "✅ Race condition tests completed successfully"
+else
+    exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo "❌ Race condition tests timed out after 10 minutes!"
+        echo "This may indicate a deadlock or infinite loop in the code."
+        exit 1
+    else
+        echo "❌ Race condition tests failed with exit code $exit_code"
+        exit $exit_code
+    fi
 fi
 
 # Show coverage summary (like xdrun test recipe)

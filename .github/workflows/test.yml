@@ -88,10 +88,28 @@ jobs:
         Get-ChildItem -Path . -Name "*.out" -File | Remove-Item -Force -ErrorAction SilentlyContinue
         echo "Testing race..."
         New-Item -ItemType Directory -Force -Path coverage
-        go test -race -cover -coverprofile="coverage\coverage.cov" github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
-        if ($LASTEXITCODE -ne 0) {
-          echo "❌ Tests failed!"
-          exit $LASTEXITCODE
+        
+        # Run race tests with timeout (10 minutes max)
+        $timeout = 600  # 10 minutes in seconds
+        $job = Start-Job -ScriptBlock {
+          go test -race -cover -coverprofile="coverage\coverage.cov" github.com/phillarmonic/drun/internal/builtins github.com/phillarmonic/drun/internal/detection github.com/phillarmonic/drun/internal/engine github.com/phillarmonic/drun/internal/fileops github.com/phillarmonic/drun/internal/lexer github.com/phillarmonic/drun/internal/parser github.com/phillarmonic/drun/internal/patterns github.com/phillarmonic/drun/internal/shell github.com/phillarmonic/drun/internal/types
+        }
+        
+        # Wait for job completion or timeout
+        $completed = Wait-Job -Job $job -Timeout $timeout
+        
+        if ($completed) {
+          $result = Receive-Job -Job $job
+          Remove-Job -Job $job
+          if ($LASTEXITCODE -ne 0) {
+            echo "❌ Tests failed!"
+            exit $LASTEXITCODE
+          }
+        } else {
+          echo "❌ Tests timed out after $timeout seconds!"
+          Stop-Job -Job $job
+          Remove-Job -Job $job
+          exit 1
         }
         echo "Building the binary..."
         go build -o bin/xdrun.exe ./cmd/drun

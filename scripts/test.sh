@@ -206,11 +206,28 @@ run_unit_tests() {
     log_info "Test flags: $test_flags"
     
     # Run tests for internal packages
-    if eval "go test $test_flags ./internal/..."; then
-        log_success "Unit tests passed"
+    if [[ "$RACE" == true ]]; then
+        log_info "Running with race detection and 10-minute timeout..."
+        if timeout 600 eval "go test $test_flags ./internal/..."; then
+            log_success "Unit tests passed"
+        else
+            exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                log_error "Unit tests timed out after 10 minutes!"
+                log_error "This may indicate a deadlock or infinite loop in the code."
+                exit 1
+            else
+                log_error "Unit tests failed with exit code $exit_code"
+                exit $exit_code
+            fi
+        fi
     else
-        log_error "Unit tests failed"
-        exit 1
+        if eval "go test $test_flags ./internal/..."; then
+            log_success "Unit tests passed"
+        else
+            log_error "Unit tests failed"
+            exit 1
+        fi
     fi
 }
 
@@ -224,11 +241,28 @@ run_integration_tests() {
         local test_flags
         test_flags=$(build_test_flags)
         
-        if eval "go test $test_flags -tags=integration ./..."; then
-            log_success "Integration tests passed"
+        if [[ "$RACE" == true ]]; then
+            log_info "Running integration tests with race detection and 10-minute timeout..."
+            if timeout 600 eval "go test $test_flags -tags=integration ./..."; then
+                log_success "Integration tests passed"
+            else
+                exit_code=$?
+                if [ $exit_code -eq 124 ]; then
+                    log_error "Integration tests timed out after 10 minutes!"
+                    log_error "This may indicate a deadlock or infinite loop in the code."
+                    exit 1
+                else
+                    log_error "Integration tests failed with exit code $exit_code"
+                    exit $exit_code
+                fi
+            fi
         else
-            log_error "Integration tests failed"
-            exit 1
+            if eval "go test $test_flags -tags=integration ./..."; then
+                log_success "Integration tests passed"
+            else
+                log_error "Integration tests failed"
+                exit 1
+            fi
         fi
     else
         log_info "No integration tests found, skipping"
