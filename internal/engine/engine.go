@@ -11,6 +11,8 @@ import (
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
+	"github.com/phillarmonic/drun/internal/domain/parameter"
+	"github.com/phillarmonic/drun/internal/domain/task"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/includes"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
@@ -27,6 +29,11 @@ type Engine struct {
 	dryRun       bool
 	verbose      bool
 	interpolator *interpolation.Interpolator
+
+	// Domain layer services
+	taskRegistry   *task.Registry
+	paramValidator *parameter.Validator
+	depResolver    *task.DependencyResolver
 
 	// Remote includes support
 	cacheManager     *cache.Manager
@@ -53,6 +60,9 @@ func NewEngine(output io.Writer) *Engine {
 	httpsFetcher := remote.NewHTTPSFetcher()
 	drunhubFetcher := remote.NewDrunhubFetcher(githubFetcher)
 
+	// Initialize domain services
+	taskReg := task.NewRegistry()
+
 	e := &Engine{
 		output:         output,
 		dryRun:         false,
@@ -60,6 +70,11 @@ func NewEngine(output io.Writer) *Engine {
 		githubFetcher:  githubFetcher,
 		httpsFetcher:   httpsFetcher,
 		drunhubFetcher: drunhubFetcher,
+
+		// Domain services
+		taskRegistry:   taskReg,
+		paramValidator: parameter.NewValidator(),
+		depResolver:    task.NewDependencyResolver(taskReg),
 
 		// Pre-compile regex patterns for performance (still used by variable operations)
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
@@ -161,18 +176,22 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	monitor.Start()
 	defer monitor.Stop()
 
-	// Create dependency resolver
-	resolver := NewDependencyResolver(program.Tasks)
-
-	// Validate all dependencies first
-	if err := resolver.ValidateAllDependencies(); err != nil {
-		return fmt.Errorf("dependency validation failed: %v", err)
+	// Register all tasks with domain registry
+	e.taskRegistry.Clear() // Clear registry for fresh execution
+	if err := e.registerTasks(program.Tasks, currentFile); err != nil {
+		return fmt.Errorf("task registration failed: %v", err)
 	}
 
-	// Resolve execution order
-	executionOrder, err := resolver.ResolveDependencies(taskName)
+	// Use domain dependency resolver
+	domainTasks, err := e.depResolver.Resolve(taskName)
 	if err != nil {
 		return fmt.Errorf("dependency resolution failed: %v", err)
+	}
+
+	// Extract task names for execution order
+	executionOrder := make([]string, len(domainTasks))
+	for i, t := range domainTasks {
+		executionOrder[i] = t.Name
 	}
 
 	if e.dryRun {
@@ -199,7 +218,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 	// Execute all tasks in dependency order
 	for _, currentTaskName := range executionOrder {
-		// Find the task
+		// Find the task using AST (still needed for execution)
 		var currentTask *ast.TaskStatement
 		for _, task := range program.Tasks {
 			if task.Name == currentTaskName {
@@ -253,6 +272,17 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		}
 	}
 
+	return nil
+}
+
+// registerTasks registers all tasks from the program into the domain registry
+func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) error {
+	for _, astTask := range tasks {
+		domainTask := task.NewTask(astTask, "", currentFile)
+		if err := e.taskRegistry.Register(domainTask); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -797,11 +827,18 @@ func (e ContinueError) Error() string {
 
 // ListTasks returns a list of available tasks in the program
 func (e *Engine) ListTasks(program *ast.Program) []TaskInfo {
-	var tasks []TaskInfo
-	for _, task := range program.Tasks {
+	// Register tasks with domain registry for listing
+	e.taskRegistry.Clear()
+	_ = e.registerTasks(program.Tasks, "")
+
+	// Get tasks from domain registry
+	domainTasks := e.taskRegistry.List()
+
+	tasks := make([]TaskInfo, 0, len(domainTasks))
+	for _, domainTask := range domainTasks {
 		info := TaskInfo{
-			Name:        task.Name,
-			Description: task.Description,
+			Name:        domainTask.Name,
+			Description: domainTask.Description,
 		}
 		if info.Description == "" {
 			info.Description = "No description"

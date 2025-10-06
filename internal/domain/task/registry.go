@@ -10,6 +10,7 @@ type Registry struct {
 	mu              sync.RWMutex
 	tasks           map[string]*Task // task name -> task
 	namespacedTasks map[string]*Task // namespace.name -> task
+	taskOrder       []string         // preserve insertion order
 }
 
 // NewRegistry creates a new task registry
@@ -17,6 +18,7 @@ func NewRegistry() *Registry {
 	return &Registry{
 		tasks:           make(map[string]*Task),
 		namespacedTasks: make(map[string]*Task),
+		taskOrder:       make([]string, 0),
 	}
 }
 
@@ -37,6 +39,7 @@ func (r *Registry) Register(task *Task) error {
 
 	// Register by name
 	r.tasks[task.Name] = task
+	r.taskOrder = append(r.taskOrder, task.Name) // preserve order
 
 	// Register by full name if namespaced
 	if task.Namespace != "" {
@@ -75,14 +78,16 @@ func (r *Registry) Exists(name string) bool {
 	return direct || namespaced
 }
 
-// List returns all registered tasks
+// List returns all registered tasks in insertion order
 func (r *Registry) List() []*Task {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	tasks := make([]*Task, 0, len(r.tasks))
-	for _, task := range r.tasks {
-		tasks = append(tasks, task)
+	tasks := make([]*Task, 0, len(r.taskOrder))
+	for _, name := range r.taskOrder {
+		if task, exists := r.tasks[name]; exists {
+			tasks = append(tasks, task)
+		}
 	}
 	return tasks
 }
@@ -108,6 +113,7 @@ func (r *Registry) Clear() {
 
 	r.tasks = make(map[string]*Task)
 	r.namespacedTasks = make(map[string]*Task)
+	r.taskOrder = make([]string, 0)
 }
 
 // Count returns the number of registered tasks
