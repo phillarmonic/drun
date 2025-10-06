@@ -37,6 +37,7 @@ type App struct {
 	debugJSON   bool
 	debugErrors bool
 	debugFull   bool
+	debugDomain bool
 	debugInput  string
 }
 
@@ -103,6 +104,7 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.debugJSON, "debug-json", false, "[xdrun CLI cmd] Show AST as JSON (requires --debug)")
 	flags.BoolVar(&a.debugErrors, "debug-errors", false, "[xdrun CLI cmd] Show parse errors only (requires --debug)")
 	flags.BoolVar(&a.debugFull, "debug-full", false, "[xdrun CLI cmd] Show full debug output (requires --debug)")
+	flags.BoolVar(&a.debugDomain, "debug-domain", false, "[xdrun CLI cmd] Show domain layer information (task registry, dependencies)")
 	flags.StringVar(&a.debugInput, "debug-input", "", "[xdrun CLI cmd] Debug input string directly instead of file (requires --debug)")
 }
 
@@ -143,6 +145,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 			a.debugAST,
 			a.debugJSON,
 			a.debugErrors,
+			a.debugDomain,
 		)
 	}
 

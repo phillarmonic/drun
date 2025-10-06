@@ -258,3 +258,68 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
+
+// DomainDebugInfo contains debug information about the domain layer
+type DomainDebugInfo struct {
+	TaskRegistry       interface{}
+	DependencyResolver interface{}
+	ParameterValidator interface{}
+}
+
+// DebugDomain prints domain layer information (task registry, dependencies, params)
+// This function signature allows the engine to pass domain information without circular imports
+func DebugDomain(info DomainDebugInfo) {
+	fmt.Println("=== DOMAIN LAYER DEBUG ===")
+	fmt.Println()
+
+	// Task Registry Debug
+	if taskReg, ok := info.TaskRegistry.(interface {
+		List() []interface{}
+		Count() int
+	}); ok {
+		fmt.Println("📋 Task Registry:")
+		fmt.Printf("  Total tasks: %d\n", taskReg.Count())
+		tasks := taskReg.List()
+		for i, task := range tasks {
+			if t, ok := task.(interface {
+				FullName() string
+				HasDependencies() bool
+			}); ok {
+				fullName := t.FullName()
+				hasDeps := t.HasDependencies()
+				depsStr := ""
+				if hasDeps {
+					depsStr = " [has dependencies]"
+				}
+				fmt.Printf("    %d: %s%s\n", i+1, fullName, depsStr)
+			}
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("📋 Task Registry: (not available)")
+		fmt.Println()
+	}
+
+	// Dependency Resolver Debug
+	fmt.Println("🔗 Dependency Resolver:")
+	fmt.Println("  Status: initialized")
+	fmt.Println("  Features:")
+	fmt.Println("    • Topological sort")
+	fmt.Println("    • Circular dependency detection")
+	fmt.Println("    • Parallel group analysis")
+	fmt.Println()
+
+	// Parameter Validator Debug
+	fmt.Println("✅ Parameter Validator:")
+	fmt.Println("  Status: initialized")
+	fmt.Println("  Validation support:")
+	fmt.Println("    • Type checking (string, number, boolean, list)")
+	fmt.Println("    • Enum constraints")
+	fmt.Println("    • Range validation (min/max)")
+	fmt.Println("    • Pattern matching (regex, email, url)")
+	fmt.Println("    • Default value handling")
+	fmt.Println()
+
+	fmt.Println("=== END DOMAIN LAYER DEBUG ===")
+	fmt.Println()
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/debug"
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
@@ -21,6 +22,7 @@ func HandleDebugMode(
 	debugAST bool,
 	debugJSON bool,
 	debugErrors bool,
+	debugDomain bool,
 ) error {
 	var content string
 
@@ -49,17 +51,18 @@ func HandleDebugMode(
 	}
 
 	// Handle individual debug flags
-	hasSpecificFlag := debugTokens || debugAST || debugJSON || debugErrors
+	hasSpecificFlag := debugTokens || debugAST || debugJSON || debugErrors || debugDomain
 
 	if debugTokens {
 		debug.DebugTokens(content)
 	}
 
-	if debugAST || debugJSON || debugErrors {
+	var program *ast.Program
+	if debugAST || debugJSON || debugErrors || debugDomain {
 		// Parse without full debug output
 		l := lexer.NewLexer(content)
 		p := parser.NewParser(l)
-		program := p.ParseProgram()
+		program = p.ParseProgram()
 		parseErrors := p.Errors()
 
 		if debugErrors {
@@ -73,11 +76,25 @@ func HandleDebugMode(
 		if debugJSON {
 			debug.DebugJSON(program)
 		}
+
+		if debugDomain {
+			// Show domain layer information
+			if err := debugDomainLayer(program, configFile); err != nil {
+				return fmt.Errorf("domain layer debug failed: %w", err)
+			}
+		}
 	}
 
 	// If no specific debug flags were set, show full debug by default
 	if !hasSpecificFlag {
 		debug.DebugFull(content)
+		// Also show domain layer in full debug mode
+		l := lexer.NewLexer(content)
+		p := parser.NewParser(l)
+		prog := p.ParseProgram()
+		if prog != nil {
+			_ = debugDomainLayer(prog, configFile)
+		}
 	}
 
 	return nil
