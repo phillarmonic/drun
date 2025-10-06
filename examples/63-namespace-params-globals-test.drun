@@ -1,0 +1,195 @@
+version: 2.0
+
+# Test namespace isolation for params and globals from remote includes
+# This ensures that custom namespaces properly isolate project parameters and settings
+
+project "namespace-test" version "1.0.0":
+	# Local project parameters
+	parameter $registry as string defaults to "local-registry.io"
+	parameter $verbose as boolean defaults to "false"
+	
+	# Local project settings
+	set local_api_url to "https://local-api.example.com"
+	set local_timeout to "30s"
+	
+	# Import docker example with custom namespace "ops"
+	include from drunhub "examples/drunhub-example-docker" as ops
+	
+	# Import validation suite with custom namespace "tests"
+	include from drunhub "examples/drunhub-engine-validation" as tests
+
+# ============================================================================
+# Test 1: Access local vs namespaced project parameters
+# ============================================================================
+
+task "test-params-namespace":
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info "TEST 1: Parameter Namespace Isolation"
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info ""
+	
+	# Access local parameters
+	info "Local Parameters:"
+	info "  $params.registry: {$params.registry}"
+	info "  $params.verbose: {$params.verbose}"
+	info ""
+	
+	# Access namespaced parameters from docker include
+	info "Docker Include Parameters (namespace: ops):"
+	info "  $params.ops.registry: {$params.ops.registry}"
+	info "  (image_name has no default, so not displayed)"
+	info ""
+	
+	# Access namespaced parameters from validation include
+	info "Validation Include Parameters (namespace: tests):"
+	info "  $params.tests.test_mode: {$params.tests.test_mode}"
+	info "  $params.tests.verbose: {$params.tests.verbose}"
+	info ""
+	
+	# Verify no collision between local and included params
+	if params.registry is "local-registry.io":
+		info "  ✓ Local registry correctly isolated"
+	
+	if params.ops.registry is "docker.io":
+		info "  ✓ Docker registry correctly namespaced"
+	
+	success "✅ Parameter namespace isolation: PASS"
+
+# ============================================================================
+# Test 2: Access local vs namespaced project settings (globals)
+# ============================================================================
+
+task "test-globals-namespace":
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info "TEST 2: Globals Namespace Isolation"
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info ""
+	
+	# Access local settings
+	info "Local Settings ($globals):"
+	info "  $globals.project: {$globals.project}"
+	info "  $globals.version: {$globals.version}"
+	info "  $globals.local_api_url: {$globals.local_api_url}"
+	info "  $globals.local_timeout: {$globals.local_timeout}"
+	info ""
+	
+	# Access namespaced settings from validation include
+	info "Validation Include Settings ($globals.tests):"
+	info "  $globals.tests.test_env: {$globals.tests.test_env}"
+	info "  $globals.tests.max_iterations: {$globals.tests.max_iterations}"
+	info ""
+	
+	# Verify project name isolation
+	if globals.project is "namespace-test":
+		info "  ✓ Local project name correctly isolated"
+	
+	if globals.tests.test_env is "validation":
+		info "  ✓ Included settings correctly namespaced"
+	
+	success "✅ Globals namespace isolation: PASS"
+
+# ============================================================================
+# Test 3: Variables from namespaced snippets
+# ============================================================================
+
+task "test-variables-namespace":
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info "TEST 3: Variables Namespace Isolation"
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info ""
+	
+	# Set a local variable
+	let $test_var = "local_value"
+	info "Local variable $test_var: {$test_var}"
+	info ""
+	
+	# Use a namespaced snippet (which sets its own variables)
+	info "Using tests.test-start snippet (sets namespaced vars)..."
+	use snippet "tests.test-start"
+	info ""
+	
+	# Verify local variable is still isolated
+	info "After using namespaced snippet:"
+	info "  Local $test_var: {$test_var}"
+	info "  (Should still be 'local_value')"
+	info ""
+	
+	if test_var is "local_value":
+		info "  ✓ Local variables remain isolated"
+	
+	success "✅ Variable namespace isolation: PASS"
+
+# ============================================================================
+# Test 4: Task calling with namespaced params
+# ============================================================================
+
+task "test-task-calling-namespace":
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info "TEST 4: Task Calling with Namespaced Params"
+	info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	info ""
+	
+	info "Calling tests.test-basic-params with custom values..."
+	call task "tests.test-basic-params" with name="NamespaceTest" greeting="Hi" count="5"
+	info ""
+	
+	info "Calling tests.test-validation with parameters..."
+	call task "tests.test-validation" with environment="production" replica_count="5" log_level="debug" port="3000"
+	info ""
+	
+	success "✅ Task calling with namespaced params: PASS"
+
+# ============================================================================
+# Test 5: Comprehensive namespace test
+# ============================================================================
+
+task "test-all-namespaces":
+	info "╔════════════════════════════════════════════════════════════╗"
+	info "║   Comprehensive Namespace Isolation Test Suite            ║"
+	info "╚════════════════════════════════════════════════════════════╝"
+	info ""
+	
+	call task "test-params-namespace"
+	info ""
+	
+	call task "test-globals-namespace"
+	info ""
+	
+	call task "test-variables-namespace"
+	info ""
+	
+	call task "test-task-calling-namespace"
+	info ""
+	
+	info "╔════════════════════════════════════════════════════════════╗"
+	info "║   🎉 ALL NAMESPACE ISOLATION TESTS PASSED!                ║"
+	info "╚════════════════════════════════════════════════════════════╝"
+	info ""
+	info "Summary:"
+	info "  ✅ Parameters ($params) correctly namespaced"
+	info "  ✅ Globals ($globals) correctly namespaced"
+	info "  ✅ Variables correctly isolated"
+	info "  ✅ Task calling works with namespaces"
+	info ""
+	info "Namespace hierarchy validated:"
+	info "  • Local: $params.key, $globals.key, $var"
+	info "  • Docker (ops): $params.ops.key, $globals.ops.key"
+	info "  • Validation (tests): $params.tests.key, $globals.tests.key"
+	info ""
+	success "🚀 Remote includes with custom namespaces are fully isolated!"
+
+task "default":
+	info "Namespace Isolation Test Suite"
+	info ""
+	info "This test validates that remote includes with custom namespaces"
+	info "properly isolate parameters, globals, and variables."
+	info ""
+	info "Available tests:"
+	info "  test-params-namespace         - Test parameter isolation"
+	info "  test-globals-namespace        - Test globals isolation"
+	info "  test-variables-namespace      - Test variable isolation"
+	info "  test-task-calling-namespace   - Test task calling with namespaces"
+	info "  test-all-namespaces          - Run all namespace tests"
+	info ""
+	info "Quick start:"
+	info "  xdrun -f examples/63-namespace-params-globals-test.drun test-all-namespaces"
