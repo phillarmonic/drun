@@ -55,9 +55,14 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 			}
 
 			// Expect "to" after type
-			if !p.expectPeek(lexer.TO) {
+			if p.peekToken.Type != lexer.TO {
+				p.addErrorWithHelpAtPeek(
+					fmt.Sprintf("expected 'to' after type declaration, got %s instead", p.peekToken.Type),
+					"Use 'to' to assign a value. Example: let $var as string to \"value\"",
+				)
 				return nil
 			}
+			p.nextToken() // consume TO
 
 			// Parse the value
 			p.nextToken()
@@ -131,9 +136,22 @@ func (p *Parser) parseSetVariableStatement(stmt *ast.VariableStatement) *ast.Var
 		}
 	}
 
-	if !p.expectPeek(lexer.TO) {
+	// Expect "to" (common mistake: using "=" instead)
+	if p.peekToken.Type != lexer.TO {
+		if p.peekToken.Type == lexer.EQUALS {
+			p.addErrorWithHelpAtPeek(
+				"cannot use '=' in set statement",
+				"Use 'to' instead of '='. Example: set $var to \"value\" (not set $var = \"value\")",
+			)
+		} else {
+			p.addErrorWithHelpAtPeek(
+				fmt.Sprintf("expected 'to' after variable name, got %s instead", p.peekToken.Type),
+				"Use 'to' to assign a value. Example: set $var to \"value\"",
+			)
+		}
 		return nil
 	}
+	p.nextToken() // consume TO
 
 	// Parse the value
 	p.nextToken()
@@ -193,9 +211,14 @@ func (p *Parser) parseCaptureVariableStatement(stmt *ast.VariableStatement) *ast
 			return nil
 		}
 
-		if !p.expectPeek(lexer.SHELL) {
+		if p.peekToken.Type != lexer.SHELL {
+			p.addErrorWithHelpAtPeek(
+				fmt.Sprintf("expected 'shell' after 'from', got %s instead", p.peekToken.Type),
+				"Use 'capture from shell' syntax. Example: capture from shell \"command\" as $var",
+			)
 			return nil
 		}
+		p.nextToken() // consume SHELL
 
 		// Check if this is multiline syntax (as $var:) or single-line syntax ("command" as $var)
 		if p.peekToken.Type == lexer.AS {

@@ -31,9 +31,14 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 	}
 
 	// Regular shell command with string
-	if !p.expectPeek(lexer.STRING) {
+	if p.peekToken.Type != lexer.STRING {
+		p.addErrorWithHelpAtPeek(
+			fmt.Sprintf("expected command string after '%s', got %s instead", stmt.Action, p.peekToken.Type),
+			fmt.Sprintf("Shell commands require a quoted string. Example: %s \"your command here\"", stmt.Action),
+		)
 		return nil
 	}
+	p.nextToken() // consume STRING
 
 	stmt.Command = p.curToken.Literal
 

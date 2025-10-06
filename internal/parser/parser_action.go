@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/lexer"
 )
@@ -56,10 +58,14 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 	}
 
 	// Expect "task" after "call"
-	if !p.expectPeek(lexer.TASK) {
-		p.addError("expected 'task' after 'call'")
+	if p.peekToken.Type != lexer.TASK {
+		p.addErrorWithHelpAtPeek(
+			fmt.Sprintf("expected 'task' after 'call', got %s instead", p.peekToken.Type),
+			"Use 'call task' to call another task. Example: call task \"build\" with env=\"production\"",
+		)
 		return nil
 	}
+	p.nextToken() // consume TASK
 
 	// Expect task name as string, identifier, or valid keyword
 	// Note: Unquoted names must be single tokens (no hyphens unless quoted)

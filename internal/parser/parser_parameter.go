@@ -72,9 +72,14 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 		// Check for optional default value: requires env from ["dev", "staging"] defaults to "dev"
 		if p.peekToken.Type == lexer.DEFAULTS {
 			p.nextToken() // consume DEFAULTS
-			if !p.expectPeek(lexer.TO) {
+			if p.peekToken.Type != lexer.TO {
+				p.addErrorWithHelpAtPeek(
+					fmt.Sprintf("expected 'to' after 'defaults', got %s instead", p.peekToken.Type),
+					"Use 'defaults to' for default values. Example: requires $env defaults to \"dev\"",
+				)
 				return nil
 			}
+			p.nextToken() // consume TO
 
 			// Parse default value - can be string, number, boolean, empty, or built-in function
 			switch p.peekToken.Type {
