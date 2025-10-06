@@ -28,7 +28,7 @@
 
 ## Overview
 
-drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. Unlike v1 which uses YAML configuration, v2 features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
+drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. It features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
 
 ### Key Features
 
