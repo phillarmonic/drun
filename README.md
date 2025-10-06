@@ -246,6 +246,39 @@ curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh 
 curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v2.10.0
 ```
 
+### Troubleshooting Installation
+
+#### macOS: "signal: killed" Error
+
+If you encounter a "signal: killed" error when running `xdrun` on macOS (especially after download or update), this is caused by macOS Gatekeeper quarantine attributes. Fix it with:
+
+```bash
+# Remove quarantine attribute
+xattr -d com.apple.quarantine /usr/local/bin/xdrun
+
+# Or if installed elsewhere
+xattr -d com.apple.quarantine /path/to/xdrun
+```
+
+**Why this happens:** When binaries are downloaded from the internet, macOS automatically sets quarantine attributes for security. Since drun binaries aren't signed with an Apple Developer certificate, Gatekeeper blocks their execution.
+
+**Note:** The install script automatically removes these attributes, but manual downloads or certain update scenarios may require this fix.
+
+### Self-Update
+
+Keep xdrun up to date with the built-in update command:
+
+```bash
+# Check for updates and install latest version
+xdrun --self-update
+```
+
+The update process includes:
+- Automatic backup of current version (kept in `~/.drun/`)
+- Download and verification of new version
+- Automatic restoration if update fails
+- Keeps last 5 backups for safety
+
 ## Quick Start
 
 ### File Structure
