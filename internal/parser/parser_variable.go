@@ -81,6 +81,13 @@ func (p *Parser) parseLetStatement(stmt *ast.VariableStatement) *ast.VariableSta
 		}
 		stmt.Variable = p.curToken.Literal
 
+		// Validate that it's not a reserved name (even though IDENT syntax doesn't use $)
+		// This prevents future conflicts if we add more reserved keywords
+		if stmt.Variable == "globals" {
+			p.addError("cannot use reserved variable name 'globals' (use a different name)")
+			return nil
+		}
+
 		if !p.expectPeek(lexer.BE) {
 			return nil
 		}

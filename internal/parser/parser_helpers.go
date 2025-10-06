@@ -306,6 +306,29 @@ func (p *Parser) expectPeekVariableName() bool {
 	}
 
 	p.nextToken()
+
+	// Check if variable name is reserved
+	if !p.validateVariableName(p.curToken.Literal) {
+		return false
+	}
+
+	return true
+}
+
+// validateVariableName checks if a variable name is reserved
+func (p *Parser) validateVariableName(name string) bool {
+	// Reserved variable names that cannot be user-defined
+	reservedNames := []string{
+		"$globals", // Used to access project settings
+	}
+
+	for _, reserved := range reservedNames {
+		if name == reserved {
+			p.addError(fmt.Sprintf("cannot use reserved variable name '%s'", name))
+			return false
+		}
+	}
+
 	return true
 }
 
