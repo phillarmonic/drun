@@ -52,7 +52,7 @@ task "hello":
   - Type-safe with constraints, enums, and validation
 - **Variable System**: Powerful variable interpolation with `$variable` syntax, `$globals` namespace, and built-in functions
 - **Control Flow**: Natural `if/else`, `for each`, `when` statements with intelligent conditions
-- **Built-in Actions**: Docker, Kubernetes, Git, HTTP operations with semantic commands (soon)
+- **Built-in Actions**: Docker, Kubernetes (soon), Git, HTTP operations with semantic commands
 - **Smart Detection**: Auto-detect project types, tools, and environments
 - **Shell Integration**: Seamless shell command execution with output capture
 - **Cross-Platform**: Works on Linux, macOS, and Windows with intelligent shell selection
