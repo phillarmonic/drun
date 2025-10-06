@@ -12,7 +12,8 @@ This directory contains the internal implementation of the drun execution engine
 |---------|-------|-------|---------|
 | `ast/` | 15 | ~1,500 | Abstract Syntax Tree definitions |
 | `parser/` | 26 | ~5,000 | Syntax parsing |
-| `engine/` | 36 | ~6,500 | Execution engine |
+| `domain/` | 7 | ~840 | **Domain layer (business logic)** ✨ |
+| `engine/` | 35 | ~6,500 | Execution engine |
 | `lexer/` | 6 | ~800 | Tokenization |
 | `builtins/` | 2 | ~200 | Built-in functions |
 | `shell/` | 3 | ~300 | Shell execution |
@@ -22,7 +23,7 @@ This directory contains the internal implementation of the drun execution engine
 | `errors/` | 1 | ~50 | Error types |
 | `types/` | 3 | ~150 | Type definitions |
 
-**Total:** ~95 files, ~15,000 lines (avg. 158 lines/file)
+**Total:** ~102 files, ~15,800 lines (avg. 155 lines/file)
 
 ---
 
@@ -98,6 +99,103 @@ program, err := p.ParseProgram()
 - Each parser file handles one domain
 - All parsers share the core `Parser` struct
 - Parsers build AST nodes from tokens
+
+---
+
+
+### 🎯 domain/ - Domain Layer
+
+**Purpose:** Business logic layer separating domain concepts from execution concerns.
+
+**Status:** ✅ Fully integrated with engine
+
+**Key Files:**
+- `task/task.go` - Task entity with validation
+- `task/registry.go` - Task management and lookup (thread-safe)
+- `task/dependencies.go` - Dependency resolution with circular detection
+- `parameter/parameter.go` - Parameter entity
+- `parameter/validation.go` - Parameter validation rules
+- `project/project.go` - Project configuration
+
+**Architecture:**
+```
+CLI Layer → Engine Layer → Domain Layer
+                 ↓              ↓
+           Orchestration   Business Logic
+```
+
+**Key Services:**
+
+1. **Task Registry** (`task/registry.go`)
+   - Registers and manages tasks
+   - Preserves insertion order
+   - Thread-safe operations
+   - Namespace support
+
+2. **Dependency Resolver** (`task/dependencies.go`)
+   - Resolves task execution order
+   - Detects circular dependencies
+   - Topological sorting
+   - Parallel/sequential grouping
+
+3. **Parameter Validator** (`parameter/validation.go`)
+   - Validates data types (string, number, boolean, list)
+   - Checks constraints (from list)
+   - Validates ranges (min/max)
+   - Pattern matching (regex, email, semver, etc.)
+
+**Usage in Engine:**
+```go
+// Engine struct holds domain services
+type Engine struct {
+    taskRegistry   *task.Registry
+    paramValidator *parameter.Validator
+    depResolver    *task.DependencyResolver
+    // ...
+}
+
+// Register tasks from AST
+func (e *Engine) registerTasks(tasks []*ast.TaskStatement, file string) error {
+    for _, astTask := range tasks {
+        domainTask := task.NewTask(astTask, "", file)
+        if err := e.taskRegistry.Register(domainTask); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// Resolve dependencies
+domainTasks, err := e.depResolver.Resolve(taskName)
+
+// Validate parameters
+domainParam := &parameter.Parameter{
+    Name:        param.Name,
+    DataType:    param.DataType,
+    Constraints: param.Constraints,
+    // ...
+}
+err := e.paramValidator.Validate(domainParam, typedValue)
+```
+
+**Design Principles:**
+- Domain entities are independent of AST
+- Business rules stay in domain layer
+- Engine orchestrates, domain validates
+- Easily testable in isolation
+
+**Test Coverage:**
+- `task/task_test.go` - 32 tests
+- `task/registry_test.go` - 16 tests  
+- `task/dependencies_test.go` - 21 tests
+- `parameter/validation_test.go` - 17 tests
+
+**When to Use Domain Layer:**
+- ✅ Adding new validation rules
+- ✅ Extending task/parameter properties
+- ✅ Adding business logic operations
+- ❌ AST changes (use `ast/` instead)
+- ❌ Execution logic (use `engine/` instead)
 
 ---
 
