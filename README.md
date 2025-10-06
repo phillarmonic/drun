@@ -354,6 +354,8 @@ drun v2 uses a clear scoping system with explicit namespaces to prevent naming c
 Declared without `$` prefix, accessed via `$globals` namespace:
 
 ```drun
+version: 2.0
+
 project "myapp" version "1.0.0":
   set registry to "ghcr.io/company"
   set api_url to "https://api.example.com"
