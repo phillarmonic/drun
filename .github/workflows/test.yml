@@ -46,11 +46,17 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Verify module
+      run: |
+        go mod tidy
+        go mod verify
+
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
         version: latest
         args: --timeout=5m
+        skip-cache: true
 
   # Test job depends on successful lint
   test:
