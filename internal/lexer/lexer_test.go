@@ -376,3 +376,237 @@ func TestLexer_EscapedQuotes(t *testing.T) {
 		}
 	}
 }
+
+func TestLexer_MultilineStrings(t *testing.T) {
+	input := `task "test":
+  run "line 1
+line 2
+line 3"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{RUN, "run"},
+		{STRING, "line 1\nline 2\nline 3"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_MultilineStringsWithEscapedQuotes(t *testing.T) {
+	input := `task "test":
+  run "echo \"Hello
+World\"
+Done"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{RUN, "run"},
+		{STRING, "echo \"Hello\nWorld\"\nDone"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_MultilineStringsWithLineContinuation(t *testing.T) {
+	input := `task "test":
+  run "line 1 \
+line 2 \
+line 3"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{RUN, "run"},
+		{STRING, "line 1 line 2 line 3"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_MultilineStringsComplex(t *testing.T) {
+	input := `task "judge" means "Evaluate code quality":
+  step "Generating a code report"
+  run "rm -f coverage.xml
+docker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php vendor/bin/phpunit --coverage-clover ./coverage.xml
+docker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/console tests:probe-coverage coverage.xml"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "judge"},
+		{MEANS, "means"},
+		{STRING, "Evaluate code quality"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{STEP, "step"},
+		{STRING, "Generating a code report"},
+		{RUN, "run"},
+		{STRING, "rm -f coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php vendor/bin/phpunit --coverage-clover ./coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/console tests:probe-coverage coverage.xml"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_MultilineStringsWithInterpolation(t *testing.T) {
+	input := `task "test":
+  let $env = "production"
+  run "echo {$env}
+is ready
+to deploy"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{LET, "let"},
+		{VARIABLE, "$env"},
+		{EQUALS, "="},
+		{STRING, "production"},
+		{RUN, "run"},
+		{STRING, "echo {$env}\nis ready\nto deploy"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_MultilineStringsMixedFeatures(t *testing.T) {
+	input := `task "test":
+  run "echo \"Starting...\"
+Line 2 with \
+continuation \
+here
+Final line"`
+
+	lexer := NewLexer(input)
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{INDENT, ""},
+		{RUN, "run"},
+		{STRING, "echo \"Starting...\"\nLine 2 with continuation here\nFinal line"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

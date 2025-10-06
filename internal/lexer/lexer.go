@@ -307,7 +307,7 @@ func (l *Lexer) handleIndentation() Token {
 	return l.NextToken()
 }
 
-// readString reads a string literal
+// readString reads a string literal (supports multi-line strings)
 func (l *Lexer) readString() string {
 	var result strings.Builder
 
@@ -318,7 +318,16 @@ func (l *Lexer) readString() string {
 		}
 		// Handle escape sequences
 		if l.ch == '\\' {
-			l.readChar() // consume the backslash
+			nextCh := l.peekChar()
+
+			// Check for line continuation: backslash followed by newline
+			if nextCh == '\n' {
+				l.readChar() // consume the newline (skip both backslash and newline)
+				// Skip the newline - don't add it to result (line continuation)
+				continue
+			}
+
+			l.readChar() // consume the character after backslash
 			// If we hit EOF after backslash, break
 			if l.ch == 0 {
 				break
@@ -341,6 +350,7 @@ func (l *Lexer) readString() string {
 				result.WriteByte(l.ch)
 			}
 		} else {
+			// Allow newlines within strings (multi-line string support)
 			result.WriteByte(l.ch)
 		}
 	}

@@ -36,6 +36,9 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[43-matrix-parallel.drun](43-matrix-parallel.drun)** - Parallel matrix execution (Multi-region deployment, CI/CD parallelization)
 - **[44-array-literals-showcase.drun](44-array-literals-showcase.drun)** - Comprehensive array literal examples and real-world use cases
 
+### 📝 String Features
+- **[64-multiline-strings.drun](64-multiline-strings.drun)** - Multi-line strings with line continuation, escaped quotes, and interpolation
+
 ## 🚀 Quick Start
 
 ### Running Examples
@@ -264,6 +267,31 @@ capture from shell "command" as $variable       # Capture command output
 let config be:
   when environment is "prod": production_config
   else: development_config
+```
+
+### Multi-line Strings
+```
+# Basic multi-line strings (preserves line breaks)
+run "echo Line 1
+echo Line 2
+echo Line 3"
+
+# Line continuation with backslash (joins lines)
+run "docker run --rm \
+    -v $(pwd):/workspace \
+    -e ENV=production \
+    myimage:latest"
+
+# Escaped quotes within multi-line strings
+run "echo \"Starting process...\"
+echo \"Status: \\\"Running\\\"\"
+echo Done"
+
+# Multi-line strings with interpolation
+let $env = "production"
+run "echo Environment: {$env}
+echo Status: Ready
+echo Deploying..."
 ```
 
 ### Variable Operations

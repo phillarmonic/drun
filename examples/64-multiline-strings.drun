@@ -1,0 +1,83 @@
+# Multi-line String Support
+# This example demonstrates the new multi-line string feature
+
+version: 2.0
+
+# Basic multi-line string
+task "basic multiline":
+    step "Demonstrating basic multi-line strings"
+    run "echo 'Starting the process...'
+echo 'Line 2 of output'
+echo 'Line 3 of output'
+echo 'Done!'"
+
+# Multi-line strings with escaped quotes
+task "escaped quotes":
+    step "Using escaped quotes in multi-line strings"
+    run "echo \"Hello, World!\"
+echo \"This is a \\\"quoted\\\" word\"
+echo \"Final line\""
+
+# Multi-line strings with line continuation using backslash
+task "line continuation":
+    step "Using backslash for line continuation"
+    run "echo This is a very long command that spans \
+multiple lines but will be \
+treated as a single line"
+
+# Complex real-world example: Docker commands
+task "judge" means "Evaluate code quality":
+    step "Generating a code report"
+    run "rm -f coverage.xml
+docker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php vendor/bin/phpunit --coverage-clover ./coverage.xml
+docker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/console tests:probe-coverage coverage.xml"
+
+# Multi-line strings with interpolation
+task "with interpolation":
+    let $environment = "production"
+    let $version = "1.2.3"
+    step "Using interpolation in multi-line strings"
+    run "echo Environment: {$environment}
+echo Version: {$version}
+echo Status: Ready to deploy"
+
+# Mixed features: interpolation, escaped quotes, and line continuation
+task "mixed features":
+    let $app_name = "MyApp"
+    let $config_file = "config.yaml"
+    step "Combining all features"
+    run "echo \"Starting {$app_name}...\"
+echo \"Loading config from {$config_file}\"
+docker run --rm -v $(pwd):/workspace \
+    -e APP_NAME=\"{$app_name}\" \
+    myimage:latest /bin/sh -c \"echo 'Processing...'\""
+
+# Build script with multi-line commands
+task "build":
+    step "Building application"
+    run "echo 'Building frontend...'
+cd frontend
+npm install
+npm run build
+cd ..
+echo 'Building backend...'
+cd backend
+go build -o app
+cd ..
+echo 'Build complete!'"
+
+# Database migration example
+task "migrate":
+    let $db_host = "localhost"
+    let $db_name = "mydb"
+    step "Running database migrations"
+    run "echo 'Connecting to {$db_host}...'
+mysql -h {$db_host} -u root -p {$db_name} <<EOF
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL
+);
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com');
+EOF
+echo 'Migration complete!'"
