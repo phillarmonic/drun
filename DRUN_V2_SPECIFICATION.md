@@ -37,6 +37,7 @@ drun v2 introduces a semantic, English-like domain-specific language (DSL) for d
 - **Shell Backend**: All constructs execute as shell commands when needed
 - **Smart Inference**: Automatic detection of tools, environments, and patterns
 - **Type Safety**: Static analysis with runtime validation
+- **Simple CLI**: Parameters use `key=value` syntax (no `--` dashes needed for task params)
 
 ### Architecture
 
@@ -46,6 +47,14 @@ drun v2 uses a **new execution engine** with the following components:
 2. **Parser**: Builds an Abstract Syntax Tree (AST) from tokens
 3. **Engine**: Directly executes the AST without intermediate compilation
 4. **Runtime**: Provides built-in actions, smart detection, and shell integration
+5. **CLI (xdrun)**: Command-line interface that accepts tasks and parameters using `key=value` syntax
+
+### CLI Usage Pattern
+
+```bash
+xdrun [task_name] [param1=value1] [param2=value2] [--cli-flags]
+      └─ task     └─ task parameters (no dashes) ─┘ └─ xdrun flags ─┘
+```
 
 ### Design Goals
 
@@ -1995,17 +2004,26 @@ requires $env from ["dev", "staging", "prod"] defaults to "production"
 
 #### CLI Argument Syntax
 
-Parameters are passed to tasks using simple `key=value` syntax (no `--` prefix required):
+**Important:** Task parameters use simple `key=value` syntax **without `--` dashes**. This is different from typical CLI tools!
 
 ```bash
-# Parameter passing examples
-xdrun deploy environment=production
+# ✅ CORRECT: Task parameters (no dashes)
+xdrun deploy environment=production replicas=5
 xdrun build tag=v1.2.3 push=true
 xdrun test suites=unit,integration verbose=true
 
-# Multiple parameters
-xdrun deploy environment=staging replicas=5 timeout=300
+# ❌ WRONG: Do NOT use dashes for task parameters
+xdrun deploy --environment=production --replicas=5  # This won't work!
+
+# ✅ CLI flags use dashes (they control xdrun behavior)
+xdrun deploy environment=prod --dry-run --verbose
+xdrun build --list
 ```
+
+**Why no dashes?**
+- Task parameters are part of the drun language (semantic parameters)
+- CLI flags control the xdrun interpreter itself (operational flags)
+- This distinction keeps the language clean and consistent
 
 #### Optional Parameters
 

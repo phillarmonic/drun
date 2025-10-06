@@ -291,36 +291,6 @@ func getIncludedSettings(project ProjectContext) map[string]string {
 	return nil
 }
 
-func getIncludedParams(project ProjectContext) interface{} {
-	// Use type assertion to access the concrete implementation
-	// This returns map[string]*ast.ProjectParameterStatement
-	type paramsProvider interface {
-		GetIncludedParams() interface{}
-	}
-	if provider, ok := project.(paramsProvider); ok {
-		return provider.GetIncludedParams()
-	}
-	return nil
-}
-
-// Helper to extract default value from a parameter stored in interface{}
-func getParamDefaultValue(paramInterface interface{}) (string, bool) {
-	// Try to access as ProjectParameterStatement fields
-	// We use reflection-style access since we can't import ast here
-	if paramMap, ok := paramInterface.(interface {
-		GetDefaultValue() string
-		GetHasDefault() bool
-	}); ok {
-		if paramMap.GetHasDefault() {
-			return paramMap.GetDefaultValue(), true
-		}
-	}
-
-	// Fallback: try struct field access via reflection
-	// The parameter is *ast.ProjectParameterStatement which has HasDefault and DefaultValue fields
-	return "", false
-}
-
 // parseQuotedArguments parses comma-separated quoted arguments
 func (i *Interpolator) parseQuotedArguments(argsStr string) []string {
 	var args []string

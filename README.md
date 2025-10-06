@@ -6,7 +6,23 @@
 
 > **For Developers:** Want to contribute or understand the architecture? See the **[Developer Guide](./DEVELOPER_GUIDE.md)** for complete documentation on the codebase, architecture diagrams, and contribution guidelines.
 
+## Quick Start
 
+```bash
+# Run a task
+xdrun build
+
+# Pass parameters using key=value syntax (NO dashes!)
+xdrun deploy environment=production replicas=5
+
+# List available tasks
+xdrun --list
+
+# Dry run to see what would execute
+xdrun deploy --dry-run
+```
+
+**Important:** Task parameters use simple `key=value` syntax without `--` dashes. CLI flags (like `--dry-run`, `--list`) use `--` as they control xdrun behavior, not task parameters.
 
 ### Small example of a Drun language script:
 

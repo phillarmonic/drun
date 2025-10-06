@@ -38,6 +38,21 @@ drun v2 introduces a revolutionary approach to task automation:
 
 ## 🚀 Quick Start
 
+### Running Examples
+
+```bash
+# Run a task
+xdrun -f examples/01-hello-world.drun hello
+
+# Pass parameters using key=value syntax (NO dashes!)
+xdrun -f examples/02-parameters.drun greet name=Alice title=Dr.
+
+# List available tasks
+xdrun -f examples/01-hello-world.drun --list
+```
+
+**Important:** Task parameters use simple `key=value` syntax without `--` dashes. CLI flags (like `--list`, `--dry-run`) use `--` as they control xdrun behavior, not task parameters.
+
 ### Hello World
 ```
 task "hello":
