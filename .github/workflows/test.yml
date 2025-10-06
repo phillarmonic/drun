@@ -46,11 +46,6 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Build packages to ensure module resolution
-      run: |
-        go build ./cmd/drun/app
-        go build ./cmd/drun
-
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
