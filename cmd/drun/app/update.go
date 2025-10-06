@@ -258,6 +258,14 @@ func downloadAndInstall(version, targetPath string) error {
 		return fmt.Errorf("failed to install binary: %w", err)
 	}
 
+	// Remove quarantine attributes on macOS (prevents "signal: killed" errors)
+	if runtime.GOOS == "darwin" {
+		if err := removeQuarantineAttributes(targetPath); err != nil {
+			// Non-fatal error, just warn
+			fmt.Fprintf(os.Stderr, "Warning: failed to remove quarantine attributes: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
@@ -328,6 +336,15 @@ func copyFile(src, dst string) error {
 // restoreBackup restores from backup
 func restoreBackup(backupPath, targetPath string) error {
 	return copyFile(backupPath, targetPath)
+}
+
+// removeQuarantineAttributes removes macOS quarantine attributes from a file
+// This prevents "signal: killed" errors when running downloaded binaries
+func removeQuarantineAttributes(path string) error {
+	cmd := exec.Command("xattr", "-d", "com.apple.quarantine", path)
+	// Ignore output - the attribute might not exist, which is fine
+	_ = cmd.Run()
+	return nil
 }
 
 // cleanupOldBackups removes old backup files, keeping only the last 5
