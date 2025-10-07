@@ -425,9 +425,9 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 
 	// Parse dependency list
 	for {
-		// Expect task name (identifier or Docker keyword)
+		// Expect task name (identifier, string, or Docker keyword)
 		switch p.peekToken.Type {
-		case lexer.IDENT:
+		case lexer.IDENT, lexer.STRING:
 			p.nextToken()
 		case lexer.BUILD, lexer.PUSH, lexer.PULL, lexer.TAG, lexer.REMOVE, lexer.START, lexer.STOP, lexer.RUN,
 			lexer.CLONE, lexer.INIT, lexer.BRANCH, lexer.SWITCH, lexer.MERGE, lexer.ADD, lexer.COMMIT, lexer.FETCH, lexer.STATUS, lexer.LOG, lexer.SHOW,
