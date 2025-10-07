@@ -64,10 +64,18 @@ Examples:
   xdrun --init                   # Create a new .drun file
   xdrun --debug --tokens         # Debug lexer tokens
   xdrun --debug --ast            # Debug AST structure
-  xdrun --debug --full           # Full debug output`,
+  xdrun --debug --full           # Full debug output
+
+Built-in Commands:
+  Use the 'cmd:' prefix for built-in commands to avoid conflicts with tasks:
+  xdrun cmd:completion bash      # Generate shell completion
+  xdrun cmd:from makefile        # Convert Makefile to drun`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: CompleteTaskNames,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true, // Disable default 'completion' command
+		},
 	}
 
 	app.setupFlags()
@@ -111,6 +119,7 @@ func (a *App) setupFlags() {
 // setupCommands sets up subcommands
 func (a *App) setupCommands() {
 	a.rootCmd.AddCommand(a.createCompletionCommand())
+	a.rootCmd.AddCommand(a.createConvertCommand())
 }
 
 // run is the main command handler
@@ -161,22 +170,26 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 	)
 }
 
-// createCompletionCommand creates the completion subcommand
+// createCompletionCommand creates the cmd:completion subcommand
 func (a *App) createCompletionCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "completion [bash|zsh|fish|powershell]",
-		Short: "[xdrun CLI cmd] Generate completion script",
-		Long: `To load completions:
+		Use:   "cmd:completion [bash|zsh|fish|powershell]",
+		Short: "Generate completion script",
+		Long: `Generate shell completion script for xdrun.
+
+Note: The 'cmd:' prefix is reserved for built-in commands to avoid conflicts with user tasks.
+
+To load completions:
 
 Bash:
 
-  $ source <(xdrun completion bash)
+  $ source <(xdrun cmd:completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ xdrun completion bash > /etc/bash_completion.d/xdrun
+  $ xdrun cmd:completion bash > /etc/bash_completion.d/xdrun
   # macOS:
-  $ xdrun completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
+  $ xdrun cmd:completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
 
 Zsh:
 
@@ -186,23 +199,23 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ xdrun completion zsh > "${fpath[1]}/_xdrun"
+  $ xdrun cmd:completion zsh > "${fpath[1]}/_xdrun"
 
   # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-  $ xdrun completion fish | source
+  $ xdrun cmd:completion fish | source
 
   # To load completions for each session, execute once:
-  $ xdrun completion fish > ~/.config/fish/completions/xdrun.fish
+  $ xdrun cmd:completion fish > ~/.config/fish/completions/xdrun.fish
 
 PowerShell:
 
-  PS> xdrun completion powershell | Out-String | Invoke-Expression
+  PS> xdrun cmd:completion powershell | Out-String | Invoke-Expression
 
   # To load completions for every new session, run:
-  PS> xdrun completion powershell > xdrun.ps1
+  PS> xdrun cmd:completion powershell > xdrun.ps1
   # and source this file from your PowerShell profile.
 `,
 		DisableFlagsInUseLine: true,

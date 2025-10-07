@@ -24,6 +24,8 @@ xdrun deploy --dry-run
 
 **Important:** Task parameters use simple `key=value` syntax without `--` dashes. CLI flags (like `--dry-run`, `--list`) use `--` as they control xdrun behavior, not task parameters.
 
+**Built-in Commands:** drun uses the `cmd:` prefix for all built-in commands (e.g., `xdrun cmd:completion`, `xdrun cmd:from makefile`) to avoid collisions with user-defined tasks. This means you can safely create tasks named `completion` or `from` without conflicts.
+
 ### Small example of a Drun language script:
 
 ```drun
@@ -85,6 +87,7 @@ task "hello":
 - **Rich Error Messages**: Helpful suggestions and context for debugging
 - **Shell Completion**: Intelligent completion for bash, zsh, fish, and PowerShell
 - **Self-Update**: Built-in update mechanism with backup management
+- **Makefile Converter**: Migrate existing Makefiles to drun with `cmd:from makefile`
 
 ### Built-in Functions
 
@@ -883,17 +886,28 @@ task "complex_chaining" means "Demonstrate operation chaining":
 
 ## Command Line Options
 
-- `--init`: Initialize a new .drun task file
+### Task Execution Flags
+
+- `--file, -f`: Specify task file (default: auto-discover .drun files)
 - `--list, -l`: List available tasks
 - `--dry-run`: Show what would be executed without running
 - `--explain`: Show rendered scripts and environment variables
-- `--update`: Update drun to the latest version from GitHub releases
-- `--file, -f`: Specify task file (default: auto-discover .drun files)
+- `--allow-undefined-variables`: Allow undefined variables in interpolation (default: strict mode)
 - `--jobs, -j`: Number of parallel jobs for dependencies
 - `--set`: Set variables (KEY=VALUE format)
 - `--shell`: Override shell type (linux/darwin/windows)
-- `--allow-undefined-variables`: Allow undefined variables in interpolation (default: strict mode)
-- `completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
+
+### Built-in Commands (cmd: prefix)
+
+Built-in commands use the `cmd:` prefix to avoid collisions with user-defined tasks:
+
+- `cmd:completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
+- `cmd:from makefile`: Convert Makefile to drun format
+
+### Management Commands
+
+- `--init`: Initialize a new .drun task file
+- `--self-update`: Update drun to the latest version from GitHub releases
 - `cleanup-backups`: Clean up old backup files created during updates
 
 ### Debug Options
@@ -992,7 +1006,7 @@ For **persistent autocompletion** that stays up-to-date with your tasks, add thi
 
 ```bash
 # Add to ~/.zshrc for persistent, always up-to-date completion
-echo 'source <(xdrun completion zsh)' >> ~/.zshrc
+echo 'source <(xdrun cmd:completion zsh)' >> ~/.zshrc
 
 # Reload your shell
 source ~/.zshrc
@@ -1002,7 +1016,7 @@ source ~/.zshrc
 
 ```bash
 # Add to ~/.bashrc for persistent, always up-to-date completion  
-echo 'source <(xdrun completion bash)' >> ~/.bashrc
+echo 'source <(xdrun cmd:completion bash)' >> ~/.bashrc
 
 # Reload your shell
 source ~/.bashrc
@@ -1012,7 +1026,7 @@ source ~/.bashrc
 
 ```bash
 # Add to Fish config for persistent completion
-echo 'xdrun completion fish | source' >> ~/.config/fish/config.fish
+echo 'xdrun cmd:completion fish | source' >> ~/.config/fish/config.fish
 
 # Reload Fish
 source ~/.config/fish/config.fish
@@ -1026,13 +1040,13 @@ If you prefer static completion files (updated less frequently):
 
 ```bash
 # Load completion for current session
-source <(xdrun completion bash)
+source <(xdrun cmd:completion bash)
 
 # Install permanently (Linux)
-xdrun completion bash > /etc/bash_completion.d/xdrun
+xdrun cmd:completion bash > /etc/bash_completion.d/xdrun
 
 # Install permanently (macOS with Homebrew)
-xdrun completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
+xdrun cmd:completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
 ```
 
 #### Zsh
@@ -1042,10 +1056,10 @@ xdrun completion bash > $(brew --prefix)/etc/bash_completion.d/xdrun
 echo "autoload -U compinit; compinit" >> ~/.zshrc
 
 # Load completion for current session
-source <(xdrun completion zsh)
+source <(xdrun cmd:completion zsh)
 
 # Install permanently
-xdrun completion zsh > "${fpath[1]}/_xdrun"
+xdrun cmd:completion zsh > "${fpath[1]}/_xdrun"
 
 # Restart your shell or source ~/.zshrc
 ```
@@ -1054,20 +1068,20 @@ xdrun completion zsh > "${fpath[1]}/_xdrun"
 
 ```bash
 # Load completion for current session
-xdrun completion fish | source
+xdrun cmd:completion fish | source
 
 # Install permanently
-xdrun completion fish > ~/.config/fish/completions/xdrun.fish
+xdrun cmd:completion fish > ~/.config/fish/completions/xdrun.fish
 ```
 
 #### PowerShell
 
 ```powershell
 # Load completion for current session
-xdrun completion powershell | Out-String | Invoke-Expression
+xdrun cmd:completion powershell | Out-String | Invoke-Expression
 
 # Install permanently
-xdrun completion powershell > xdrun.ps1
+xdrun cmd:completion powershell > xdrun.ps1
 # Then source this file from your PowerShell profile
 ```
 
@@ -1084,20 +1098,23 @@ The completion system intelligently distinguishes between:
 # Task and command completion with prefixes
 xdrun <TAB>
 # Shows:
-#   completion    [xdrun CLI cmd] Generate completion script
-#   help          Help about any command  
-#   default       [task] Welcome to drun v2
-#   hello         [task] Say hello
-#   build         [task] Build the project
-#   test          [task] Run tests
-#   deploy        [task] Deploy application
+#   cmd:completion    Generate completion script
+#   cmd:from          Convert other build tools to drun format
+#   help              Help about any command  
+#   default           [task] Welcome to drun v2
+#   hello             [task] Say hello
+#   build             [task] Build the project
+#   test              [task] Run tests
+#   deploy            [task] Deploy application
 
 # Task name completion
 xdrun hel<TAB>                 # Completes to "hello"
 xdrun dep<TAB>                 # Completes to "deploy"
 
-# CLI command completion
-xdrun comp<TAB>                # Completes to "completion"
+# Built-in command completion (cmd: prefix)
+xdrun cmd:<TAB>                # Shows cmd:completion, cmd:from
+xdrun cmd:comp<TAB>            # Completes to "cmd:completion"
+xdrun cmd:from<TAB>            # Shows makefile subcommand
 
 # Flag completion
 xdrun --<TAB>                  # Shows all available flags with descriptions
@@ -1106,7 +1123,7 @@ xdrun --list                   # Lists all tasks
 
 ### Why Use Dynamic Completion?
 
-**Recommended approach**: `source <(xdrun completion zsh)` in your shell config
+**Recommended approach**: `source <(xdrun cmd:completion zsh)` in your shell config
 
 **Benefits:**
 
@@ -1116,6 +1133,83 @@ xdrun --list                   # Lists all tasks
 -  **Fast**: Completion generation is highly optimized (microseconds)
 
 **Static files** work but require manual updates when you add/remove tasks.
+
+## Convert from Makefile
+
+Migrate existing Makefiles to drun with the built-in converter:
+
+```bash
+# Convert Makefile in current directory
+xdrun cmd:from makefile
+
+# Convert specific Makefile
+xdrun cmd:from makefile -i myproject.mk -o tasks.drun
+
+# Convert with custom output
+xdrun cmd:from makefile --input Makefile --output build.drun
+```
+
+### What Gets Converted
+
+The converter intelligently translates Makefile syntax to drun:
+
+- **Targets** → drun tasks
+- **Dependencies** → `depends on` declarations  
+- **Variables** → drun variables with interpolation (`$(VAR)` → `{$var}`)
+- **Comments** → task descriptions
+- **Shell commands** → appropriate drun actions
+- **.PHONY targets** → properly handled
+- **@ prefix** (silent) → semantic drun actions
+- **- prefix** (ignore errors) → `try/ignore` blocks
+
+### Example Conversion
+
+**Input Makefile:**
+```makefile
+PROJECT_NAME = myapp
+VERSION = 1.0.0
+
+.PHONY: build
+
+build: install
+	@echo "Building $(PROJECT_NAME) version $(VERSION)..."
+	mkdir -p build
+	go build -o build/$(PROJECT_NAME)
+```
+
+**Output drun:**
+```drun
+version: 2.0
+
+# Variables from Makefile (will be set in tasks):
+# - $project_name = "myapp"
+# - $version = "1.0.0"
+
+task "build" means "Build the application":
+	depends on "install"
+
+	# Set variables from Makefile
+	set $project_name to "myapp"
+	set $version to "1.0.0"
+
+	info "Running build"
+
+	echo "Building {$project_name} version {$version}..."
+	create dir "build"
+	run "go build -o build/{$project_name}"
+
+	success "build completed successfully!"
+```
+
+### Benefits of Converting
+
+- **Readable** - Semantic syntax vs cryptic Make patterns
+- **Type-safe** - Built-in validation and error handling
+- **Maintainable** - Self-documenting with clear structure
+- **Powerful** - Access to drun's full feature set (HTTP, Docker, etc.)
+- **Cross-platform** - Better Windows support than Make
+
+Learn more in [`examples/makefile-conversion/README.md`](examples/makefile-conversion/README.md)
 
 ## Self-Update & Backup Management
 
