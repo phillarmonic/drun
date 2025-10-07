@@ -69,7 +69,8 @@ Examples:
 Built-in Commands:
   Use the 'cmd:' prefix for built-in commands to avoid conflicts with tasks:
   xdrun cmd:completion bash      # Generate shell completion
-  xdrun cmd:from makefile        # Convert Makefile to drun`,
+  xdrun cmd:from makefile        # Convert Makefile to drun
+  xdrun cmd:dump-env             # Dump all environment variables`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: CompleteTaskNames,
@@ -120,6 +121,7 @@ func (a *App) setupFlags() {
 func (a *App) setupCommands() {
 	a.rootCmd.AddCommand(a.createCompletionCommand())
 	a.rootCmd.AddCommand(a.createConvertCommand())
+	a.rootCmd.AddCommand(a.createDumpEnvCommand())
 }
 
 // run is the main command handler
