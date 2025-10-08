@@ -178,3 +178,39 @@ func (ep *ExecutionPlan) ToJSON() (string, error) {
 
 	return string(data), nil
 }
+
+// Helper methods for debug utilities
+
+// GetTargetTask returns the target task name
+func (ep *ExecutionPlan) GetTargetTask() string {
+	return ep.TargetTask
+}
+
+// GetExecutionOrder returns the execution order
+func (ep *ExecutionPlan) GetExecutionOrder() []string {
+	return ep.ExecutionOrder
+}
+
+// GetTaskCount returns the number of tasks in the plan
+func (ep *ExecutionPlan) GetTaskCount() int {
+	return len(ep.Tasks)
+}
+
+// GetProjectName returns the project name
+func (ep *ExecutionPlan) GetProjectName() string {
+	return ep.ProjectName
+}
+
+// GetProjectVersion returns the project version
+func (ep *ExecutionPlan) GetProjectVersion() string {
+	return ep.ProjectVersion
+}
+
+// GetNamespaces returns a list of namespaces used in the plan
+func (ep *ExecutionPlan) GetNamespaces() []string {
+	namespaces := make([]string, 0, len(ep.Namespaces))
+	for ns := range ep.Namespaces {
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces
+}
