@@ -12,14 +12,14 @@ import (
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 )
 
-// MockStatementExecutor implements StatementExecutor for testing
+// MockStatementExecutor implements DomainStatementExecutor for testing
 type MockStatementExecutor struct {
-	ExecutedStatements []ast.Statement
-	ShouldFail         bool
+	ExecutedDomainStatements []statement.Statement
+	ShouldFail               bool
 }
 
-func (m *MockStatementExecutor) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
-	m.ExecutedStatements = append(m.ExecutedStatements, stmt)
+func (m *MockStatementExecutor) ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error {
+	m.ExecutedDomainStatements = append(m.ExecutedDomainStatements, stmt)
 	if m.ShouldFail {
 		return fmt.Errorf("mock execution error")
 	}
@@ -68,8 +68,8 @@ func TestExecutor_ExecuteTask(t *testing.T) {
 	}
 
 	// Verify statement was executed
-	if len(mockExec.ExecutedStatements) != 1 {
-		t.Errorf("Expected 1 statement to be executed, got %d", len(mockExec.ExecutedStatements))
+	if len(mockExec.ExecutedDomainStatements) != 1 {
+		t.Errorf("Expected 1 statement to be executed, got %d", len(mockExec.ExecutedDomainStatements))
 	}
 }
 
@@ -125,8 +125,8 @@ func TestExecutor_ExecuteSetupHooks(t *testing.T) {
 		t.Errorf("ExecuteSetupHooks() error = %v", err)
 	}
 
-	if len(mockExec.ExecutedStatements) != 1 {
-		t.Errorf("Expected 1 hook to be executed, got %d", len(mockExec.ExecutedStatements))
+	if len(mockExec.ExecutedDomainStatements) != 1 {
+		t.Errorf("Expected 1 hook to be executed, got %d", len(mockExec.ExecutedDomainStatements))
 	}
 }
 

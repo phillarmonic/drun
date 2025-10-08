@@ -91,15 +91,14 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		depResolver:    options.DepResolver,
 
 		// Execution components
-		planner:  planner.NewPlanner(options.TaskRegistry, options.DepResolver),
-		executor: executor.NewExecutor(options.Output, options.DryRun, nil), // stmtExecutor set later
+		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
 
 		// Pre-compile regex patterns for performance (still used by variable operations)
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
 
-	// Set the engine as the statement executor
+	// Set the engine as the domain statement executor
 	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
 
 	// Initialize includes resolver
@@ -203,26 +202,38 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		return fmt.Errorf("task registration failed: %v", err)
 	}
 
-	// Use domain dependency resolver
-	domainTasks, err := e.depResolver.Resolve(taskName)
-	if err != nil {
-		return fmt.Errorf("dependency resolution failed: %v", err)
-	}
-
-	// Extract task names for execution order
-	executionOrder := make([]string, len(domainTasks))
-	for i, t := range domainTasks {
-		executionOrder[i] = t.Name
-	}
-
-	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", executionOrder)
-	}
-
-	// Create project context
+	// Create project context for planning
 	projectCtx, err := e.createProjectContext(program.Project, currentFile)
 	if err != nil {
 		return fmt.Errorf("creating project context: %w", err)
+	}
+
+	// Build planner context from project
+	var plannerCtx *planner.ProjectContext
+	if projectCtx != nil && projectCtx.HookManager != nil {
+		plannerCtx = &planner.ProjectContext{
+			Name:          projectCtx.Name,
+			Version:       projectCtx.Version,
+			SetupHooks:    projectCtx.HookManager.GetSetupHooks(),
+			TeardownHooks: projectCtx.HookManager.GetTeardownHooks(),
+			BeforeHooks:   projectCtx.HookManager.GetBeforeHooks(),
+			AfterHooks:    projectCtx.HookManager.GetAfterHooks(),
+		}
+	}
+
+	// Create comprehensive execution plan
+	plan, err := e.planner.Plan(taskName, program, plannerCtx)
+	if err != nil {
+		return fmt.Errorf("execution planning failed: %w", err)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", plan.ExecutionOrder)
+		if e.verbose {
+			if planJSON, err := plan.ToJSON(); err == nil {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution plan:\n%s\n", planJSON)
+			}
+		}
 	}
 
 	// Create execution context with parameters
@@ -234,42 +245,23 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		Program:     program,
 	}
 
-	// Execute drun setup hooks
-	if ctx.Project != nil && ctx.Project.HookManager != nil {
-		for _, hook := range ctx.Project.HookManager.GetSetupHooks() {
-			// Convert domain statement to AST for execution (temporary bridge)
-			astHook, err := statement.ToAST(hook)
-			if err != nil {
-				return fmt.Errorf("converting setup hook: %w", err)
-			}
-			if err := e.executeStatement(astHook, ctx); err != nil {
-				return fmt.Errorf("drun setup hook failed: %v", err)
-			}
+	// Execute drun setup hooks from the execution plan
+	if plan.Hooks != nil && len(plan.Hooks.SetupHooks) > 0 {
+		if err := e.executor.ExecuteHooks("setup", plan.Hooks.SetupHooks, ctx, true); err != nil {
+			return fmt.Errorf("setup hook failed: %w", err)
 		}
 	}
 
-	// Execute all tasks in dependency order
-	for _, currentTaskName := range executionOrder {
-		// Get the domain task from the registry
-		domainTask, err := e.taskRegistry.Get(currentTaskName)
+	// Execute all tasks in the planned execution order
+	for _, currentTaskName := range plan.ExecutionOrder {
+		// Get the task plan from the execution plan
+		taskPlan, err := plan.GetTask(currentTaskName)
 		if err != nil {
-			return fmt.Errorf("task '%s' not found in registry: %w", currentTaskName, err)
+			return fmt.Errorf("task '%s' not found in plan: %w", currentTaskName, err)
 		}
 
-		// Find the AST task for parameter setup (still needed temporarily)
-		var astTask *ast.TaskStatement
-		for _, task := range program.Tasks {
-			if task.Name == currentTaskName {
-				astTask = task
-				break
-			}
-		}
-		if astTask == nil {
-			return fmt.Errorf("task '%s' not found in AST", currentTaskName)
-		}
-
-		// Set up parameters for this specific task
-		if err := e.setupTaskParameters(astTask, params, ctx); err != nil {
+		// Set up parameters for this specific task using task plan
+		if err := e.setupTaskParametersFromPlan(taskPlan, params, ctx); err != nil {
 			return err
 		}
 
@@ -277,65 +269,33 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		ctx.CurrentTask = currentTaskName
 
 		// Execute before hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
-			for _, hook := range ctx.Project.HookManager.GetBeforeHooks() {
-				// Convert domain statement to AST for execution (temporary bridge)
-				astHook, err := statement.ToAST(hook)
-				if err != nil {
-					return fmt.Errorf("converting before hook: %w", err)
-				}
-				if err := e.executeStatement(astHook, ctx); err != nil {
-					return fmt.Errorf("before hook failed: %v", err)
-				}
+		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.BeforeHooks) > 0 {
+			if err := e.executor.ExecuteHooks("before", plan.Hooks.BeforeHooks, ctx, true); err != nil {
+				return fmt.Errorf("before hook failed: %w", err)
 			}
 		}
 
-		// Convert domain task body to AST for execution (temporary bridge)
-		astBody, err := statement.ToASTList(domainTask.Body)
-		if err != nil {
-			return fmt.Errorf("converting task body for '%s': %w", currentTaskName, err)
+		// Execute task body directly using domain statements
+		for _, stmt := range taskPlan.Body {
+			if err := e.executeDomainStatement(stmt, ctx); err != nil {
+				return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
+			}
 		}
 
-		// Create a temporary AST task for execution
-		tempASTTask := &ast.TaskStatement{
-			Name:        domainTask.Name,
-			Description: domainTask.Description,
-			Body:        astBody,
-		}
-
-		// Execute the task
-		if err := e.executeTask(tempASTTask, ctx); err != nil {
-			return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
-		}
-
-		// Execute after hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
-			for _, hook := range ctx.Project.HookManager.GetAfterHooks() {
-				// Convert domain statement to AST for execution (temporary bridge)
-				astHook, hookErr := statement.ToAST(hook)
-				if hookErr != nil {
-					_, _ = fmt.Fprintf(e.output, "⚠️  After hook conversion failed: %v\n", hookErr)
-					continue
-				}
-				if hookErr := e.executeStatement(astHook, ctx); hookErr != nil {
-					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
-				}
+		// Execute after hooks only for the target task (best-effort)
+		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.AfterHooks) > 0 {
+			if err := e.executor.ExecuteHooks("after", plan.Hooks.AfterHooks, ctx, false); err != nil {
+				// After hooks failures are logged but don't fail the execution
+				_, _ = fmt.Fprintf(e.output, "⚠️  after hook failed: %v\n", err)
 			}
 		}
 	}
 
-	// Execute drun teardown hooks
-	if ctx.Project != nil && ctx.Project.HookManager != nil {
-		for _, hook := range ctx.Project.HookManager.GetTeardownHooks() {
-			// Convert domain statement to AST for execution (temporary bridge)
-			astHook, hookErr := statement.ToAST(hook)
-			if hookErr != nil {
-				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook conversion failed: %v\n", hookErr)
-				continue
-			}
-			if hookErr := e.executeStatement(astHook, ctx); hookErr != nil {
-				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
-			}
+	// Execute drun teardown hooks (best-effort)
+	if plan.Hooks != nil && len(plan.Hooks.TeardownHooks) > 0 {
+		if err := e.executor.ExecuteHooks("teardown", plan.Hooks.TeardownHooks, ctx, false); err != nil {
+			// Teardown hook failures are logged but don't fail the execution
+			_, _ = fmt.Fprintf(e.output, "⚠️  teardown hook failed: %v\n", err)
 		}
 	}
 
@@ -356,7 +316,128 @@ func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) e
 	return nil
 }
 
-// setupTaskParameters sets up parameters for a specific task
+// setupTaskParametersFromPlan sets up parameters for a specific task using TaskPlan
+func (e *Engine) setupTaskParametersFromPlan(taskPlan *planner.TaskPlan, params map[string]string, ctx *ExecutionContext) error {
+	// First, add included/namespaced parameters from includes (e.g., docker.registry)
+	if ctx.Project != nil && ctx.Project.IncludedParams != nil {
+		for namespacedName, projectParam := range ctx.Project.IncludedParams {
+			// Use the namespaced name as the key (e.g., "docker.registry")
+			var rawValue string
+			var hasValue bool
+
+			// Included params won't be provided via CLI, so just use defaults
+			if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				// Determine parameter type
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				// Create typed value
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("included parameter '%s': invalid %s value '%s': %v",
+						namespacedName, paramType, rawValue, err))
+				}
+
+				ctx.Parameters[namespacedName] = typedValue
+			}
+		}
+	}
+
+	// Then, add project-level parameters if they exist
+	if ctx.Project != nil && ctx.Project.Parameters != nil {
+		for paramName, projectParam := range ctx.Project.Parameters {
+			var rawValue string
+			var hasValue bool
+
+			// Check if a value was provided via CLI
+			if providedValue, exists := params[paramName]; exists {
+				rawValue = providedValue
+				hasValue = true
+			} else if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': invalid %s value '%s': %v",
+						paramName, paramType, rawValue, err))
+				}
+
+				ctx.Parameters[paramName] = typedValue
+			}
+		}
+	}
+
+	// Finally, set up task-specific parameters with defaults and validation
+	for _, param := range taskPlan.Parameters {
+		var rawValue string
+		var hasValue bool
+
+		if providedValue, exists := params[param.Name]; exists {
+			rawValue = providedValue
+			hasValue = true
+		} else if param.HasDefault {
+			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
+			hasValue = true
+		} else if param.Required {
+			return errors.NewParameterValidationError(fmt.Sprintf("required parameter '%s' not provided", param.Name))
+		}
+
+		if hasValue {
+			paramType, err := types.ParseParameterType(param.DataType)
+			if err != nil {
+				paramType = types.InferType(rawValue)
+			}
+
+			typedValue, err := types.NewValue(paramType, rawValue)
+			if err != nil {
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': invalid %s value '%s': %v",
+					param.Name, paramType, rawValue, err))
+			}
+
+			// Use domain validator
+			domainParam := &parameter.Parameter{
+				Name:         param.Name,
+				Type:         param.Type,
+				DefaultValue: param.DefaultValue,
+				HasDefault:   param.HasDefault,
+				Required:     param.Required,
+				DataType:     param.DataType,
+				Constraints:  param.Constraints,
+				MinValue:     param.MinValue,
+				MaxValue:     param.MaxValue,
+				Pattern:      param.Pattern,
+				PatternMacro: param.PatternMacro,
+				EmailFormat:  param.EmailFormat,
+				Variadic:     param.Variadic,
+			}
+
+			if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
+			}
+
+			ctx.Parameters[param.Name] = typedValue
+		}
+	}
+
+	return nil
+}
+
+// setupTaskParameters sets up parameters for a specific task (deprecated - use setupTaskParametersFromPlan)
 func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]string, ctx *ExecutionContext) error {
 	// First, add included/namespaced parameters from includes (e.g., docker.registry)
 	if ctx.Project != nil && ctx.Project.IncludedParams != nil {
@@ -602,7 +683,7 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 	return nil
 }
 
-// ExecuteStatement executes a single statement (implements executor.StatementExecutor)
+// ExecuteStatement executes a single AST statement (implements executor.StatementExecutor)
 func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
 	execCtx, ok := ctx.(*ExecutionContext)
 	if !ok {
@@ -611,7 +692,16 @@ func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
 	return e.executeStatement(stmt, execCtx)
 }
 
-// executeStatement executes a single statement (action, parameter, conditional, etc.)
+// ExecuteDomainStatement executes a single domain statement (implements executor.DomainStatementExecutor)
+func (e *Engine) ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error {
+	execCtx, ok := ctx.(*ExecutionContext)
+	if !ok {
+		return fmt.Errorf("invalid execution context type")
+	}
+	return e.executeDomainStatement(stmt, execCtx)
+}
+
+// executeStatement executes a single AST statement (action, parameter, conditional, etc.)
 func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) error {
 	switch s := stmt.(type) {
 	case *ast.ActionStatement:
@@ -656,7 +746,211 @@ func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) err
 	case *ast.TaskFromTemplateStatement:
 		return e.executeTaskFromTemplate(s, ctx)
 	default:
-		return fmt.Errorf("unknown statement type: %T", stmt)
+		return fmt.Errorf("unknown AST statement type: %T", stmt)
+	}
+}
+
+// executeDomainStatement executes a single domain statement by converting to AST and delegating
+func (e *Engine) executeDomainStatement(stmt statement.Statement, ctx *ExecutionContext) error {
+	switch s := stmt.(type) {
+	case *statement.Action:
+		return e.executeAction(&ast.ActionStatement{
+			Action:          s.ActionType,
+			Message:         s.Message,
+			LineBreakBefore: s.LineBreakBefore,
+			LineBreakAfter:  s.LineBreakAfter,
+		}, ctx)
+	case *statement.Shell:
+		return e.executeShell(&ast.ShellStatement{
+			Action:       s.Action,
+			Command:      s.Command,
+			Commands:     s.Commands,
+			CaptureVar:   s.CaptureVar,
+			StreamOutput: s.StreamOutput,
+			IsMultiline:  s.IsMultiline,
+		}, ctx)
+	case *statement.Variable:
+		var value ast.Expression
+		if s.Value != "" {
+			value = &ast.LiteralExpression{Value: s.Value}
+		}
+		return e.executeVariable(&ast.VariableStatement{
+			Operation: s.Operation,
+			Variable:  s.Name,
+			Value:     value,
+			Function:  s.Function,
+			Arguments: s.Arguments,
+		}, ctx)
+	case *statement.Conditional:
+		// Convert body statements recursively
+		body, err := statement.ToASTList(s.Body)
+		if err != nil {
+			return fmt.Errorf("converting conditional body: %w", err)
+		}
+		elseBody, err := statement.ToASTList(s.ElseBody)
+		if err != nil {
+			return fmt.Errorf("converting conditional else body: %w", err)
+		}
+		return e.executeConditional(&ast.ConditionalStatement{
+			Type:      s.ConditionType,
+			Condition: s.Condition,
+			Body:      body,
+			ElseBody:  elseBody,
+		}, ctx)
+	case *statement.Loop:
+		body, err := statement.ToASTList(s.Body)
+		if err != nil {
+			return fmt.Errorf("converting loop body: %w", err)
+		}
+		var filter *ast.FilterExpression
+		if s.Filter != nil {
+			filter = &ast.FilterExpression{
+				Variable: s.Filter.Variable,
+				Operator: s.Filter.Operator,
+				Value:    s.Filter.Value,
+			}
+		}
+		return e.executeLoop(&ast.LoopStatement{
+			Type:       s.LoopType,
+			Variable:   s.Variable,
+			Iterable:   s.Iterable,
+			RangeStart: s.RangeStart,
+			RangeEnd:   s.RangeEnd,
+			RangeStep:  s.RangeStep,
+			Filter:     filter,
+			Parallel:   s.Parallel,
+			MaxWorkers: s.MaxWorkers,
+			FailFast:   s.FailFast,
+			Body:       body,
+		}, ctx)
+	case *statement.Try:
+		tryBody, err := statement.ToASTList(s.TryBody)
+		if err != nil {
+			return fmt.Errorf("converting try body: %w", err)
+		}
+		var catchClauses []ast.CatchClause
+		for _, domainCatch := range s.CatchClauses {
+			catchBody, err := statement.ToASTList(domainCatch.Body)
+			if err != nil {
+				return fmt.Errorf("converting catch body: %w", err)
+			}
+			catchClauses = append(catchClauses, ast.CatchClause{
+				ErrorType: domainCatch.ErrorType,
+				ErrorVar:  domainCatch.ErrorVar,
+				Body:      catchBody,
+			})
+		}
+		finallyBody, err := statement.ToASTList(s.FinallyBody)
+		if err != nil {
+			return fmt.Errorf("converting finally body: %w", err)
+		}
+		return e.executeTry(&ast.TryStatement{
+			TryBody:      tryBody,
+			CatchClauses: catchClauses,
+			FinallyBody:  finallyBody,
+		}, ctx)
+	case *statement.Throw:
+		return e.executeThrow(&ast.ThrowStatement{
+			Action:  s.Action,
+			Message: s.Message,
+		}, ctx)
+	case *statement.Break:
+		return e.executeBreak(&ast.BreakStatement{
+			Condition: s.Condition,
+		}, ctx)
+	case *statement.Continue:
+		return e.executeContinue(&ast.ContinueStatement{
+			Condition: s.Condition,
+		}, ctx)
+	case *statement.Docker:
+		return e.executeDocker(&ast.DockerStatement{
+			Operation: s.Operation,
+			Resource:  s.Resource,
+			Name:      s.Name,
+			Options:   s.Options,
+		}, ctx)
+	case *statement.Git:
+		return e.executeGit(&ast.GitStatement{
+			Operation: s.Operation,
+			Resource:  s.Resource,
+			Name:      s.Name,
+			Options:   s.Options,
+		}, ctx)
+	case *statement.HTTP:
+		return e.executeHTTP(&ast.HTTPStatement{
+			Method:  s.Method,
+			URL:     s.URL,
+			Headers: s.Headers,
+			Body:    s.Body,
+			Auth:    s.Auth,
+			Options: s.Options,
+		}, ctx)
+	case *statement.Download:
+		var astPerms []ast.PermissionSpec
+		for _, perm := range s.AllowPermissions {
+			astPerms = append(astPerms, ast.PermissionSpec{
+				Permissions: perm.Permissions,
+				Targets:     perm.Targets,
+			})
+		}
+		return e.executeDownload(&ast.DownloadStatement{
+			URL:              s.URL,
+			Path:             s.Path,
+			AllowOverwrite:   s.AllowOverwrite,
+			AllowPermissions: astPerms,
+			ExtractTo:        s.ExtractTo,
+			RemoveArchive:    s.RemoveArchive,
+			Headers:          s.Headers,
+			Auth:             s.Auth,
+			Options:          s.Options,
+		}, ctx)
+	case *statement.Network:
+		return e.executeNetwork(&ast.NetworkStatement{
+			Action:    s.Action,
+			Target:    s.Target,
+			Port:      s.Port,
+			Options:   s.Options,
+			Condition: s.Condition,
+		}, ctx)
+	case *statement.File:
+		return e.executeFile(&ast.FileStatement{
+			Action:     s.Action,
+			Target:     s.Target,
+			Source:     s.Source,
+			Content:    s.Content,
+			IsDir:      s.IsDir,
+			CaptureVar: s.CaptureVar,
+		}, ctx)
+	case *statement.Detection:
+		body, err := statement.ToASTList(s.Body)
+		if err != nil {
+			return fmt.Errorf("converting detection body: %w", err)
+		}
+		elseBody, err := statement.ToASTList(s.ElseBody)
+		if err != nil {
+			return fmt.Errorf("converting detection else body: %w", err)
+		}
+		return e.executeDetection(&ast.DetectionStatement{
+			Type:         s.DetectionType,
+			Target:       s.Target,
+			Alternatives: s.Alternatives,
+			Condition:    s.Condition,
+			Value:        s.Value,
+			CaptureVar:   s.CaptureVar,
+			Body:         body,
+			ElseBody:     elseBody,
+		}, ctx)
+	case *statement.UseSnippet:
+		return e.executeUseSnippet(&ast.UseSnippetStatement{
+			SnippetName: s.SnippetName,
+		}, ctx)
+	case *statement.TaskCall:
+		return e.executeTaskCall(&ast.TaskCallStatement{
+			TaskName:   s.TaskName,
+			Parameters: s.Parameters,
+		}, ctx)
+	default:
+		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}
 }
 

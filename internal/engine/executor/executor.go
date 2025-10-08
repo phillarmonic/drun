@@ -4,35 +4,34 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/domain/task"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 )
 
-// StatementExecutor defines the interface for executing statements
+// DomainStatementExecutor defines the interface for executing domain statements
 // The context parameter is intentionally interface{} to avoid circular dependencies
-type StatementExecutor interface {
-	ExecuteStatement(stmt ast.Statement, ctx interface{}) error
+type DomainStatementExecutor interface {
+	ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error
 }
 
 // Executor handles execution of tasks and hooks
 type Executor struct {
-	output       io.Writer
-	dryRun       bool
-	stmtExecutor StatementExecutor
+	output             io.Writer
+	dryRun             bool
+	domainStmtExecutor DomainStatementExecutor
 }
 
 // NewExecutor creates a new task executor
-func NewExecutor(output io.Writer, dryRun bool, stmtExecutor StatementExecutor) *Executor {
+func NewExecutor(output io.Writer, dryRun bool, domainStmtExecutor DomainStatementExecutor) *Executor {
 	return &Executor{
-		output:       output,
-		dryRun:       dryRun,
-		stmtExecutor: stmtExecutor,
+		output:             output,
+		dryRun:             dryRun,
+		domainStmtExecutor: domainStmtExecutor,
 	}
 }
 
-// ExecuteTask executes a single task
+// ExecuteTask executes a single task using domain statements
 func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx interface{}) error {
 	if ex.dryRun {
 		_, _ = fmt.Fprintf(ex.output, "[DRY RUN] Would execute task: %s\n", domainTask.Name)
@@ -41,15 +40,9 @@ func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx interface{}) error {
 		}
 	}
 
-	// Convert domain task body to AST for execution (temporary bridge)
-	astBody, err := statement.ToASTList(domainTask.Body)
-	if err != nil {
-		return fmt.Errorf("converting task body: %w", err)
-	}
-
-	// Execute each statement in the task body
-	for _, stmt := range astBody {
-		if err := ex.stmtExecutor.ExecuteStatement(stmt, ctx); err != nil {
+	// Execute each domain statement directly
+	for _, stmt := range domainTask.Body {
+		if err := ex.domainStmtExecutor.ExecuteDomainStatement(stmt, ctx); err != nil {
 			return err
 		}
 	}
@@ -57,20 +50,10 @@ func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx interface{}) error {
 	return nil
 }
 
-// ExecuteHooks executes a list of hooks
+// ExecuteHooks executes a list of domain statement hooks
 func (ex *Executor) ExecuteHooks(hookType string, domainHooks []statement.Statement, ctx interface{}, failFast bool) error {
 	for _, hook := range domainHooks {
-		// Convert domain statement to AST for execution (temporary bridge)
-		astHook, err := statement.ToAST(hook)
-		if err != nil {
-			if failFast {
-				return fmt.Errorf("converting %s hook: %w", hookType, err)
-			}
-			_, _ = fmt.Fprintf(ex.output, "⚠️  %s hook conversion failed: %v\n", hookType, err)
-			continue
-		}
-
-		if err := ex.stmtExecutor.ExecuteStatement(astHook, ctx); err != nil {
+		if err := ex.domainStmtExecutor.ExecuteDomainStatement(hook, ctx); err != nil {
 			if failFast {
 				return fmt.Errorf("%s hook failed: %w", hookType, err)
 			}

@@ -1,18 +1,53 @@
 package planner
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/domain/task"
 )
 
-// ExecutionPlan represents a planned execution with resolved dependencies
+// HookPlan represents hooks to execute at various lifecycle points
+type HookPlan struct {
+	SetupHooks    []statement.Statement
+	TeardownHooks []statement.Statement
+	BeforeHooks   []statement.Statement
+	AfterHooks    []statement.Statement
+}
+
+// TaskPlan represents a single task in the execution plan
+type TaskPlan struct {
+	Name        string
+	Description string
+	Namespace   string
+	Source      string
+	Parameters  []task.Parameter
+	Body        []statement.Statement
+}
+
+// ExecutionPlan represents a complete, deterministic execution plan
+// All dependencies, hooks, and includes are resolved upfront
 type ExecutionPlan struct {
-	TaskName       string
-	ExecutionOrder []string                      // Tasks to execute in order
-	DomainTasks    map[string]*task.Task         // Map of task name to domain task
-	ASTTasks       map[string]*ast.TaskStatement // Map of task name to AST task (temporary)
+	// Target task being executed
+	TargetTask string
+
+	// Ordered list of tasks to execute (includes dependencies)
+	ExecutionOrder []string
+
+	// Fully resolved task plans (domain-level, no AST)
+	Tasks map[string]*TaskPlan
+
+	// Lifecycle hooks resolved from project
+	Hooks *HookPlan
+
+	// Project metadata
+	ProjectName    string
+	ProjectVersion string
+
+	// Namespace tracking for includes
+	Namespaces map[string]bool // Set of namespaces used
 }
 
 // Planner orchestrates dependency resolution and produces execution plans
@@ -29,8 +64,18 @@ func NewPlanner(taskRegistry *task.Registry, depResolver *task.DependencyResolve
 	}
 }
 
-// Plan creates an execution plan for the given task
-func (p *Planner) Plan(taskName string, program *ast.Program) (*ExecutionPlan, error) {
+// ProjectContext provides project-level information for planning
+type ProjectContext struct {
+	Name          string
+	Version       string
+	SetupHooks    []statement.Statement
+	TeardownHooks []statement.Statement
+	BeforeHooks   []statement.Statement
+	AfterHooks    []statement.Statement
+}
+
+// Plan creates a comprehensive execution plan for the given task
+func (p *Planner) Plan(taskName string, program *ast.Program, projectCtx *ProjectContext) (*ExecutionPlan, error) {
 	// Resolve dependencies using domain resolver
 	domainTasks, err := p.depResolver.Resolve(taskName)
 	if err != nil {
@@ -39,40 +84,97 @@ func (p *Planner) Plan(taskName string, program *ast.Program) (*ExecutionPlan, e
 
 	// Build execution order
 	executionOrder := make([]string, len(domainTasks))
-	domainTaskMap := make(map[string]*task.Task)
-	for i, t := range domainTasks {
-		executionOrder[i] = t.Name
-		domainTaskMap[t.Name] = t
+	taskPlans := make(map[string]*TaskPlan)
+	namespaces := make(map[string]bool)
+
+	for i, domainTask := range domainTasks {
+		executionOrder[i] = domainTask.Name
+
+		// Create TaskPlan from domain task
+		taskPlans[domainTask.Name] = &TaskPlan{
+			Name:        domainTask.Name,
+			Description: domainTask.Description,
+			Namespace:   domainTask.Namespace,
+			Source:      domainTask.Source,
+			Parameters:  domainTask.Parameters,
+			Body:        domainTask.Body,
+		}
+
+		// Track namespaces
+		if domainTask.Namespace != "" {
+			namespaces[domainTask.Namespace] = true
+		}
 	}
 
-	// Build AST task map (temporary - will be removed in Phase 4)
-	astTaskMap := make(map[string]*ast.TaskStatement)
-	for _, astTask := range program.Tasks {
-		astTaskMap[astTask.Name] = astTask
+	// Build hook plan from project context
+	var hookPlan *HookPlan
+	if projectCtx != nil {
+		hookPlan = &HookPlan{
+			SetupHooks:    projectCtx.SetupHooks,
+			TeardownHooks: projectCtx.TeardownHooks,
+			BeforeHooks:   projectCtx.BeforeHooks,
+			AfterHooks:    projectCtx.AfterHooks,
+		}
 	}
 
-	return &ExecutionPlan{
-		TaskName:       taskName,
+	plan := &ExecutionPlan{
+		TargetTask:     taskName,
 		ExecutionOrder: executionOrder,
-		DomainTasks:    domainTaskMap,
-		ASTTasks:       astTaskMap,
-	}, nil
+		Tasks:          taskPlans,
+		Hooks:          hookPlan,
+		Namespaces:     namespaces,
+	}
+
+	// Set project metadata if available
+	if projectCtx != nil {
+		plan.ProjectName = projectCtx.Name
+		plan.ProjectVersion = projectCtx.Version
+	}
+
+	return plan, nil
 }
 
-// GetDomainTask retrieves a domain task from the plan
-func (ep *ExecutionPlan) GetDomainTask(name string) (*task.Task, error) {
-	t, ok := ep.DomainTasks[name]
+// GetTask retrieves a task plan from the execution plan
+func (ep *ExecutionPlan) GetTask(name string) (*TaskPlan, error) {
+	t, ok := ep.Tasks[name]
 	if !ok {
 		return nil, fmt.Errorf("task '%s' not found in execution plan", name)
 	}
 	return t, nil
 }
 
-// GetASTTask retrieves an AST task from the plan (temporary)
-func (ep *ExecutionPlan) GetASTTask(name string) (*ast.TaskStatement, error) {
-	t, ok := ep.ASTTasks[name]
-	if !ok {
-		return nil, fmt.Errorf("AST task '%s' not found in execution plan", name)
+// ToJSON serializes the execution plan to JSON (for debugging/visualization)
+func (ep *ExecutionPlan) ToJSON() (string, error) {
+	// Create a serializable version (excluding AST tasks)
+	type SerializablePlan struct {
+		TargetTask     string
+		ExecutionOrder []string
+		ProjectName    string
+		ProjectVersion string
+		Namespaces     []string
+		TaskCount      int
+		HasHooks       bool
 	}
-	return t, nil
+
+	namespaceList := make([]string, 0, len(ep.Namespaces))
+	for ns := range ep.Namespaces {
+		namespaceList = append(namespaceList, ns)
+	}
+
+	plan := SerializablePlan{
+		TargetTask:     ep.TargetTask,
+		ExecutionOrder: ep.ExecutionOrder,
+		ProjectName:    ep.ProjectName,
+		ProjectVersion: ep.ProjectVersion,
+		Namespaces:     namespaceList,
+		TaskCount:      len(ep.Tasks),
+		HasHooks:       ep.Hooks != nil,
+	}
+
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize plan: %w", err)
+	}
+
+	return string(data), nil
 }

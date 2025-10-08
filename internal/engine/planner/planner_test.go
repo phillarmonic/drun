@@ -56,7 +56,7 @@ func TestPlanner_Plan(t *testing.T) {
 	}
 
 	// Plan execution
-	plan, err := planner.Plan("task2", program)
+	plan, err := planner.Plan("task2", program, nil)
 	if err != nil {
 		t.Fatalf("Plan() error = %v", err)
 	}
@@ -72,22 +72,13 @@ func TestPlanner_Plan(t *testing.T) {
 		t.Errorf("ExecutionOrder[1] = %v, want task2", plan.ExecutionOrder[1])
 	}
 
-	// Verify domain tasks are available
-	domainTask, err := plan.GetDomainTask("task1")
+	// Verify task plans are available
+	taskPlan, err := plan.GetTask("task1")
 	if err != nil {
-		t.Errorf("GetDomainTask(task1) error = %v", err)
+		t.Errorf("GetTask(task1) error = %v", err)
 	}
-	if domainTask.Name != "task1" {
-		t.Errorf("DomainTask.Name = %v, want task1", domainTask.Name)
-	}
-
-	// Verify AST tasks are available
-	astTask, err := plan.GetASTTask("task1")
-	if err != nil {
-		t.Errorf("GetASTTask(task1) error = %v", err)
-	}
-	if astTask.Name != "task1" {
-		t.Errorf("ASTTask.Name = %v, want task1", astTask.Name)
+	if taskPlan.Name != "task1" {
+		t.Errorf("TaskPlan.Name = %v, want task1", taskPlan.Name)
 	}
 }
 
@@ -100,8 +91,54 @@ func TestPlanner_PlanMissingTask(t *testing.T) {
 		Tasks: []*ast.TaskStatement{},
 	}
 
-	_, err := planner.Plan("missing", program)
+	_, err := planner.Plan("missing", program, nil)
 	if err == nil {
 		t.Error("Expected error for missing task, got nil")
 	}
+}
+
+func TestExecutionPlan_ToJSON(t *testing.T) {
+	plan := &ExecutionPlan{
+		TargetTask:     "test",
+		ExecutionOrder: []string{"dep1", "test"},
+		ProjectName:    "test-project",
+		ProjectVersion: "1.0",
+		Namespaces:     map[string]bool{"ns1": true, "ns2": true},
+		Tasks: map[string]*TaskPlan{
+			"test": {Name: "test"},
+			"dep1": {Name: "dep1"},
+		},
+		Hooks: &HookPlan{},
+	}
+
+	json, err := plan.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() error = %v", err)
+	}
+
+	if json == "" {
+		t.Error("Expected non-empty JSON output")
+	}
+
+	// Verify it contains expected fields
+	if !contains(json, "test-project") {
+		t.Error("Expected JSON to contain project name")
+	}
+	if !contains(json, "\"TaskCount\": 2") {
+		t.Error("Expected JSON to contain task count")
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && s != substr && len(s) >= len(substr) &&
+		(s == substr || findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
