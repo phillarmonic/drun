@@ -14,9 +14,11 @@ import (
 	"github.com/phillarmonic/drun/internal/domain/parameter"
 	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/internal/engine/executor"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/includes"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
+	"github.com/phillarmonic/drun/internal/engine/planner"
 	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
@@ -35,6 +37,10 @@ type Engine struct {
 	taskRegistry   *task.Registry
 	paramValidator *parameter.Validator
 	depResolver    *task.DependencyResolver
+
+	// Execution components
+	planner  *planner.Planner
+	executor *executor.Executor
 
 	// Remote includes support
 	cacheManager     *cache.Manager
@@ -64,6 +70,8 @@ func NewEngine(output io.Writer) *Engine {
 	// Initialize domain services
 	taskReg := task.NewRegistry()
 
+	depResolver := task.NewDependencyResolver(taskReg)
+
 	e := &Engine{
 		output:         output,
 		dryRun:         false,
@@ -75,12 +83,19 @@ func NewEngine(output io.Writer) *Engine {
 		// Domain services
 		taskRegistry:   taskReg,
 		paramValidator: parameter.NewValidator(),
-		depResolver:    task.NewDependencyResolver(taskReg),
+		depResolver:    depResolver,
+
+		// Execution components
+		planner:  planner.NewPlanner(taskReg, depResolver),
+		executor: executor.NewExecutor(output, false, nil), // stmtExecutor set later
 
 		// Pre-compile regex patterns for performance (still used by variable operations)
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
+
+	// Set the engine as the statement executor
+	e.executor = executor.NewExecutor(output, false, e)
 
 	// Initialize includes resolver
 	e.includesResolver = includes.NewResolver(
@@ -580,6 +595,15 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 	}
 
 	return nil
+}
+
+// ExecuteStatement executes a single statement (implements executor.StatementExecutor)
+func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
+	execCtx, ok := ctx.(*ExecutionContext)
+	if !ok {
+		return fmt.Errorf("invalid execution context type")
+	}
+	return e.executeStatement(stmt, execCtx)
 }
 
 // executeStatement executes a single statement (action, parameter, conditional, etc.)
