@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -56,38 +55,44 @@ type Engine struct {
 
 // ExecutionContext and ProjectContext moved to context.go
 
-// NewEngine creates a new v2 execution engine
+// NewEngine creates a new v2 execution engine with default options
+// For backward compatibility - uses the new options-based constructor internally
 func NewEngine(output io.Writer) *Engine {
-	if output == nil {
-		output = os.Stdout
-	}
-	githubFetcher := remote.NewGitHubFetcher()
-	interp := interpolation.NewInterpolator()
+	return NewEngineWithOptions(WithOutput(output))
+}
 
+// NewEngineWithOptions creates a new v2 execution engine with custom options
+func NewEngineWithOptions(opts ...Option) *Engine {
+	// Build options with defaults
+	options := &EngineOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	options.applyDefaults()
+
+	// Create default fetchers and interpolator
+	githubFetcher := remote.NewGitHubFetcher()
 	httpsFetcher := remote.NewHTTPSFetcher()
 	drunhubFetcher := remote.NewDrunhubFetcher(githubFetcher)
-
-	// Initialize domain services
-	taskReg := task.NewRegistry()
-
-	depResolver := task.NewDependencyResolver(taskReg)
+	interp := interpolation.NewInterpolator()
 
 	e := &Engine{
-		output:         output,
-		dryRun:         false,
+		output:         options.Output,
+		dryRun:         options.DryRun,
+		verbose:        options.Verbose,
 		interpolator:   interp,
 		githubFetcher:  githubFetcher,
 		httpsFetcher:   httpsFetcher,
 		drunhubFetcher: drunhubFetcher,
 
 		// Domain services
-		taskRegistry:   taskReg,
-		paramValidator: parameter.NewValidator(),
-		depResolver:    depResolver,
+		taskRegistry:   options.TaskRegistry,
+		paramValidator: options.ParamValidator,
+		depResolver:    options.DepResolver,
 
 		// Execution components
-		planner:  planner.NewPlanner(taskReg, depResolver),
-		executor: executor.NewExecutor(output, false, nil), // stmtExecutor set later
+		planner:  planner.NewPlanner(options.TaskRegistry, options.DepResolver),
+		executor: executor.NewExecutor(options.Output, options.DryRun, nil), // stmtExecutor set later
 
 		// Pre-compile regex patterns for performance (still used by variable operations)
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
@@ -95,16 +100,16 @@ func NewEngine(output io.Writer) *Engine {
 	}
 
 	// Set the engine as the statement executor
-	e.executor = executor.NewExecutor(output, false, e)
+	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
 
 	// Initialize includes resolver
 	e.includesResolver = includes.NewResolver(
-		nil, // cacheManager set later
+		options.CacheManager,
 		githubFetcher,
 		httpsFetcher,
 		drunhubFetcher,
-		false, // verbose set later
-		output,
+		options.Verbose,
+		options.Output,
 		ParseStringWithFilename,
 	)
 
