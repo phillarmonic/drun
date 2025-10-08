@@ -1,7 +1,10 @@
 package project
 
 import (
+	"fmt"
+
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Project represents a domain project entity
@@ -17,7 +20,7 @@ type Project struct {
 }
 
 // NewProject creates a new project from AST
-func NewProject(stmt *ast.ProjectStatement) *Project {
+func NewProject(stmt *ast.ProjectStatement) (*Project, error) {
 	project := &Project{
 		Name:         stmt.Name,
 		Version:      stmt.Version,
@@ -43,10 +46,16 @@ func NewProject(stmt *ast.ProjectStatement) *Project {
 			}
 
 		case *ast.LifecycleHook:
+			// Convert hook body from AST to domain
+			body, err := statement.FromASTList(s.Body)
+			if err != nil {
+				return nil, fmt.Errorf("converting %s hook body: %w", s.Type, err)
+			}
+
 			hook := Hook{
 				Type:  s.Type,
 				Scope: s.Scope,
-				Body:  s.Body,
+				Body:  body,
 			}
 
 			switch s.Type {
@@ -62,7 +71,7 @@ func NewProject(stmt *ast.ProjectStatement) *Project {
 		}
 	}
 
-	return project
+	return project, nil
 }
 
 // GetSetting gets a project setting
@@ -96,5 +105,5 @@ type ShellConfig struct {
 type Hook struct {
 	Type  string // "before", "after", "setup", "teardown"
 	Scope string // "any", "drun"
-	Body  []ast.Statement
+	Body  []statement.Statement
 }

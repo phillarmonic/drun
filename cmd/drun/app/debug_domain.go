@@ -28,7 +28,10 @@ func debugDomainLayer(program *ast.Program, currentFile string) error {
 
 	// Register all tasks
 	for _, astTask := range program.Tasks {
-		domainTask := task.NewTask(astTask, "", currentFile)
+		domainTask, err := task.NewTask(astTask, "", currentFile)
+		if err != nil {
+			return fmt.Errorf("converting task %s: %w", astTask.Name, err)
+		}
 		if err := taskReg.Register(domainTask); err != nil {
 			return fmt.Errorf("task registration failed: %v", err)
 		}

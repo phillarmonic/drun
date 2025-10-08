@@ -12,6 +12,7 @@ import (
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/domain/parameter"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/domain/task"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/includes"
@@ -198,11 +199,17 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", executionOrder)
 	}
 
+	// Create project context
+	projectCtx, err := e.createProjectContext(program.Project, currentFile)
+	if err != nil {
+		return fmt.Errorf("creating project context: %w", err)
+	}
+
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
 		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
 		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
-		Project:     e.createProjectContext(program.Project, currentFile),
+		Project:     projectCtx,
 		CurrentFile: currentFile,
 		Program:     program,
 	}
@@ -210,7 +217,12 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	// Execute drun setup hooks
 	if ctx.Project != nil && ctx.Project.HookManager != nil {
 		for _, hook := range ctx.Project.HookManager.GetSetupHooks() {
-			if err := e.executeStatement(hook, ctx); err != nil {
+			// Convert domain statement to AST for execution (temporary bridge)
+			astHook, err := statement.ToAST(hook)
+			if err != nil {
+				return fmt.Errorf("converting setup hook: %w", err)
+			}
+			if err := e.executeStatement(astHook, ctx); err != nil {
 				return fmt.Errorf("drun setup hook failed: %v", err)
 			}
 		}
@@ -218,21 +230,26 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 	// Execute all tasks in dependency order
 	for _, currentTaskName := range executionOrder {
-		// Find the task using AST (still needed for execution)
-		var currentTask *ast.TaskStatement
+		// Get the domain task from the registry
+		domainTask, err := e.taskRegistry.Get(currentTaskName)
+		if err != nil {
+			return fmt.Errorf("task '%s' not found in registry: %w", currentTaskName, err)
+		}
+
+		// Find the AST task for parameter setup (still needed temporarily)
+		var astTask *ast.TaskStatement
 		for _, task := range program.Tasks {
 			if task.Name == currentTaskName {
-				currentTask = task
+				astTask = task
 				break
 			}
 		}
-
-		if currentTask == nil {
-			return fmt.Errorf("task '%s' not found during execution", currentTaskName)
+		if astTask == nil {
+			return fmt.Errorf("task '%s' not found in AST", currentTaskName)
 		}
 
 		// Set up parameters for this specific task
-		if err := e.setupTaskParameters(currentTask, params, ctx); err != nil {
+		if err := e.setupTaskParameters(astTask, params, ctx); err != nil {
 			return err
 		}
 
@@ -242,21 +259,45 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		// Execute before hooks only for the target task
 		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
 			for _, hook := range ctx.Project.HookManager.GetBeforeHooks() {
-				if err := e.executeStatement(hook, ctx); err != nil {
+				// Convert domain statement to AST for execution (temporary bridge)
+				astHook, err := statement.ToAST(hook)
+				if err != nil {
+					return fmt.Errorf("converting before hook: %w", err)
+				}
+				if err := e.executeStatement(astHook, ctx); err != nil {
 					return fmt.Errorf("before hook failed: %v", err)
 				}
 			}
 		}
 
+		// Convert domain task body to AST for execution (temporary bridge)
+		astBody, err := statement.ToASTList(domainTask.Body)
+		if err != nil {
+			return fmt.Errorf("converting task body for '%s': %w", currentTaskName, err)
+		}
+
+		// Create a temporary AST task for execution
+		tempASTTask := &ast.TaskStatement{
+			Name:        domainTask.Name,
+			Description: domainTask.Description,
+			Body:        astBody,
+		}
+
 		// Execute the task
-		if err := e.executeTask(currentTask, ctx); err != nil {
+		if err := e.executeTask(tempASTTask, ctx); err != nil {
 			return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
 		}
 
 		// Execute after hooks only for the target task
 		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
 			for _, hook := range ctx.Project.HookManager.GetAfterHooks() {
-				if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+				// Convert domain statement to AST for execution (temporary bridge)
+				astHook, hookErr := statement.ToAST(hook)
+				if hookErr != nil {
+					_, _ = fmt.Fprintf(e.output, "⚠️  After hook conversion failed: %v\n", hookErr)
+					continue
+				}
+				if hookErr := e.executeStatement(astHook, ctx); hookErr != nil {
 					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
 				}
 			}
@@ -266,7 +307,13 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	// Execute drun teardown hooks
 	if ctx.Project != nil && ctx.Project.HookManager != nil {
 		for _, hook := range ctx.Project.HookManager.GetTeardownHooks() {
-			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
+			// Convert domain statement to AST for execution (temporary bridge)
+			astHook, hookErr := statement.ToAST(hook)
+			if hookErr != nil {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook conversion failed: %v\n", hookErr)
+				continue
+			}
+			if hookErr := e.executeStatement(astHook, ctx); hookErr != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
 			}
 		}
@@ -278,7 +325,10 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 // registerTasks registers all tasks from the program into the domain registry
 func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) error {
 	for _, astTask := range tasks {
-		domainTask := task.NewTask(astTask, "", currentFile)
+		domainTask, err := task.NewTask(astTask, "", currentFile)
+		if err != nil {
+			return fmt.Errorf("converting task %s: %w", astTask.Name, err)
+		}
 		if err := e.taskRegistry.Register(domainTask); err != nil {
 			return err
 		}
@@ -440,9 +490,9 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 }
 
 // createProjectContext creates a project context from the project statement
-func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) *ProjectContext {
+func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
 	if project == nil {
-		return nil
+		return nil, nil
 	}
 
 	ctx := &ProjectContext{
@@ -476,15 +526,21 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 			// Store snippet for later use
 			ctx.Snippets[s.Name] = s
 		case *ast.LifecycleHook:
+			// Convert AST statements to domain statements
+			domainBody, err := statement.FromASTList(s.Body)
+			if err != nil {
+				return nil, fmt.Errorf("converting %s hook body: %w", s.Type, err)
+			}
+
 			switch s.Type {
 			case "before":
-				ctx.HookManager.RegisterBeforeHooks(s.Body)
+				ctx.HookManager.RegisterBeforeHooks(domainBody)
 			case "after":
-				ctx.HookManager.RegisterAfterHooks(s.Body)
+				ctx.HookManager.RegisterAfterHooks(domainBody)
 			case "setup":
-				ctx.HookManager.RegisterSetupHooks(s.Body)
+				ctx.HookManager.RegisterSetupHooks(domainBody)
 			case "teardown":
-				ctx.HookManager.RegisterTeardownHooks(s.Body)
+				ctx.HookManager.RegisterTeardownHooks(domainBody)
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform
@@ -497,7 +553,7 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		}
 	}
 
-	return ctx
+	return ctx, nil
 }
 
 // executeTask executes a single task with the given context
