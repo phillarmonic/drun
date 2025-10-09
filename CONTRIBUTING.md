@@ -380,14 +380,6 @@ case *ast.SlackStatement:
         Channel: s.Channel,
         Message: s.Message,
     }, nil
-
-// In ToAST function (needed for nested execution)
-case *Slack:
-    return &ast.SlackStatement{
-        Action:  s.Action,
-        Channel: s.Channel,
-        Message: s.Message,
-    }, nil
 ```
 
 #### 4. Add Parser
@@ -431,11 +423,12 @@ Create `internal/engine/executor_slack.go`:
 ```go
 package engine
 
-import "github.com/phillarmonic/drun/internal/ast"
+import "github.com/phillarmonic/drun/internal/domain/statement"
 
-func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) error {
     // Interpolate variables
     message := e.interpolateVariables(stmt.Message, ctx)
+    channel := e.interpolateVariables(stmt.Channel, ctx)
     
     // Send to Slack...
     
@@ -443,15 +436,11 @@ func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) e
 }
 ```
 
-Wire it up in `executeDomainStatement` in `engine.go`:
+Wire it up in `executeStatement` in `engine.go`:
 
 ```go
 case *statement.Slack:
-    return e.executeSlack(&ast.SlackStatement{
-        Action:  s.Action,
-        Channel: s.Channel,
-        Message: s.Message,
-    }, ctx)
+    return e.executeSlack(s, ctx)
 ```
 
 #### 6. Add Tests
