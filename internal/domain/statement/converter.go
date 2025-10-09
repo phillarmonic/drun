@@ -225,6 +225,13 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			SnippetName: s.SnippetName,
 		}, nil
 
+	case *ast.TaskFromTemplateStatement:
+		return &TaskFromTemplate{
+			Name:         s.Name,
+			TemplateName: s.TemplateName,
+			Overrides:    s.Overrides,
+		}, nil
+
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		// Return nil to skip them in the body

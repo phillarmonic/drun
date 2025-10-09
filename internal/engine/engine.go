@@ -756,6 +756,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeDetection(s, ctx)
 	case *statement.TaskCall:
 		return e.executeTaskCall(s, ctx)
+	case *statement.TaskFromTemplate:
+		return e.executeTaskFromTemplate(s, ctx)
 	case *statement.UseSnippet:
 		return e.executeUseSnippet(s, ctx)
 	default:
@@ -989,10 +991,7 @@ func (e *Engine) executeUseSnippet(useStmt *statement.UseSnippet, ctx *Execution
 }
 
 // executeTaskFromTemplate instantiates and executes a task from a template
-// TODO: Integrate with domain model - currently accessed via AST
-//
-//nolint:unused
-func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would instantiate task '%s' from template '%s'\n", tfts.Name, tfts.TemplateName)
 		return nil

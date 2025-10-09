@@ -11,24 +11,25 @@ type Statement interface {
 type StatementType string
 
 const (
-	TypeAction      StatementType = "action"
-	TypeShell       StatementType = "shell"
-	TypeVariable    StatementType = "variable"
-	TypeConditional StatementType = "conditional"
-	TypeLoop        StatementType = "loop"
-	TypeTry         StatementType = "try"
-	TypeThrow       StatementType = "throw"
-	TypeBreak       StatementType = "break"
-	TypeContinue    StatementType = "continue"
-	TypeTaskCall    StatementType = "task_call"
-	TypeDocker      StatementType = "docker"
-	TypeGit         StatementType = "git"
-	TypeHTTP        StatementType = "http"
-	TypeDownload    StatementType = "download"
-	TypeNetwork     StatementType = "network"
-	TypeFile        StatementType = "file"
-	TypeDetection   StatementType = "detection"
-	TypeUseSnippet  StatementType = "use_snippet"
+	TypeAction           StatementType = "action"
+	TypeShell            StatementType = "shell"
+	TypeVariable         StatementType = "variable"
+	TypeConditional      StatementType = "conditional"
+	TypeLoop             StatementType = "loop"
+	TypeTry              StatementType = "try"
+	TypeThrow            StatementType = "throw"
+	TypeBreak            StatementType = "break"
+	TypeContinue         StatementType = "continue"
+	TypeTaskCall         StatementType = "task_call"
+	TypeTaskFromTemplate StatementType = "task_from_template"
+	TypeDocker           StatementType = "docker"
+	TypeGit              StatementType = "git"
+	TypeHTTP             StatementType = "http"
+	TypeDownload         StatementType = "download"
+	TypeNetwork          StatementType = "network"
+	TypeFile             StatementType = "file"
+	TypeDetection        StatementType = "detection"
+	TypeUseSnippet       StatementType = "use_snippet"
 )
 
 // Action represents an action statement (info, step, success, etc.)
@@ -143,6 +144,15 @@ type TaskCall struct {
 }
 
 func (tc *TaskCall) Type() StatementType { return TypeTaskCall }
+
+// TaskFromTemplate represents a task instantiated from a template
+type TaskFromTemplate struct {
+	Name         string
+	TemplateName string
+	Overrides    map[string]string
+}
+
+func (tft *TaskFromTemplate) Type() StatementType { return TypeTaskFromTemplate }
 
 // Docker represents Docker operations
 type Docker struct {
