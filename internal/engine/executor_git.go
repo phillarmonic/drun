@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Git Operations Execution
@@ -12,7 +12,7 @@ import (
 // - Branch management
 
 // executeGit executes Git operations
-func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeGit(gitStmt *statement.Git, ctx *ExecutionContext) error {
 	// Interpolate variables in Git statement
 	operation := gitStmt.Operation
 	resource := gitStmt.Resource

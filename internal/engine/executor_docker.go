@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Docker Operations Execution
@@ -14,7 +14,7 @@ import (
 
 // executeTry executes a try/catch/finally statement
 // executeDocker executes Docker operations
-func (e *Engine) executeDocker(dockerStmt *ast.DockerStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionContext) error {
 	// Interpolate variables in Docker statement
 	operation := dockerStmt.Operation
 	resource := dockerStmt.Resource

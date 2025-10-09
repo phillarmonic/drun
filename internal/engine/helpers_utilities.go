@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/shell"
 )
 
@@ -73,7 +73,7 @@ func (e *Engine) parseArrayLiteralString(arrayStr string) []string {
 }
 
 // executeSingleLineShell executes a single-line shell command
-func (e *Engine) executeSingleLineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
 	// Interpolate variables in the command
 	interpolatedCommand, err := e.interpolateVariablesWithError(shellStmt.Command, ctx)
 	if err != nil {

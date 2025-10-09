@@ -277,7 +277,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 		// Execute task body directly using domain statements
 		for _, stmt := range taskPlan.Body {
-			if err := e.executeDomainStatement(stmt, ctx); err != nil {
+			if err := e.executeStatement(stmt, ctx); err != nil {
 				return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
 			}
 		}
@@ -657,25 +657,33 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 	return ctx, nil
 }
 
-// executeTask executes a single task with the given context
+// executeTask executes a single task with the given context (AST version for templates)
 func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
 		if task.Description != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
 		}
-		// Process statements in dry run mode
-		for _, stmt := range task.Body {
-			if err := e.executeStatement(stmt, ctx); err != nil {
+		// Convert AST statements to domain and execute
+		for _, astStmt := range task.Body {
+			domainStmt, err := statement.FromAST(astStmt)
+			if err != nil {
+				return fmt.Errorf("converting statement: %w", err)
+			}
+			if err := e.executeStatement(domainStmt, ctx); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
-	// Execute each statement in the task body
-	for _, stmt := range task.Body {
-		if err := e.executeStatement(stmt, ctx); err != nil {
+	// Execute each statement in the task body (convert AST to domain)
+	for _, astStmt := range task.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, ctx); err != nil {
 			return err
 		}
 	}
@@ -684,12 +692,18 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 }
 
 // ExecuteStatement executes a single AST statement (implements executor.StatementExecutor)
+// Converts AST to domain before execution
 func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
 	execCtx, ok := ctx.(*ExecutionContext)
 	if !ok {
 		return fmt.Errorf("invalid execution context type")
 	}
-	return e.executeStatement(stmt, execCtx)
+	// Convert AST to domain
+	domainStmt, err := statement.FromAST(stmt)
+	if err != nil {
+		return fmt.Errorf("converting statement: %w", err)
+	}
+	return e.executeStatement(domainStmt, execCtx)
 }
 
 // ExecuteDomainStatement executes a single domain statement (implements executor.DomainStatementExecutor)
@@ -698,277 +712,72 @@ func (e *Engine) ExecuteDomainStatement(stmt statement.Statement, ctx interface{
 	if !ok {
 		return fmt.Errorf("invalid execution context type")
 	}
-	return e.executeDomainStatement(stmt, execCtx)
+	return e.executeStatement(stmt, execCtx)
 }
 
 // executeStatement executes a single AST statement (action, parameter, conditional, etc.)
-func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) error {
-	switch s := stmt.(type) {
-	case *ast.ActionStatement:
-		return e.executeAction(s, ctx)
-	case *ast.ShellStatement:
-		return e.executeShell(s, ctx)
-	case *ast.FileStatement:
-		return e.executeFile(s, ctx)
-	case *ast.TryStatement:
-		return e.executeTry(s, ctx)
-	case *ast.ThrowStatement:
-		return e.executeThrow(s, ctx)
-	case *ast.DockerStatement:
-		return e.executeDocker(s, ctx)
-	case *ast.GitStatement:
-		return e.executeGit(s, ctx)
-	case *ast.HTTPStatement:
-		return e.executeHTTP(s, ctx)
-	case *ast.DownloadStatement:
-		return e.executeDownload(s, ctx)
-	case *ast.NetworkStatement:
-		return e.executeNetwork(s, ctx)
-	case *ast.DetectionStatement:
-		return e.executeDetection(s, ctx)
-	case *ast.BreakStatement:
-		return e.executeBreak(s, ctx)
-	case *ast.ContinueStatement:
-		return e.executeContinue(s, ctx)
-	case *ast.VariableStatement:
-		return e.executeVariable(s, ctx)
-	case *ast.ParameterStatement:
-		// Parameters are handled during task setup, not execution
-		return nil
-	case *ast.ConditionalStatement:
-		return e.executeConditional(s, ctx)
-	case *ast.LoopStatement:
-		return e.executeLoop(s, ctx)
-	case *ast.TaskCallStatement:
-		return e.executeTaskCall(s, ctx)
-	case *ast.UseSnippetStatement:
-		return e.executeUseSnippet(s, ctx)
-	case *ast.TaskFromTemplateStatement:
-		return e.executeTaskFromTemplate(s, ctx)
-	default:
-		return fmt.Errorf("unknown AST statement type: %T", stmt)
-	}
-}
+// Note: executeASTStatement removed - all execution now uses domain statements
+// TaskFromTemplate converted to domain at parse time like other statements
 
-// executeDomainStatement executes a single domain statement by converting to AST and delegating
-func (e *Engine) executeDomainStatement(stmt statement.Statement, ctx *ExecutionContext) error {
+// executeStatement executes domain statements directly
+func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContext) error {
 	switch s := stmt.(type) {
 	case *statement.Action:
-		return e.executeAction(&ast.ActionStatement{
-			Action:          s.ActionType,
-			Message:         s.Message,
-			LineBreakBefore: s.LineBreakBefore,
-			LineBreakAfter:  s.LineBreakAfter,
-		}, ctx)
+		return e.executeAction(s, ctx)
 	case *statement.Shell:
-		return e.executeShell(&ast.ShellStatement{
-			Action:       s.Action,
-			Command:      s.Command,
-			Commands:     s.Commands,
-			CaptureVar:   s.CaptureVar,
-			StreamOutput: s.StreamOutput,
-			IsMultiline:  s.IsMultiline,
-		}, ctx)
+		return e.executeShell(s, ctx)
 	case *statement.Variable:
-		var value ast.Expression
-		if s.Value != "" {
-			value = &ast.LiteralExpression{Value: s.Value}
-		}
-		return e.executeVariable(&ast.VariableStatement{
-			Operation: s.Operation,
-			Variable:  s.Name,
-			Value:     value,
-			Function:  s.Function,
-			Arguments: s.Arguments,
-		}, ctx)
+		return e.executeVariable(s, ctx)
 	case *statement.Conditional:
-		// Convert body statements recursively
-		body, err := statement.ToASTList(s.Body)
-		if err != nil {
-			return fmt.Errorf("converting conditional body: %w", err)
-		}
-		elseBody, err := statement.ToASTList(s.ElseBody)
-		if err != nil {
-			return fmt.Errorf("converting conditional else body: %w", err)
-		}
-		return e.executeConditional(&ast.ConditionalStatement{
-			Type:      s.ConditionType,
-			Condition: s.Condition,
-			Body:      body,
-			ElseBody:  elseBody,
-		}, ctx)
+		return e.executeConditional(s, ctx)
 	case *statement.Loop:
-		body, err := statement.ToASTList(s.Body)
-		if err != nil {
-			return fmt.Errorf("converting loop body: %w", err)
-		}
-		var filter *ast.FilterExpression
-		if s.Filter != nil {
-			filter = &ast.FilterExpression{
-				Variable: s.Filter.Variable,
-				Operator: s.Filter.Operator,
-				Value:    s.Filter.Value,
-			}
-		}
-		return e.executeLoop(&ast.LoopStatement{
-			Type:       s.LoopType,
-			Variable:   s.Variable,
-			Iterable:   s.Iterable,
-			RangeStart: s.RangeStart,
-			RangeEnd:   s.RangeEnd,
-			RangeStep:  s.RangeStep,
-			Filter:     filter,
-			Parallel:   s.Parallel,
-			MaxWorkers: s.MaxWorkers,
-			FailFast:   s.FailFast,
-			Body:       body,
-		}, ctx)
+		return e.executeLoop(s, ctx)
 	case *statement.Try:
-		tryBody, err := statement.ToASTList(s.TryBody)
-		if err != nil {
-			return fmt.Errorf("converting try body: %w", err)
-		}
-		var catchClauses []ast.CatchClause
-		for _, domainCatch := range s.CatchClauses {
-			catchBody, err := statement.ToASTList(domainCatch.Body)
-			if err != nil {
-				return fmt.Errorf("converting catch body: %w", err)
-			}
-			catchClauses = append(catchClauses, ast.CatchClause{
-				ErrorType: domainCatch.ErrorType,
-				ErrorVar:  domainCatch.ErrorVar,
-				Body:      catchBody,
-			})
-		}
-		finallyBody, err := statement.ToASTList(s.FinallyBody)
-		if err != nil {
-			return fmt.Errorf("converting finally body: %w", err)
-		}
-		return e.executeTry(&ast.TryStatement{
-			TryBody:      tryBody,
-			CatchClauses: catchClauses,
-			FinallyBody:  finallyBody,
-		}, ctx)
+		return e.executeTry(s, ctx)
 	case *statement.Throw:
-		return e.executeThrow(&ast.ThrowStatement{
-			Action:  s.Action,
-			Message: s.Message,
-		}, ctx)
+		return e.executeThrow(s, ctx)
 	case *statement.Break:
-		return e.executeBreak(&ast.BreakStatement{
-			Condition: s.Condition,
-		}, ctx)
+		return e.executeBreak(s, ctx)
 	case *statement.Continue:
-		return e.executeContinue(&ast.ContinueStatement{
-			Condition: s.Condition,
-		}, ctx)
+		return e.executeContinue(s, ctx)
 	case *statement.Docker:
-		return e.executeDocker(&ast.DockerStatement{
-			Operation: s.Operation,
-			Resource:  s.Resource,
-			Name:      s.Name,
-			Options:   s.Options,
-		}, ctx)
+		return e.executeDocker(s, ctx)
 	case *statement.Git:
-		return e.executeGit(&ast.GitStatement{
-			Operation: s.Operation,
-			Resource:  s.Resource,
-			Name:      s.Name,
-			Options:   s.Options,
-		}, ctx)
+		return e.executeGit(s, ctx)
 	case *statement.HTTP:
-		return e.executeHTTP(&ast.HTTPStatement{
-			Method:  s.Method,
-			URL:     s.URL,
-			Headers: s.Headers,
-			Body:    s.Body,
-			Auth:    s.Auth,
-			Options: s.Options,
-		}, ctx)
+		return e.executeHTTP(s, ctx)
 	case *statement.Download:
-		var astPerms []ast.PermissionSpec
-		for _, perm := range s.AllowPermissions {
-			astPerms = append(astPerms, ast.PermissionSpec{
-				Permissions: perm.Permissions,
-				Targets:     perm.Targets,
-			})
-		}
-		return e.executeDownload(&ast.DownloadStatement{
-			URL:              s.URL,
-			Path:             s.Path,
-			AllowOverwrite:   s.AllowOverwrite,
-			AllowPermissions: astPerms,
-			ExtractTo:        s.ExtractTo,
-			RemoveArchive:    s.RemoveArchive,
-			Headers:          s.Headers,
-			Auth:             s.Auth,
-			Options:          s.Options,
-		}, ctx)
+		return e.executeDownload(s, ctx)
 	case *statement.Network:
-		return e.executeNetwork(&ast.NetworkStatement{
-			Action:    s.Action,
-			Target:    s.Target,
-			Port:      s.Port,
-			Options:   s.Options,
-			Condition: s.Condition,
-		}, ctx)
+		return e.executeNetwork(s, ctx)
 	case *statement.File:
-		return e.executeFile(&ast.FileStatement{
-			Action:     s.Action,
-			Target:     s.Target,
-			Source:     s.Source,
-			Content:    s.Content,
-			IsDir:      s.IsDir,
-			CaptureVar: s.CaptureVar,
-		}, ctx)
+		return e.executeFile(s, ctx)
 	case *statement.Detection:
-		body, err := statement.ToASTList(s.Body)
-		if err != nil {
-			return fmt.Errorf("converting detection body: %w", err)
-		}
-		elseBody, err := statement.ToASTList(s.ElseBody)
-		if err != nil {
-			return fmt.Errorf("converting detection else body: %w", err)
-		}
-		return e.executeDetection(&ast.DetectionStatement{
-			Type:         s.DetectionType,
-			Target:       s.Target,
-			Alternatives: s.Alternatives,
-			Condition:    s.Condition,
-			Value:        s.Value,
-			CaptureVar:   s.CaptureVar,
-			Body:         body,
-			ElseBody:     elseBody,
-		}, ctx)
-	case *statement.UseSnippet:
-		return e.executeUseSnippet(&ast.UseSnippetStatement{
-			SnippetName: s.SnippetName,
-		}, ctx)
+		return e.executeDetection(s, ctx)
 	case *statement.TaskCall:
-		return e.executeTaskCall(&ast.TaskCallStatement{
-			TaskName:   s.TaskName,
-			Parameters: s.Parameters,
-		}, ctx)
+		return e.executeTaskCall(s, ctx)
+	case *statement.UseSnippet:
+		return e.executeUseSnippet(s, ctx)
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}
 }
 
 // executeAction executes a single action statement
-func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) error {
 	// Interpolate variables in the message
 	interpolatedMessage, err := e.interpolateVariablesWithError(action.Message, ctx)
 	if err != nil {
-		return fmt.Errorf("in %s statement: %w", action.Action, err)
+		return fmt.Errorf("in %s statement: %w", action.ActionType, err)
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.ActionType, interpolatedMessage)
 		return nil
 	}
 
 	// Map actions to output with appropriate formatting and emojis
-	switch action.Action {
+	switch action.ActionType {
 	case "info":
 		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
@@ -1002,14 +811,14 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")
 		_, _ = fmt.Fprintf(e.output, "%s\n", processedMessage)
 	default:
-		return fmt.Errorf("unknown action: %s", action.Action)
+		return fmt.Errorf("unknown action: %s", action.ActionType)
 	}
 
 	return nil
 }
 
 // executeTaskCall executes a task call statement
-func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would call task: %s\n", callStmt.TaskName)
 		if len(callStmt.Parameters) > 0 {
@@ -1109,7 +918,7 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 }
 
 // executeUseSnippet executes a snippet by running its body statements
-func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeUseSnippet(useStmt *statement.UseSnippet, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute snippet: %s\n", useStmt.SnippetName)
 		return nil
@@ -1165,9 +974,13 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 		ctx.CurrentNamespace = oldNamespace
 	}()
 
-	// Execute all statements in the snippet body
-	for _, stmt := range snippet.Body {
-		if err := e.executeStatement(stmt, ctx); err != nil {
+	// Execute all statements in the snippet body (convert AST to domain)
+	for _, astStmt := range snippet.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting snippet statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, ctx); err != nil {
 			return fmt.Errorf("error executing snippet '%s': %w", useStmt.SnippetName, err)
 		}
 	}
@@ -1176,6 +989,9 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 }
 
 // executeTaskFromTemplate instantiates and executes a task from a template
+// TODO: Integrate with domain model - currently accessed via AST
+//
+//nolint:unused
 func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would instantiate task '%s' from template '%s'\n", tfts.Name, tfts.TemplateName)
@@ -1270,9 +1086,13 @@ func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ct
 		}
 	}
 
-	// Execute the template body
-	for _, stmt := range template.Body {
-		if err := e.executeStatement(stmt, taskCtx); err != nil {
+	// Execute the template body (convert AST to domain)
+	for _, astStmt := range template.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting template statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, taskCtx); err != nil {
 			return fmt.Errorf("error executing template task '%s': %w", tfts.Name, err)
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/shell"
 )
 
@@ -16,7 +16,7 @@ import (
 // - Variable capture (from expressions and shell commands)
 
 // executeVariable executes variable operation statements
-func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeVariable(varStmt *statement.Variable, ctx *ExecutionContext) error {
 	switch varStmt.Operation {
 	case "let":
 		return e.executeLetStatement(varStmt, ctx)
@@ -34,20 +34,15 @@ func (e *Engine) executeVariable(varStmt *ast.VariableStatement, ctx *ExecutionC
 }
 
 // executeLetStatement executes "let variable = value" statements
-func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value, err := e.evaluateExpression(varStmt.Value, ctx)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate expression: %v", err)
-	}
-
+func (e *Engine) executeLetStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
 	// Interpolate the value if it contains braces (for builtin function calls)
-	interpolatedValue := e.interpolateVariables(value, ctx)
+	interpolatedValue := e.interpolateVariables(varStmt.Value, ctx)
 
 	// Determine the variable name (namespace it if in an included snippet/task)
-	varName := varStmt.Variable
+	varName := varStmt.Name
 	if ctx.CurrentNamespace != "" {
 		// Namespace the variable (e.g., docker.image)
-		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+		varName = ctx.CurrentNamespace + "." + varStmt.Name
 	}
 
 	// Store the variable in the context even in dry run for interpolation
@@ -64,20 +59,15 @@ func (e *Engine) executeLetStatement(varStmt *ast.VariableStatement, ctx *Execut
 }
 
 // executeSetStatement executes "set variable to value" statements
-func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	value, err := e.evaluateExpression(varStmt.Value, ctx)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate expression: %v", err)
-	}
-
+func (e *Engine) executeSetStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
 	// Interpolate the value if it contains braces (for builtin function calls)
-	interpolatedValue := e.interpolateVariables(value, ctx)
+	interpolatedValue := e.interpolateVariables(varStmt.Value, ctx)
 
 	// Determine the variable name (namespace it if in an included snippet/task)
-	varName := varStmt.Variable
+	varName := varStmt.Name
 	if ctx.CurrentNamespace != "" {
 		// Namespace the variable (e.g., docker.image)
-		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+		varName = ctx.CurrentNamespace + "." + varStmt.Name
 	}
 
 	// Store the variable in the context even in dry run for interpolation
@@ -96,11 +86,11 @@ func (e *Engine) executeSetStatement(varStmt *ast.VariableStatement, ctx *Execut
 }
 
 // executeTransformStatement executes "transform variable with function args" statements
-func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTransformStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
 	// Determine the variable name (namespace it if in an included snippet/task)
-	varName := varStmt.Variable
+	varName := varStmt.Name
 	if ctx.CurrentNamespace != "" {
-		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+		varName = ctx.CurrentNamespace + "." + varStmt.Name
 	}
 
 	// Get the current value of the variable
@@ -130,19 +120,14 @@ func (e *Engine) executeTransformStatement(varStmt *ast.VariableStatement, ctx *
 }
 
 // executeCaptureStatement executes "capture variable_name from expression" statements
-func (e *Engine) executeCaptureStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	expression, err := e.evaluateExpression(varStmt.Value, ctx)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate expression: %v", err)
-	}
-
-	// The expression is already evaluated, so we can use it directly as the value
-	value := expression
+func (e *Engine) executeCaptureStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
+	// The value is already a string in domain model
+	value := varStmt.Value
 
 	// Determine the variable name (namespace it if in an included snippet/task)
-	varName := varStmt.Variable
+	varName := varStmt.Name
 	if ctx.CurrentNamespace != "" {
-		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+		varName = ctx.CurrentNamespace + "." + varStmt.Name
 	}
 
 	// Store the captured value in the context
@@ -163,15 +148,9 @@ func (e *Engine) executeCaptureStatement(varStmt *ast.VariableStatement, ctx *Ex
 }
 
 // executeCaptureShellStatement executes "capture from shell command as $variable" statements
-func (e *Engine) executeCaptureShellStatement(varStmt *ast.VariableStatement, ctx *ExecutionContext) error {
-	// Extract the command from the literal expression
-	literalExpr, ok := varStmt.Value.(*ast.LiteralExpression)
-	if !ok {
-		return fmt.Errorf("expected literal expression for shell capture command")
-	}
-
-	// Interpolate variables in the command
-	command := e.interpolateVariables(literalExpr.Value, ctx)
+func (e *Engine) executeCaptureShellStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
+	// Interpolate variables in the command (value contains the shell command)
+	command := e.interpolateVariables(varStmt.Value, ctx)
 
 	// Execute the shell command
 	shellOpts := e.getPlatformShellConfig(ctx)
@@ -181,9 +160,9 @@ func (e *Engine) executeCaptureShellStatement(varStmt *ast.VariableStatement, ct
 	}
 
 	// Determine the variable name (namespace it if in an included snippet/task)
-	varName := varStmt.Variable
+	varName := varStmt.Name
 	if ctx.CurrentNamespace != "" {
-		varName = ctx.CurrentNamespace + "." + varStmt.Variable
+		varName = ctx.CurrentNamespace + "." + varStmt.Name
 	}
 
 	// Store the captured output (trimmed)

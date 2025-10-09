@@ -14,6 +14,9 @@ import (
 // This file contains helper methods for evaluating expressions and builtin operations
 
 // evaluateExpression evaluates an AST expression and returns its string value
+// NOTE: Deprecated - domain model uses pre-evaluated string values. Kept for potential AST features.
+//
+//nolint:unused
 func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) (string, error) {
 	if expr == nil {
 		return "", nil
@@ -65,6 +68,8 @@ func (e *Engine) evaluateExpression(expr ast.Expression, ctx *ExecutionContext) 
 }
 
 // evaluateBinaryExpression evaluates binary operations like {a} - {b}
+//
+//nolint:unused
 func (e *Engine) evaluateBinaryExpression(expr *ast.BinaryExpression, ctx *ExecutionContext) (string, error) {
 	leftVal, err := e.evaluateExpression(expr.Left, ctx)
 	if err != nil {
@@ -219,6 +224,8 @@ func (e *Engine) evaluateBinaryExpression(expr *ast.BinaryExpression, ctx *Execu
 }
 
 // evaluateFunctionCall evaluates function calls like now(), current git branch
+//
+//nolint:unused
 func (e *Engine) evaluateFunctionCall(expr *ast.FunctionCallExpression, ctx *ExecutionContext) (string, error) {
 	switch expr.Function {
 	case "now":

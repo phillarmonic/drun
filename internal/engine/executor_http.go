@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: HTTP Operations Execution
@@ -12,7 +12,7 @@ import (
 // - API interactions
 
 // executeHTTP executes HTTP operations
-func (e *Engine) executeHTTP(httpStmt *ast.HTTPStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeHTTP(httpStmt *statement.HTTP, ctx *ExecutionContext) error {
 	// Interpolate variables in HTTP statement
 	method := httpStmt.Method
 	url := e.interpolateVariables(httpStmt.URL, ctx)
