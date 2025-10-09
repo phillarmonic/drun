@@ -94,26 +94,48 @@ value := types.NewValue(types.NumberType, "8080")
 err := validator.Validate(param, value)
 ```
 
-## Future Integration
+## Engine Integration
 
-The domain layer is designed to be integrated into the engine for:
+The domain layer is fully integrated with the execution engine:
 
-- Cleaner business logic separation
-- Better testability of validation rules
-- More maintainable dependency resolution
-- Explicit domain boundaries
+**Task Execution:**
+- Engine uses `task.Registry` for task registration and lookup
+- `task.DependencyResolver` provides dependency ordering
+- Tasks execute using domain statements, not AST nodes
 
-Integration can be done gradually without breaking existing functionality.
+**Parameter Validation:**
+- `parameter.Validator` validates all parameter values
+- Supports advanced constraints (patterns, ranges, enums)
+- Type-safe parameter handling throughout execution
 
-## Statistics
+**Project Management:**
+- `project.Project` manages project-level configuration
+- Lifecycle hooks use domain statements
+- Project settings integration
 
-- **Total Lines**: 839
-- **Files**: 7  
-- **Packages**: 3
-- **Average File Size**: 120 lines
+## Domain Statement System
+
+The statement package (`internal/domain/statement/`) provides:
+
+**Statement Types:**
+- Core: Action, Shell, Variable, Parameter
+- Control: Conditional, Loop, Try/Catch, Break, Continue
+- Operations: File, Docker, Git, HTTP, Network, Download
+- Advanced: Detection, TaskCall, UseSnippet
+
+**Converters:**
+- `FromAST()` - Converts AST to domain (used during parsing)
+- `ToAST()` - Temporary bridge for execution (being phased out)
+
+**Benefits:**
+- Clean separation from parser internals
+- Type-safe domain entities
+- Easier testing and validation
+- Future-proof for engine improvements
 
 ---
 
-**Created**: Phase 5 Refactoring - October 2025  
-**Status**: ✅ Complete - Ready for use
+**Created**: October 2025  
+**Status**: ✅ Complete & Integrated  
+**Usage**: Production (all examples passing)
 

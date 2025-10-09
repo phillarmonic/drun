@@ -1,8 +1,8 @@
 # drun Architecture Guide
 
-**Version:** 2.0.0  
-**Last Updated:** October 5, 2025  
-**Status:** Post-Refactoring (Phases 1-4 Complete)
+**Version:** 2.1.0  
+**Last Updated:** October 9, 2025  
+**Status:** Production (Modular Architecture with Debug Diagnostics)
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## Overview
 
-drun is a task automation tool that executes declarative task definitions written in the drun language. The system follows a **pipeline architecture** where source code flows through distinct stages: lexing → parsing → execution.
+drun is a task automation tool that executes declarative task definitions written in the drun language. The system follows a **modular pipeline architecture** where source code flows through distinct stages: lexing → parsing → domain modeling → planning → execution.
 
 ### High-Level Architecture
 
@@ -31,28 +31,33 @@ graph LR
     B --> C[Parser]
     C --> D[AST]
     D --> DOM[Domain Layer]
-    DOM --> E[Engine]
-    E --> F[Executors]
-    F --> G[Shell/Docker/Git/HTTP]
+    DOM --> PLAN[Planner]
+    PLAN --> EXEC[Executor]
+    EXEC --> G[Shell/Docker/Git/HTTP]
     G --> H[Output]
     
     DOM -.->|Task Registry| DOM1[Tasks]
     DOM -.->|Dependency Resolver| DOM2[Deps]
     DOM -.->|Parameter Validator| DOM3[Params]
+    PLAN -.->|Execution Plan| PLAN1[Order]
+    EXEC -.->|Domain Statements| EXEC1[Actions]
     
     style A fill:#e1f5ff
     style D fill:#fff4e1
     style DOM fill:#f0e1ff
-    style E fill:#ffe1f5
+    style PLAN fill:#e1ffe1
+    style EXEC fill:#ffe1f5
     style H fill:#e1ffe1
 ```
 
 ### Core Principles
 
 1. **Separation of Concerns** - Each package has a single, well-defined responsibility
-2. **Dependency Inversion** - High-level modules don't depend on low-level details
-3. **Testability** - Components can be tested in isolation
-4. **Extensibility** - New features can be added without modifying existing code
+2. **Domain-Driven Design** - Business logic separated from infrastructure details
+3. **Dependency Injection** - Infrastructure dependencies are pluggable and testable
+4. **Explicit Planning** - Execution plans are built upfront, eliminating redundant AST scans
+5. **Testability** - Components can be tested in isolation
+6. **Extensibility** - New features can be added without modifying existing code
 
 ---
 
@@ -72,17 +77,22 @@ graph TB
     subgraph "Domain Layer"
         TASK_REG[task/registry.go]
         TASK_DEP[task/dependencies.go]
+        TASK_DOMAIN[task/task.go]
         PARAM_VAL[parameter/validation.go]
         PROJ[project/project.go]
+        STMT[statement/statement.go]
         
         style TASK_REG fill:#f0e1ff
         style TASK_DEP fill:#f0e1ff
         style PARAM_VAL fill:#f0e1ff
+        style STMT fill:#f0e1ff
     end
     
     subgraph "Core Engine"
         ENGINE[engine/engine.go]
         CONTEXT[engine/context.go]
+        PLANNER[planner/planner.go]
+        EXECUTOR[executor/executor.go]
         
         subgraph "Engine Subsystems"
             INTERP[interpolation/]
@@ -295,9 +305,32 @@ drun/
 │   │   ├── parser_detection.go    # Detection parsing
 │   │   └── parser_helper.go       # Helper methods
 │   │
+│   ├── domain/            # Domain layer (decoupled from AST)
+│   │   ├── task/
+│   │   │   ├── task.go            # Domain task entity
+│   │   │   ├── registry.go        # Task registration
+│   │   │   └── dependencies.go    # Dependency resolution
+│   │   ├── parameter/
+│   │   │   ├── parameter.go       # Parameter entity
+│   │   │   └── validation.go      # Validation logic
+│   │   ├── project/
+│   │   │   └── project.go         # Project entity
+│   │   └── statement/
+│   │       ├── statement.go       # Domain statement types
+│   │       └── converter.go       # AST↔Domain converters
+│   │
 │   ├── engine/            # Execution engine
-│   │   ├── engine.go              # Core engine (911 lines)
+│   │   ├── engine.go              # Core orchestration
 │   │   ├── context.go             # Execution context
+│   │   ├── options.go             # Options-based configuration
+│   │   │
+│   │   ├── planner/               # Execution planning
+│   │   │   ├── planner.go         # Dependency resolution & plan generation
+│   │   │   └── planner_test.go    # Planner tests
+│   │   │
+│   │   ├── executor/              # Task execution
+│   │   │   ├── executor.go        # Task & hook executor
+│   │   │   └── executor_test.go   # Executor tests
 │   │   │
 │   │   ├── interpolation/         # Variable interpolation subsystem
 │   │   │   ├── interpolator.go    # Main interpolator
@@ -335,6 +368,9 @@ drun/
 │   │   ├── tokens.go              # Token definitions
 │   │   └── ...
 │   │
+│   ├── debug/             # Debug utilities and diagnostics
+│   │   ├── debug.go               # Core debug functions
+│   │   └── plan.go                # Execution plan visualization
 │   ├── builtins/          # Built-in functions
 │   ├── shell/             # Shell execution
 │   ├── detection/         # Tool detection
@@ -450,6 +486,118 @@ flowchart TD
     style M fill:#ffe1f5
     style O fill:#e1ffe1
 ```
+
+---
+
+## Modular Architecture
+
+### Domain Model Decoupling
+
+The domain layer is fully decoupled from the AST, providing clean domain-level representations:
+
+**Domain Statement Types** (`internal/domain/statement/`)
+- Action, Shell, Variable, Conditional, Loop, Try/Catch
+- File, Docker, Git, HTTP, Download, Network, Detection
+- Break, Continue, TaskCall, UseSnippet
+
+**Bidirectional Converters** (`statement/converter.go`)
+- `FromAST()` - Converts AST nodes to domain statements
+- `ToAST()` - Temporary conversion for execution (being phased out)
+
+**Domain Entities**
+- `task.Task` - Task with domain statements instead of AST nodes
+- `project.Project` - Project with domain-level hooks
+- `parameter.Parameter` - Parameter with validation rules
+
+### Execution Planning
+
+The **Planner** (`internal/engine/planner/`) generates comprehensive execution plans upfront:
+
+```go
+type ExecutionPlan struct {
+    TargetTask     string
+    ExecutionOrder []string
+    Tasks          map[string]*TaskPlan
+    Hooks          *HookPlan
+    ProjectName    string
+    ProjectVersion string
+    Namespaces     map[string]bool
+}
+```
+
+**Benefits:**
+- Single AST scan instead of repeated traversals
+- Deterministic execution order
+- Complete dependency resolution upfront
+- Rich metadata for debugging
+
+### Task Execution
+
+The **Executor** (`internal/engine/executor/`) handles task and hook execution:
+
+```go
+type Executor struct {
+    output             io.Writer
+    dryRun             bool
+    domainStmtExecutor DomainStatementExecutor
+}
+```
+
+**Responsibilities:**
+- Execute tasks using domain statements
+- Execute lifecycle hooks (setup, before, after, teardown)
+- Delegate statement execution to the engine
+- Handle dry-run mode
+
+### Dependency Injection
+
+The engine uses an **options-based constructor** for pluggable infrastructure:
+
+```go
+engine := NewEngineWithOptions(
+    WithOutput(os.Stdout),
+    WithTaskRegistry(customRegistry),
+    WithCacheManager(customCache),
+    WithVerbose(true),
+)
+```
+
+**Injectable Dependencies:**
+- Task Registry
+- Parameter Validator
+- Dependency Resolver
+- Cache Manager
+- Remote Fetchers
+- Interpolator
+
+### Debug & Visualization Tools
+
+**Execution Plan Diagnostics** (`internal/debug/plan.go`)
+
+Export execution plans in multiple formats:
+- **Graphviz DOT** - For rendering dependency graphs
+- **Mermaid** - For markdown diagrams  
+- **JSON** - For programmatic analysis
+
+**CLI Debug Flags:**
+```bash
+# View execution plan
+xdrun --debug --debug-domain --debug-plan -f myfile.drun
+
+# Export formats
+xdrun --debug --debug-domain \
+  --debug-export-graph plan \
+  --debug-export-mermaid plan \
+  --debug-export-json plan \
+  -f myfile.drun
+```
+
+**Plan Visualization Features:**
+- Execution order with task metadata
+- Dependency relationships
+- Parallel execution opportunities
+- Hook integration points
+- Project and namespace information
 
 ---
 
@@ -842,30 +990,58 @@ for each item in parallel {
 
 ## Summary
 
-The drun architecture follows a **clean, layered design** with clear separation between:
+The drun architecture follows a **modular, domain-driven design** with clear separation between:
 
 1. **CLI Layer** - User interaction and command handling
 2. **Parser Layer** - Syntax analysis and AST generation
-3. **Engine Layer** - Execution orchestration and coordination
-4. **Executor Layer** - Domain-specific action execution
-5. **Support Services** - Utilities and cross-cutting concerns
+3. **Domain Layer** - Business logic decoupled from AST
+4. **Planning Layer** - Execution plan generation
+5. **Execution Layer** - Task and hook execution
+6. **Support Services** - Utilities and cross-cutting concerns
 
-### Key Benefits
+### Key Architecture Features
 
-✅ **Modular** - Each component has single responsibility  
+✅ **Domain-Driven Design** - Business logic separated from infrastructure  
+✅ **Explicit Planning** - Upfront execution plan eliminates redundant scans  
+✅ **Dependency Injection** - Pluggable infrastructure for testability  
+✅ **Modular Components** - Planner, Executor, and Engine work together cleanly  
+✅ **Debug Diagnostics** - Rich visualization tools for complex workflows  
 ✅ **Testable** - Components can be tested in isolation  
 ✅ **Extensible** - New features easy to add  
-✅ **Maintainable** - Code is organized and documented  
-✅ **Performant** - Efficient execution with caching  
+✅ **Performant** - Optimized execution with caching  
+
+### Architecture Improvements
+
+**Domain Model:**
+- Tasks and projects use domain statements, not AST nodes
+- Clean separation between parsing and business logic
+- Type-safe domain entities with validation
+
+**Execution Planning:**
+- Single upfront dependency resolution
+- Comprehensive execution plan with all metadata
+- Deterministic execution order
+
+**Component Modularity:**
+- Planner handles dependency resolution and planning
+- Executor handles task and hook execution  
+- Engine orchestrates the overall flow
+- Options-based configuration for flexibility
+
+**Debugging Tools:**
+- Execution plan visualization (Graphviz, Mermaid, JSON)
+- Domain layer inspection
+- Dependency graph analysis
 
 ---
 
 **For more details:**
 - [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md) - Language specification
-- [spec/REFACTORING_ARCHITECTURE.md](./spec/REFACTORING_ARCHITECTURE.md) - Refactoring details
+- [internal/domain/README.md](./internal/domain/README.md) - Domain layer documentation
+- [internal/engine/README.md](./internal/engine/README.md) - Engine architecture
 - [ROADMAP.md](./ROADMAP.md) - Feature roadmap
 
 ---
 
-*Last Updated: October 5, 2025*  
-*Architecture Version: 2.0 (Post-Refactoring)*
+*Last Updated: October 9, 2025*  
+*Architecture Version: 2.1 (Modular Architecture with Debug Diagnostics)*

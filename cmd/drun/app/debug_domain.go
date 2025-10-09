@@ -24,12 +24,7 @@ type DebugOptions struct {
 }
 
 // debugDomainLayer initializes domain services and shows their state
-func debugDomainLayer(program *ast.Program, currentFile string) error {
-	return debugDomainLayerWithOptions(program, currentFile, DebugOptions{})
-}
-
-// debugDomainLayerWithOptions initializes domain services with custom debug options
-func debugDomainLayerWithOptions(program *ast.Program, currentFile string, opts DebugOptions) error {
+func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOptions) error {
 	if program == nil {
 		fmt.Println("=== DOMAIN LAYER DEBUG ===")
 		fmt.Println("Program is nil - cannot debug domain layer")
