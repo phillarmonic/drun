@@ -47,4 +47,3 @@ func NewSecretError(op, namespace, key string, err error) *SecretError {
 		Err:       err,
 	}
 }
-

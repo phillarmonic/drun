@@ -11,4 +11,3 @@ type Secret struct {
 }
 
 func (s *Secret) Type() StatementType { return TypeSecret }
-

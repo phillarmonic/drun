@@ -6,4 +6,3 @@ package secrets
 func NewCredentialBackend() (Backend, error) {
 	return nil, ErrBackendNotAvail
 }
-

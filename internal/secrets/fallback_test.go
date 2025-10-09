@@ -9,7 +9,7 @@ import (
 func TestFallbackBackend(t *testing.T) {
 	// Create temp directory for test
 	tmpDir := t.TempDir()
-	
+
 	backend := &FallbackBackend{
 		filepath: filepath.Join(tmpDir, "test_secrets.enc"),
 		key:      deriveKey(),
@@ -43,7 +43,7 @@ func TestFallbackBackend(t *testing.T) {
 	// Test List
 	backend.Set("key1", "value1")
 	backend.Set("key2", "value2")
-	
+
 	keys, err := backend.List()
 	if err != nil {
 		t.Fatalf("Failed to list secrets: %v", err)
@@ -66,7 +66,7 @@ func TestFallbackBackend(t *testing.T) {
 
 func TestFallbackEncryption(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	backend := &FallbackBackend{
 		filepath: filepath.Join(tmpDir, "test_secrets.enc"),
 		key:      deriveKey(),
@@ -164,7 +164,7 @@ func TestSecureRandom(t *testing.T) {
 
 	// Generate another set and verify they're different
 	bytes2, _ := SecureRandom(32)
-	
+
 	same := true
 	for i := range bytes {
 		if bytes[i] != bytes2[i] {
@@ -172,9 +172,8 @@ func TestSecureRandom(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if same {
 		t.Error("Two random generations should not be identical")
 	}
 }
-

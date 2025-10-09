@@ -25,6 +25,16 @@ import (
 	"github.com/phillarmonic/drun/internal/types"
 )
 
+// SecretsManager defines the interface for managing secrets
+type SecretsManager interface {
+	Set(namespace, key, value string) error
+	Get(namespace, key string) (string, error)
+	Delete(namespace, key string) error
+	Exists(namespace, key string) (bool, error)
+	List(namespace string) ([]string, error)
+	ListNamespaces() ([]string, error)
+}
+
 // Engine executes drun v2 programs directly
 type Engine struct {
 	output       io.Writer
@@ -47,6 +57,9 @@ type Engine struct {
 	httpsFetcher     *remote.HTTPSFetcher
 	drunhubFetcher   *remote.DrunhubFetcher
 	includesResolver *includes.Resolver
+
+	// Secrets management
+	secretsManager SecretsManager
 
 	// Legacy regex patterns (still used by variable operations)
 	quotedArgRegex *regexp.Regexp
@@ -89,6 +102,9 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		taskRegistry:   options.TaskRegistry,
 		paramValidator: options.ParamValidator,
 		depResolver:    options.DepResolver,
+
+		// Secrets management
+		secretsManager: options.SecretsManager,
 
 		// Execution components
 		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
@@ -760,6 +776,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeTaskFromTemplate(s, ctx)
 	case *statement.UseSnippet:
 		return e.executeUseSnippet(s, ctx)
+	case *statement.Secret:
+		return e.executeSecret(s, ctx)
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}

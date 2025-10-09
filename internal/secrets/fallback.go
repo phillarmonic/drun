@@ -229,7 +229,7 @@ func deriveKey() []byte {
 	// For now, we use a simple deterministic approach
 	homeDir, _ := os.UserHomeDir()
 	hostname, _ := os.Hostname()
-	
+
 	seed := homeDir + ":" + hostname + ":drun-secrets"
 	return pbkdf2.Key([]byte(seed), []byte("drun-salt"), pbkdf2Iterations, keySize, sha256.New)
 }
@@ -242,4 +242,3 @@ func SecureRandom(n int) ([]byte, error) {
 	}
 	return b, nil
 }
-

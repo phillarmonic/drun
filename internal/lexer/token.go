@@ -746,6 +746,10 @@ func (t TokenType) String() string {
 		return "FORMAT"
 	case LET:
 		return "LET"
+	case SECRET:
+		return "SECRET"
+	case NAMESPACE:
+		return "NAMESPACE"
 	case CONCAT:
 		return "CONCAT"
 	case SPLIT:

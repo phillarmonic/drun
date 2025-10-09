@@ -255,4 +255,3 @@ func ClearString(s *string) {
 	}
 	*s = ""
 }
-

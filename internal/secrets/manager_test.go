@@ -130,7 +130,7 @@ func TestManagerExists(t *testing.T) {
 	if !exists {
 		t.Error("Secret should exist after set")
 	}
-	
+
 	// Clean up
 	mgr.Delete(namespace, key)
 }
@@ -269,4 +269,3 @@ func TestClearString(t *testing.T) {
 	var nilString *string
 	ClearString(nilString) // Should not panic
 }
-

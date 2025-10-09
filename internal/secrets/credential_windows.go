@@ -84,4 +84,3 @@ func (c *CredentialBackend) List() ([]string, error) {
 
 	return keys, nil
 }
-

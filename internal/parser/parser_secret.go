@@ -9,25 +9,39 @@ import (
 
 // parseSecretStatement parses secret management statements
 // Syntax:
-//   secret set "key" to "value" [in namespace "ns"]
-//   secret get "key" [from namespace "ns"] [or "default"]
-//   secret delete "key" [from namespace "ns"]
-//   secret exists "key" [from namespace "ns"]
-//   secret list [matching "pattern"] [from namespace "ns"]
+//
+//	secret set "key" to "value" [in namespace "ns"]
+//	secret get "key" [from namespace "ns"] [or "default"]
+//	secret delete "key" [from namespace "ns"]
+//	secret exists "key" [from namespace "ns"]
+//	secret list [matching "pattern"] [from namespace "ns"]
 func (p *Parser) parseSecretStatement() *ast.SecretStatement {
 	stmt := &ast.SecretStatement{
 		Token: p.curToken,
 	}
 
-	// Expect operation (set, get, delete, exists, list)
-	if !p.expectPeek(lexer.IDENT) {
-		p.addError("expected secret operation (set, get, delete, exists, list)")
+	// Advance to operation token
+	p.nextToken()
+
+	// Determine operation based on token type or literal
+	var operation string
+	switch p.curToken.Type {
+	case lexer.SET:
+		operation = "set"
+	case lexer.GET:
+		operation = "get"
+	case lexer.DELETE:
+		operation = "delete"
+	case lexer.IDENT:
+		operation = p.curToken.Literal
+	default:
+		p.addError(fmt.Sprintf("expected secret operation (set, get, delete, exists, list), got %s", p.curToken.Type))
 		return nil
 	}
 
-	stmt.Operation = p.curToken.Literal
+	stmt.Operation = operation
 
-	switch stmt.Operation {
+	switch operation {
 	case "set":
 		return p.parseSecretSetStatement(stmt)
 	case "get":
@@ -39,7 +53,7 @@ func (p *Parser) parseSecretStatement() *ast.SecretStatement {
 	case "list":
 		return p.parseSecretListStatement(stmt)
 	default:
-		p.addError(fmt.Sprintf("unknown secret operation: %s (expected: set, get, delete, exists, list)", stmt.Operation))
+		p.addError(fmt.Sprintf("unknown secret operation: %s (expected: set, get, delete, exists, list)", operation))
 		return nil
 	}
 }
@@ -193,4 +207,3 @@ func (p *Parser) parseSecretListStatement(stmt *ast.SecretStatement) *ast.Secret
 
 	return stmt
 }
-

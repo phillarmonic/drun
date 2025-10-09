@@ -6,4 +6,3 @@ package secrets
 func NewSecretServiceBackend() (Backend, error) {
 	return nil, ErrBackendNotAvail
 }
-

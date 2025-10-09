@@ -18,15 +18,15 @@ func TestPlatformDetection(t *testing.T) {
 		}
 		return
 	}
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create backend for %s: %v", runtime.GOOS, err)
 	}
-	
+
 	if backend == nil {
 		t.Fatal("Backend should not be nil")
 	}
-	
+
 	// Just verify we got a backend - type checking is platform-specific
 	t.Logf("Platform %s using backend: %T", runtime.GOOS, backend)
 }
@@ -66,4 +66,3 @@ func TestManagerWithPlatformBackend(t *testing.T) {
 	// Cleanup
 	mgr.Delete(namespace, key)
 }
-

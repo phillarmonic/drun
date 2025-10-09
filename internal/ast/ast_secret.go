@@ -9,12 +9,12 @@ import (
 // SecretStatement represents secret operations (set, get, delete, exists, list)
 type SecretStatement struct {
 	Token     lexer.Token
-	Operation string      // "set", "get", "delete", "exists", "list"
-	Key       string      // Secret key name
-	Value     Expression  // For "set" operation
-	Namespace string      // Optional namespace (defaults to current project)
-	Pattern   string      // For "list" with pattern matching
-	Default   Expression  // Default value for "get" operation
+	Operation string     // "set", "get", "delete", "exists", "list"
+	Key       string     // Secret key name
+	Value     Expression // For "set" operation
+	Namespace string     // Optional namespace (defaults to current project)
+	Pattern   string     // For "list" with pattern matching
+	Default   Expression // Default value for "get" operation
 }
 
 func (ss *SecretStatement) statementNode() {}
@@ -122,4 +122,3 @@ func (se *SecretExpression) String() string {
 	out.WriteString(")")
 	return out.String()
 }
-

@@ -66,4 +66,3 @@ func (s *SecretServiceBackend) List() ([]string, error) {
 	// For now, return an empty list or implement a workaround.
 	return []string{}, nil
 }
-

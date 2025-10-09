@@ -6,4 +6,3 @@ package secrets
 func NewKeychainBackend() (Backend, error) {
 	return nil, ErrBackendNotAvail
 }
-

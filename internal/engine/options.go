@@ -33,6 +33,9 @@ type EngineOptions struct {
 
 	// Verbose mode
 	Verbose bool
+
+	// Secrets manager
+	SecretsManager SecretsManager
 }
 
 // Option is a functional option for configuring the Engine
@@ -77,6 +80,13 @@ func WithDryRun(dryRun bool) Option {
 func WithVerbose(verbose bool) Option {
 	return func(o *EngineOptions) {
 		o.Verbose = verbose
+	}
+}
+
+// WithSecretsManager sets the secrets manager
+func WithSecretsManager(sm SecretsManager) Option {
+	return func(o *EngineOptions) {
+		o.SecretsManager = sm
 	}
 }
 
