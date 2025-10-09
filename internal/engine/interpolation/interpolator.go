@@ -22,6 +22,7 @@ type Interpolator struct {
 	// Callback functions for complex resolution (provided by engine)
 	resolveVariableOps func(expr string, ctx interface{}) string
 	resolveBuiltinOps  func(funcName string, operations string, ctx interface{}) (string, error)
+	resolveBuiltin     func(funcName string, args []string, ctx interface{}) (string, error)
 }
 
 // NewInterpolator creates a new interpolator
@@ -52,6 +53,11 @@ func (i *Interpolator) SetResolveVariableOpsCallback(fn func(expr string, ctx in
 // SetResolveBuiltinOpsCallback sets the callback for resolving builtin operations
 func (i *Interpolator) SetResolveBuiltinOpsCallback(fn func(funcName string, operations string, ctx interface{}) (string, error)) {
 	i.resolveBuiltinOps = fn
+}
+
+// SetResolveBuiltinCallback sets the callback for resolving builtin function calls
+func (i *Interpolator) SetResolveBuiltinCallback(fn func(funcName string, args []string, ctx interface{}) (string, error)) {
+	i.resolveBuiltin = fn
 }
 
 // Context represents the interpolation context (generic interface to avoid circular dependency)

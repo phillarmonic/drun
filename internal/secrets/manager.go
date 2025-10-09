@@ -49,6 +49,15 @@ type Logger interface {
 	Error(msg string)
 }
 
+// ManagerOption is a functional option for configuring the manager
+type ManagerOption func(*ManagerConfig)
+
+// ManagerConfig holds configuration for the secrets manager
+type ManagerConfig struct {
+	forceFallback bool
+	storagePath   string
+}
+
 // Option is a functional option for configuring the manager
 type Option func(*DefaultManager)
 
@@ -58,10 +67,28 @@ var (
 )
 
 // NewManager creates a new secrets manager with appropriate backend
-func NewManager(opts ...Option) (Manager, error) {
-	backend, err := detectBackend()
-	if err != nil {
-		return nil, err
+func NewManager(opts ...ManagerOption) (Manager, error) {
+	// Apply configuration
+	config := &ManagerConfig{}
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	// Select backend
+	var backend Backend
+	var err error
+
+	if config.forceFallback {
+		if config.storagePath != "" {
+			backend = NewFallbackBackendWithPath(config.storagePath)
+		} else {
+			backend = NewFallbackBackend()
+		}
+	} else {
+		backend, err = detectBackend()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	mgr := &DefaultManager{
@@ -69,15 +96,25 @@ func NewManager(opts ...Option) (Manager, error) {
 		separator: ":",
 	}
 
-	for _, opt := range opts {
-		opt(mgr)
-	}
-
 	return mgr, nil
 }
 
 // WithFallback forces fallback backend (for testing)
-func WithFallback() Option {
+func WithFallback() ManagerOption {
+	return func(c *ManagerConfig) {
+		c.forceFallback = true
+	}
+}
+
+// WithStoragePath sets a custom storage path for the fallback backend
+func WithStoragePath(path string) ManagerOption {
+	return func(c *ManagerConfig) {
+		c.storagePath = path
+	}
+}
+
+// WithFallbackLegacy forces fallback backend (deprecated, use WithFallback)
+func WithFallbackLegacy() Option {
 	return func(m *DefaultManager) {
 		m.backend = NewFallbackBackend()
 	}

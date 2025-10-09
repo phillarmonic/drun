@@ -998,6 +998,41 @@ The drun architecture follows a **modular, domain-driven design** with clear sep
 4. **Planning Layer** - Execution plan generation
 5. **Execution Layer** - Task and hook execution
 6. **Support Services** - Utilities and cross-cutting concerns
+7. **Secrets Management** - Secure secret storage and retrieval
+
+### Secrets Management Architecture
+
+The secrets management system provides secure storage for sensitive data like API keys, passwords, and tokens:
+
+**Components:**
+- `internal/secrets/manager.go` - Core Manager interface with namespace support
+- `internal/secrets/fallback.go` - AES-256-GCM encrypted file storage backend  
+- `internal/secrets/keychain_darwin.go` - macOS Keychain integration
+- `internal/secrets/credential_windows.go` - Windows Credential Manager integration
+- `internal/secrets/secretservice_linux.go` - Linux Secret Service integration
+- `internal/engine/executor_secrets.go` - Domain statement executor
+- `internal/builtins/builtins_secret.go` - `secret()` interpolation function
+
+**Language Integration:**
+```drun
+# Store secrets
+secret set "api_key" to "secret123"
+
+# Retrieve in interpolation
+info "Key: {secret('api_key')}"
+
+# Manage secrets
+secret exists "key"
+secret list
+secret delete "key"
+```
+
+**Security Features:**
+- ✅ Per-project namespace isolation
+- ✅ Platform-native keychain integration (with encrypted fallback)
+- ✅ AES-256-GCM encryption with PBKDF2 key derivation
+- ✅ Secure memory clearing for sensitive data
+- ✅ Input validation and sanitization
 
 ### Key Architecture Features
 

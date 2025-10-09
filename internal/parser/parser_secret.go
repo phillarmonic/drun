@@ -32,6 +32,10 @@ func (p *Parser) parseSecretStatement() *ast.SecretStatement {
 		operation = "get"
 	case lexer.DELETE:
 		operation = "delete"
+	case lexer.EXISTS:
+		operation = "exists"
+	case lexer.LIST:
+		operation = "list"
 	case lexer.IDENT:
 		operation = p.curToken.Literal
 	default:

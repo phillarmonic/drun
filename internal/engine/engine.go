@@ -143,13 +143,30 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 	interp.SetResolveBuiltinOpsCallback(func(funcName string, operations string, ctx interface{}) (string, error) {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
-			if result, err := builtins.CallBuiltin(funcName); err == nil {
+			// Create builtin context
+			builtinCtx := &BuiltinContext{
+				execCtx:        execCtx,
+				secretsManager: e.secretsManager,
+			}
+			if result, err := builtins.CallBuiltin(funcName, builtinCtx); err == nil {
 				if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
 					return e.applyBuiltinOperations(result, chain, execCtx)
 				}
 			}
 		}
 		return "", fmt.Errorf("failed to resolve builtin operations")
+	})
+
+	interp.SetResolveBuiltinCallback(func(funcName string, args []string, ctx interface{}) (string, error) {
+		if execCtx, ok := ctx.(*ExecutionContext); ok {
+			// Create builtin context
+			builtinCtx := &BuiltinContext{
+				execCtx:        execCtx,
+				secretsManager: e.secretsManager,
+			}
+			return builtins.CallBuiltin(funcName, builtinCtx, args...)
+		}
+		return "", fmt.Errorf("no execution context available")
 	})
 
 	return e

@@ -60,11 +60,11 @@ func ExecuteTask(
 		_, _ = fmt.Fprintf(os.Stdout, "✅ Parsed successfully\n")
 	}
 
-	// Initialize secrets manager
-	secretsMgr, err := secrets.NewManager()
+	// Initialize secrets manager - use fallback backend for now
+	// TODO: Fix platform backends to handle all characters in namespace names
+	secretsMgr, err := secrets.NewManager(secrets.WithFallback())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Warning: Failed to initialize secrets manager: %v\n", err)
-		// Fall back to non-secrets mode
 		secretsMgr = nil
 	}
 

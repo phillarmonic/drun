@@ -48,13 +48,22 @@ func NewFallbackBackend() Backend {
 	secretsDir := filepath.Join(homeDir, ".drun")
 	os.MkdirAll(secretsDir, 0700)
 
-	filepath := filepath.Join(secretsDir, "secrets.enc")
+	storagePath := filepath.Join(secretsDir, "secrets.enc")
+
+	return NewFallbackBackendWithPath(storagePath)
+}
+
+// NewFallbackBackendWithPath creates a new fallback backend with a custom storage path
+func NewFallbackBackendWithPath(storagePath string) Backend {
+	// Ensure directory exists
+	dir := filepath.Dir(storagePath)
+	os.MkdirAll(dir, 0700)
 
 	// Generate or load encryption key
 	key := deriveKey()
 
 	backend := &FallbackBackend{
-		filepath: filepath,
+		filepath: storagePath,
 		key:      key,
 		secrets:  make(map[string]string),
 	}
