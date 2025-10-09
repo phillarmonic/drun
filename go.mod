@@ -3,20 +3,26 @@ module github.com/phillarmonic/drun
 go 1.25.1
 
 require (
+	github.com/danieljoos/wincred v1.2.3
+	github.com/keybase/go-keychain v0.0.1
 	github.com/mholt/archives v0.1.4
 	github.com/phillarmonic/SoloDB v1.0.1
 	github.com/phillarmonic/figlet v1.2.0
 	github.com/spf13/cobra v1.8.1
+	github.com/zalando/go-keyring v0.2.6
+	golang.org/x/crypto v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
@@ -30,5 +36,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/text v0.30.0 // indirect
 )

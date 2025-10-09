@@ -271,3 +271,4 @@ func escapeMermaid(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	return s
 }
+
