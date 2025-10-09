@@ -1,8 +1,8 @@
 # 🗺️ drun Implementation Roadmap
 
-**Version**: 2.1.0  
+**Version**: 2.1.1  
 **Last Updated**: October 9, 2025  
-**Status**: 🚀 Production Ready  
+**Status**: 🚀 Production Ready - Pure Domain-Driven Architecture  
 
 This roadmap tracks the implementation progress of features documented in the [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md).
 

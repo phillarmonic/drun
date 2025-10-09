@@ -133,7 +133,7 @@ Domain-specific statement execution:
     - Tool and command detection
     - Environment detection
 
-### Helper Files (1,885 lines across 7 files)
+### Helper Files (1,652 lines across 7 files)
 
 Supporting functionality organized by domain:
 
@@ -141,10 +141,10 @@ Supporting functionality organized by domain:
    - Command builders for Docker, Git, HTTP, Network operations
    - Shell command construction
 
-2. **`helpers_expressions.go` (354 lines)**
-   - Expression evaluation (binary, function calls)
-   - Builtin operations parsing and application
-   - Variable operation chains
+2. **`helpers_expressions.go` (121 lines)**
+   - Builtin operations parsing (replace, without, trim, etc.)
+   - Variable operation chains for interpolator
+   - Post-interpolation transformations
 
 3. **`helpers_conditions.go` (332 lines)**
    - Condition evaluation logic
@@ -385,5 +385,6 @@ Potential areas for further improvement:
 ---
 
 **Last Updated:** October 9, 2025  
-**Status:** ✅ Production - Modular architecture with debug diagnostics  
+**Status:** ✅ Production - Pure domain-driven architecture  
+**Code Quality:** 249 lines of legacy code removed, all executors use domain types  
 **Test Coverage:** 60/60 examples passing, all unit tests passing

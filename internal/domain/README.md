@@ -121,11 +121,11 @@ The statement package (`internal/domain/statement/`) provides:
 - Core: Action, Shell, Variable, Parameter
 - Control: Conditional, Loop, Try/Catch, Break, Continue
 - Operations: File, Docker, Git, HTTP, Network, Download
-- Advanced: Detection, TaskCall, UseSnippet
+- Advanced: Detection, TaskCall, TaskFromTemplate, UseSnippet
 
-**Converters:**
-- `FromAST()` - Converts AST to domain (used during parsing)
-- `ToAST()` - Temporary bridge for execution (being phased out)
+**Converter:**
+- `FromAST()` - Unidirectional converter from AST to domain (one-way only)
+- All execution uses pure domain types (no AST conversion during runtime)
 
 **Benefits:**
 - Clean separation from parser internals

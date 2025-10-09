@@ -1,8 +1,8 @@
 # drun Architecture Guide
 
-**Version:** 2.1.0  
+**Version:** 2.1.1  
 **Last Updated:** October 9, 2025  
-**Status:** Production (Modular Architecture with Debug Diagnostics)
+**Status:** Production (Pure Domain-Driven Architecture)
 
 ---
 
@@ -359,7 +359,7 @@ drun/
 │   │   ├── helpers_conditions.go  # Condition evaluation
 │   │   ├── helpers_detection.go   # Detection helpers
 │   │   ├── helpers_download.go    # Download helpers
-│   │   ├── helpers_expressions.go # Expression evaluation
+│   │   ├── helpers_expressions.go # Builtin operations (replace, trim, etc.)
 │   │   ├── helpers_filesystem.go  # Filesystem helpers
 │   │   └── helpers_utilities.go   # General utilities
 │   │
@@ -498,11 +498,11 @@ The domain layer is fully decoupled from the AST, providing clean domain-level r
 **Domain Statement Types** (`internal/domain/statement/`)
 - Action, Shell, Variable, Conditional, Loop, Try/Catch
 - File, Docker, Git, HTTP, Download, Network, Detection
-- Break, Continue, TaskCall, UseSnippet
+- Break, Continue, TaskCall, TaskFromTemplate, UseSnippet
 
-**Bidirectional Converters** (`statement/converter.go`)
-- `FromAST()` - Converts AST nodes to domain statements
-- `ToAST()` - Temporary conversion for execution (being phased out)
+**Unidirectional Converter** (`statement/converter.go`)
+- `FromAST()` - Converts AST nodes to domain statements (one-way conversion)
+- All execution uses domain statements directly (no AST conversion needed)
 
 **Domain Entities**
 - `task.Task` - Task with domain statements instead of AST nodes
