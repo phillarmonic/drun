@@ -46,7 +46,7 @@ func NewFallbackBackend() Backend {
 	}
 
 	secretsDir := filepath.Join(homeDir, ".drun")
-	os.MkdirAll(secretsDir, 0700)
+	_ = os.MkdirAll(secretsDir, 0700)
 
 	storagePath := filepath.Join(secretsDir, "secrets.enc")
 
@@ -57,7 +57,7 @@ func NewFallbackBackend() Backend {
 func NewFallbackBackendWithPath(storagePath string) Backend {
 	// Ensure directory exists
 	dir := filepath.Dir(storagePath)
-	os.MkdirAll(dir, 0700)
+	_ = os.MkdirAll(dir, 0700)
 
 	// Generate or load encryption key
 	key := deriveKey()
@@ -69,7 +69,7 @@ func NewFallbackBackendWithPath(storagePath string) Backend {
 	}
 
 	// Try to load existing secrets
-	backend.load()
+	_ = backend.load()
 
 	return backend
 }

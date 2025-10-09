@@ -54,8 +54,8 @@ func TestNamespaceIsolation(t *testing.T) {
 	value2 := "value_ns2"
 
 	// Set same key in different namespaces
-	mgr.Set("ns1", key, value1)
-	mgr.Set("ns2", key, value2)
+	_ = mgr.Set("ns1", key, value1)
+	_ = mgr.Set("ns2", key, value2)
 
 	// Retrieve from each namespace
 	val1, err := mgr.Get("ns1", key)
@@ -87,7 +87,7 @@ func TestManagerDelete(t *testing.T) {
 	key := "delete_me"
 
 	// Set and verify
-	mgr.Set(namespace, key, "value")
+	_ = mgr.Set(namespace, key, "value")
 	exists, _ := mgr.Exists(namespace, key)
 	if !exists {
 		t.Error("Secret should exist after set")
@@ -116,7 +116,7 @@ func TestManagerExists(t *testing.T) {
 	key := "unique_exists_key_123"
 
 	// Clean up first in case of previous test runs
-	mgr.Delete(namespace, key)
+	_ = mgr.Delete(namespace, key)
 
 	// Should not exist initially
 	exists, _ := mgr.Exists(namespace, key)
@@ -125,14 +125,14 @@ func TestManagerExists(t *testing.T) {
 	}
 
 	// Set and check
-	mgr.Set(namespace, key, "value")
+	_ = mgr.Set(namespace, key, "value")
 	exists, _ = mgr.Exists(namespace, key)
 	if !exists {
 		t.Error("Secret should exist after set")
 	}
 
 	// Clean up
-	mgr.Delete(namespace, key)
+	_ = mgr.Delete(namespace, key)
 }
 
 func TestManagerList(t *testing.T) {
@@ -144,9 +144,9 @@ func TestManagerList(t *testing.T) {
 	namespace := "test-list"
 
 	// Set multiple secrets
-	mgr.Set(namespace, "key1", "value1")
-	mgr.Set(namespace, "key2", "value2")
-	mgr.Set(namespace, "key3", "value3")
+	_ = mgr.Set(namespace, "key1", "value1")
+	_ = mgr.Set(namespace, "key2", "value2")
+	_ = mgr.Set(namespace, "key3", "value3")
 
 	// List keys
 	keys, err := mgr.List(namespace)
@@ -178,9 +178,9 @@ func TestManagerListNamespaces(t *testing.T) {
 	}
 
 	// Set secrets in different namespaces
-	mgr.Set("ns1", "key1", "value1")
-	mgr.Set("ns2", "key2", "value2")
-	mgr.Set("ns3", "key3", "value3")
+	_ = mgr.Set("ns1", "key1", "value1")
+	_ = mgr.Set("ns2", "key2", "value2")
+	_ = mgr.Set("ns3", "key3", "value3")
 
 	// List namespaces
 	namespaces, err := mgr.ListNamespaces()

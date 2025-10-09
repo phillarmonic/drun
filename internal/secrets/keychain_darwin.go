@@ -21,7 +21,7 @@ func NewKeychainBackend() (Backend, error) {
 // Set stores a secret in the keychain
 func (k *KeychainBackend) Set(key, value string) error {
 	// First try to delete any existing item
-	k.Delete(key)
+	_ = k.Delete(key)
 
 	item := keychain.NewItem()
 	item.SetService(k.service)

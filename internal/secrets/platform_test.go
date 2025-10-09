@@ -46,7 +46,7 @@ func TestManagerWithPlatformBackend(t *testing.T) {
 	value := "test_value"
 
 	// Clean up first
-	mgr.Delete(namespace, key)
+	_ = mgr.Delete(namespace, key)
 
 	// Set
 	err = mgr.Set(namespace, key, value)
@@ -64,5 +64,5 @@ func TestManagerWithPlatformBackend(t *testing.T) {
 	}
 
 	// Cleanup
-	mgr.Delete(namespace, key)
+	_ = mgr.Delete(namespace, key)
 }

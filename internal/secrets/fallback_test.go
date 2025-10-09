@@ -41,8 +41,8 @@ func TestFallbackBackend(t *testing.T) {
 	}
 
 	// Test List
-	backend.Set("key1", "value1")
-	backend.Set("key2", "value2")
+	_ = backend.Set("key1", "value1")
+	_ = backend.Set("key2", "value2")
 
 	keys, err := backend.List()
 	if err != nil {
@@ -74,7 +74,7 @@ func TestFallbackEncryption(t *testing.T) {
 	}
 
 	sensitiveValue := "super_secret_password_123"
-	backend.Set("password", sensitiveValue)
+	_ = backend.Set("password", sensitiveValue)
 
 	// Read the file directly
 	data, err := os.ReadFile(backend.filepath)
@@ -100,8 +100,8 @@ func TestFallbackPersistence(t *testing.T) {
 		key:      key,
 		secrets:  make(map[string]string),
 	}
-	backend1.Set("key1", "value1")
-	backend1.Set("key2", "value2")
+	_ = backend1.Set("key1", "value1")
+	_ = backend1.Set("key2", "value2")
 
 	// Create second backend with same filepath and key
 	backend2 := &FallbackBackend{
@@ -109,7 +109,7 @@ func TestFallbackPersistence(t *testing.T) {
 		key:      key,
 		secrets:  make(map[string]string),
 	}
-	backend2.load()
+	_ = backend2.load()
 
 	// Verify secrets were persisted
 	value1, err := backend2.Get("key1")

@@ -17,7 +17,7 @@ func TestIntegration_SecretStatements(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Parse a simple drun file with secret operations
 	input := `
@@ -82,7 +82,7 @@ func TestIntegration_SecretInterpolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	input := `
 version: 2.0
@@ -160,7 +160,7 @@ func TestIntegration_NamespaceIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Project 1
 	input1 := `
@@ -200,7 +200,7 @@ task "test":
 		engine.WithOutput(os.Stdout),
 		engine.WithSecretsManager(secretsMgr),
 	)
-	eng1.Execute(program1, "setup")
+	_ = eng1.Execute(program1, "setup")
 
 	// Execute project 2
 	program2, _ := engine.ParseStringWithFilename(input2, "test2.drun")
@@ -209,9 +209,9 @@ task "test":
 		engine.WithOutput(&output2),
 		engine.WithSecretsManager(secretsMgr),
 	)
-	eng2.Execute(program2, "setup")
+	_ = eng2.Execute(program2, "setup")
 	output2.Reset()
-	eng2.Execute(program2, "test")
+	_ = eng2.Execute(program2, "test")
 
 	// Verify project 2 sees its own value, not project 1's
 	outputStr := output2.String()
@@ -229,7 +229,7 @@ func TestIntegration_SecretExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	input := `
 version: 2.0
@@ -278,7 +278,7 @@ func TestIntegration_SecretList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	input := `
 version: 2.0

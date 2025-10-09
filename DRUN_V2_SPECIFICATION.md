@@ -4083,6 +4083,158 @@ task "parameter defaults with pipes":
 
 ---
 
+## Secrets Management
+
+drun v2 provides secure, built-in secrets management for storing and retrieving sensitive data like API keys, passwords, and tokens.
+
+### Features
+
+- **Automatic Project Isolation**: Secrets are automatically namespaced by project name
+- **Platform Integration**: Uses native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Encrypted Fallback**: AES-256-GCM encrypted file storage when platform keychain is unavailable
+- **Interpolation Support**: Access secrets directly in strings using `{secret('key')}`
+- **Namespace Override**: Optionally specify custom namespaces for shared secrets
+
+### Secret Operations
+
+#### Setting Secrets
+
+```drun
+# Basic usage (automatic project namespace)
+secret set "api_key" to "secret123"
+secret set "db_password" to "super_secure_pass"
+
+# With custom namespace
+secret set "shared_token" to "token456" in namespace "team-shared"
+
+# From environment variable
+secret set "github_token" to ${GITHUB_TOKEN}
+```
+
+#### Retrieving Secrets
+
+```drun
+# In interpolation (recommended)
+info "Connecting with key: {secret('api_key')}"
+run "curl -H 'Authorization: Bearer {secret('api_key')}' https://api.example.com"
+
+# With default value
+info "Webhook: {secret('webhook_url', 'https://default.webhook.com')}"
+
+# From custom namespace
+info "Token: {secret('shared_token', '', 'team-shared')}"
+```
+
+#### Checking Secret Existence
+
+```drun
+# Check if secret exists
+secret exists "api_key"
+
+# With namespace
+secret exists "shared_token" in namespace "team-shared"
+```
+
+#### Listing Secrets
+
+```drun
+# List all secrets in current project namespace
+secret list
+
+# List from custom namespace
+secret list from namespace "team-shared"
+```
+
+#### Deleting Secrets
+
+```drun
+# Delete secret
+secret delete "api_key"
+
+# Delete from custom namespace
+secret delete "shared_token" from namespace "team-shared"
+```
+
+### Complete Example
+
+```drun
+version: 2.0
+
+project "api-deployment" version "1.0":
+
+task "configure":
+  info "Setting up secrets..."
+  secret set "api_key" to prompt "Enter API key:" masked
+  secret set "db_password" to prompt "Enter database password:" masked
+  success "Secrets configured"
+
+task "deploy":
+  depends on "configure"
+  
+  # Check if secrets exist
+  secret exists "api_key"
+  secret exists "db_password"
+  
+  # Use secrets in deployment
+  run """
+    kubectl create secret generic app-secrets \
+      --from-literal=api-key={secret('api_key')} \
+      --from-literal=db-password={secret('db_password')}
+  """
+  
+  success "Deployed with secrets"
+
+task "cleanup":
+  info "Removing secrets..."
+  secret delete "api_key"
+  secret delete "db_password"
+  success "Secrets removed"
+```
+
+### Security Features
+
+- **Per-Project Isolation**: Secrets are automatically scoped to project names, preventing accidental access
+- **Platform Keychains**: Integrates with OS-native secure storage when available
+- **Encrypted Storage**: AES-256-GCM encryption with PBKDF2 key derivation for fallback storage
+- **Memory Safety**: Secure clearing of sensitive data from memory
+- **Input Validation**: Keys, namespaces, and values are validated before storage
+
+### secret() Function
+
+The `secret()` builtin function allows seamless secret access in interpolations:
+
+**Syntax:**
+```
+{secret('key')}                           # Get from current project namespace
+{secret('key', 'default')}                # Get with default value
+{secret('key', '', 'namespace')}          # Get from specific namespace
+```
+
+**Examples:**
+```drun
+# Simple usage
+info "API Key: {secret('api_key')}"
+
+# With default for optional secrets
+run "webhook_url={secret('webhook', 'https://default.com')}"
+
+# From shared namespace
+run "deploy --token {secret('deploy_token', '', 'ci-secrets')}"
+
+# In complex strings
+run "curl -u admin:{secret('password')} https://api.example.com"
+```
+
+### Best Practices
+
+1. **Use Project Namespaces**: Let drun automatically scope secrets to projects
+2. **Set Defaults**: Provide sensible defaults for optional secrets
+3. **Clean Up**: Delete secrets after use in temporary workflows
+4. **Audit Access**: Use `secret list` to review stored secrets
+5. **Avoid Hardcoding**: Never commit secrets to version control
+
+---
+
 ## Smart Detection
 
 ### Tool Detection
