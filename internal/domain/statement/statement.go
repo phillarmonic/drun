@@ -30,6 +30,7 @@ const (
 	TypeFile             StatementType = "file"
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
+	TypeSecret           StatementType = "secret"
 )
 
 // Action represents an action statement (info, step, success, etc.)

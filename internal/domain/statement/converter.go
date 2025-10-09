@@ -237,6 +237,23 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 		// Return nil to skip them in the body
 		return nil, nil
 
+	case *ast.SecretStatement:
+		var valueStr, defaultStr string
+		if s.Value != nil {
+			valueStr = s.Value.String()
+		}
+		if s.Default != nil {
+			defaultStr = s.Default.String()
+		}
+		return &Secret{
+			Operation: s.Operation,
+			Key:       s.Key,
+			Value:     valueStr,
+			Namespace: s.Namespace,
+			Pattern:   s.Pattern,
+			Default:   defaultStr,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown AST statement type: %T", astStmt)
 	}
