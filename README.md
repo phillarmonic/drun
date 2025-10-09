@@ -74,6 +74,7 @@ task "hello":
 - **Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **Parallel Execution**: True parallel loops with concurrency control and progress tracking
 - **Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
+- **Secrets Management**: Secure storage for API keys, passwords, and tokens with platform-native keychain integration
 - **Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
 - **DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **File Operations**: Built-in file system operations with path interpolation
@@ -125,6 +126,48 @@ drun includes powerful built-in functions for common operations:
 - `{start timer('name')}` - Start a named timer
 - `{stop timer('name')}` - Stop a timer and show elapsed time
 - `{show elapsed time('name')}` - Show current elapsed time for a timer
+
+#### **Secrets Management** 🔐 *New*
+
+- `{secret('key')}` - Get secret from current project namespace
+- `{secret('key', 'default')}` - Get secret with default value if not found
+- `{secret('key', '', 'namespace')}` - Get secret from specific namespace
+
+**Features:**
+- **Platform Integration**: Uses native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Encrypted Fallback**: AES-256-GCM encrypted storage when platform keychain unavailable
+- **Automatic Isolation**: Secrets automatically scoped to project names
+- **Namespace Override**: Optional custom namespaces for shared secrets
+
+**Example:**
+
+```drun
+version: 2.0
+project "api-deployment" version "1.0":
+
+task "setup":
+  secret set "api_key" to "secret_key_12345"
+  secret set "db_password" to "super_secure_pass"
+
+task "deploy":
+  # Use secrets in interpolation
+  info "Connecting with key: {secret('api_key')}"
+  run "curl -H 'Authorization: Bearer {secret('api_key')}' https://api.example.com"
+  
+  # With default value for optional secrets
+  run "webhook_url={secret('webhook', 'https://default.com')}"
+
+task "cleanup":
+  secret delete "api_key"
+  secret delete "db_password"
+```
+
+**Secret Operations:**
+- `secret set "key" to "value"` - Store a secret
+- `secret get "key"` - Retrieve a secret (or use `{secret('key')}` in interpolation)
+- `secret exists "key"` - Check if a secret exists
+- `secret list` - List all secrets in current namespace
+- `secret delete "key"` - Remove a secret
 
 #### **Usage Examples**
 
@@ -1283,6 +1326,7 @@ Explore comprehensive examples in the `examples/` directory:
 - **`examples/26-smart-detection.drun`** - Smart tool and environment detection
 - **`examples/38-progress-and-timers.drun`** - Progress indicators and timing operations
 - **`examples/46-task-calling.drun`** - Task calling and modular task design
+- **`examples/62-secrets-interpolation.drun`** 🔐 - Secrets management with the `secret()` function
 
 ### Quick Examples
 
@@ -1305,6 +1349,10 @@ xdrun -f examples/26-smart-detection.drun "detect project"
 # Try task calling and modular design
 xdrun -f examples/46-task-calling.drun "quick-test"
 
+# Try secrets management
+xdrun -f examples/62-secrets-interpolation.drun setup
+xdrun -f examples/62-secrets-interpolation.drun use_secrets_in_interpolation
+
 # See comprehensive features
 xdrun -f examples/07-final-showcase.drun showcase project_name=MyApp
 ```
@@ -1318,8 +1366,8 @@ drun is **production-ready** with enterprise-grade features:
 ### Implemented Features
 
 - **Core Functionality**: .drun semantic language, parameters, variables, control flow
-- **Advanced Features**: Remote includes, matrix execution, secrets management, task calling
-- **Developer Experience**: 15+ template functions, intelligent caching, rich errors
+- **Advanced Features**: Remote includes, matrix execution, **secrets management** 🔐, task calling
+- **Developer Experience**: 20+ template functions, intelligent caching, rich errors
 - **Performance**: Microsecond-level operations, high test coverage (71-83%)
 - **Quality**: Zero linting issues, comprehensive test suite
 
