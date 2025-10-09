@@ -396,6 +396,8 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		return p.parseTaskCallStatement()
 	case lexer.SET, lexer.LET:
 		return p.parseVariableStatement()
+	case lexer.SECRET:
+		return p.parseSecretStatement()
 	case lexer.TRY:
 		return p.parseErrorHandlingStatement()
 	}
