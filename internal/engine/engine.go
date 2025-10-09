@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -12,16 +11,29 @@ import (
 	"github.com/phillarmonic/drun/internal/builtins"
 	"github.com/phillarmonic/drun/internal/cache"
 	"github.com/phillarmonic/drun/internal/domain/parameter"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/internal/engine/executor"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/includes"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
+	"github.com/phillarmonic/drun/internal/engine/planner"
 	"github.com/phillarmonic/drun/internal/errors"
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
 	"github.com/phillarmonic/drun/internal/remote"
 	"github.com/phillarmonic/drun/internal/types"
 )
+
+// SecretsManager defines the interface for managing secrets
+type SecretsManager interface {
+	Set(namespace, key, value string) error
+	Get(namespace, key string) (string, error)
+	Delete(namespace, key string) error
+	Exists(namespace, key string) (bool, error)
+	List(namespace string) ([]string, error)
+	ListNamespaces() ([]string, error)
+}
 
 // Engine executes drun v2 programs directly
 type Engine struct {
@@ -35,12 +47,19 @@ type Engine struct {
 	paramValidator *parameter.Validator
 	depResolver    *task.DependencyResolver
 
+	// Execution components
+	planner  *planner.Planner
+	executor *executor.Executor
+
 	// Remote includes support
 	cacheManager     *cache.Manager
 	githubFetcher    *remote.GitHubFetcher
 	httpsFetcher     *remote.HTTPSFetcher
 	drunhubFetcher   *remote.DrunhubFetcher
 	includesResolver *includes.Resolver
+
+	// Secrets management
+	secretsManager SecretsManager
 
 	// Legacy regex patterns (still used by variable operations)
 	quotedArgRegex *regexp.Regexp
@@ -49,46 +68,63 @@ type Engine struct {
 
 // ExecutionContext and ProjectContext moved to context.go
 
-// NewEngine creates a new v2 execution engine
+// NewEngine creates a new v2 execution engine with default options
+// For backward compatibility - uses the new options-based constructor internally
 func NewEngine(output io.Writer) *Engine {
-	if output == nil {
-		output = os.Stdout
-	}
-	githubFetcher := remote.NewGitHubFetcher()
-	interp := interpolation.NewInterpolator()
+	return NewEngineWithOptions(WithOutput(output))
+}
 
+// NewEngineWithOptions creates a new v2 execution engine with custom options
+func NewEngineWithOptions(opts ...Option) *Engine {
+	// Build options with defaults
+	options := &EngineOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	options.applyDefaults()
+
+	// Create default fetchers and interpolator
+	githubFetcher := remote.NewGitHubFetcher()
 	httpsFetcher := remote.NewHTTPSFetcher()
 	drunhubFetcher := remote.NewDrunhubFetcher(githubFetcher)
-
-	// Initialize domain services
-	taskReg := task.NewRegistry()
+	interp := interpolation.NewInterpolator()
 
 	e := &Engine{
-		output:         output,
-		dryRun:         false,
+		output:         options.Output,
+		dryRun:         options.DryRun,
+		verbose:        options.Verbose,
 		interpolator:   interp,
 		githubFetcher:  githubFetcher,
 		httpsFetcher:   httpsFetcher,
 		drunhubFetcher: drunhubFetcher,
 
 		// Domain services
-		taskRegistry:   taskReg,
-		paramValidator: parameter.NewValidator(),
-		depResolver:    task.NewDependencyResolver(taskReg),
+		taskRegistry:   options.TaskRegistry,
+		paramValidator: options.ParamValidator,
+		depResolver:    options.DepResolver,
+
+		// Secrets management
+		secretsManager: options.SecretsManager,
+
+		// Execution components
+		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
 
 		// Pre-compile regex patterns for performance (still used by variable operations)
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
 
+	// Set the engine as the domain statement executor
+	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
+
 	// Initialize includes resolver
 	e.includesResolver = includes.NewResolver(
-		nil, // cacheManager set later
+		options.CacheManager,
 		githubFetcher,
 		httpsFetcher,
 		drunhubFetcher,
-		false, // verbose set later
-		output,
+		options.Verbose,
+		options.Output,
 		ParseStringWithFilename,
 	)
 
@@ -107,13 +143,30 @@ func NewEngine(output io.Writer) *Engine {
 
 	interp.SetResolveBuiltinOpsCallback(func(funcName string, operations string, ctx interface{}) (string, error) {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
-			if result, err := builtins.CallBuiltin(funcName); err == nil {
+			// Create builtin context
+			builtinCtx := &BuiltinContext{
+				execCtx:        execCtx,
+				secretsManager: e.secretsManager,
+			}
+			if result, err := builtins.CallBuiltin(funcName, builtinCtx); err == nil {
 				if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
 					return e.applyBuiltinOperations(result, chain, execCtx)
 				}
 			}
 		}
 		return "", fmt.Errorf("failed to resolve builtin operations")
+	})
+
+	interp.SetResolveBuiltinCallback(func(funcName string, args []string, ctx interface{}) (string, error) {
+		if execCtx, ok := ctx.(*ExecutionContext); ok {
+			// Create builtin context
+			builtinCtx := &BuiltinContext{
+				execCtx:        execCtx,
+				secretsManager: e.secretsManager,
+			}
+			return builtins.CallBuiltin(funcName, builtinCtx, args...)
+		}
+		return "", fmt.Errorf("no execution context available")
 	})
 
 	return e
@@ -182,57 +235,66 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		return fmt.Errorf("task registration failed: %v", err)
 	}
 
-	// Use domain dependency resolver
-	domainTasks, err := e.depResolver.Resolve(taskName)
+	// Create project context for planning
+	projectCtx, err := e.createProjectContext(program.Project, currentFile)
 	if err != nil {
-		return fmt.Errorf("dependency resolution failed: %v", err)
+		return fmt.Errorf("creating project context: %w", err)
 	}
 
-	// Extract task names for execution order
-	executionOrder := make([]string, len(domainTasks))
-	for i, t := range domainTasks {
-		executionOrder[i] = t.Name
+	// Build planner context from project
+	var plannerCtx *planner.ProjectContext
+	if projectCtx != nil && projectCtx.HookManager != nil {
+		plannerCtx = &planner.ProjectContext{
+			Name:          projectCtx.Name,
+			Version:       projectCtx.Version,
+			SetupHooks:    projectCtx.HookManager.GetSetupHooks(),
+			TeardownHooks: projectCtx.HookManager.GetTeardownHooks(),
+			BeforeHooks:   projectCtx.HookManager.GetBeforeHooks(),
+			AfterHooks:    projectCtx.HookManager.GetAfterHooks(),
+		}
+	}
+
+	// Create comprehensive execution plan
+	plan, err := e.planner.Plan(taskName, program, plannerCtx)
+	if err != nil {
+		return fmt.Errorf("execution planning failed: %w", err)
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", executionOrder)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", plan.ExecutionOrder)
+		if e.verbose {
+			if planJSON, err := plan.ToJSON(); err == nil {
+				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution plan:\n%s\n", planJSON)
+			}
+		}
 	}
 
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
 		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
 		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
-		Project:     e.createProjectContext(program.Project, currentFile),
+		Project:     projectCtx,
 		CurrentFile: currentFile,
 		Program:     program,
 	}
 
-	// Execute drun setup hooks
-	if ctx.Project != nil && ctx.Project.HookManager != nil {
-		for _, hook := range ctx.Project.HookManager.GetSetupHooks() {
-			if err := e.executeStatement(hook, ctx); err != nil {
-				return fmt.Errorf("drun setup hook failed: %v", err)
-			}
+	// Execute drun setup hooks from the execution plan
+	if plan.Hooks != nil && len(plan.Hooks.SetupHooks) > 0 {
+		if err := e.executor.ExecuteHooks("setup", plan.Hooks.SetupHooks, ctx, true); err != nil {
+			return fmt.Errorf("setup hook failed: %w", err)
 		}
 	}
 
-	// Execute all tasks in dependency order
-	for _, currentTaskName := range executionOrder {
-		// Find the task using AST (still needed for execution)
-		var currentTask *ast.TaskStatement
-		for _, task := range program.Tasks {
-			if task.Name == currentTaskName {
-				currentTask = task
-				break
-			}
+	// Execute all tasks in the planned execution order
+	for _, currentTaskName := range plan.ExecutionOrder {
+		// Get the task plan from the execution plan
+		taskPlan, err := plan.GetTask(currentTaskName)
+		if err != nil {
+			return fmt.Errorf("task '%s' not found in plan: %w", currentTaskName, err)
 		}
 
-		if currentTask == nil {
-			return fmt.Errorf("task '%s' not found during execution", currentTaskName)
-		}
-
-		// Set up parameters for this specific task
-		if err := e.setupTaskParameters(currentTask, params, ctx); err != nil {
+		// Set up parameters for this specific task using task plan
+		if err := e.setupTaskParametersFromPlan(taskPlan, params, ctx); err != nil {
 			return err
 		}
 
@@ -240,35 +302,33 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		ctx.CurrentTask = currentTaskName
 
 		// Execute before hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
-			for _, hook := range ctx.Project.HookManager.GetBeforeHooks() {
-				if err := e.executeStatement(hook, ctx); err != nil {
-					return fmt.Errorf("before hook failed: %v", err)
-				}
+		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.BeforeHooks) > 0 {
+			if err := e.executor.ExecuteHooks("before", plan.Hooks.BeforeHooks, ctx, true); err != nil {
+				return fmt.Errorf("before hook failed: %w", err)
 			}
 		}
 
-		// Execute the task
-		if err := e.executeTask(currentTask, ctx); err != nil {
-			return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
+		// Execute task body directly using domain statements
+		for _, stmt := range taskPlan.Body {
+			if err := e.executeStatement(stmt, ctx); err != nil {
+				return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
+			}
 		}
 
-		// Execute after hooks only for the target task
-		if currentTaskName == taskName && ctx.Project != nil && ctx.Project.HookManager != nil {
-			for _, hook := range ctx.Project.HookManager.GetAfterHooks() {
-				if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
-					_, _ = fmt.Fprintf(e.output, "⚠️  After hook failed: %v\n", hookErr)
-				}
+		// Execute after hooks only for the target task (best-effort)
+		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.AfterHooks) > 0 {
+			if err := e.executor.ExecuteHooks("after", plan.Hooks.AfterHooks, ctx, false); err != nil {
+				// After hooks failures are logged but don't fail the execution
+				_, _ = fmt.Fprintf(e.output, "⚠️  after hook failed: %v\n", err)
 			}
 		}
 	}
 
-	// Execute drun teardown hooks
-	if ctx.Project != nil && ctx.Project.HookManager != nil {
-		for _, hook := range ctx.Project.HookManager.GetTeardownHooks() {
-			if hookErr := e.executeStatement(hook, ctx); hookErr != nil {
-				_, _ = fmt.Fprintf(e.output, "⚠️  Drun teardown hook failed: %v\n", hookErr)
-			}
+	// Execute drun teardown hooks (best-effort)
+	if plan.Hooks != nil && len(plan.Hooks.TeardownHooks) > 0 {
+		if err := e.executor.ExecuteHooks("teardown", plan.Hooks.TeardownHooks, ctx, false); err != nil {
+			// Teardown hook failures are logged but don't fail the execution
+			_, _ = fmt.Fprintf(e.output, "⚠️  teardown hook failed: %v\n", err)
 		}
 	}
 
@@ -278,7 +338,10 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 // registerTasks registers all tasks from the program into the domain registry
 func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) error {
 	for _, astTask := range tasks {
-		domainTask := task.NewTask(astTask, "", currentFile)
+		domainTask, err := task.NewTask(astTask, "", currentFile)
+		if err != nil {
+			return fmt.Errorf("converting task %s: %w", astTask.Name, err)
+		}
 		if err := e.taskRegistry.Register(domainTask); err != nil {
 			return err
 		}
@@ -286,7 +349,128 @@ func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) e
 	return nil
 }
 
-// setupTaskParameters sets up parameters for a specific task
+// setupTaskParametersFromPlan sets up parameters for a specific task using TaskPlan
+func (e *Engine) setupTaskParametersFromPlan(taskPlan *planner.TaskPlan, params map[string]string, ctx *ExecutionContext) error {
+	// First, add included/namespaced parameters from includes (e.g., docker.registry)
+	if ctx.Project != nil && ctx.Project.IncludedParams != nil {
+		for namespacedName, projectParam := range ctx.Project.IncludedParams {
+			// Use the namespaced name as the key (e.g., "docker.registry")
+			var rawValue string
+			var hasValue bool
+
+			// Included params won't be provided via CLI, so just use defaults
+			if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				// Determine parameter type
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				// Create typed value
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("included parameter '%s': invalid %s value '%s': %v",
+						namespacedName, paramType, rawValue, err))
+				}
+
+				ctx.Parameters[namespacedName] = typedValue
+			}
+		}
+	}
+
+	// Then, add project-level parameters if they exist
+	if ctx.Project != nil && ctx.Project.Parameters != nil {
+		for paramName, projectParam := range ctx.Project.Parameters {
+			var rawValue string
+			var hasValue bool
+
+			// Check if a value was provided via CLI
+			if providedValue, exists := params[paramName]; exists {
+				rawValue = providedValue
+				hasValue = true
+			} else if projectParam.HasDefault {
+				rawValue = e.interpolateVariables(projectParam.DefaultValue, ctx)
+				hasValue = true
+			}
+
+			if hasValue {
+				paramType, err := types.ParseParameterType(projectParam.DataType)
+				if err != nil {
+					paramType = types.InferType(rawValue)
+				}
+
+				typedValue, err := types.NewValue(paramType, rawValue)
+				if err != nil {
+					return errors.NewParameterValidationError(fmt.Sprintf("project parameter '%s': invalid %s value '%s': %v",
+						paramName, paramType, rawValue, err))
+				}
+
+				ctx.Parameters[paramName] = typedValue
+			}
+		}
+	}
+
+	// Finally, set up task-specific parameters with defaults and validation
+	for _, param := range taskPlan.Parameters {
+		var rawValue string
+		var hasValue bool
+
+		if providedValue, exists := params[param.Name]; exists {
+			rawValue = providedValue
+			hasValue = true
+		} else if param.HasDefault {
+			rawValue = e.interpolateVariables(param.DefaultValue, ctx)
+			hasValue = true
+		} else if param.Required {
+			return errors.NewParameterValidationError(fmt.Sprintf("required parameter '%s' not provided", param.Name))
+		}
+
+		if hasValue {
+			paramType, err := types.ParseParameterType(param.DataType)
+			if err != nil {
+				paramType = types.InferType(rawValue)
+			}
+
+			typedValue, err := types.NewValue(paramType, rawValue)
+			if err != nil {
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': invalid %s value '%s': %v",
+					param.Name, paramType, rawValue, err))
+			}
+
+			// Use domain validator
+			domainParam := &parameter.Parameter{
+				Name:         param.Name,
+				Type:         param.Type,
+				DefaultValue: param.DefaultValue,
+				HasDefault:   param.HasDefault,
+				Required:     param.Required,
+				DataType:     param.DataType,
+				Constraints:  param.Constraints,
+				MinValue:     param.MinValue,
+				MaxValue:     param.MaxValue,
+				Pattern:      param.Pattern,
+				PatternMacro: param.PatternMacro,
+				EmailFormat:  param.EmailFormat,
+				Variadic:     param.Variadic,
+			}
+
+			if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
+				return errors.NewParameterValidationError(fmt.Sprintf("parameter '%s': %v", param.Name, err))
+			}
+
+			ctx.Parameters[param.Name] = typedValue
+		}
+	}
+
+	return nil
+}
+
+// setupTaskParameters sets up parameters for a specific task (deprecated - use setupTaskParametersFromPlan)
 func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]string, ctx *ExecutionContext) error {
 	// First, add included/namespaced parameters from includes (e.g., docker.registry)
 	if ctx.Project != nil && ctx.Project.IncludedParams != nil {
@@ -440,9 +624,9 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 }
 
 // createProjectContext creates a project context from the project statement
-func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) *ProjectContext {
+func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
 	if project == nil {
-		return nil
+		return nil, nil
 	}
 
 	ctx := &ProjectContext{
@@ -476,15 +660,21 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 			// Store snippet for later use
 			ctx.Snippets[s.Name] = s
 		case *ast.LifecycleHook:
+			// Convert AST statements to domain statements
+			domainBody, err := statement.FromASTList(s.Body)
+			if err != nil {
+				return nil, fmt.Errorf("converting %s hook body: %w", s.Type, err)
+			}
+
 			switch s.Type {
 			case "before":
-				ctx.HookManager.RegisterBeforeHooks(s.Body)
+				ctx.HookManager.RegisterBeforeHooks(domainBody)
 			case "after":
-				ctx.HookManager.RegisterAfterHooks(s.Body)
+				ctx.HookManager.RegisterAfterHooks(domainBody)
 			case "setup":
-				ctx.HookManager.RegisterSetupHooks(s.Body)
+				ctx.HookManager.RegisterSetupHooks(domainBody)
 			case "teardown":
-				ctx.HookManager.RegisterTeardownHooks(s.Body)
+				ctx.HookManager.RegisterTeardownHooks(domainBody)
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform
@@ -497,28 +687,36 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		}
 	}
 
-	return ctx
+	return ctx, nil
 }
 
-// executeTask executes a single task with the given context
+// executeTask executes a single task with the given context (AST version for templates)
 func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
 		if task.Description != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Description: %s\n", task.Description)
 		}
-		// Process statements in dry run mode
-		for _, stmt := range task.Body {
-			if err := e.executeStatement(stmt, ctx); err != nil {
+		// Convert AST statements to domain and execute
+		for _, astStmt := range task.Body {
+			domainStmt, err := statement.FromAST(astStmt)
+			if err != nil {
+				return fmt.Errorf("converting statement: %w", err)
+			}
+			if err := e.executeStatement(domainStmt, ctx); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
-	// Execute each statement in the task body
-	for _, stmt := range task.Body {
-		if err := e.executeStatement(stmt, ctx); err != nil {
+	// Execute each statement in the task body (convert AST to domain)
+	for _, astStmt := range task.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, ctx); err != nil {
 			return err
 		}
 	}
@@ -526,70 +724,97 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 	return nil
 }
 
-// executeStatement executes a single statement (action, parameter, conditional, etc.)
-func (e *Engine) executeStatement(stmt ast.Statement, ctx *ExecutionContext) error {
+// ExecuteStatement executes a single AST statement (implements executor.StatementExecutor)
+// Converts AST to domain before execution
+func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
+	execCtx, ok := ctx.(*ExecutionContext)
+	if !ok {
+		return fmt.Errorf("invalid execution context type")
+	}
+	// Convert AST to domain
+	domainStmt, err := statement.FromAST(stmt)
+	if err != nil {
+		return fmt.Errorf("converting statement: %w", err)
+	}
+	return e.executeStatement(domainStmt, execCtx)
+}
+
+// ExecuteDomainStatement executes a single domain statement (implements executor.DomainStatementExecutor)
+func (e *Engine) ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error {
+	execCtx, ok := ctx.(*ExecutionContext)
+	if !ok {
+		return fmt.Errorf("invalid execution context type")
+	}
+	return e.executeStatement(stmt, execCtx)
+}
+
+// executeStatement executes a single AST statement (action, parameter, conditional, etc.)
+// Note: executeASTStatement removed - all execution now uses domain statements
+// TaskFromTemplate converted to domain at parse time like other statements
+
+// executeStatement executes domain statements directly
+func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContext) error {
 	switch s := stmt.(type) {
-	case *ast.ActionStatement:
+	case *statement.Action:
 		return e.executeAction(s, ctx)
-	case *ast.ShellStatement:
+	case *statement.Shell:
 		return e.executeShell(s, ctx)
-	case *ast.FileStatement:
-		return e.executeFile(s, ctx)
-	case *ast.TryStatement:
-		return e.executeTry(s, ctx)
-	case *ast.ThrowStatement:
-		return e.executeThrow(s, ctx)
-	case *ast.DockerStatement:
-		return e.executeDocker(s, ctx)
-	case *ast.GitStatement:
-		return e.executeGit(s, ctx)
-	case *ast.HTTPStatement:
-		return e.executeHTTP(s, ctx)
-	case *ast.DownloadStatement:
-		return e.executeDownload(s, ctx)
-	case *ast.NetworkStatement:
-		return e.executeNetwork(s, ctx)
-	case *ast.DetectionStatement:
-		return e.executeDetection(s, ctx)
-	case *ast.BreakStatement:
-		return e.executeBreak(s, ctx)
-	case *ast.ContinueStatement:
-		return e.executeContinue(s, ctx)
-	case *ast.VariableStatement:
+	case *statement.Variable:
 		return e.executeVariable(s, ctx)
-	case *ast.ParameterStatement:
-		// Parameters are handled during task setup, not execution
-		return nil
-	case *ast.ConditionalStatement:
+	case *statement.Conditional:
 		return e.executeConditional(s, ctx)
-	case *ast.LoopStatement:
+	case *statement.Loop:
 		return e.executeLoop(s, ctx)
-	case *ast.TaskCallStatement:
+	case *statement.Try:
+		return e.executeTry(s, ctx)
+	case *statement.Throw:
+		return e.executeThrow(s, ctx)
+	case *statement.Break:
+		return e.executeBreak(s, ctx)
+	case *statement.Continue:
+		return e.executeContinue(s, ctx)
+	case *statement.Docker:
+		return e.executeDocker(s, ctx)
+	case *statement.Git:
+		return e.executeGit(s, ctx)
+	case *statement.HTTP:
+		return e.executeHTTP(s, ctx)
+	case *statement.Download:
+		return e.executeDownload(s, ctx)
+	case *statement.Network:
+		return e.executeNetwork(s, ctx)
+	case *statement.File:
+		return e.executeFile(s, ctx)
+	case *statement.Detection:
+		return e.executeDetection(s, ctx)
+	case *statement.TaskCall:
 		return e.executeTaskCall(s, ctx)
-	case *ast.UseSnippetStatement:
-		return e.executeUseSnippet(s, ctx)
-	case *ast.TaskFromTemplateStatement:
+	case *statement.TaskFromTemplate:
 		return e.executeTaskFromTemplate(s, ctx)
+	case *statement.UseSnippet:
+		return e.executeUseSnippet(s, ctx)
+	case *statement.Secret:
+		return e.executeSecret(s, ctx)
 	default:
-		return fmt.Errorf("unknown statement type: %T", stmt)
+		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}
 }
 
 // executeAction executes a single action statement
-func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) error {
 	// Interpolate variables in the message
 	interpolatedMessage, err := e.interpolateVariablesWithError(action.Message, ctx)
 	if err != nil {
-		return fmt.Errorf("in %s statement: %w", action.Action, err)
+		return fmt.Errorf("in %s statement: %w", action.ActionType, err)
 	}
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.Action, interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] %s: %s\n", action.ActionType, interpolatedMessage)
 		return nil
 	}
 
 	// Map actions to output with appropriate formatting and emojis
-	switch action.Action {
+	switch action.ActionType {
 	case "info":
 		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
@@ -623,14 +848,14 @@ func (e *Engine) executeAction(action *ast.ActionStatement, ctx *ExecutionContex
 		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")
 		_, _ = fmt.Fprintf(e.output, "%s\n", processedMessage)
 	default:
-		return fmt.Errorf("unknown action: %s", action.Action)
+		return fmt.Errorf("unknown action: %s", action.ActionType)
 	}
 
 	return nil
 }
 
 // executeTaskCall executes a task call statement
-func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would call task: %s\n", callStmt.TaskName)
 		if len(callStmt.Parameters) > 0 {
@@ -730,7 +955,7 @@ func (e *Engine) executeTaskCall(callStmt *ast.TaskCallStatement, ctx *Execution
 }
 
 // executeUseSnippet executes a snippet by running its body statements
-func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeUseSnippet(useStmt *statement.UseSnippet, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute snippet: %s\n", useStmt.SnippetName)
 		return nil
@@ -786,9 +1011,13 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 		ctx.CurrentNamespace = oldNamespace
 	}()
 
-	// Execute all statements in the snippet body
-	for _, stmt := range snippet.Body {
-		if err := e.executeStatement(stmt, ctx); err != nil {
+	// Execute all statements in the snippet body (convert AST to domain)
+	for _, astStmt := range snippet.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting snippet statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, ctx); err != nil {
 			return fmt.Errorf("error executing snippet '%s': %w", useStmt.SnippetName, err)
 		}
 	}
@@ -797,7 +1026,7 @@ func (e *Engine) executeUseSnippet(useStmt *ast.UseSnippetStatement, ctx *Execut
 }
 
 // executeTaskFromTemplate instantiates and executes a task from a template
-func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *ExecutionContext) error {
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would instantiate task '%s' from template '%s'\n", tfts.Name, tfts.TemplateName)
 		return nil
@@ -891,9 +1120,13 @@ func (e *Engine) executeTaskFromTemplate(tfts *ast.TaskFromTemplateStatement, ct
 		}
 	}
 
-	// Execute the template body
-	for _, stmt := range template.Body {
-		if err := e.executeStatement(stmt, taskCtx); err != nil {
+	// Execute the template body (convert AST to domain)
+	for _, astStmt := range template.Body {
+		domainStmt, err := statement.FromAST(astStmt)
+		if err != nil {
+			return fmt.Errorf("converting template statement: %w", err)
+		}
+		if err := e.executeStatement(domainStmt, taskCtx); err != nil {
 			return fmt.Errorf("error executing template task '%s': %w", tfts.Name, err)
 		}
 	}

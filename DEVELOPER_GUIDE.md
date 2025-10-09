@@ -121,17 +121,25 @@ Read these in order:
 
 ```
 ┌─────────────────────────────────────┐
-│  CLI Layer (cmd/drun/)              │  User interaction
+│  CLI Layer (cmd/drun/)              │  User interaction & debug flags
 ├─────────────────────────────────────┤
-│  Domain Layer (internal/domain/)    │  Business logic
+│  Domain Layer (internal/domain/)    │  Business logic (decoupled from AST)
+│    • task/ - Task entities          │
+│    • parameter/ - Validation        │
+│    • statement/ - Domain statements │
 ├─────────────────────────────────────┤
-│  Engine Layer (internal/engine/)    │  Execution orchestration
+│  Engine Layer (internal/engine/)    │  Modular execution orchestration
+│    • planner/ - Execution planning  │
+│    • executor/ - Task execution     │
+│    • options.go - DI configuration  │
 ├─────────────────────────────────────┤
 │  Parser Layer (internal/parser/)    │  Syntax analysis
 ├─────────────────────────────────────┤
 │  Lexer Layer (internal/lexer/)      │  Tokenization
 ├─────────────────────────────────────┤
 │  AST Layer (internal/ast/)          │  Tree structure
+├─────────────────────────────────────┤
+│  Debug Layer (internal/debug/)      │  Plan visualization & diagnostics
 ├─────────────────────────────────────┤
 │  Support (builtins, shell, etc.)    │  Utilities
 └─────────────────────────────────────┘
@@ -145,13 +153,22 @@ Read these in order:
 internal/
 ├── ast/               # 15 files - AST node definitions
 ├── parser/            # 26 files - Syntax parsing
-├── engine/            # 36 files - Execution engine
+├── domain/            # Domain layer (decoupled from AST)
+│   ├── task/          # Task entities, registry, dependencies
+│   ├── parameter/     # Parameter validation & constraints
+│   ├── project/       # Project entities
+│   └── statement/     # Domain statement types & converters
+├── engine/            # Modular execution engine
+│   ├── planner/       # Execution planning & dependency resolution
+│   ├── executor/      # Task & hook execution
 │   ├── interpolation/ # Variable interpolation
 │   ├── hooks/         # Lifecycle hooks
-│   └── includes/      # Include resolution
-├── domain/            # 7 files - Domain layer (NEW!)
-│   ├── task/          # Task entities & business logic
-│   ├── parameter/     # Parameter validation & constraints
+│   ├── includes/      # Include resolution
+│   ├── engine.go      # Core orchestration
+│   └── options.go     # Dependency injection configuration
+├── debug/             # Debug utilities & plan visualization
+│   ├── debug.go       # Core debug functions
+│   └── plan.go        # Execution plan export (Graphviz, Mermaid, JSON)
 
 ### Domain Layer Integration
 
@@ -180,40 +197,42 @@ The domain layer contains business logic separated from execution concerns:
 **Engine Integration Points:**
 
 ```go
-// Engine uses all 3 domain services
+// Engine uses domain services and modular components
 type Engine struct {
     taskRegistry   *task.Registry          // Task management
     paramValidator *parameter.Validator    // Parameter validation
     depResolver    *task.DependencyResolver // Dependency resolution
+    planner        *planner.Planner        // Execution planning
+    executor       *executor.Executor      // Task execution
     // ... other fields
 }
 
-// Example: Task execution flow
-func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string, params map[string]string, currentFile string) error {
-    // 1. Register tasks with domain registry
-    e.taskRegistry.Clear()
+// Example: Modular execution flow
+func (e *Engine) ExecuteWithParamsAndFile(...) error {
+    // 1. Register tasks in domain registry
     e.registerTasks(program.Tasks, currentFile)
     
-    // 2. Resolve dependencies using domain resolver
-    domainTasks, err := e.depResolver.Resolve(taskName)
+    // 2. Create comprehensive execution plan
+    plan, err := e.planner.Plan(taskName, program, projectCtx)
     
-    // 3. Validate parameters using domain validator
-    domainParam := convertASTToDomainParameter(param)
-    e.paramValidator.Validate(domainParam, typedValue)
-    
-    // 4. Execute in resolved order
-    // ...
+    // 3. Execute using plan (no redundant AST scans)
+    for _, taskName := range plan.ExecutionOrder {
+        taskPlan, _ := plan.GetTask(taskName)
+        // Execute task using domain statements
+        for _, stmt := range taskPlan.Body {
+            e.executeDomainStatement(stmt, ctx)
+        }
+    }
 }
 ```
 
-**Benefits:**
-- Clear separation of business logic from execution
-- Testable in isolation
-- Reusable across different execution contexts
-- Thread-safe operations
-- Consistent validation logic
+**Architectural Benefits:**
+- **Domain-Driven** - Business logic separated from infrastructure
+- **Explicit Planning** - Upfront execution plan eliminates waste
+- **Modular Components** - Planner, Executor work with clear interfaces
+- **Dependency Injection** - Options-based configuration for testing
+- **Debug Diagnostics** - Rich visualization tools (Graphviz, Mermaid, JSON)
 
-│   └── project/       # Project configuration
 ├── lexer/             # 6 files - Tokenization
 └── (support packages) # builtins, shell, detection, etc.
 ```
@@ -634,7 +653,38 @@ type SlackStatement struct {
 func (s *SlackStatement) statementNode() {}
 ```
 
-#### 2. Add Parser
+#### 2. Define Domain Statement
+
+Create `internal/domain/statement/slack.go` (or add to `statement.go`):
+
+```go
+package statement
+
+// Slack represents a Slack notification action
+type Slack struct {
+    Action  string
+    Channel string
+    Message string
+}
+
+func (s *Slack) Type() StatementType { return "slack" }
+```
+
+#### 3. Add Domain Converter
+
+Add to `internal/domain/statement/converter.go`:
+
+```go
+// In FromAST function
+case *ast.SlackStatement:
+    return &Slack{
+        Action:  s.Action,
+        Channel: s.Channel,
+        Message: s.Message,
+    }, nil
+```
+
+#### 4. Add Parser
 
 Create `internal/parser/parser_slack.go`:
 
@@ -663,19 +713,19 @@ case "notify":
     }
 ```
 
-#### 3. Add Executor
+#### 5. Add Executor
 
 Create `internal/engine/executor_slack.go`:
 
 ```go
 package engine
 
-func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) error {
+import "github.com/phillarmonic/drun/internal/domain/statement"
+
+func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) error {
     // Interpolate variables
-    message, err := e.interpolator.InterpolateString(stmt.Message, ctx)
-    if err != nil {
-        return err
-    }
+    message := e.interpolateVariables(stmt.Message, ctx)
+    channel := e.interpolateVariables(stmt.Channel, ctx)
     
     // Send to Slack...
     
@@ -683,18 +733,21 @@ func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) e
 }
 ```
 
-Wire it up in `engine.go`:
+Wire it up in `executeStatement` in `engine.go`:
 
 ```go
-case *ast.SlackStatement:
+case *statement.Slack:
     return e.executeSlack(s, ctx)
 ```
 
-#### 4. Add Tests
+#### 6. Add Tests
 
-Create `internal/parser/parser_slack_test.go` and `internal/engine/executor_slack_test.go`
+Create:
+- `internal/parser/parser_slack_test.go` - Parser tests
+- `internal/domain/statement/slack_test.go` - Domain converter tests  
+- `internal/engine/executor_slack_test.go` - Executor tests
 
-#### 5. Update Documentation
+#### 7. Update Documentation
 
 - Add to [ROADMAP.md](./ROADMAP.md)
 - Add example to `examples/`
@@ -828,6 +881,30 @@ xdrun -v task_name
 xdrun --dry-run task_name
 ```
 
+### Execution Plan Debugging
+
+```bash
+# View execution plan
+xdrun --debug --debug-domain --debug-plan -f myfile.drun
+
+# Export plan as Graphviz (render with dot)
+xdrun --debug --debug-domain --debug-export-graph plan -f myfile.drun
+dot -Tpng plan-mytask.dot -o plan.png
+
+# Export plan as Mermaid
+xdrun --debug --debug-domain --debug-export-mermaid plan -f myfile.drun
+
+# Export plan as JSON
+xdrun --debug --debug-domain --debug-export-json plan -f myfile.drun
+```
+
+**Plan diagnostics show:**
+- Complete execution order
+- Task dependencies
+- Parameter metadata
+- Hook integration points
+- Project and namespace information
+
 ### Variable Issues
 
 Check interpolation logic in:
@@ -838,20 +915,22 @@ Check interpolation logic in:
 
 ## Project Statistics
 
-**Current Architecture:**
+**Architecture Evolution:**
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Largest file | 5,179 lines | 911 lines | 5.7x better |
-| Average file | 1,230 lines | 158 lines | 7.8x better |
-| Total files | 4 monoliths | 95+ focused | 23x more organized |
-| Test coverage | Good | Excellent | Better isolation |
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Domain Decoupling | ✅ Complete | Tasks/Projects use domain statements |
+| Execution Planning | ✅ Implemented | Planner generates comprehensive plans |
+| Dependency Injection | ✅ Available | Options-based configuration |
+| Debug Diagnostics | ✅ Available | Graphviz, Mermaid, JSON exports |
+| Code Organization | 100+ focused files | Modular, maintainable structure |
 
 **Current Status:**
-- 58 tests passing
-- 62 examples working
-- All features functional
-- Zero regressions
+- ✅ All unit tests passing
+- ✅ 60 examples working
+- ✅ All features functional
+- ✅ Zero regressions
+- ✅ Production ready
 
 ---
 
@@ -900,20 +979,22 @@ How to contribute                       → CONTRIBUTING.md
 ## Summary
 
 **drun is now:**
-- Well-organized (95+ focused files)
-- Well-documented (15+ guides)
-- Well-tested (58 tests, 62 examples)
-- Well-architected (clean, modular design)
-- Ready for contributions
+- ✅ Well-organized (100+ focused files, modular architecture)
+- ✅ Well-documented (15+ guides with architecture details)
+- ✅ Well-tested (all tests passing, 60 examples verified)
+- ✅ Well-architected (domain-driven, explicit planning, DI)
+- ✅ Well-equipped (debug diagnostics, plan visualization)
+- ✅ Ready for contributions
 
 **Start with:**
 1. [ARCHITECTURE.md](./ARCHITECTURE.md) for the big picture
-2. [internal/README.md](./internal/README.md) for code navigation
-3. [examples/](./examples/) to see it in action
+2. [internal/domain/README.md](./internal/domain/README.md) for domain layer
+3. [internal/engine/README.md](./internal/engine/README.md) for engine architecture
+4. [examples/](./examples/) to see it in action
 
 Happy coding!
 
 ---
 
-*Last Updated: October 5, 2025*  
-*Version: 2.0*
+*Last Updated: October 9, 2025*  
+*Version: 2.1.1 - Pure Domain-Driven Architecture*

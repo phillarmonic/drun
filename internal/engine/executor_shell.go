@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/shell"
 )
 
@@ -16,7 +16,7 @@ import (
 // - Platform-specific shell configuration
 
 // executeShell executes a shell command statement
-func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
 	if shellStmt.IsMultiline {
 		return e.executeMultilineShell(shellStmt, ctx)
 	}
@@ -24,7 +24,7 @@ func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionConte
 }
 
 // executeMultilineShell executes multiline shell commands as a single shell session
-func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
 	// Interpolate variables in all commands
 	var interpolatedCommands []string
 	for _, cmd := range shellStmt.Commands {

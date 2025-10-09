@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/fileops"
 )
 
@@ -13,7 +13,7 @@ import (
 // - File operations (create, delete, copy, move)
 
 // executeFile executes a file operation statement
-func (e *Engine) executeFile(fileStmt *ast.FileStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) error {
 	// Interpolate variables in paths and content
 	target := e.interpolateVariables(fileStmt.Target, ctx)
 	source := e.interpolateVariables(fileStmt.Source, ctx)

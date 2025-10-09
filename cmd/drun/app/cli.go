@@ -32,13 +32,17 @@ type App struct {
 
 	// Debug flags
 	debugMode   bool
-	debugTokens bool
-	debugAST    bool
-	debugJSON   bool
-	debugErrors bool
-	debugFull   bool
-	debugDomain bool
-	debugInput  string
+	debugTokens       bool
+	debugAST          bool
+	debugJSON         bool
+	debugErrors       bool
+	debugFull         bool
+	debugDomain       bool
+	debugInput        string
+	debugPlan         bool
+	debugExportGraph  string
+	debugExportMermaid string
+	debugExportJSON   string
 }
 
 // NewApp creates a new CLI application
@@ -115,6 +119,10 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.debugFull, "debug-full", false, "[xdrun CLI cmd] Show full debug output (requires --debug)")
 	flags.BoolVar(&a.debugDomain, "debug-domain", false, "[xdrun CLI cmd] Show domain layer information (task registry, dependencies)")
 	flags.StringVar(&a.debugInput, "debug-input", "", "[xdrun CLI cmd] Debug input string directly instead of file (requires --debug)")
+	flags.BoolVar(&a.debugPlan, "debug-plan", false, "[xdrun CLI cmd] Show execution plan (requires --debug-domain)")
+	flags.StringVar(&a.debugExportGraph, "debug-export-graph", "", "[xdrun CLI cmd] Export execution plan as Graphviz DOT file (e.g., 'plan' creates plan-<task>.dot)")
+	flags.StringVar(&a.debugExportMermaid, "debug-export-mermaid", "", "[xdrun CLI cmd] Export execution plan as Mermaid diagram (e.g., 'plan' creates plan-<task>.mmd)")
+	flags.StringVar(&a.debugExportJSON, "debug-export-json", "", "[xdrun CLI cmd] Export execution plan as JSON (e.g., 'plan' creates plan-<task>.json)")
 }
 
 // setupCommands sets up subcommands
@@ -157,6 +165,12 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 			a.debugJSON,
 			a.debugErrors,
 			a.debugDomain,
+			DebugOptions{
+				ShowPlan:       a.debugPlan,
+				ExportGraphviz: a.debugExportGraph,
+				ExportMermaid:  a.debugExportMermaid,
+				ExportJSON:     a.debugExportJSON,
+			},
 		)
 	}
 

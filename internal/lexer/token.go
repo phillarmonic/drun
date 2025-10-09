@@ -213,10 +213,14 @@ const (
 	FORMAT   // format
 
 	// Variable Operations keywords
-	LET       // let
-	CONCAT    // concat
-	SPLIT     // split
-	REPLACE   // replace
+	LET     // let
+	CONCAT  // concat
+	SPLIT   // split
+	REPLACE // replace
+
+	// Secret Management keywords
+	SECRET    // secret
+	NAMESPACE // namespace
 	TRIM      // trim
 	UPPERCASE // uppercase
 	LOWERCASE // lowercase
@@ -742,6 +746,10 @@ func (t TokenType) String() string {
 		return "FORMAT"
 	case LET:
 		return "LET"
+	case SECRET:
+		return "SECRET"
+	case NAMESPACE:
+		return "NAMESPACE"
 	case CONCAT:
 		return "CONCAT"
 	case SPLIT:
@@ -1164,6 +1172,8 @@ var keywords = map[string]TokenType{
 	"email":       EMAIL,
 	"format":      FORMAT,
 	"let":         LET,
+	"secret":      SECRET,
+	"namespace":   NAMESPACE,
 	"concat":      CONCAT,
 	"split":       SPLIT,
 	"replace":     REPLACE,

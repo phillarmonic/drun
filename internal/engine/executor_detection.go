@@ -3,8 +3,8 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/detection"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Detection Operations Execution
@@ -13,10 +13,10 @@ import (
 // - Environment and system detection
 
 // executeDetection executes smart detection operations
-func (e *Engine) executeDetection(detectionStmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDetection(detectionStmt *statement.Detection, ctx *ExecutionContext) error {
 	detector := detection.NewDetector()
 
-	switch detectionStmt.Type {
+	switch detectionStmt.DetectionType {
 	case "detect":
 		return e.executeDetectOperation(detector, detectionStmt, ctx)
 	case "detect_available":
@@ -28,6 +28,6 @@ func (e *Engine) executeDetection(detectionStmt *ast.DetectionStatement, ctx *Ex
 	case "when_environment":
 		return e.executeWhenEnvironment(detector, detectionStmt, ctx)
 	default:
-		return fmt.Errorf("unknown detection type: %s", detectionStmt.Type)
+		return fmt.Errorf("unknown detection type: %s", detectionStmt.DetectionType)
 	}
 }

@@ -128,7 +128,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 
 			// Check if the first part is a builtin function
 			if builtins.IsBuiltin(funcName) {
-				if result, err := builtins.CallBuiltin(funcName); err == nil {
+				if result, err := builtins.CallBuiltinLegacy(funcName); err == nil {
 					// Delegate to engine callback for operations
 					if i.resolveBuiltinOps != nil {
 						if finalResult, err := i.resolveBuiltinOps(funcName, operations, ctx); err == nil {
@@ -144,7 +144,14 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 
 	// 4. Check if it's a simple builtin function call (no arguments)
 	if builtins.IsBuiltin(expr) {
-		if result, err := builtins.CallBuiltin(expr); err == nil {
+		// Try context-aware callback first
+		if i.resolveBuiltin != nil {
+			if result, err := i.resolveBuiltin(expr, nil, ctx); err == nil {
+				return result
+			}
+		}
+		// Fall back to legacy non-context call
+		if result, err := builtins.CallBuiltinLegacy(expr); err == nil {
 			return result
 		}
 	}
@@ -159,7 +166,14 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 		args := i.parseQuotedArguments(argsStr)
 
 		if builtins.IsBuiltin(funcName) && len(args) > 0 {
-			if result, err := builtins.CallBuiltin(funcName, args...); err == nil {
+			// Try context-aware callback first
+			if i.resolveBuiltin != nil {
+				if result, err := i.resolveBuiltin(funcName, args, ctx); err == nil {
+					return result
+				}
+			}
+			// Fall back to legacy non-context call
+			if result, err := builtins.CallBuiltinLegacy(funcName, args...); err == nil {
 				return result
 			}
 		}
@@ -176,7 +190,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 			params := ctx.GetParameters()
 			if paramValue, exists := params[paramName]; exists {
 				if builtins.IsBuiltin(funcName) {
-					if result, err := builtins.CallBuiltin(funcName, paramValue.AsString()); err == nil {
+					if result, err := builtins.CallBuiltinLegacy(funcName, paramValue.AsString()); err == nil {
 						return result
 					}
 				}

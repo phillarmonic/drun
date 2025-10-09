@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Task represents a domain task entity
@@ -12,19 +13,25 @@ type Task struct {
 	Description  string
 	Parameters   []Parameter
 	Dependencies []Dependency
-	Body         []ast.Statement
+	Body         []statement.Statement
 	Namespace    string
 	Source       string // File where task is defined
 }
 
 // NewTask creates a new task from AST
-func NewTask(stmt *ast.TaskStatement, namespace, source string) *Task {
+func NewTask(stmt *ast.TaskStatement, namespace, source string) (*Task, error) {
+	// Convert body statements from AST to domain
+	body, err := statement.FromASTList(stmt.Body)
+	if err != nil {
+		return nil, fmt.Errorf("converting task body: %w", err)
+	}
+
 	task := &Task{
 		Name:        stmt.Name,
 		Description: stmt.Description,
 		Namespace:   namespace,
 		Source:      source,
-		Body:        stmt.Body,
+		Body:        body,
 	}
 
 	// Convert parameters
@@ -43,7 +50,7 @@ func NewTask(stmt *ast.TaskStatement, namespace, source string) *Task {
 		}
 	}
 
-	return task
+	return task, nil
 }
 
 // FullName returns the fully qualified task name (with namespace)

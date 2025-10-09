@@ -10,7 +10,7 @@ import (
 
 func TestFormatCurrentTime(t *testing.T) {
 	// Test default format
-	result, err := formatCurrentTime()
+	result, err := formatCurrentTime(nil)
 	if err != nil {
 		t.Fatalf("formatCurrentTime() failed: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestFormatCurrentTime(t *testing.T) {
 	}
 
 	// Test custom format
-	result, err = formatCurrentTime("2006-01-02")
+	result, err = formatCurrentTime(nil, "2006-01-02")
 	if err != nil {
 		t.Fatalf("formatCurrentTime() with custom format failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestCheckFileExists(t *testing.T) {
 	_ = tmpFile.Close()
 
 	// Test existing file
-	result, err := checkFileExists(tmpFile.Name())
+	result, err := checkFileExists(nil, tmpFile.Name())
 	if err != nil {
 		t.Fatalf("checkFileExists() failed: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCheckFileExists(t *testing.T) {
 	}
 
 	// Test non-existing file
-	result, err = checkFileExists("/non/existent/file.txt")
+	result, err = checkFileExists(nil, "/non/existent/file.txt")
 	if err != nil {
 		t.Fatalf("checkFileExists() failed: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestCheckFileExists(t *testing.T) {
 	}
 
 	// Test no arguments
-	_, err = checkFileExists()
+	_, err = checkFileExists(nil)
 	if err == nil {
 		t.Error("Expected error when no arguments provided")
 	}
@@ -77,7 +77,7 @@ func TestCheckDirExists(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test existing directory
-	result, err := checkDirExists(tmpDir)
+	result, err := checkDirExists(nil, tmpDir)
 	if err != nil {
 		t.Fatalf("checkDirExists() failed: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestCheckDirExists(t *testing.T) {
 	}
 
 	// Test non-existing directory
-	result, err = checkDirExists("/non/existent/directory")
+	result, err = checkDirExists(nil, "/non/existent/directory")
 	if err != nil {
 		t.Fatalf("checkDirExists() failed: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestGetEnvironmentVariable(t *testing.T) {
 	defer func() { _ = os.Unsetenv(testKey) }()
 
 	// Test existing env var
-	result, err := getEnvironmentVariable(testKey)
+	result, err := getEnvironmentVariable(nil, testKey)
 	if err != nil {
 		t.Fatalf("getEnvironmentVariable() failed: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestGetEnvironmentVariable(t *testing.T) {
 	}
 
 	// Test non-existing env var with default
-	result, err = getEnvironmentVariable("NON_EXISTENT_VAR", "default_value")
+	result, err = getEnvironmentVariable(nil, "NON_EXISTENT_VAR", "default_value")
 	if err != nil {
 		t.Fatalf("getEnvironmentVariable() with default failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestGetEnvironmentVariable(t *testing.T) {
 	}
 
 	// Test no arguments
-	_, err = getEnvironmentVariable()
+	_, err = getEnvironmentVariable(nil)
 	if err == nil {
 		t.Error("Expected error when no arguments provided")
 	}
@@ -133,7 +133,7 @@ func TestGetEnvironmentVariable(t *testing.T) {
 
 func TestGetCurrentDirectory(t *testing.T) {
 	// Test default (full path)
-	result, err := getCurrentDirectory()
+	result, err := getCurrentDirectory(nil)
 	if err != nil {
 		t.Fatalf("getCurrentDirectory() failed: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestGetCurrentDirectory(t *testing.T) {
 	}
 
 	// Test basename
-	result, err = getCurrentDirectory("basename")
+	result, err = getCurrentDirectory(nil, "basename")
 	if err != nil {
 		t.Fatalf("getCurrentDirectory('basename') failed: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestGetCurrentDirectory(t *testing.T) {
 }
 
 func TestGetHostname(t *testing.T) {
-	result, err := getHostname()
+	result, err := getHostname(nil)
 	if err != nil {
 		t.Fatalf("getHostname() failed: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestGetHostname(t *testing.T) {
 
 func TestCallBuiltin(t *testing.T) {
 	// Test existing builtin
-	result, err := CallBuiltin("hostname")
+	result, err := CallBuiltin("hostname", nil)
 	if err != nil {
 		t.Fatalf("CallBuiltin('hostname') failed: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestCallBuiltin(t *testing.T) {
 	}
 
 	// Test non-existing builtin
-	_, err = CallBuiltin("non_existent_function")
+	_, err = CallBuiltin("non_existent_function", nil)
 	if err == nil {
 		t.Error("Expected error for non-existent builtin")
 	}
@@ -209,7 +209,7 @@ func TestIsBuiltin(t *testing.T) {
 func TestGetCurrentGitCommit(t *testing.T) {
 	// This test might fail in environments without git or outside a git repo
 	// So we'll make it more lenient
-	result, err := getCurrentGitCommit()
+	result, err := getCurrentGitCommit(nil)
 
 	// If we're in a git repo, should get a commit hash
 	if err == nil {
@@ -219,7 +219,7 @@ func TestGetCurrentGitCommit(t *testing.T) {
 	}
 
 	// Test short version
-	result, err = getCurrentGitCommit("short")
+	result, err = getCurrentGitCommit(nil, "short")
 	if err == nil {
 		if len(result) != 7 { // Short hash length
 			t.Errorf("Expected 7-character short commit hash, got %d characters: %s", len(result), result)
@@ -233,7 +233,7 @@ func TestGetCurrentGitCommit(t *testing.T) {
 func TestGetCurrentGitBranch(t *testing.T) {
 	// This test might fail in environments without git or outside a git repo
 	// So we'll make it more lenient
-	result, err := getCurrentGitBranch()
+	result, err := getCurrentGitBranch(nil)
 
 	// If we're in a git repo, should get a branch name
 	if err == nil {
@@ -257,7 +257,7 @@ func TestProgressFunctions(t *testing.T) {
 	stateMutex.Unlock()
 
 	// Test start progress
-	result, err := startProgress("Starting task")
+	result, err := startProgress(nil, "Starting task")
 	if err != nil {
 		t.Fatalf("startProgress() failed: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test start progress with custom name
-	result, err = startProgress("Custom task", "custom")
+	result, err = startProgress(nil, "Custom task", "custom")
 	if err != nil {
 		t.Fatalf("startProgress() with custom name failed: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test update progress
-	result, err = updateProgress("50", "Halfway done")
+	result, err = updateProgress(nil, "50", "Halfway done")
 	if err != nil {
 		t.Fatalf("updateProgress() failed: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test update progress with custom name
-	result, err = updateProgress("75", "Almost done", "custom")
+	result, err = updateProgress(nil, "75", "Almost done", "custom")
 	if err != nil {
 		t.Fatalf("updateProgress() with custom name failed: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test finish progress
-	result, err = finishProgress("Task completed")
+	result, err = finishProgress(nil, "Task completed")
 	if err != nil {
 		t.Fatalf("finishProgress() failed: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test finish progress with custom name
-	result, err = finishProgress("Custom task completed", "custom")
+	result, err = finishProgress(nil, "Custom task completed", "custom")
 	if err != nil {
 		t.Fatalf("finishProgress() with custom name failed: %v", err)
 	}
@@ -331,37 +331,37 @@ func TestProgressFunctions(t *testing.T) {
 	}
 
 	// Test error cases
-	_, err = startProgress()
+	_, err = startProgress(nil)
 	if err == nil {
 		t.Error("Expected error when no message provided to startProgress")
 	}
 
-	_, err = updateProgress("50")
+	_, err = updateProgress(nil, "50")
 	if err == nil {
 		t.Error("Expected error when no message provided to updateProgress")
 	}
 
-	_, err = updateProgress("invalid", "message")
+	_, err = updateProgress(nil, "invalid", "message")
 	if err == nil {
 		t.Error("Expected error when invalid percentage provided to updateProgress")
 	}
 
-	_, err = updateProgress("150", "message")
+	_, err = updateProgress(nil, "150", "message")
 	if err == nil {
 		t.Error("Expected error when percentage > 100 provided to updateProgress")
 	}
 
-	_, err = finishProgress()
+	_, err = finishProgress(nil)
 	if err == nil {
 		t.Error("Expected error when no message provided to finishProgress")
 	}
 
-	_, err = updateProgress("50", "message", "nonexistent")
+	_, err = updateProgress(nil, "50", "message", "nonexistent")
 	if err == nil {
 		t.Error("Expected error when updating non-existent progress")
 	}
 
-	_, err = finishProgress("message", "nonexistent")
+	_, err = finishProgress(nil, "message", "nonexistent")
 	if err == nil {
 		t.Error("Expected error when finishing non-existent progress")
 	}
@@ -374,7 +374,7 @@ func TestTimerFunctions(t *testing.T) {
 	stateMutex.Unlock()
 
 	// Test start timer
-	result, err := startTimer("test_timer")
+	result, err := startTimer(nil, "test_timer")
 	if err != nil {
 		t.Fatalf("startTimer() failed: %v", err)
 	}
@@ -385,7 +385,7 @@ func TestTimerFunctions(t *testing.T) {
 	}
 
 	// Test show elapsed time for running timer
-	result, err = showElapsedTime("test_timer")
+	result, err = showElapsedTime(nil, "test_timer")
 	if err != nil {
 		t.Fatalf("showElapsedTime() for running timer failed: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestTimerFunctions(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Test stop timer
-	result, err = stopTimer("test_timer")
+	result, err = stopTimer(nil, "test_timer")
 	if err != nil {
 		t.Fatalf("stopTimer() failed: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestTimerFunctions(t *testing.T) {
 	}
 
 	// Test show elapsed time for stopped timer
-	result, err = showElapsedTime("test_timer")
+	result, err = showElapsedTime(nil, "test_timer")
 	if err != nil {
 		t.Fatalf("showElapsedTime() for stopped timer failed: %v", err)
 	}
@@ -421,51 +421,51 @@ func TestTimerFunctions(t *testing.T) {
 	}
 
 	// Test error cases
-	_, err = startTimer()
+	_, err = startTimer(nil)
 	if err == nil {
 		t.Error("Expected error when no timer name provided to startTimer")
 	}
 
 	// Try to start the same timer again while it's stopped (should work)
-	_, err = startTimer("test_timer")
+	_, err = startTimer(nil, "test_timer")
 	if err != nil {
 		t.Errorf("Expected to be able to restart stopped timer, got error: %v", err)
 	}
 
 	// Now try to start it again while it's running (should fail)
-	_, err = startTimer("test_timer")
+	_, err = startTimer(nil, "test_timer")
 	if err == nil {
 		t.Error("Expected error when starting already running timer")
 	}
 
-	_, err = stopTimer()
+	_, err = stopTimer(nil)
 	if err == nil {
 		t.Error("Expected error when no timer name provided to stopTimer")
 	}
 
-	_, err = stopTimer("nonexistent")
+	_, err = stopTimer(nil, "nonexistent")
 	if err == nil {
 		t.Error("Expected error when stopping non-existent timer")
 	}
 
 	// Stop the timer again (should work since we restarted it)
-	_, err = stopTimer("test_timer")
+	_, err = stopTimer(nil, "test_timer")
 	if err != nil {
 		t.Errorf("Expected to be able to stop running timer, got error: %v", err)
 	}
 
 	// Now try to stop it again while it's already stopped (should fail)
-	_, err = stopTimer("test_timer")
+	_, err = stopTimer(nil, "test_timer")
 	if err == nil {
 		t.Error("Expected error when stopping already stopped timer")
 	}
 
-	_, err = showElapsedTime()
+	_, err = showElapsedTime(nil)
 	if err == nil {
 		t.Error("Expected error when no timer name provided to showElapsedTime")
 	}
 
-	_, err = showElapsedTime("nonexistent")
+	_, err = showElapsedTime(nil, "nonexistent")
 	if err == nil {
 		t.Error("Expected error when showing elapsed time for non-existent timer")
 	}
@@ -539,7 +539,7 @@ func TestIsCommandAvailable(t *testing.T) {
 
 func TestCheckDockerComposeStatus(t *testing.T) {
 	// Test with current directory (should work even if no compose project exists)
-	result, err := checkDockerComposeStatus()
+	result, err := checkDockerComposeStatus(nil)
 
 	// The function should not error even if docker compose is not available
 	// It should return "unavailable" in that case
@@ -571,7 +571,7 @@ func TestCheckDockerComposeStatus(t *testing.T) {
 
 func TestCheckDockerComposeStatusWithPath(t *testing.T) {
 	// Test with a non-existent directory
-	result, err := checkDockerComposeStatus("/non/existent/directory")
+	result, err := checkDockerComposeStatus(nil, "/non/existent/directory")
 
 	if err != nil {
 		// Should get an error about the directory not existing or docker compose not available
@@ -607,7 +607,7 @@ func TestDockerComposeStatusInterpolation(t *testing.T) {
 	}
 
 	// Test calling it directly
-	result, err := CallBuiltin("docker compose status")
+	result, err := CallBuiltin("docker compose status", nil)
 	if err != nil {
 		// Should get a result even if docker compose is not available
 		if !strings.Contains(err.Error(), "docker compose not available") {

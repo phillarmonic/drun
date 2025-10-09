@@ -193,6 +193,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if variable != nil {
 				stmt.Body = append(stmt.Body, variable)
 			}
+		} else if p.curToken.Type == lexer.SECRET {
+			secret := p.parseSecretStatement()
+			if secret != nil {
+				stmt.Body = append(stmt.Body, secret)
+			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
 				shell := p.parseShellStatement()
@@ -396,6 +401,8 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		return p.parseTaskCallStatement()
 	case lexer.SET, lexer.LET:
 		return p.parseVariableStatement()
+	case lexer.SECRET:
+		return p.parseSecretStatement()
 	case lexer.TRY:
 		return p.parseErrorHandlingStatement()
 	}

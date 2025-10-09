@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/detection"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Detection Helpers
 // This file contains helper methods for tool and environment detection
 
 // executeDetectOperation executes detect operations
-func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *statement.Detection, ctx *ExecutionContext) error {
 	switch stmt.Target {
 	case "project":
 		if stmt.Condition == "type" {
@@ -48,7 +48,7 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *ast.
 }
 
 // executeIfAvailable executes "if tool is available" and "if tool is not available" conditions
-func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statement.Detection, ctx *ExecutionContext) error {
 	// Build list of all tools to check (primary + alternatives)
 	toolsToCheck := []string{stmt.Target}
 	toolsToCheck = append(toolsToCheck, stmt.Alternatives...)
@@ -133,7 +133,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *ast.Dete
 }
 
 // executeIfVersion executes "if tool version comparison" conditions
-func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *statement.Detection, ctx *ExecutionContext) error {
 	version := detector.GetToolVersion(stmt.Target)
 	targetVersion := e.interpolateVariables(stmt.Value, ctx)
 
@@ -183,7 +183,7 @@ func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *ast.Detect
 }
 
 // executeWhenEnvironment executes "when in environment" conditions
-func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *statement.Detection, ctx *ExecutionContext) error {
 	currentEnv := detector.DetectEnvironment()
 	matches := currentEnv == stmt.Target
 
@@ -218,7 +218,7 @@ func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *ast.
 }
 
 // executeDetectAvailable executes "detect available" operations with tool alternatives
-func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *ast.DetectionStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *statement.Detection, ctx *ExecutionContext) error {
 	// Build list of tools to try (primary + alternatives)
 	toolsToTry := []string{stmt.Target}
 	toolsToTry = append(toolsToTry, stmt.Alternatives...)

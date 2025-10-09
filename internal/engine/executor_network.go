@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Network Operations Execution
@@ -13,7 +14,7 @@ import (
 // - File downloads (HTTP/HTTPS)
 
 // executeNetwork executes network operations (health checks, port testing, ping)
-func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionContext) error {
 	// Interpolate variables in network statement
 	target := e.interpolateVariables(networkStmt.Target, ctx)
 	port := e.interpolateVariables(networkStmt.Port, ctx)
@@ -52,7 +53,7 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 }
 
 // executeDownload executes file download operations using native Go HTTP client
-func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *ExecutionContext) error {
 	// Interpolate variables in download statement
 	url := e.interpolateVariables(downloadStmt.URL, ctx)
 	path := e.interpolateVariables(downloadStmt.Path, ctx)
@@ -137,7 +138,15 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 	} else {
 		// Apply file permissions if specified (only for non-extracted files)
 		if len(downloadStmt.AllowPermissions) > 0 {
-			err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+			// Convert domain PermissionSpec to ast.PermissionSpec
+			var astPerms []ast.PermissionSpec
+			for _, perm := range downloadStmt.AllowPermissions {
+				astPerms = append(astPerms, ast.PermissionSpec{
+					Permissions: perm.Permissions,
+					Targets:     perm.Targets,
+				})
+			}
+			err = e.applyFilePermissions(path, astPerms)
 			if err != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
 				// Don't fail the download, just warn

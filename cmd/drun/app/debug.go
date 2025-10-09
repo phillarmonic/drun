@@ -23,6 +23,7 @@ func HandleDebugMode(
 	debugJSON bool,
 	debugErrors bool,
 	debugDomain bool,
+	opts DebugOptions,
 ) error {
 	var content string
 
@@ -78,8 +79,8 @@ func HandleDebugMode(
 		}
 
 		if debugDomain {
-			// Show domain layer information
-			if err := debugDomainLayer(program, configFile); err != nil {
+			// Show domain layer information with options
+			if err := debugDomainLayer(program, configFile, opts); err != nil {
 				return fmt.Errorf("domain layer debug failed: %w", err)
 			}
 		}
@@ -93,7 +94,7 @@ func HandleDebugMode(
 		p := parser.NewParser(l)
 		prog := p.ParseProgram()
 		if prog != nil {
-			_ = debugDomainLayer(prog, configFile)
+			_ = debugDomainLayer(prog, configFile, opts)
 		}
 	}
 

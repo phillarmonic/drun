@@ -8,6 +8,7 @@ import (
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/engine"
 	"github.com/phillarmonic/drun/internal/errors"
+	"github.com/phillarmonic/drun/internal/secrets"
 )
 
 // Domain: Task Execution
@@ -59,10 +60,21 @@ func ExecuteTask(
 		_, _ = fmt.Fprintf(os.Stdout, "✅ Parsed successfully\n")
 	}
 
-	// Create engine
-	eng := engine.NewEngine(os.Stdout)
-	eng.SetDryRun(dryRun)
-	eng.SetVerbose(verbose)
+	// Initialize secrets manager - use fallback backend for now
+	// TODO: Fix platform backends to handle all characters in namespace names
+	secretsMgr, err := secrets.NewManager(secrets.WithFallback())
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Warning: Failed to initialize secrets manager: %v\n", err)
+		secretsMgr = nil
+	}
+
+	// Create engine with secrets support
+	eng := engine.NewEngineWithOptions(
+		engine.WithOutput(os.Stdout),
+		engine.WithDryRun(dryRun),
+		engine.WithVerbose(verbose),
+		engine.WithSecretsManager(secretsMgr),
+	)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)
 
 	if verbose {
