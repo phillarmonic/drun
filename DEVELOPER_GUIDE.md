@@ -683,7 +683,7 @@ case *ast.SlackStatement:
         Message: s.Message,
     }, nil
 
-// In ToAST function (temporary bridge)
+// In ToAST function (needed for nested execution)
 case *Slack:
     return &ast.SlackStatement{
         Action:  s.Action,
