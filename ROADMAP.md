@@ -1,7 +1,7 @@
 # 🗺️ drun Implementation Roadmap
 
-**Version**: 2.0.0  
-**Last Updated**: October 5, 2025  
+**Version**: 2.1.0  
+**Last Updated**: October 9, 2025  
 **Status**: 🚀 Production Ready  
 
 This roadmap tracks the implementation progress of features documented in the [DRUN_V2_SPECIFICATION.md](DRUN_V2_SPECIFICATION.md).
@@ -307,9 +307,17 @@ This roadmap tracks the implementation progress of features documented in the [D
 - Command completion
 - Description display
 
+### ✅ Completed: Debug & Diagnostics
+- Domain layer inspection (`--debug-domain`)
+- Execution plan visualization (`--debug-plan`)
+- Graphviz DOT export (`--debug-export-graph`)
+- Mermaid diagram export (`--debug-export-mermaid`)
+- JSON plan export (`--debug-export-json`)
+- Dependency graph analysis
+- Task metadata inspection
+
 ### 📋 Planned: Advanced CLI Features
 - Interactive parameter prompting
-- Task dependency visualization
 - Performance profiling and metrics
 
 ### 📋 Planned: IDE Integration
@@ -326,16 +334,44 @@ This roadmap tracks the implementation progress of features documented in the [D
 ### ✅ Completed: Core Testing
 - Unit tests for lexer/parser
 - Integration tests for engine
-- Example file validation (62 examples)
+- Example file validation (60 examples)
 - Regression testing
-- 58 tests passing
+- All tests passing
 - High test coverage (71-83%)
+- Domain layer unit tests
+- Planner and executor tests
 
 ### 📋 Planned: Advanced Testing
 - End-to-end testing framework
 - Performance benchmarks
 - Cross-platform testing
 - Memory leak detection
+
+---
+
+## 🏗️ Architecture & Infrastructure
+
+### ✅ Completed: Modular Architecture
+- Domain model decoupling (AST-independent entities)
+- Domain statement types and converters
+- Task registry and dependency resolver
+- Parameter validation framework
+- Execution planning component (Planner)
+- Task execution component (Executor)
+- Options-based dependency injection
+- Pluggable infrastructure for testability
+
+### ✅ Completed: Performance Optimizations
+- Upfront execution planning (single AST scan)
+- Deterministic execution order
+- Eliminated redundant AST traversals
+- Comprehensive execution metadata
+
+### 📋 Planned: Additional Architecture Features
+- Execution plan caching for warm-start performance
+- Interactive debugger with breakpoints
+- Plan diff tool for comparing changes
+- Web UI for plan visualization
 
 ---
 
@@ -420,7 +456,7 @@ This roadmap tracks the implementation progress of features documented in the [D
 
 ## 🎯 Implementation Status
 
-### ✅ Completed (v2.0.0 - October 2025)
+### ✅ Completed (v2.1.0 - October 2025)
 - Core language features (lexer, parser, AST, engine)
 - All semantic actions (Docker, Git, HTTP, File, Network, Shell)
 - Advanced variable operations with chaining
@@ -430,8 +466,11 @@ This roadmap tracks the implementation progress of features documented in the [D
 - Code reuse (snippets, templates, includes)
 - Shell completion
 - Self-update mechanism
+- **Modular architecture** (domain model, planner, executor)
+- **Dependency injection** (options-based configuration)
+- **Debug diagnostics** (plan visualization, Graphviz, Mermaid, JSON)
 - Comprehensive documentation
-- 58 tests passing, 62 working examples
+- All tests passing, 60 working examples
 
 ### 🚀 Next Priorities (Q1 2026)
 
@@ -474,15 +513,24 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed contribution guidelines.
 
 ## 📊 Summary
 
-**Current Status**: 🚀 Production Ready (v2.0.0)
-- 58/58 tests passing
-- 62 working examples
+**Current Status**: 🚀 Production Ready (v2.1.0)
+- All unit tests passing
+- 60 working examples
 - Comprehensive documentation
-- Clean, modular architecture
+- Modular, domain-driven architecture
+- Execution plan diagnostics
+- Dependency injection support
 
-**Next Focus**: Advanced features, IDE integration, enterprise capabilities
+**Recent Improvements (v2.1.0)**:
+- Domain model fully decoupled from AST
+- Planner component for execution planning
+- Executor component for task execution
+- Rich debug diagnostics (Graphviz, Mermaid, JSON)
+- Options-based configuration
+
+**Next Focus**: Advanced type system, IDE integration, enterprise capabilities
 
 ---
 
-**Last Updated**: October 5, 2025  
+**Last Updated**: October 9, 2025  
 **Next Review**: Quarterly

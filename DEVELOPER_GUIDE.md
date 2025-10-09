@@ -653,7 +653,46 @@ type SlackStatement struct {
 func (s *SlackStatement) statementNode() {}
 ```
 
-#### 2. Add Parser
+#### 2. Define Domain Statement
+
+Create `internal/domain/statement/slack.go` (or add to `statement.go`):
+
+```go
+package statement
+
+// Slack represents a Slack notification action
+type Slack struct {
+    Action  string
+    Channel string
+    Message string
+}
+
+func (s *Slack) Type() StatementType { return "slack" }
+```
+
+#### 3. Add Domain Converter
+
+Add to `internal/domain/statement/converter.go`:
+
+```go
+// In FromAST function
+case *ast.SlackStatement:
+    return &Slack{
+        Action:  s.Action,
+        Channel: s.Channel,
+        Message: s.Message,
+    }, nil
+
+// In ToAST function (temporary bridge)
+case *Slack:
+    return &ast.SlackStatement{
+        Action:  s.Action,
+        Channel: s.Channel,
+        Message: s.Message,
+    }, nil
+```
+
+#### 4. Add Parser
 
 Create `internal/parser/parser_slack.go`:
 
@@ -682,7 +721,7 @@ case "notify":
     }
 ```
 
-#### 3. Add Executor
+#### 5. Add Executor
 
 Create `internal/engine/executor_slack.go`:
 
@@ -691,10 +730,7 @@ package engine
 
 func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) error {
     // Interpolate variables
-    message, err := e.interpolator.InterpolateString(stmt.Message, ctx)
-    if err != nil {
-        return err
-    }
+    message := e.interpolateVariables(stmt.Message, ctx)
     
     // Send to Slack...
     
@@ -702,18 +738,25 @@ func (e *Engine) executeSlack(stmt *ast.SlackStatement, ctx *ExecutionContext) e
 }
 ```
 
-Wire it up in `engine.go`:
+Wire it up in `executeDomainStatement` in `engine.go`:
 
 ```go
-case *ast.SlackStatement:
-    return e.executeSlack(s, ctx)
+case *statement.Slack:
+    return e.executeSlack(&ast.SlackStatement{
+        Action:  s.Action,
+        Channel: s.Channel,
+        Message: s.Message,
+    }, ctx)
 ```
 
-#### 4. Add Tests
+#### 6. Add Tests
 
-Create `internal/parser/parser_slack_test.go` and `internal/engine/executor_slack_test.go`
+Create:
+- `internal/parser/parser_slack_test.go` - Parser tests
+- `internal/domain/statement/slack_test.go` - Domain converter tests  
+- `internal/engine/executor_slack_test.go` - Executor tests
 
-#### 5. Update Documentation
+#### 7. Update Documentation
 
 - Add to [ROADMAP.md](./ROADMAP.md)
 - Add example to `examples/`
