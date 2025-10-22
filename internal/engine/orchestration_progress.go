@@ -230,10 +230,10 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 		if service.Build != nil && service.Build.Required {
 			progress.UpdateService(serviceName, "building", "Building container...")
 			progress.RenderInline(serviceName)
-			
+
 			// Show build output header
 			_, _ = fmt.Fprintf(e.output, "\n🔨 Building %s:\n", serviceName)
-			
+
 			if err := e.buildServiceWithOutput(service); err != nil {
 				progress.FailService(serviceName, err)
 				progress.RenderInline(serviceName)

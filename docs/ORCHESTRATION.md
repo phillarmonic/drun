@@ -11,10 +11,13 @@ Drun provides a comprehensive microservices orchestration system that manages th
 - ✅ **BuildKit-Style Progress**: Real-time visual feedback during operations
 - ✅ **Health Monitoring**: HTTP, TCP, Docker, DNS, and custom health checks
 - ✅ **Dependency Resolution**: Topological sort ensures correct startup/shutdown order
-- ✅ **Circuit Breaker**: Stop all services on first failure (optional)
+- ✅ **Smart Circuit Breaker**: Only stops dependent services on failure (not all services)
 - ✅ **Docker Compose Integration**: Direct `docker compose` command execution
+- ✅ **Automatic Building**: Build containers before starting with real-time output
+- ✅ **PWD Environment**: Correct working directory for Docker Compose files
 - ✅ **Graceful Shutdown**: Services stopped in reverse dependency order
 - ✅ **Error Handling**: Detailed error messages with rollback support
+- ✅ **BuildKit Output Streaming**: Real-time Docker build progress visibility
 
 ## Quick Start
 
@@ -785,6 +788,200 @@ Planned features for future releases:
 - [Drun v2 Specification](../DRUN_V2_SPECIFICATION.md)
 - [Microservices Orchestration Spec](../spec/microservices-orchestration.md)
 - [Examples](../examples/)
+
+## Implementation Details & Minutia
+
+This section covers the technical implementation details, edge cases, and minutia that have been addressed in the orchestration system.
+
+### Parser Implementation
+
+#### Infinite Loop Prevention
+The orchestration parser includes robust error handling to prevent infinite loops:
+
+- **String Array Parsing**: Added `continue` statements to advance tokens when encountering unexpected types
+- **Orchestration Body Parsing**: Proper error handling with token advancement in default cases
+- **Service Body Parsing**: Comprehensive error recovery with detailed error messages
+
+```go
+// Example: String array parsing with loop prevention
+for p.curToken.Type != lexer.RBRACKET && p.curToken.Type != lexer.EOF {
+    if p.curToken.Type == lexer.STRING {
+        result = append(result, p.curToken.Literal)
+    } else {
+        p.addError(fmt.Sprintf("expected string in array, got %s", p.curToken.Type))
+        // Advance to avoid infinite loop
+        p.nextToken()
+        continue
+    }
+    p.nextToken()
+    // ... rest of parsing logic
+}
+```
+
+#### Compose File Syntax Support
+The parser supports both syntaxes for Docker Compose file specification:
+
+- **Block syntax**: `compose:` with nested configuration
+- **Inline syntax**: `compose file "docker-compose.yml"`
+
+```drun
+# Both syntaxes are supported:
+service "api" in "./api":
+    compose file "docker-compose.dev.yml"  # Inline syntax
+
+service "db" in "./database":
+    compose:                               # Block syntax
+        file "docker-compose.yml"
+        project "myproject"
+```
+
+### Docker Compose Integration
+
+#### Working Directory Management
+The orchestration system ensures Docker Compose commands run with the correct working directory:
+
+- **Service Directory**: Each service runs `docker compose` from its own directory
+- **PWD Environment**: Sets `PWD` environment variable to service directory for `${PWD}` references
+- **Absolute Path Resolution**: Converts relative service paths to absolute paths
+
+```go
+// PWD environment setup for Docker Compose
+env := os.Environ()
+for i, envVar := range env {
+    if strings.HasPrefix(envVar, "PWD=") {
+        env[i] = "PWD=" + servicePath
+        break
+    }
+}
+if !strings.Contains(strings.Join(env, " "), "PWD=") {
+    env = append(env, "PWD="+servicePath)
+}
+cmd.Env = env
+```
+
+#### BuildKit Output Streaming
+Real-time Docker build output is streamed to provide visibility into the build process:
+
+- **Real-time Streaming**: Build output is streamed directly to the user
+- **Progress Integration**: Build status is integrated with the progress display
+- **Error Handling**: Build failures trigger circuit breaker if enabled
+
+### Circuit Breaker Implementation
+
+#### Smart Rollback Logic
+The circuit breaker uses intelligent rollback that only stops dependent services:
+
+- **Dependency-Aware**: Only stops services that were started after the failed service
+- **Index-Based**: Uses service order to determine which services to rollback
+- **Selective Stopping**: Avoids stopping services that don't depend on the failed service
+
+```go
+// Smart rollback - only stop dependent services
+failedServiceIndex := -1
+for i, svcName := range orderedServices {
+    if svcName == serviceName {
+        failedServiceIndex = i
+        break
+    }
+}
+
+// Only stop services that were started after the failed service
+for i := failedServiceIndex + 1; i < len(orderedServices); i++ {
+    // ... rollback logic
+}
+```
+
+#### Build Failure Handling
+Circuit breaker is triggered by both startup failures and build failures:
+
+- **Build Failures**: `docker compose build` failures trigger circuit breaker
+- **Startup Failures**: `docker compose up` failures trigger circuit breaker
+- **Health Check Failures**: Health check timeouts trigger circuit breaker
+
+### Progress Display System
+
+#### BuildKit-Style Visual Feedback
+The progress display provides real-time visual feedback similar to Docker BuildKit:
+
+- **Status Icons**: Different icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
+- **Real-time Updates**: Progress updates are rendered inline without cluttering output
+- **Build Output**: Docker build output is streamed and integrated with progress display
+- **Summary Display**: Final summary shows success/failure counts
+
+#### Service State Management
+Comprehensive state tracking for each service:
+
+- **Thread-Safe**: Uses mutex locks for concurrent access
+- **Timing Information**: Tracks start/end times for performance monitoring
+- **Error Tracking**: Captures and displays detailed error information
+- **Status Transitions**: Clear state transitions (pending → building → starting → healthy)
+
+### Error Handling & Recovery
+
+#### Parser Error Recovery
+Robust error recovery mechanisms in the parser:
+
+- **Token Synchronization**: Skips to next valid token on parse errors
+- **Detailed Error Messages**: Specific error messages with line/column information
+- **Graceful Degradation**: Continues parsing other statements when one fails
+
+#### Docker Compose Error Handling
+Comprehensive error handling for Docker operations:
+
+- **Command Execution**: Proper error capture and reporting
+- **Output Capture**: Captures both stdout and stderr for debugging
+- **Timeout Handling**: Configurable timeouts for long-running operations
+- **Exit Code Checking**: Proper exit code validation
+
+### Performance Considerations
+
+#### Parallel vs Sequential Operations
+The orchestration system balances safety and performance:
+
+- **Sequential Startup**: Services start one at a time to ensure proper dependency resolution
+- **Parallel Health Checks**: Health checks can run concurrently after startup
+- **Concurrent Rollback**: Multiple services can be stopped simultaneously during rollback
+
+#### Memory Management
+Efficient memory usage patterns:
+
+- **Streaming Output**: Build output is streamed rather than buffered
+- **Goroutine Management**: Proper cleanup of background goroutines
+- **Resource Cleanup**: Docker containers and networks are properly cleaned up
+
+### Configuration Flexibility
+
+#### Service Configuration
+Comprehensive service configuration options:
+
+- **Health Check Types**: HTTP, TCP, Docker, DNS, and custom health checks
+- **Build Configuration**: Optional building with timeout and parallel job settings
+- **Dependency Management**: Complex dependency graphs with topological sorting
+- **Environment Variables**: Service-specific environment variable management
+
+#### Orchestration Strategies
+Multiple orchestration strategies supported:
+
+- **Dependency-Based**: Services start in dependency order (default)
+- **Sequential**: Services start one after another regardless of dependencies
+- **Parallel**: All services start simultaneously (future enhancement)
+
+### Testing & Validation
+
+#### Comprehensive Test Coverage
+The implementation includes extensive testing:
+
+- **Parser Tests**: Unit tests for all parsing scenarios
+- **Integration Tests**: End-to-end tests with real Docker containers
+- **Error Case Tests**: Tests for various failure scenarios
+- **Circuit Breaker Tests**: Specific tests for rollback behavior
+
+#### Real-World Validation
+The system has been validated with real projects:
+
+- **Celesta Project**: Production validation with complex microservices
+- **Docker Compose Integration**: Real Docker Compose file compatibility
+- **Health Check Validation**: Actual HTTP/TCP health check testing
 
 ## Support
 

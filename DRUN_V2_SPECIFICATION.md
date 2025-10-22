@@ -6102,6 +6102,144 @@ Orchestration Engine
    └→ Progress Display
 ```
 
+### Implementation Details
+
+The microservices orchestration system includes several sophisticated implementation details and edge case handling:
+
+#### Parser Robustness
+
+**Infinite Loop Prevention**
+The orchestration parser includes comprehensive error handling to prevent infinite loops during parsing:
+
+- String array parsing advances tokens on unexpected types
+- Orchestration body parsing includes proper error recovery
+- Service body parsing provides detailed error messages with graceful degradation
+
+**Compose File Syntax Support**
+The parser supports multiple Docker Compose file specification syntaxes:
+
+- Inline syntax: `compose file "docker-compose.yml"`
+- Block syntax: `compose:` with nested configuration
+- Automatic detection and proper handling of both formats
+
+#### Docker Compose Integration
+
+**Working Directory Management**
+Each service runs Docker Compose commands from its own directory with proper environment setup:
+
+- Service directory resolution with absolute path conversion
+- PWD environment variable setup for `${PWD}` references in compose files
+- Proper working directory context for all Docker operations
+
+**BuildKit Output Streaming**
+Real-time Docker build output is streamed to provide visibility:
+
+- Direct stdout/stderr streaming during build operations
+- Integration with progress display system
+- Build failure handling with circuit breaker integration
+
+#### Circuit Breaker Implementation
+
+**Smart Rollback Logic**
+The circuit breaker uses intelligent dependency-aware rollback:
+
+- Only stops services that were started after the failed service
+- Index-based dependency tracking for efficient rollback
+- Avoids stopping services that don't depend on the failed service
+
+**Multi-Failure Type Handling**
+Circuit breaker is triggered by various failure types:
+
+- Docker Compose build failures
+- Docker Compose startup failures  
+- Health check timeout failures
+- Service dependency resolution failures
+
+#### Progress Display System
+
+**BuildKit-Style Visual Feedback**
+Real-time progress display with comprehensive state tracking:
+
+- Status icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
+- Inline progress updates without output cluttering
+- Build output integration with progress display
+- Final summary with success/failure counts
+
+**Thread-Safe State Management**
+Comprehensive state tracking with concurrency safety:
+
+- Mutex-protected state updates for concurrent access
+- Timing information for performance monitoring
+- Error tracking with detailed error information
+- Clear state transitions throughout service lifecycle
+
+#### Error Handling & Recovery
+
+**Parser Error Recovery**
+Robust error recovery mechanisms:
+
+- Token synchronization on parse errors
+- Detailed error messages with line/column information
+- Graceful degradation when individual statements fail
+
+**Docker Compose Error Handling**
+Comprehensive error handling for Docker operations:
+
+- Proper error capture and reporting for all Docker commands
+- Output capture for both stdout and stderr debugging
+- Configurable timeouts for long-running operations
+- Exit code validation and error propagation
+
+#### Performance Considerations
+
+**Sequential vs Parallel Operations**
+Balanced approach to safety and performance:
+
+- Sequential service startup for proper dependency resolution
+- Parallel health checks after startup completion
+- Concurrent rollback operations for efficiency
+
+**Memory Management**
+Efficient resource usage patterns:
+
+- Streaming output instead of buffering for large builds
+- Proper goroutine cleanup and management
+- Docker resource cleanup on completion
+
+#### Configuration Flexibility
+
+**Service Configuration Options**
+Comprehensive service configuration:
+
+- Multiple health check types (HTTP, TCP, Docker, DNS, Custom)
+- Build configuration with timeout and parallel job settings
+- Complex dependency graphs with topological sorting
+- Environment variable management per service
+
+**Orchestration Strategies**
+Multiple orchestration approaches:
+
+- Dependency-based startup (default)
+- Sequential startup regardless of dependencies
+- Future parallel startup capabilities
+
+#### Testing & Validation
+
+**Comprehensive Test Coverage**
+Extensive testing implementation:
+
+- Unit tests for all parsing scenarios
+- Integration tests with real Docker containers
+- Error case testing for various failure scenarios
+- Circuit breaker behavior validation
+
+**Real-World Validation**
+Production validation with actual projects:
+
+- Celesta project integration and testing
+- Docker Compose file compatibility validation
+- Health check testing with real services
+
 ### Future Enhancements
 
 Planned features for future versions:
