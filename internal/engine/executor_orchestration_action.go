@@ -317,7 +317,21 @@ func (e *Engine) buildDockerComposeCmd(service *ast.ServiceStatement, args ...st
 
 	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = servicePath
-	cmd.Env = os.Environ()
+
+	// Set up environment with correct PWD for the service directory
+	env := os.Environ()
+	// Update PWD to point to the service directory
+	for i, envVar := range env {
+		if strings.HasPrefix(envVar, "PWD=") {
+			env[i] = "PWD=" + servicePath
+			break
+		}
+	}
+	// If PWD wasn't found, add it
+	if !strings.Contains(strings.Join(env, " "), "PWD=") {
+		env = append(env, "PWD="+servicePath)
+	}
+	cmd.Env = env
 
 	return cmd
 }
