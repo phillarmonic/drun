@@ -5528,3 +5528,597 @@ Error: parameter 'version': value '1.2.3' does not match semver pattern (Basic s
 Error: parameter 'id': value 'not-a-uuid' does not match uuid pattern (UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000))
 ```
 
+
+---
+
+## Microservices Orchestration
+
+drun v2 includes a comprehensive microservices orchestration system for managing multi-service architectures with Docker Compose integration, health monitoring, and visual progress feedback.
+
+### Overview
+
+The orchestration system allows you to:
+
+- Define services with dependencies and health checks
+- Group services into orchestration units
+- Manage service lifecycles with semantic actions
+- Monitor health and status in real-time
+- Handle errors with circuit breaker support
+- Visualize progress with BuildKit-style display
+
+### Service Declaration
+
+Services represent Docker Compose projects that can be orchestrated together.
+
+#### Syntax
+
+```drun
+service "<name>" in "<path>":
+    [depends on ["service1", "service2", ...]]
+    [health check:
+        type "<type>"
+        endpoint "<endpoint>"
+        [timeout "<duration>"]
+        [interval "<duration>"]
+        [retries <number>]
+        [condition "<condition>"]]
+```
+
+#### Example
+
+```drun
+service "api" in "./services/api":
+    depends on ["database", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        interval "2s"
+        retries 5
+        condition "200"
+```
+
+#### Properties
+
+- **name**: Unique identifier for the service
+- **path**: Directory containing docker-compose.yml
+- **depends on**: List of service dependencies (optional)
+- **health check**: Health check configuration (optional)
+
+### Health Check Types
+
+#### HTTP Health Check
+
+Checks an HTTP endpoint for successful response:
+
+```drun
+health check:
+    type "http"
+    endpoint "http://localhost:8080/health"
+    timeout "10s"
+    interval "2s"
+    retries 5
+    condition "200"  # Expected HTTP status code
+```
+
+#### TCP Health Check
+
+Checks if a TCP port is accepting connections:
+
+```drun
+health check:
+    type "tcp"
+    endpoint "localhost:5432"
+    timeout "5s"
+    interval "1s"
+    retries 10
+```
+
+#### Docker Health Check
+
+Uses Docker's native health check status:
+
+```drun
+health check:
+    type "docker"
+    container "container-name"
+    timeout "30s"
+    interval "2s"
+```
+
+#### DNS Health Check
+
+Checks if a hostname resolves:
+
+```drun
+health check:
+    type "dns"
+    endpoint "api.example.com"
+    timeout "5s"
+    retries 3
+```
+
+#### Custom Health Check
+
+Runs a custom command:
+
+```drun
+health check:
+    type "custom"
+    command "curl -f http://localhost:8080/ready || exit 1"
+    timeout "5s"
+    interval "2s"
+    retries 5
+```
+
+### Orchestration Groups
+
+Orchestration groups define collections of services with shared lifecycle management.
+
+#### Syntax
+
+```drun
+orchestrate "<name>":
+    services ["service1", "service2", ...]
+    [strategy "<strategy>"]
+    [circuit <boolean>]
+    [health_check_interval "<duration>"]
+```
+
+#### Example
+
+```drun
+orchestrate "full_stack":
+    services ["database", "redis", "api", "frontend"]
+    strategy "dependency-based"
+    circuit true
+    health_check_interval "30s"
+```
+
+#### Properties
+
+- **services**: List of services to orchestrate
+- **strategy**: Startup strategy (sequential, parallel, dependency-based)
+- **circuit**: Enable circuit breaker (stops all on failure)
+- **health_check_interval**: How often to check health
+
+#### Startup Strategies
+
+**Sequential**: Start services one by one in declaration order
+
+```drun
+orchestrate "simple":
+    services ["a", "b", "c"]
+    strategy "sequential"
+```
+
+**Dependency-Based** (Recommended): Start based on dependency graph
+
+```drun
+orchestrate "smart":
+    services ["frontend", "api", "database"]
+    strategy "dependency-based"
+```
+
+**Parallel**: Start all services simultaneously
+
+```drun
+orchestrate "workers":
+    services ["worker1", "worker2", "worker3"]
+    strategy "parallel"
+```
+
+### Orchestration Actions
+
+Use orchestration actions within task bodies to manage services.
+
+#### Syntax
+
+```drun
+orchestrate "<group_name>" <action> [services ["service1", ...]]
+```
+
+#### Available Actions
+
+- `start` - Start all services in dependency order
+- `stop` - Stop all services in reverse order
+- `restart` - Stop then start services
+- `status` - Show status of all services
+- `build` - Build service images
+- `pull` - Pull latest images
+- `down` - Stop and remove containers
+
+#### Examples
+
+```drun
+task "start":
+    orchestrate "my_stack" start
+
+task "stop":
+    orchestrate "my_stack" stop
+
+task "restart_api":
+    orchestrate "my_stack" restart services ["api"]
+
+task "status":
+    orchestrate "my_stack" status
+```
+
+### Progress Display
+
+The orchestration system features a BuildKit-inspired real-time progress display.
+
+#### Status Indicators
+
+- ⏸️ **Pending** - Waiting to start
+- 🔄 **Starting** - Service is starting
+- ✅ **Healthy** - Started and passed health checks
+- ❌ **Failed** - Failed to start or unhealthy
+- 🛑 **Stopping** - Being stopped
+- ⏹️ **Stopped** - Successfully stopped
+
+#### Example Output
+
+```
+🚀 Starting orchestration: full_stack
+   4 services in dependency order
+
+  ⏸️ database     
+  ⏸️ redis        
+  ⏸️ api          
+  ⏸️ frontend     
+
+  🔄 database     Starting service... [0s]
+  🔄 database     Waiting for health check... [0s]
+  ✅ database     Healthy [2s]
+  🔄 redis        Starting service... [0s]
+  ✅ redis        Healthy [1s]
+  🔄 api          Starting service... [0s]
+  ✅ api          Healthy [3s]
+  🔄 frontend     Starting service... [0s]
+  ✅ frontend     Healthy [2s]
+
+✅ 4/4 services completed successfully
+```
+
+### Circuit Breaker
+
+When circuit breaker is enabled, any failure stops and rolls back all services.
+
+#### Configuration
+
+```drun
+orchestrate "critical":
+    services ["database", "api", "frontend"]
+    circuit true  # Enable circuit breaker
+```
+
+#### Behavior
+
+```
+🚀 Starting orchestration: critical
+   🔴 Circuit breaker: ENABLED - will stop all on failure
+
+  ✅ database     Healthy [2s]
+  ❌ api          Health check failed [5s]
+
+🔴 Circuit breaker triggered! Rolling back all services...
+
+  🛑 database     Rolling back... [0s]
+  ⏹️ database     Stopped (rollback) [0s]
+
+❌ 1/3 services failed
+Error: circuit breaker: health check failed for 'api', all services stopped
+```
+
+### Resilient Mode
+
+When circuit breaker is disabled, failures are tolerated and the system continues in degraded mode.
+
+#### Configuration
+
+```drun
+orchestrate "resilient":
+    services ["database", "api", "frontend"]
+    circuit false  # Disable circuit breaker
+```
+
+#### Behavior
+
+```
+🚀 Starting orchestration: resilient
+
+  ✅ database     Healthy [2s]
+  ❌ api          Health check failed [5s]
+  🔄 api          ⚠️  Unhealthy: health check failed [5s]
+  ✅ frontend     Healthy [2s]
+
+✅ 2/3 services completed successfully
+```
+
+### Complete Example
+
+```drun
+version: 2.0
+
+project "e-commerce" version "1.0":
+
+# Infrastructure
+service "database" in "./services/db":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "10s"
+        retries 10
+
+service "cache" in "./services/redis":
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "5s"
+        retries 5
+
+# Application
+service "api" in "./services/api":
+    depends on ["database", "cache"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "15s"
+        interval "2s"
+        retries 5
+
+service "frontend" in "./services/web":
+    depends on ["api"]
+    health check:
+        type "http"
+        endpoint "http://localhost:3000/"
+        timeout "10s"
+        retries 3
+
+# Orchestration
+orchestrate "platform":
+    services ["database", "cache", "api", "frontend"]
+    strategy "dependency-based"
+    circuit true
+
+# Tasks
+task "start":
+    info "🚀 Starting platform..."
+    orchestrate "platform" start
+    success "Platform ready at http://localhost:3000"
+
+task "stop":
+    info "🛑 Stopping platform..."
+    orchestrate "platform" stop
+
+task "restart":
+    orchestrate "platform" restart
+
+task "status":
+    orchestrate "platform" status
+
+task "rebuild":
+    orchestrate "platform" build
+    orchestrate "platform" restart
+
+task "cleanup":
+    orchestrate "platform" down
+```
+
+### Docker Compose Integration
+
+The orchestration system executes `docker compose` commands directly:
+
+#### Start Service
+
+```bash
+cd /path/to/service
+docker compose up -d
+```
+
+#### Stop Service
+
+```bash
+cd /path/to/service
+docker compose stop
+```
+
+#### Service Status
+
+```bash
+cd /path/to/service
+docker compose ps
+```
+
+#### Down (Remove)
+
+```bash
+cd /path/to/service
+docker compose down
+```
+
+### Dependency Resolution
+
+Services are started in topological order based on dependencies:
+
+#### Example
+
+```drun
+service "database" in "./db":
+service "cache" in "./cache":
+service "api" in "./api":
+    depends on ["database", "cache"]
+service "frontend" in "./web":
+    depends on ["api"]
+```
+
+**Resolution Order:**
+1. `database` and `cache` (parallel - no dependencies)
+2. `api` (after database and cache)
+3. `frontend` (after api)
+
+#### Shutdown Order
+
+Shutdown occurs in reverse topological order:
+1. `frontend`
+2. `api`
+3. `database` and `cache`
+
+### Error Handling
+
+#### Health Check Failures
+
+```
+  ❌ api    Waiting for health check...: health check failed after 5 attempts [10s]
+```
+
+**Common causes:**
+- Service not responding at endpoint
+- Wrong port or URL configuration
+- Service internal error
+- Health check timeout too short
+
+#### Docker Compose Errors
+
+```
+  ❌ service  Starting service...: docker compose failed: exit status 1
+Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+**Common causes:**
+- Port conflict with another container
+- Docker Compose file doesn't exist
+- Permission issues
+- Invalid Docker Compose configuration
+
+#### Missing Service Path
+
+```
+  ❌ service  Starting service...: docker compose failed: chdir /path: no such file or directory
+```
+
+**Common causes:**
+- Incorrect path in service declaration
+- Service directory doesn't exist
+- Docker Compose file not in expected location
+
+### Best Practices
+
+1. **Always Use Health Checks**
+
+```drun
+service "api" in "./api":
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        retries 5
+```
+
+2. **Use Dependency-Based Strategy**
+
+```drun
+orchestrate "stack":
+    services [...]
+    strategy "dependency-based"  # Recommended
+```
+
+3. **Enable Circuit Breaker for Critical Systems**
+
+```drun
+orchestrate "production":
+    circuit true  # Fail fast in production
+```
+
+4. **Group Related Services**
+
+```drun
+orchestrate "infra":
+    services ["database", "cache"]
+
+orchestrate "app":
+    services ["api", "worker"]
+```
+
+5. **Use Meaningful Timeouts**
+
+```drun
+service "database" in "./db":
+    health check:
+        timeout "30s"  # Databases need more time
+        retries 10
+
+service "api" in "./api":
+    health check:
+        timeout "10s"  # APIs start faster
+        retries 5
+```
+
+### Implementation Details
+
+#### Components
+
+1. **AST Nodes**
+   - `ServiceStatement` - Service declarations
+   - `OrchestrateStatement` - Orchestration groups
+   - `OrchestrationActionStatement` - Actions in tasks
+
+2. **Domain Models**
+   - `Service` - Runtime service representation
+   - `OrchestrationGroup` - Group configuration
+   - `HealthCheck` - Health check configuration
+
+3. **Execution Engine**
+   - Dependency resolution (topological sort)
+   - Docker Compose execution
+   - Health check monitoring
+   - Progress display
+
+4. **Health Check System**
+   - HTTP checker
+   - TCP checker
+   - Docker checker
+   - DNS checker
+   - Custom command checker
+
+#### Data Flow
+
+```
+Drunfile
+   ↓
+Parser (service & orchestrate)
+   ↓
+AST Nodes
+   ↓
+Domain Models
+   ↓
+Task Execution
+   ↓
+Orchestration Engine
+   ├→ Dependency Resolution
+   ├→ Docker Compose Commands
+   ├→ Health Monitoring
+   └→ Progress Display
+```
+
+### Future Enhancements
+
+Planned features for future versions:
+
+- Pre/post lifecycle tasks
+- Environment file management
+- Makefile integration during build
+- Git repository auto-cloning
+- Service discovery integration
+- Metrics and monitoring
+- Automatic rollback support
+- Blue/green deployments
+- Dynamic scaling operations
+
+### Related Documentation
+
+- [Orchestration Guide](./docs/ORCHESTRATION.md) - Complete orchestration documentation
+- [Microservices Spec](./spec/microservices-orchestration.md) - Original specification
+- [Examples](./examples/) - Working examples
+

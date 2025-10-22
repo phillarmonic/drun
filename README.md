@@ -68,6 +68,7 @@ task "hello":
 - **Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **Dependency System**: Automatic task dependency resolution with parallel execution
 - **Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
+- **Microservices Orchestration**: Full-featured orchestration system for managing multi-service architectures with BuildKit-style progress display, health checks, dependency resolution, and circuit breaker support ([→ Learn more](./docs/ORCHESTRATION.md))
 - **HTTP Actions**: Built-in HTTP requests with authentication and response handling
 - **Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
 - **Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)

@@ -58,9 +58,9 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	// Execute the action
 	switch orchestrStmt.Action {
 	case "start":
-		return e.orchestrateStart(orchestration, orderedServices, services)
+		return e.orchestrateStartWithProgress(orchestration, orderedServices, services)
 	case "stop":
-		return e.orchestrateStop(orchestration, orderedServices, services)
+		return e.orchestrateStopWithProgress(orchestration, orderedServices, services)
 	case "restart":
 		if err := e.orchestrateStop(orchestration, orderedServices, services); err != nil {
 			return err
