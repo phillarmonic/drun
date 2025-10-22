@@ -83,8 +83,22 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 			// Parse build config
 			stmt.Build = p.parseBuildConfig()
 		case lexer.COMPOSE:
-			// Parse compose config
-			stmt.Compose = p.parseComposeConfig()
+			// Parse compose config - handle both "compose:" and "compose file" syntax
+			if p.peekToken.Type == lexer.FILE {
+				// Handle "compose file" syntax
+				p.nextToken() // consume "file"
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected compose file string")
+					return nil
+				}
+				stmt.Compose = &ast.ComposeConfig{
+					File: p.curToken.Literal,
+				}
+				p.nextToken()
+			} else {
+				// Handle "compose:" syntax
+				stmt.Compose = p.parseComposeConfig()
+			}
 		case lexer.ENVIRONMENT:
 			// Parse environment variables
 			stmt.Environment = p.parseEnvironmentMap()
@@ -900,7 +914,7 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 		case lexer.MAKEFILE:
 			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "order" {
 				p.nextToken() // consume 'order'
-				stmt.MakefileOrder = p.parseStringArray()
+				stmt.MakefileOrder = p.parseOrchestrationStringArray()
 			} else if p.peekToken.Type == lexer.TIMEOUT {
 				p.nextToken() // consume 'timeout'
 				if !p.expectPeek(lexer.STRING) {
@@ -913,7 +927,7 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 		case lexer.CLONE:
 			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "order" {
 				p.nextToken() // consume 'order'
-				stmt.CloneOrder = p.parseStringArray()
+				stmt.CloneOrder = p.parseOrchestrationStringArray()
 			} else if p.peekToken.Type == lexer.TIMEOUT {
 				p.nextToken() // consume 'timeout'
 				if !p.expectPeek(lexer.STRING) {
@@ -925,8 +939,11 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 			}
 		case lexer.DEDENT:
 			break
+		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
+			p.nextToken() // Skip comments
 		default:
-			p.nextToken()
+			p.addError(fmt.Sprintf("unexpected token in orchestration body: %s", p.curToken.Type))
+			p.nextToken() // Advance to avoid infinite loop
 		}
 	}
 
@@ -954,6 +971,9 @@ func (p *Parser) parseOrchestrationStringArray() []string {
 			result = append(result, p.curToken.Literal)
 		} else {
 			p.addError(fmt.Sprintf("expected string in array, got %s", p.curToken.Type))
+			// Advance to avoid infinite loop
+			p.nextToken()
+			continue
 		}
 
 		p.nextToken()
