@@ -148,6 +148,75 @@ const (
 	BE         // be
 	EXPECT     // expect
 
+	// Orchestration keywords
+	ORCHESTRATE // orchestrate
+	SERVICES    // services
+	STRATEGY    // strategy
+	SEQUENTIAL  // sequential
+	CIRCUIT     // circuit
+	BREAKER     // breaker
+	FAILURE     // failure
+	THRESHOLD   // threshold
+	RECOVERY    // recovery
+	INTERVAL    // interval
+	RETRIES     // retries
+	CONDITION   // condition
+	DNS         // dns
+	TCP         // tcp
+	DOMAIN      // domain
+	RECORD      // record
+	EXPECTED    // expected
+	IP          // ip
+	IPS         // ips
+	COMMAND     // command
+	WORKING     // working
+	REQUIRED    // required
+	MISSING     // missing
+	UPDATE      // update
+	RESTART     // restart
+	FORCE       // force
+	RECREATE    // recreate
+	DEPS        // deps
+	NO          // no
+	NEVER       // never
+	ALWAYS      // always
+	MAKEFILE    // makefile
+	TARGET      // target
+	ARGS        // args
+	PRE         // pre
+	JOBS        // jobs
+	VERBOSE     // verbose
+	SSH         // ssh
+	KEY         // key
+	FALLBACK    // fallback
+	DELAY       // delay
+	FILE        // file
+	PATH        // path
+	STARTUP     // startup
+	SHUTDOWN    // shutdown
+	DISCOVERY   // discovery
+	METRICS     // metrics
+	ENABLED     // enabled
+	LABELS      // labels
+	UNAVAILABLE // unavailable
+	MAX         // max
+	MIN         // min
+	CONSUL      // consul
+	ETCD        // etcd
+	KUBERNETES  // kubernetes
+	SERVER      // server
+	SEARCH      // search
+	DOMAINS     // domains
+	TTL         // ttl
+	CACHE       // cache
+	MEMORY      // memory
+	CPU         // cpu
+	LIMIT       // limit
+	POLICY      // policy
+	ORPHANS     // orphans
+	PERIOD      // period
+	ENV_FILE    // env_file (using underscore to distinguish from ENV)
+
 	// Smart Detection keywords
 	DETECT      // detect
 	AVAILABLE   // available
@@ -624,6 +693,140 @@ func (t TokenType) String() string {
 		return "BE"
 	case EXPECT:
 		return "EXPECT"
+	case ORCHESTRATE:
+		return "ORCHESTRATE"
+	case SERVICES:
+		return "SERVICES"
+	case STRATEGY:
+		return "STRATEGY"
+	case SEQUENTIAL:
+		return "SEQUENTIAL"
+	case CIRCUIT:
+		return "CIRCUIT"
+	case BREAKER:
+		return "BREAKER"
+	case FAILURE:
+		return "FAILURE"
+	case THRESHOLD:
+		return "THRESHOLD"
+	case RECOVERY:
+		return "RECOVERY"
+	case INTERVAL:
+		return "INTERVAL"
+	case RETRIES:
+		return "RETRIES"
+	case CONDITION:
+		return "CONDITION"
+	case DNS:
+		return "DNS"
+	case TCP:
+		return "TCP"
+	case DOMAIN:
+		return "DOMAIN"
+	case RECORD:
+		return "RECORD"
+	case EXPECTED:
+		return "EXPECTED"
+	case IP:
+		return "IP"
+	case IPS:
+		return "IPS"
+	case COMMAND:
+		return "COMMAND"
+	case WORKING:
+		return "WORKING"
+	case REQUIRED:
+		return "REQUIRED"
+	case MISSING:
+		return "MISSING"
+	case UPDATE:
+		return "UPDATE"
+	case RESTART:
+		return "RESTART"
+	case FORCE:
+		return "FORCE"
+	case RECREATE:
+		return "RECREATE"
+	case DEPS:
+		return "DEPS"
+	case NO:
+		return "NO"
+	case NEVER:
+		return "NEVER"
+	case ALWAYS:
+		return "ALWAYS"
+	case MAKEFILE:
+		return "MAKEFILE"
+	case TARGET:
+		return "TARGET"
+	case ARGS:
+		return "ARGS"
+	case PRE:
+		return "PRE"
+	case JOBS:
+		return "JOBS"
+	case VERBOSE:
+		return "VERBOSE"
+	case SSH:
+		return "SSH"
+	case KEY:
+		return "KEY"
+	case FALLBACK:
+		return "FALLBACK"
+	case DELAY:
+		return "DELAY"
+	case FILE:
+		return "FILE"
+	case PATH:
+		return "PATH"
+	case STARTUP:
+		return "STARTUP"
+	case SHUTDOWN:
+		return "SHUTDOWN"
+	case DISCOVERY:
+		return "DISCOVERY"
+	case METRICS:
+		return "METRICS"
+	case ENABLED:
+		return "ENABLED"
+	case LABELS:
+		return "LABELS"
+	case UNAVAILABLE:
+		return "UNAVAILABLE"
+	case MAX:
+		return "MAX"
+	case MIN:
+		return "MIN"
+	case CONSUL:
+		return "CONSUL"
+	case ETCD:
+		return "ETCD"
+	case KUBERNETES:
+		return "KUBERNETES"
+	case SERVER:
+		return "SERVER"
+	case SEARCH:
+		return "SEARCH"
+	case DOMAINS:
+		return "DOMAINS"
+	case TTL:
+		return "TTL"
+	case CACHE:
+		return "CACHE"
+	case MEMORY:
+		return "MEMORY"
+	case CPU:
+		return "CPU"
+	case LIMIT:
+		return "LIMIT"
+	case POLICY:
+		return "POLICY"
+	case ORPHANS:
+		return "ORPHANS"
+	case PERIOD:
+		return "PERIOD"
+	case ENV_FILE:
+		return "ENV_FILE"
 	case DETECT:
 		return "DETECT"
 	case AVAILABLE:
@@ -1111,6 +1314,73 @@ var keywords = map[string]TokenType{
 	"at":          AT,
 	"be":          BE,
 	"expect":      EXPECT,
+	"orchestrate": ORCHESTRATE,
+	"services":    SERVICES,
+	"strategy":    STRATEGY,
+	"sequential":  SEQUENTIAL,
+	"circuit":     CIRCUIT,
+	"breaker":     BREAKER,
+	"failure":     FAILURE,
+	"threshold":   THRESHOLD,
+	"recovery":    RECOVERY,
+	"interval":    INTERVAL,
+	"retries":     RETRIES,
+	"condition":   CONDITION,
+	"dns":         DNS,
+	"tcp":         TCP,
+	"domain":      DOMAIN,
+	"record":      RECORD,
+	"expected":    EXPECTED,
+	"ip":          IP,
+	"ips":         IPS,
+	"command":     COMMAND,
+	"working":     WORKING,
+	"required":    REQUIRED,
+	"missing":     MISSING,
+	"update":      UPDATE,
+	"restart":     RESTART,
+	"force":       FORCE,
+	"recreate":    RECREATE,
+	"deps":        DEPS,
+	"no":          NO,
+	"never":       NEVER,
+	"always":      ALWAYS,
+	"makefile":    MAKEFILE,
+	"target":      TARGET,
+	"args":        ARGS,
+	"pre":         PRE,
+	"jobs":        JOBS,
+	"verbose":     VERBOSE,
+	"ssh":         SSH,
+	"key":         KEY,
+	"fallback":    FALLBACK,
+	"delay":       DELAY,
+	"file":        FILE,
+	"path":        PATH,
+	"startup":     STARTUP,
+	"shutdown":    SHUTDOWN,
+	"discovery":   DISCOVERY,
+	"metrics":     METRICS,
+	"enabled":     ENABLED,
+	"labels":      LABELS,
+	"unavailable": UNAVAILABLE,
+	"max":         MAX,
+	"min":         MIN,
+	"consul":      CONSUL,
+	"etcd":        ETCD,
+	"kubernetes":  KUBERNETES,
+	"server":      SERVER,
+	"search":      SEARCH,
+	"domains":     DOMAINS,
+	"ttl":         TTL,
+	"cache":       CACHE,
+	"memory":      MEMORY,
+	"cpu":         CPU,
+	"limit":       LIMIT,
+	"policy":      POLICY,
+	"orphans":     ORPHANS,
+	"period":      PERIOD,
+	"env_file":    ENV_FILE,
 	"detect":      DETECT,
 	"available":   AVAILABLE,
 	"not":         NOT,

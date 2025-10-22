@@ -1,0 +1,172 @@
+version: 2.0
+
+project "ecommerce-platform" version "1.0.0":
+    set environment to "production"
+    set registry to "ghcr.io/company"
+
+# Infrastructure services
+service "postgres" in "./services/database" means "PostgreSQL Database":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "5s"
+        interval "10s"
+        retries 3
+    compose:
+        file "docker-compose.yml"
+    environment:
+        POSTGRES_DB "ecommerce"
+        POSTGRES_USER "app_user"
+        POSTGRES_PASSWORD "secure_password"
+
+service "redis" in "./services/cache" means "Redis Cache":
+    depends on ["postgres"]
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "3s"
+        interval "5s"
+        retries 2
+    compose:
+        file "docker-compose.yml"
+
+# Business services
+service "user-service" in "./services/user-service" means "User Management Service":
+    depends on ["postgres", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8001/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+    environment:
+        DATABASE_URL "postgresql://app_user:secure_password@postgres:5432/ecommerce"
+        REDIS_URL "redis://redis:6379"
+        SERVICE_PORT "8001"
+
+service "order-service" in "./services/order-service" means "Order Management Service":
+    depends on ["user-service", "postgres"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8002/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+    environment:
+        DATABASE_URL "postgresql://app_user:secure_password@postgres:5432/ecommerce"
+        USER_SERVICE_URL "http://user-service:8001"
+        SERVICE_PORT "8002"
+
+service "payment-service" in "./services/payment-service" means "Payment Processing Service":
+    depends on ["order-service", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8003/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+    environment:
+        REDIS_URL "redis://redis:6379"
+        ORDER_SERVICE_URL "http://order-service:8002"
+        SERVICE_PORT "8003"
+
+service "notification-service" in "./services/notification-service" means "Notification Service":
+    depends on ["redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8004/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+    environment:
+        REDIS_URL "redis://redis:6379"
+        SERVICE_PORT "8004"
+
+# Orchestration groups
+orchestrate "infrastructure" means "Infrastructure services":
+    services ["postgres", "redis"]
+    strategy "sequential"
+    circuit_breaker false
+    stop_on_failure false
+
+orchestrate "business_services" means "Business logic services":
+    services ["user-service", "order-service", "payment-service", "notification-service"]
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    health_check_interval "30s"
+    startup_timeout "300s"
+    shutdown_timeout "60s"
+
+orchestrate "all_services" means "Complete platform":
+    services ["postgres", "redis", "user-service", "order-service", "payment-service", "notification-service"]
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    health_check_interval "30s"
+    startup_timeout "300s"
+    shutdown_timeout "60s"
+
+# Tasks
+task "start_infrastructure" means "Start only infrastructure services":
+    orchestrate "infrastructure" start
+    success "Infrastructure services started!"
+
+task "start_business_services" means "Start business services":
+    depends on start_infrastructure
+    orchestrate "business_services" start
+    success "Business services started!"
+
+task "start_all" means "Start complete platform":
+    orchestrate "all_services" start
+    success "Complete platform started!"
+
+task "stop_all" means "Stop all services":
+    orchestrate "all_services" stop
+    success "All services stopped!"
+
+task "restart_service" means "Restart a specific service":
+    given $service_name
+    
+    info "Restarting service: {$service_name}"
+    orchestrate "all_services" restart service "{$service_name}"
+    success "Service {$service_name} restarted!"
+
+task "health_check_all" means "Check health of all services":
+    orchestrate "all_services" health_check
+    success "All services are healthy!"
+
+task "build_all" means "Build all services":
+    orchestrate "all_services" build
+    success "All services built successfully!"
+
+task "logs" means "View logs for all services":
+    given $service_name defaults to "all"
+    
+    when $service_name is "all":
+        info "Viewing logs for all services..."
+        orchestrate "all_services" logs
+    otherwise:
+        info "Viewing logs for service: {$service_name}"
+        orchestrate "all_services" logs service "{$service_name}"
+

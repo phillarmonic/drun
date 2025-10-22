@@ -1,0 +1,246 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/phillarmonic/drun/internal/domain/orchestration"
+)
+
+// Manager manages Git repository operations
+type Manager struct {
+	workDir string
+}
+
+// NewManager creates a new repository manager
+func NewManager(workDir string) *Manager {
+	return &Manager{
+		workDir: workDir,
+	}
+}
+
+// Clone clones a repository if it doesn't exist
+func (m *Manager) Clone(ctx context.Context, config *orchestration.Repository, targetPath string) error {
+	// Check if target path exists
+	fullPath := filepath.Join(m.workDir, targetPath)
+	if _, err := os.Stat(fullPath); err == nil {
+		if config.CloneIfMissing {
+			// Directory exists, skip cloning
+			return nil
+		}
+	}
+
+	// Prepare clone command
+	args := []string{"clone"}
+
+	// Add branch or tag if specified
+	if config.Branch != "" {
+		args = append(args, "--branch", config.Branch)
+	} else if config.Tag != "" {
+		args = append(args, "--branch", config.Tag)
+	}
+
+	// Add URL and target path
+	args = append(args, config.URL, fullPath)
+
+	// Execute clone command
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = m.workDir
+
+	// Set up SSH key if specified
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+
+		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// Update updates a repository by pulling latest changes
+func (m *Manager) Update(ctx context.Context, config *orchestration.Repository, targetPath string) error {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
+		// Repository doesn't exist, clone it
+		return m.Clone(ctx, config, targetPath)
+	}
+
+	// Fetch latest changes
+	fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin")
+	fetchCmd.Dir = fullPath
+
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+
+		fetchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	if output, err := fetchCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
+	}
+
+	// Pull latest changes for current branch
+	pullCmd := exec.CommandContext(ctx, "git", "pull")
+	pullCmd.Dir = fullPath
+
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+
+		pullCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	if output, err := pullCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to pull repository: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// Checkout checks out a specific branch or tag
+func (m *Manager) Checkout(ctx context.Context, targetPath, ref string) error {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	cmd := exec.CommandContext(ctx, "git", "checkout", ref)
+	cmd.Dir = fullPath
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to checkout %s: %w\nOutput: %s", ref, err, string(output))
+	}
+
+	return nil
+}
+
+// GetCurrentBranch returns the current branch name
+func (m *Manager) GetCurrentBranch(ctx context.Context, targetPath string) (string, error) {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = fullPath
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// GetCurrentTag returns the current tag if any
+func (m *Manager) GetCurrentTag(ctx context.Context, targetPath string) (string, error) {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	cmd := exec.CommandContext(ctx, "git", "describe", "--exact-match", "--tags", "HEAD")
+	cmd.Dir = fullPath
+
+	output, err := cmd.Output()
+	if err != nil {
+		// No tag at HEAD is not an error
+		return "", nil
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// GetStatus returns the repository status
+func (m *Manager) GetStatus(ctx context.Context, targetPath string) (string, error) {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	cmd := exec.CommandContext(ctx, "git", "status", "--short")
+	cmd.Dir = fullPath
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get status: %w", err)
+	}
+
+	return string(output), nil
+}
+
+// IsClean returns true if the repository has no uncommitted changes
+func (m *Manager) IsClean(ctx context.Context, targetPath string) (bool, error) {
+	status, err := m.GetStatus(ctx, targetPath)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.TrimSpace(status) == "", nil
+}
+
+// EnsureRepository ensures a repository is cloned and optionally updated
+func (m *Manager) EnsureRepository(ctx context.Context, config *orchestration.Repository, targetPath string) error {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
+		// Repository doesn't exist, clone it
+		if err := m.Clone(ctx, config, targetPath); err != nil {
+			return fmt.Errorf("failed to clone repository: %w", err)
+		}
+
+		// Checkout specific branch or tag if specified
+		if config.Branch != "" {
+			if err := m.Checkout(ctx, targetPath, config.Branch); err != nil {
+				return fmt.Errorf("failed to checkout branch: %w", err)
+			}
+		} else if config.Tag != "" {
+			if err := m.Checkout(ctx, targetPath, config.Tag); err != nil {
+				return fmt.Errorf("failed to checkout tag: %w", err)
+			}
+		}
+
+		return nil
+	}
+
+	// Repository exists
+	if config.UpdateOnStart {
+		// Update repository
+		if err := m.Update(ctx, config, targetPath); err != nil {
+			return fmt.Errorf("failed to update repository: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// expandPath expands ~ in paths to the user's home directory
+func expandPath(path string) (string, error) {
+	if !strings.HasPrefix(path, "~") {
+		return path, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	if path == "~" {
+		return homeDir, nil
+	}
+
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(homeDir, path[2:]), nil
+	}
+
+	return path, nil
+}

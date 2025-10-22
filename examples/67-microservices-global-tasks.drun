@@ -1,0 +1,128 @@
+version: 2.0
+
+project "microservices-global-tasks" version "1.0.0":
+    set environment to "development"
+
+# Define services
+service "database" in "./services/database" means "PostgreSQL Database":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "5s"
+        interval "10s"
+        retries 3
+    compose:
+        file "docker-compose.yml"
+
+service "redis" in "./services/redis" means "Redis Cache":
+    depends on ["database"]
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "3s"
+        interval "5s"
+        retries 2
+    compose:
+        file "docker-compose.yml"
+
+service "api" in "./services/api" means "REST API":
+    depends on ["database", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    compose:
+        file "docker-compose.yml"
+
+service "frontend" in "./services/frontend" means "React Frontend":
+    depends on ["api"]
+    health check:
+        type "http"
+        endpoint "http://localhost:3000/health"
+        timeout "5s"
+        interval "10s"
+        retries 2
+        condition "200"
+    compose:
+        file "docker-compose.yml"
+
+# Orchestration with global pre/post tasks
+orchestrate "production" means "Production microservices with global setup":
+    services ["database", "redis", "api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    pre_task "global_setup"
+    post_task "global_cleanup"
+    health_check_interval "30s"
+    startup_timeout "300s"
+    shutdown_timeout "60s"
+
+# Global setup task - runs before ANY service starts
+task "global_setup" means "Global setup required for all services":
+    info "Running global setup for all services..."
+    
+    # Create shared directories
+    create dir "./shared/logs"
+    create dir "./shared/data"
+    create dir "./shared/cache"
+    
+    # Set up networking
+    info "Setting up Docker network..."
+    run "docker network create microservices-network || true"
+    
+    # Create shared volumes
+    info "Creating shared volumes..."
+    run "docker volume create microservices-data || true"
+    run "docker volume create microservices-logs || true"
+    
+    # Set up environment files for all services
+    info "Setting up environment files..."
+    for service in ["database", "redis", "api", "frontend"]:
+        when file "./services/{$service}/.env" exists:
+            success "✅ {$service} .env exists"
+        otherwise:
+            when file "./services/{$service}/.env.example" exists:
+                copy "./services/{$service}/.env.example" to "./services/{$service}/.env"
+                success "✅ {$service} .env created from example"
+            otherwise:
+                warn "⚠️ {$service} .env.example missing"
+    
+    # Generate shared secrets
+    info "Generating shared secrets..."
+    set $shared_secret to "{generate_password 64}"
+    write "{$shared_secret}" to file "./shared/.secret"
+    run "chmod 600 ./shared/.secret"
+    
+    success "Global setup completed!"
+
+# Global cleanup task - runs after all services stop
+task "global_cleanup" means "Global cleanup after all services stop":
+    info "Running global cleanup..."
+    
+    # Clean up temporary files
+    info "Cleaning up temporary files..."
+    run "rm -rf ./shared/tmp/*"
+    
+    # Archive logs
+    info "Archiving logs..."
+    set $timestamp to "{date '2006-01-02-15-04-05'}"
+    run "tar -czf ./shared/logs/archive-{$timestamp}.tar.gz ./shared/logs/*.log || true"
+    
+    # Clean up old archives (keep last 7 days)
+    run "find ./shared/logs -name 'archive-*.tar.gz' -mtime +7 -delete || true"
+    
+    success "Global cleanup completed!"
+
+# Tasks
+task "start_production" means "Start all production services":
+    orchestrate "production" start
+    success "All production services started successfully!"
+
+task "stop_production" means "Stop all production services":
+    orchestrate "production" stop
+    success "All production services stopped!"
+

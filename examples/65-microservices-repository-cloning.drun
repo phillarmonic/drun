@@ -1,0 +1,98 @@
+version: 2.0
+
+project "microservices-with-repos" version "1.0.0":
+    set environment to "development"
+    set organization to "mycompany"
+
+# Service with repository cloning
+service "user-service" in "./services/user-service" means "User Management Service":
+    repository:
+        url "https://github.com/{$organization}/user-service.git"
+        branch "main"
+        clone_if_missing true
+        update_on_start false
+    depends on ["database", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8001/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+        makefile "Makefile"
+        make_target "build"
+        make_args ["ENV=development", "DEBUG=true"]
+    compose:
+        file "docker-compose.dev.yml"
+        project "user-service-dev"
+    environment:
+        DATABASE_URL "postgresql://app_user:pass@database:5432/myapp"
+        REDIS_URL "redis://redis:6379"
+        SERVICE_PORT "8001"
+        ENVIRONMENT "{$environment}"
+
+service "order-service" in "./services/order-service" means "Order Management Service":
+    repository:
+        url "https://github.com/{$organization}/order-service.git"
+        tag "v1.2.0"
+        clone_if_missing true
+    depends on ["user-service", "database"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8002/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+        makefile "Makefile"
+        make_target "build"
+    compose:
+        file "docker-compose.dev.yml"
+
+service "database" in "./services/database" means "PostgreSQL Database":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "5s"
+        interval "10s"
+        retries 3
+    compose:
+        file "docker-compose.yml"
+
+service "redis" in "./services/redis" means "Redis Cache":
+    depends on ["database"]
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "3s"
+        interval "5s"
+        retries 2
+    compose:
+        file "docker-compose.yml"
+
+# Orchestration with repository cloning
+orchestrate "all_services" means "Complete platform with cloning":
+    services ["database", "redis", "user-service", "order-service"]
+    clone_order ["user-service", "order-service"]
+    clone_timeout "600s"
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    health_check_interval "30s"
+    startup_timeout "300s"
+    shutdown_timeout "60s"
+
+task "setup_repositories" means "Clone all service repositories":
+    info "Setting up service repositories..."
+    orchestrate "all_services" clone_repositories
+    success "All repositories cloned!"
+
+task "start_all" means "Start all services with cloning":
+    info "Starting services with repository cloning..."
+    orchestrate "all_services" start
+    success "All services started!"
+

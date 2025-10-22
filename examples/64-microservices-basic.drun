@@ -1,0 +1,99 @@
+version: 2.0
+
+project "microservices-demo" version "1.0.0":
+    set environment to "development"
+
+# Define services
+service "database" in "./services/database" means "PostgreSQL Database":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "5s"
+        interval "10s"
+        retries 3
+    compose:
+        file "docker-compose.yml"
+    environment:
+        POSTGRES_DB "myapp"
+        POSTGRES_USER "app_user"
+        POSTGRES_PASSWORD "secure_password"
+
+service "redis" in "./services/redis" means "Redis Cache":
+    depends on ["database"]
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "3s"
+        interval "5s"
+        retries 2
+    compose:
+        file "docker-compose.yml"
+
+service "api" in "./services/api" means "REST API Service":
+    depends on ["database", "redis"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+    environment:
+        NODE_ENV "production"
+        DATABASE_URL "postgresql://app_user:secure_password@database:5432/myapp"
+        REDIS_URL "redis://redis:6379"
+
+service "frontend" in "./services/frontend" means "React Frontend":
+    depends on ["api"]
+    health check:
+        type "http"
+        endpoint "http://localhost:3000/health"
+        timeout "5s"
+        interval "10s"
+        retries 2
+        condition "200"
+    build:
+        required true
+    compose:
+        file "docker-compose.yml"
+
+# Define orchestration
+orchestrate "development" means "Development microservices":
+    services ["database", "redis", "api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker false
+    stop_on_failure false
+    health_check_interval "30s"
+    startup_timeout "120s"
+    shutdown_timeout "30s"
+
+# Tasks
+task "start" means "Start all services":
+    info "Starting microservices..."
+    orchestrate "development" start
+    success "All services started successfully!"
+
+task "stop" means "Stop all services":
+    info "Stopping microservices..."
+    orchestrate "development" stop
+    success "All services stopped!"
+
+task "restart" means "Restart all services":
+    info "Restarting microservices..."
+    orchestrate "development" restart
+    success "All services restarted!"
+
+task "health" means "Check service health":
+    info "Checking service health..."
+    orchestrate "development" health_check
+    success "All services are healthy!"
+
+task "status" means "Show service status":
+    info "Service status:"
+    set $status to "{orchestrate 'development' status}"
+    info "Status: {$status}"
+
