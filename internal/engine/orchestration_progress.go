@@ -151,6 +151,8 @@ func (pd *ProgressDisplay) getStatusIcon(status string) string {
 	switch status {
 	case "pending":
 		return "⏸️"
+	case "building":
+		return "🔨"
 	case "starting":
 		return "🔄"
 	case "healthy":
@@ -224,6 +226,73 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 		progress.StartService(serviceName)
 		progress.RenderInline(serviceName)
 
+		// Build the service if build is required
+		if service.Build != nil && service.Build.Required {
+			progress.UpdateService(serviceName, "building", "Building container...")
+			progress.RenderInline(serviceName)
+			
+			// Show build output header
+			_, _ = fmt.Fprintf(e.output, "\n🔨 Building %s:\n", serviceName)
+			
+			if err := e.buildServiceWithOutput(service); err != nil {
+				progress.FailService(serviceName, err)
+				progress.RenderInline(serviceName)
+
+				// Check if we should stop on failure
+				if orch.StopOnFailure || orch.CircuitBreaker {
+					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+
+					// Only stop services that depend on the failed service
+					startedServices := []string{}
+					failedServiceIndex := -1
+
+					// Find the index of the failed service
+					for i, svcName := range orderedServices {
+						if svcName == serviceName {
+							failedServiceIndex = i
+							break
+						}
+					}
+
+					// Only stop services that were started after the failed service
+					for i := failedServiceIndex + 1; i < len(orderedServices); i++ {
+						svcName := orderedServices[i]
+						if svc, ok := pd.services[svcName]; ok {
+							svc.mu.RLock()
+							isStarted := svc.Status == "healthy" || svc.Status == "starting"
+							svc.mu.RUnlock()
+
+							if isStarted {
+								startedServices = append(startedServices, svcName)
+							}
+						}
+					}
+
+					// Stop dependent services in reverse order
+					for i := len(startedServices) - 1; i >= 0; i-- {
+						svcName := startedServices[i]
+						pd.UpdateService(svcName, "stopping", "Rolling back...")
+						pd.RenderInline(svcName)
+						_ = e.stopService(services[svcName]) // Ignore error during rollback
+						pd.UpdateService(svcName, "stopped", "Stopped (rollback)")
+						pd.RenderInline(svcName)
+					}
+
+					_, _ = fmt.Fprintf(e.output, "\n")
+					progress.RenderSummary()
+					return fmt.Errorf("circuit breaker: failed to build '%s', dependent services stopped", serviceName)
+				}
+
+				progress.RenderSummary()
+				return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
+			}
+
+			// Show build completion and update progress
+			_, _ = fmt.Fprintf(e.output, "✅ Build completed for %s\n\n", serviceName)
+			progress.UpdateService(serviceName, "starting", "Build complete, starting...")
+			progress.RenderInline(serviceName)
+		}
+
 		// Start the service
 		if err := e.startService(service); err != nil {
 			progress.FailService(serviceName, err)
@@ -231,23 +300,38 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 
 			// Check if we should stop on failure
 			if orch.StopOnFailure || orch.CircuitBreaker {
-				_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back all services...\n\n")
+				_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
 
-				// Stop all services that were started (in reverse order)
+				// Only stop services that depend on the failed service
+				// For now, we'll stop all services that were started after the failed one
+				// In the future, we could implement proper dependency tracking
 				startedServices := []string{}
-				for _, svcName := range orderedServices {
+				failedServiceIndex := -1
+
+				// Find the index of the failed service
+				for i, svcName := range orderedServices {
+					if svcName == serviceName {
+						failedServiceIndex = i
+						break
+					}
+				}
+
+				// Only stop services that were started after the failed service
+				// This is a simple heuristic - in practice, you might want more sophisticated dependency tracking
+				for i := failedServiceIndex + 1; i < len(orderedServices); i++ {
+					svcName := orderedServices[i]
 					if svc, ok := pd.services[svcName]; ok {
 						svc.mu.RLock()
 						isStarted := svc.Status == "healthy" || svc.Status == "starting"
 						svc.mu.RUnlock()
 
-						if isStarted && svcName != serviceName { // Don't try to stop the failing service again
+						if isStarted {
 							startedServices = append(startedServices, svcName)
 						}
 					}
 				}
 
-				// Stop in reverse order
+				// Stop dependent services in reverse order
 				for i := len(startedServices) - 1; i >= 0; i-- {
 					svcName := startedServices[i]
 					pd.UpdateService(svcName, "stopping", "Rolling back...")
@@ -259,7 +343,7 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 
 				_, _ = fmt.Fprintf(e.output, "\n")
 				progress.RenderSummary()
-				return fmt.Errorf("circuit breaker: failed to start '%s', all services stopped", serviceName)
+				return fmt.Errorf("circuit breaker: failed to start '%s', dependent services stopped", serviceName)
 			}
 
 			progress.RenderSummary()
@@ -277,23 +361,35 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 
 				// Check if we should stop on failure
 				if orch.StopOnFailure || orch.CircuitBreaker {
-					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back all services...\n\n")
+					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
 
-					// Stop all services that were started (in reverse order)
+					// Only stop services that depend on the failed service
 					startedServices := []string{}
-					for _, svcName := range orderedServices {
+					failedServiceIndex := -1
+
+					// Find the index of the failed service
+					for i, svcName := range orderedServices {
+						if svcName == serviceName {
+							failedServiceIndex = i
+							break
+						}
+					}
+
+					// Only stop services that were started after the failed service
+					for i := failedServiceIndex + 1; i < len(orderedServices); i++ {
+						svcName := orderedServices[i]
 						if svc, ok := pd.services[svcName]; ok {
 							svc.mu.RLock()
 							isStarted := svc.Status == "healthy" || svc.Status == "starting"
 							svc.mu.RUnlock()
 
-							if isStarted && svcName != serviceName {
+							if isStarted {
 								startedServices = append(startedServices, svcName)
 							}
 						}
 					}
 
-					// Stop in reverse order
+					// Stop dependent services in reverse order
 					for i := len(startedServices) - 1; i >= 0; i-- {
 						svcName := startedServices[i]
 						pd.UpdateService(svcName, "stopping", "Rolling back...")
@@ -305,7 +401,7 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 
 					_, _ = fmt.Fprintf(e.output, "\n")
 					progress.RenderSummary()
-					return fmt.Errorf("circuit breaker: health check failed for '%s', all services stopped", serviceName)
+					return fmt.Errorf("circuit breaker: health check failed for '%s', dependent services stopped", serviceName)
 				}
 
 				// Continue but mark as warning (degraded mode)

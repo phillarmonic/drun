@@ -260,6 +260,24 @@ func (e *Engine) buildService(service *ast.ServiceStatement) error {
 	return e.runDockerCompose(service, "build")
 }
 
+func (e *Engine) buildServiceWithOutput(service *ast.ServiceStatement) error {
+	cmd := e.buildDockerComposeCmd(service, "build")
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Running: %s\n", strings.Join(cmd.Args, " "))
+	}
+
+	// Stream the output in real-time
+	cmd.Stdout = e.output
+	cmd.Stderr = e.output
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker compose build failed: %w", err)
+	}
+
+	return nil
+}
+
 func (e *Engine) pullService(service *ast.ServiceStatement) error {
 	return e.runDockerCompose(service, "pull")
 }
