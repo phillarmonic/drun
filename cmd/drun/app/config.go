@@ -33,6 +33,17 @@ func FindConfigFile(filename string) (string, error) {
 		return filename, nil
 	}
 
+	// Check if current directory is marked as stateless
+	// If so, use the home directory config location
+	if statelessFile, err := getStatelessConfigFile(); err == nil && statelessFile != "" {
+		// Stateless directory - check if config exists
+		if _, err := os.Stat(statelessFile); err == nil {
+			return statelessFile, nil
+		}
+		// Config doesn't exist yet - return the path so --init can create it
+		return statelessFile, nil
+	}
+
 	// Check workspace configuration first
 	if workspaceFile := getWorkspaceDefaultFile(); workspaceFile != "" {
 		if _, err := os.Stat(workspaceFile); err == nil {

@@ -111,7 +111,19 @@ func ExecuteTask(
 		}
 		params = make(map[string]string)
 	} else {
-		target = args[0]
+		// Resolve partial task name to full task name
+		partialName := args[0]
+		resolvedName, err := ResolvePartialTaskName(partialName, program)
+		if err != nil {
+			return fmt.Errorf("%w\n\nRun 'xdrun --list' to see all available tasks", err)
+		}
+		target = resolvedName
+
+		// Show which task was resolved if it's a partial match
+		if verbose && partialName != resolvedName {
+			_, _ = fmt.Fprintf(os.Stdout, "🎯 Resolved '%s' → '%s'\n", partialName, resolvedName)
+		}
+
 		params = ParseTaskParameters(args[1:])
 	}
 

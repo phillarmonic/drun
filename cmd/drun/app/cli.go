@@ -31,18 +31,18 @@ type App struct {
 	noDrunCache        bool
 
 	// Debug flags
-	debugMode   bool
-	debugTokens       bool
-	debugAST          bool
-	debugJSON         bool
-	debugErrors       bool
-	debugFull         bool
-	debugDomain       bool
-	debugInput        string
-	debugPlan         bool
-	debugExportGraph  string
+	debugMode          bool
+	debugTokens        bool
+	debugAST           bool
+	debugJSON          bool
+	debugErrors        bool
+	debugFull          bool
+	debugDomain        bool
+	debugInput         string
+	debugPlan          bool
+	debugExportGraph   string
 	debugExportMermaid string
-	debugExportJSON   string
+	debugExportJSON    string
 }
 
 // NewApp creates a new CLI application
@@ -130,6 +130,7 @@ func (a *App) setupCommands() {
 	a.rootCmd.AddCommand(a.createCompletionCommand())
 	a.rootCmd.AddCommand(a.createConvertCommand())
 	a.rootCmd.AddCommand(a.createDumpEnvCommand())
+	a.rootCmd.AddCommand(a.createStatelessCommand())
 }
 
 // run is the main command handler
@@ -250,4 +251,82 @@ PowerShell:
 			}
 		},
 	}
+}
+
+// createStatelessCommand creates the cmd:stateless subcommand
+func (a *App) createStatelessCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cmd:stateless",
+		Short: "Manage stateless drun directories (configs stored in home directory)",
+		Long: `Manage stateless drun directories.
+
+When a directory is marked as stateless, drun will store its configuration
+in your home directory (~/.drun/stateless/) instead of in the repository.
+This is useful for repositories where you can't commit drun configs.
+
+Note: The 'cmd:' prefix is reserved for built-in commands to avoid conflicts with user tasks.`,
+	}
+
+	// Add subcommand
+	addCmd := &cobra.Command{
+		Use:   "add [directory]",
+		Short: "Mark a directory as stateless",
+		Long: `Mark a directory as stateless.
+
+The directory's drun configuration will be stored in your home directory
+instead of in the repository itself.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			createTemplate, _ := cmd.Flags().GetBool("create")
+			return AddStatelessDirectory(dir, createTemplate)
+		},
+	}
+	addCmd.Flags().BoolP("create", "c", false, "Create a template configuration file")
+
+	// Remove subcommand
+	removeCmd := &cobra.Command{
+		Use:   "remove [directory]",
+		Short: "Remove stateless marking from a directory",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			deleteConfig, _ := cmd.Flags().GetBool("delete")
+			return RemoveStatelessDirectory(dir, deleteConfig)
+		},
+	}
+	removeCmd.Flags().BoolP("delete", "d", false, "Also delete the configuration file")
+
+	// List subcommand
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all stateless directories",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return ListStatelessDirectories()
+		},
+	}
+
+	// Info subcommand
+	infoCmd := &cobra.Command{
+		Use:   "info",
+		Short: "Show stateless status of current directory",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return ShowStatelessInfo()
+		},
+	}
+
+	cmd.AddCommand(addCmd)
+	cmd.AddCommand(removeCmd)
+	cmd.AddCommand(listCmd)
+	cmd.AddCommand(infoCmd)
+
+	return cmd
 }
