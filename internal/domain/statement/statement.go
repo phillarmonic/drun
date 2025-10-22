@@ -31,6 +31,7 @@ const (
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
+	TypeOrchestration    StatementType = "orchestration"
 )
 
 // Action represents an action statement (info, step, success, etc.)
@@ -251,3 +252,13 @@ type UseSnippet struct {
 }
 
 func (us *UseSnippet) Type() StatementType { return TypeUseSnippet }
+
+// Orchestration represents orchestration action operations
+type Orchestration struct {
+	GroupName      string
+	Action         string // start, stop, restart, health_check, status, logs, etc.
+	Options        map[string]string
+	ServiceFilters []string
+}
+
+func (o *Orchestration) Type() StatementType { return TypeOrchestration }

@@ -254,6 +254,14 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Default:   defaultStr,
 		}, nil
 
+	case *ast.OrchestrationActionStatement:
+		return &Orchestration{
+			GroupName:      s.GroupName,
+			Action:         s.Action,
+			Options:        s.Options,
+			ServiceFilters: s.ServiceFilters,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown AST statement type: %T", astStmt)
 	}

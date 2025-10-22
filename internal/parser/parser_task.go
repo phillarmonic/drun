@@ -276,6 +276,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if call != nil {
 				stmt.Body = append(stmt.Body, call)
 			}
+		} else if p.curToken.Type == lexer.ORCHESTRATE {
+			// Parse orchestration action (e.g., orchestrate "group" start)
+			orchAction := p.parseOrchestrationActionStatement()
+			if orchAction != nil {
+				stmt.Body = append(stmt.Body, orchAction)
+			}
 		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments in task body
 			continue
@@ -405,6 +411,8 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		return p.parseSecretStatement()
 	case lexer.TRY:
 		return p.parseErrorHandlingStatement()
+	case lexer.ORCHESTRATE:
+		return p.parseOrchestrationActionStatement()
 	}
 
 	// Delegate to existing statement parsing logic

@@ -7,6 +7,28 @@ import (
 	"github.com/phillarmonic/drun/internal/lexer"
 )
 
+// OrchestrationActionStatement represents orchestration actions in task bodies
+// Examples: orchestrate "group" start, orchestrate "group" stop
+type OrchestrationActionStatement struct {
+	Token          lexer.Token
+	GroupName      string
+	Action         string // start, stop, restart, health_check, status, logs, etc.
+	Options        map[string]string
+	ServiceFilters []string // optional: specific services to act on
+}
+
+func (oas *OrchestrationActionStatement) statementNode() {}
+func (oas *OrchestrationActionStatement) String() string {
+	out := fmt.Sprintf("orchestrate \"%s\" %s", oas.GroupName, oas.Action)
+	if len(oas.ServiceFilters) > 0 {
+		out += fmt.Sprintf(" services %v", oas.ServiceFilters)
+	}
+	for key, value := range oas.Options {
+		out += fmt.Sprintf(" %s \"%s\"", key, value)
+	}
+	return out
+}
+
 // ServiceStatement represents a microservice definition
 type ServiceStatement struct {
 	Token        lexer.Token

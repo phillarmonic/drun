@@ -795,6 +795,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeUseSnippet(s, ctx)
 	case *statement.Secret:
 		return e.executeSecret(s, ctx)
+	case *statement.Orchestration:
+		return e.executeOrchestration(s, ctx)
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}
