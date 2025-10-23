@@ -42,6 +42,7 @@ type ServiceStatement struct {
 	Compose      *ComposeConfig
 	Environment  map[string]string
 	EnvFile      *EnvFileConfig
+	Networks     map[string]*DockerNetworkConfig
 	PreTask      string
 	PostTask     string
 }
@@ -447,4 +448,15 @@ func (oas *OrchestrateActionStatement) String() string {
 	}
 
 	return out.String()
+}
+
+// DockerNetworkConfig represents Docker network configuration
+type DockerNetworkConfig struct {
+	Token         lexer.Token
+	Name          string
+	External      bool
+	Required      bool
+	AutoProvision bool // defaults to false
+	Driver        string
+	Options       map[string]string
 }

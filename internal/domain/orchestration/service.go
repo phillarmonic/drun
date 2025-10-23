@@ -16,6 +16,7 @@ type Service struct {
 	Compose      *ComposeConfig
 	Environment  map[string]string
 	EnvFile      *EnvFileConfig
+	Networks     map[string]*DockerNetwork
 	PreTask      string
 	PostTask     string
 
@@ -163,4 +164,14 @@ func (s *Service) MarkStopped() {
 // MarkFailed marks the service as failed
 func (s *Service) MarkFailed() {
 	s.Status = ServiceStatusFailed
+}
+
+// DockerNetwork represents Docker network configuration
+type DockerNetwork struct {
+	Name          string
+	External      bool
+	Required      bool
+	AutoProvision bool
+	Driver        string
+	Options       map[string]string
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/docker"
 	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
@@ -129,6 +131,11 @@ func (e *Engine) resolveServiceOrder(serviceNames []string, services map[string]
 // orchestrateStart starts services in dependency order
 func (e *Engine) orchestrateStart(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🚀 Starting orchestration: %s\n", orch.Name)
+
+	// Check and provision Docker networks before starting services
+	if err := e.checkAndProvisionNetworks(services); err != nil {
+		return fmt.Errorf("network provisioning failed: %w", err)
+	}
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -482,4 +489,50 @@ func parseDurationToSeconds(durationStr string) (int, error) {
 		return 0, err
 	}
 	return int(d.Seconds()), nil
+}
+
+// checkAndProvisionNetworks checks and provisions Docker networks for services
+func (e *Engine) checkAndProvisionNetworks(services map[string]*ast.ServiceStatement) error {
+	networkManager := docker.NewNetworkManager()
+	ctx := context.Background()
+
+	// Collect all required networks
+	requiredNetworks := make(map[string]*ast.DockerNetworkConfig)
+	for _, service := range services {
+		if service.Networks != nil {
+			for name, networkConfig := range service.Networks {
+				requiredNetworks[name] = networkConfig
+			}
+		}
+	}
+
+	// Check and provision each network
+	for networkName, networkConfig := range requiredNetworks {
+		exists, err := networkManager.CheckNetworkExists(ctx, networkName)
+		if err != nil {
+			return fmt.Errorf("failed to check network %s: %w", networkName, err)
+		}
+
+		if !exists {
+			if networkConfig.Required {
+				if networkConfig.AutoProvision {
+					// Create the network
+					_, _ = fmt.Fprintf(e.output, "Creating Docker network: %s\n", networkName)
+					err = networkManager.CreateNetwork(ctx, networkName, networkConfig.Driver, networkConfig.Options)
+					if err != nil {
+						return fmt.Errorf("failed to create network %s: %w", networkName, err)
+					}
+					_, _ = fmt.Fprintf(e.output, "✓ Created network: %s\n", networkName)
+				} else {
+					return fmt.Errorf("required network %s does not exist and autoprovision is disabled", networkName)
+				}
+			} else {
+				_, _ = fmt.Fprintf(e.output, "⚠️  Network %s does not exist (not required)\n", networkName)
+			}
+		} else {
+			_, _ = fmt.Fprintf(e.output, "✓ Network %s exists\n", networkName)
+		}
+	}
+
+	return nil
 }

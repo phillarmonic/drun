@@ -52,14 +52,16 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 		return nil
 	}
 
-	// Expect indent
-	if !p.expectPeek(lexer.INDENT) {
+	// Expect indent (optional for empty services)
+	if p.peekToken.Type == lexer.INDENT {
+		p.nextToken() // consume INDENT
+	} else if p.peekToken.Type == lexer.EOF {
+		// Empty service body - return immediately
+		return stmt
+	} else {
 		p.addError("expected indent after service declaration")
 		return nil
 	}
-
-	// Move past the INDENT token
-	p.nextToken()
 
 	// Parse service body
 	stmt.Environment = make(map[string]string)
@@ -105,6 +107,14 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 		case lexer.ENV_FILE:
 			// Parse env_file config
 			stmt.EnvFile = p.parseEnvFileConfig()
+		case lexer.DOCKER:
+			// Parse docker networks config
+			if p.peekToken.Type == lexer.NETWORKS {
+				p.nextToken() // consume "networks"
+				stmt.Networks = p.parseDockerNetworksConfig()
+			} else {
+				p.addError("expected 'networks' after 'docker'")
+			}
 		case lexer.PRE:
 			// Parse pre_task
 			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "task" {
@@ -128,6 +138,9 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 			} else {
 				p.nextToken()
 			}
+		case lexer.INDENT:
+			// Skip INDENT tokens in service body
+			p.nextToken()
 		case lexer.DEDENT:
 			// End of service body
 			break
@@ -939,6 +952,29 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 			}
 		case lexer.DEDENT:
 			break
+		case lexer.IDENT:
+			// Handle orchestration options like stop_on_failure, circuit_breaker
+			switch p.curToken.Literal {
+			case "stop_on_failure":
+				p.nextToken() // consume the identifier
+				if p.curToken.Type != lexer.BOOLEAN {
+					p.addError(fmt.Sprintf("expected boolean for stop_on_failure, got %s", p.curToken.Type))
+					return nil
+				}
+				stmt.StopOnFailure = p.curToken.Literal == "true"
+				p.nextToken()
+			case "circuit_breaker":
+				p.nextToken() // consume the identifier
+				if p.curToken.Type != lexer.BOOLEAN {
+					p.addError(fmt.Sprintf("expected boolean for circuit_breaker, got %s", p.curToken.Type))
+					return nil
+				}
+				stmt.CircuitBreaker = p.curToken.Literal == "true"
+				p.nextToken()
+			default:
+				p.addError(fmt.Sprintf("unexpected identifier in orchestration body: %s", p.curToken.Literal))
+				p.nextToken()
+			}
 		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments
 		default:
@@ -1084,4 +1120,120 @@ func (p *Parser) parseHeadersMap() map[string]string {
 	}
 
 	return headersMap
+}
+
+// parseDockerNetworksConfig parses docker networks configuration
+func (p *Parser) parseDockerNetworksConfig() map[string]*ast.DockerNetworkConfig {
+	networks := make(map[string]*ast.DockerNetworkConfig)
+
+	// Expect colon after "networks"
+	if !p.expectPeek(lexer.COLON) {
+		p.addError("expected ':' after 'networks'")
+		return networks
+	}
+	p.nextToken() // consume ':'
+
+	// Skip initial INDENT if present
+	if p.curToken.Type == lexer.INDENT {
+		p.nextToken()
+	}
+
+	// Parse network configurations
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		if p.curToken.Type == lexer.STRING {
+			networkName := p.curToken.Literal
+			networkConfig := &ast.DockerNetworkConfig{
+				Token: p.curToken,
+				Name:  networkName,
+			}
+
+			p.nextToken() // consume network name
+
+			// Expect colon after network name
+			if p.curToken.Type != lexer.COLON {
+				p.addError(fmt.Sprintf("expected ':' after network name '%s', got %s", networkName, p.curToken.Type))
+				return networks
+			}
+			p.nextToken() // consume ':'
+
+			// Skip INDENT if present
+			if p.curToken.Type == lexer.INDENT {
+				p.nextToken()
+			}
+
+			// Parse network properties (direct format without dashes)
+			for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+				// Skip newlines
+				for p.curToken.Type == lexer.NEWLINE {
+					p.nextToken()
+				}
+
+				// Parse the property
+				switch p.curToken.Type {
+				case lexer.EXTERNAL:
+					p.nextToken() // consume 'external'
+					// Expect colon and boolean
+					if p.curToken.Type == lexer.COLON {
+						p.nextToken()
+						if p.curToken.Type == lexer.BOOLEAN {
+							networkConfig.External = p.curToken.Literal == "true"
+							p.nextToken()
+						}
+					}
+				case lexer.REQUIRED:
+					p.nextToken() // consume 'required'
+					// Expect colon and boolean
+					if p.curToken.Type == lexer.COLON {
+						p.nextToken()
+						if p.curToken.Type == lexer.BOOLEAN {
+							networkConfig.Required = p.curToken.Literal == "true"
+							p.nextToken()
+						}
+					}
+				case lexer.AUTOPROVISION:
+					p.nextToken() // consume 'autoprovision'
+					// Expect colon and boolean
+					if p.curToken.Type == lexer.COLON {
+						p.nextToken()
+						if p.curToken.Type == lexer.BOOLEAN {
+							networkConfig.AutoProvision = p.curToken.Literal == "true"
+							p.nextToken()
+						}
+					}
+				case lexer.DRIVER:
+					p.nextToken() // consume 'driver'
+					// Expect colon and string
+					if p.curToken.Type == lexer.COLON {
+						p.nextToken()
+						if p.curToken.Type == lexer.STRING {
+							networkConfig.Driver = p.curToken.Literal
+							p.nextToken()
+						}
+					}
+				case lexer.DEDENT:
+					// End of network config
+					break
+				default:
+					p.addError(fmt.Sprintf("unexpected token in network config: %s", p.curToken.Type))
+					p.nextToken()
+				}
+			}
+
+			// Skip DEDENT if present
+			if p.curToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
+
+			networks[networkName] = networkConfig
+		} else {
+			p.nextToken()
+		}
+	}
+
+	// Skip final DEDENT if present
+	if p.curToken.Type == lexer.DEDENT {
+		p.nextToken()
+	}
+
+	return networks
 }

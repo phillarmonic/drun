@@ -206,6 +206,11 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 	progress := NewProgressDisplay(e.output)
 	pd := progress // Alias for use in nested scope
 
+	// Check and provision Docker networks before starting services
+	if err := e.checkAndProvisionNetworks(services); err != nil {
+		return fmt.Errorf("network provisioning failed: %w", err)
+	}
+
 	// Initialize all services as pending
 	for _, name := range orderedServices {
 		progress.services[name] = &ServiceProgress{
