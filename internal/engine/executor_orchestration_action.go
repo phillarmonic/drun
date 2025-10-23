@@ -58,6 +58,25 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		return fmt.Errorf("failed to resolve service order: %w", err)
 	}
 
+	// Apply service filters if provided
+	if len(orchestrStmt.ServiceFilters) > 0 {
+		filteredServices := make([]string, 0, len(orchestrStmt.ServiceFilters))
+		for _, rawFilter := range orchestrStmt.ServiceFilters {
+			resolved := e.interpolateVariables(rawFilter, ctx)
+			if resolved == "" {
+				continue
+			}
+			if _, exists := services[resolved]; !exists {
+				return fmt.Errorf("service '%s' not found in orchestration '%s'", resolved, orchestration.Name)
+			}
+			filteredServices = append(filteredServices, resolved)
+		}
+		if len(filteredServices) == 0 {
+			return fmt.Errorf("no services matched filters: %v", orchestrStmt.ServiceFilters)
+		}
+		orderedServices = filteredServices
+	}
+
 	// Execute the action
 	switch orchestrStmt.Action {
 	case "start":
@@ -81,6 +100,10 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		return e.orchestrateStart(ctx, orchestration, orderedServices, services)
 	case "status":
 		return e.orchestrateStatus(orchestration, orderedServices, services)
+	case "health", "health_check":
+		return e.orchestrateHealth(orchestration, orderedServices, services)
+	case "logs":
+		return e.orchestrateLogs(ctx, orchestration, orderedServices, services)
 	case "build":
 		return e.orchestrateBuild(ctx, orchestration, orderedServices, services)
 	case "pull":
@@ -89,6 +112,8 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		errDown := e.orchestrateDown(ctx, orchestration, orderedServices, services)
 		errHook := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
 		return errors.Join(errDown, errHook)
+	case "clone_repositories":
+		return e.orchestrateCloneRepositories(orchestration, orderedServices, services)
 	default:
 		return fmt.Errorf("unknown orchestration action: %s", orchestrStmt.Action)
 	}
@@ -220,6 +245,86 @@ func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServic
 		service := services[serviceName]
 		status := e.getServiceStatus(service)
 		_, _ = fmt.Fprintf(e.output, "  %s: %s\n", serviceName, status)
+	}
+
+	return nil
+}
+
+// orchestrateHealth checks health for all services
+func (e *Engine) orchestrateHealth(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	_, _ = fmt.Fprintf(e.output, "🏥 Health check for orchestration: %s\n", orch.Name)
+
+	var unhealthy []string
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+
+		if service.HealthCheck == nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  no health check configured\n", serviceName)
+			continue
+		}
+
+		_, _ = fmt.Fprintf(e.output, "  %s: checking health...\n", serviceName)
+		if err := e.waitForHealth(service); err != nil {
+			_, _ = fmt.Fprintf(e.output, "    ⚠️  %s is unhealthy: %v\n", serviceName, err)
+			unhealthy = append(unhealthy, fmt.Sprintf("%s (%v)", serviceName, err))
+		} else {
+			_, _ = fmt.Fprintf(e.output, "    ✓ %s is healthy\n", serviceName)
+		}
+	}
+
+	if len(unhealthy) > 0 {
+		return fmt.Errorf("services unhealthy: %s", strings.Join(unhealthy, ", "))
+	}
+
+	_, _ = fmt.Fprintf(e.output, "✅ All services healthy\n")
+	return nil
+}
+
+// orchestrateLogs displays logs for the selected services
+func (e *Engine) orchestrateLogs(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	_, _ = fmt.Fprintf(e.output, "📝 Logs for orchestration: %s\n", orch.Name)
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+
+		if e.dryRun {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would show logs for %s\n", serviceName)
+			continue
+		}
+
+		_, _ = fmt.Fprintf(e.output, "  ▸ Showing logs for %s...\n", serviceName)
+		if err := e.runDockerCompose(service, "logs"); err != nil {
+			return fmt.Errorf("failed to retrieve logs for '%s': %w", serviceName, err)
+		}
+	}
+
+	return nil
+}
+
+// orchestrateCloneRepositories reports repository cloning order
+func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	_, _ = fmt.Fprintf(e.output, "📦 Repository cloning plan for orchestration: %s\n", orch.Name)
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		if service.Repository == nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ℹ️  no repository configured, skipping\n", serviceName)
+			continue
+		}
+
+		_, _ = fmt.Fprintf(e.output, "  %s: %s", serviceName, service.Repository.URL)
+		if service.Repository.Branch != "" {
+			_, _ = fmt.Fprintf(e.output, " (branch %s)", service.Repository.Branch)
+		}
+		if service.Repository.Tag != "" {
+			_, _ = fmt.Fprintf(e.output, " (tag %s)", service.Repository.Tag)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	}
+
+	if !e.dryRun {
+		return fmt.Errorf("clone_repositories action currently supported only in dry-run mode")
 	}
 
 	return nil

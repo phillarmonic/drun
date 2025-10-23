@@ -33,6 +33,8 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 		return p.parseBackupStatement(stmt)
 	case "check":
 		return p.parseCheckStatement(stmt)
+	case "replace":
+		return p.parseReplaceStatement(stmt)
 	default:
 		p.addError(fmt.Sprintf("unknown file operation: %s", stmt.Action))
 		return nil
@@ -43,20 +45,23 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: create file "path" or create dir "path" or create directory "path"
 	switch p.peekToken.Type {
+	case lexer.FILE:
+		p.nextToken() // consume FILE
+		stmt.IsDir = false
+	case lexer.DIR, lexer.DIRECTORY:
+		p.nextToken() // consume DIR/DIRECTORY
+		stmt.IsDir = true
 	case lexer.IDENT:
 		p.nextToken() // consume IDENT
-		if p.curToken.Literal == "file" {
+		switch p.curToken.Literal {
+		case "file":
 			stmt.IsDir = false
-		} else {
+		case "dir", "directory":
+			stmt.IsDir = true
+		default:
 			p.addError("expected 'file', 'dir', or 'directory' after 'create'")
 			return nil
 		}
-	case lexer.DIR:
-		p.nextToken() // consume DIR
-		stmt.IsDir = true
-	case lexer.DIRECTORY:
-		p.nextToken() // consume DIRECTORY
-		stmt.IsDir = true
 	default:
 		p.addError("expected 'file', 'dir', or 'directory' after 'create'")
 		return nil
@@ -139,19 +144,25 @@ func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement 
 func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: delete file "path" or delete dir "path"
 	switch p.peekToken.Type {
+	case lexer.FILE:
+		p.nextToken() // consume FILE
+		stmt.IsDir = false
+	case lexer.DIR, lexer.DIRECTORY:
+		p.nextToken() // consume DIR/DIRECTORY
+		stmt.IsDir = true
 	case lexer.IDENT:
 		p.nextToken() // consume IDENT
-		if p.curToken.Literal == "file" {
+		switch p.curToken.Literal {
+		case "file":
 			stmt.IsDir = false
-		} else {
-			p.addError("expected 'file' or 'dir' after 'delete'")
+		case "dir", "directory":
+			stmt.IsDir = true
+		default:
+			p.addError("expected 'file', 'dir', or 'directory' after 'delete'")
 			return nil
 		}
-	case lexer.DIR:
-		p.nextToken() // consume DIR
-		stmt.IsDir = true
 	default:
-		p.addError("expected 'file' or 'dir' after 'delete'")
+		p.addError("expected 'file', 'dir', or 'directory' after 'delete'")
 		return nil
 	}
 
@@ -231,6 +242,70 @@ func (p *Parser) parseAppendStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		return nil
 	}
 	stmt.Target = p.curToken.Literal
+
+	return stmt
+}
+
+// parseReplaceStatement parses "replace in" statements with multiple replacements
+func (p *Parser) parseReplaceStatement(stmt *ast.FileStatement) *ast.FileStatement {
+	stmt.Action = "replace"
+	stmt.Replacements = make(map[string]string)
+
+	if !p.expectPeek(lexer.IN) {
+		p.addError("expected 'in' after 'replace'")
+		return nil
+	}
+
+	if !p.expectPeek(lexer.STRING) {
+		return nil
+	}
+	stmt.Target = p.curToken.Literal
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+		return nil
+	}
+
+	// Move to first token inside the block
+	p.nextToken()
+
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		// Skip blank lines
+		for p.curToken.Type == lexer.NEWLINE {
+			p.nextToken()
+		}
+
+		if p.curToken.Type == lexer.DEDENT || p.curToken.Type == lexer.EOF {
+			break
+		}
+
+		if p.curToken.Type != lexer.STRING {
+			p.addError(fmt.Sprintf("expected replacement pattern string, got %s", p.curToken.Type))
+			p.nextToken()
+			continue
+		}
+
+		oldValue := p.curToken.Literal
+
+		if !p.expectPeek(lexer.WITH) {
+			return nil
+		}
+
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Replacements[oldValue] = p.curToken.Literal
+
+		// Move to next potential entry
+		p.nextToken()
+	}
+
+	if p.curToken.Type == lexer.DEDENT {
+		p.nextToken()
+	}
 
 	return stmt
 }

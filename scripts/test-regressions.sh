@@ -27,8 +27,11 @@ echo -e "${BLUE}🧪 Testing all drun examples for regressions...${NC}"
 echo "=================================================="
 
 # Build fresh binary
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 echo -e "${BLUE}📦 Building fresh drun binary...${NC}"
-cd /Users/andy/repos/phillarmonic/drun
+cd "${REPO_ROOT}"
 go build -o xdrun ./cmd/drun
 echo -e "${GREEN}✅ Build completed${NC}"
 echo

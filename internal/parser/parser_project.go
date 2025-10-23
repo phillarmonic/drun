@@ -135,7 +135,7 @@ func (p *Parser) parseSetStatement() *ast.SetStatement {
 	case lexer.IDENT, lexer.MESSAGE, lexer.BRANCH, lexer.REMOTE, lexer.STATUS, lexer.LOG, lexer.COMMIT, lexer.ADD, lexer.PUSH, lexer.PULL,
 		lexer.GET, lexer.POST, lexer.PUT, lexer.DELETE, lexer.PATCH, lexer.HEAD, lexer.OPTIONS, lexer.HTTP, lexer.HTTPS, lexer.URL, lexer.API, lexer.JSON, lexer.XML,
 		lexer.TIMEOUT, lexer.RETRY, lexer.AUTH, lexer.BEARER, lexer.BASIC, lexer.TOKEN, lexer.HEADER, lexer.BODY, lexer.DATA,
-		lexer.SCALE, lexer.PORT, lexer.REGISTRY, lexer.CHECKOUT, lexer.BACKUP, lexer.CHECK, lexer.SIZE, lexer.DIRECTORY:
+		lexer.SCALE, lexer.PORT, lexer.REGISTRY, lexer.CHECKOUT, lexer.BACKUP, lexer.CHECK, lexer.SIZE, lexer.DIRECTORY, lexer.ENVIRONMENT:
 		p.nextToken()
 	default:
 		p.addError(fmt.Sprintf("expected set key, got %s instead", p.peekToken.Type))
@@ -512,7 +512,7 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
-		case lexer.IDENT, lexer.ENVIRONMENT:
+		case lexer.IDENT:
 			key := p.curToken.Literal
 
 			// Expect colon
@@ -522,27 +522,34 @@ func (p *Parser) parsePlatformShellConfig() *ast.PlatformShellConfig {
 
 			switch key {
 			case "executable":
-				// Expect string value
 				if !p.expectPeek(lexer.STRING) {
 					return nil
 				}
 				config.Executable = p.curToken.Literal
 				p.nextToken()
-
 			case "args":
-				// Parse array of strings
 				config.Args = p.parseStringArray()
-
 			case "environment":
-				// Parse key-value pairs
 				envVars := p.parseKeyValuePairs()
 				for k, v := range envVars {
 					config.Environment[k] = v
 				}
-
 			default:
 				p.addError(fmt.Sprintf("unknown shell config key: %s", key))
 				p.nextToken()
+			}
+		case lexer.ARGS:
+			if !p.expectPeek(lexer.COLON) {
+				return nil
+			}
+			config.Args = p.parseStringArray()
+		case lexer.ENVIRONMENT:
+			if !p.expectPeek(lexer.COLON) {
+				return nil
+			}
+			envVars := p.parseKeyValuePairs()
+			for k, v := range envVars {
+				config.Environment[k] = v
 			}
 		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 			p.nextToken() // Skip comments

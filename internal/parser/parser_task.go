@@ -159,7 +159,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					if git != nil {
 						stmt.Body = append(stmt.Body, git)
 					}
-				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "file") {
+				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || p.peekToken.Type == lexer.FILE || (p.peekToken.Type == lexer.IDENT && (p.peekToken.Literal == "file" || p.peekToken.Literal == "dir" || p.peekToken.Literal == "directory")) {
 					file := p.parseFileStatement()
 					if file != nil {
 						stmt.Body = append(stmt.Body, file)

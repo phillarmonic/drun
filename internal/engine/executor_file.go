@@ -19,13 +19,21 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 	source := e.interpolateVariables(fileStmt.Source, ctx)
 	content := e.interpolateVariables(fileStmt.Content, ctx)
 
+	replacements := make(map[string]string, len(fileStmt.Replacements))
+	for oldValue, newValue := range fileStmt.Replacements {
+		resolvedOld := e.interpolateVariables(oldValue, ctx)
+		resolvedNew := e.interpolateVariables(newValue, ctx)
+		replacements[resolvedOld] = resolvedNew
+	}
+
 	// Create file operation
 	op := &fileops.FileOperation{
-		Type:    fileStmt.Action,
-		Target:  target,
-		Source:  source,
-		Content: content,
-		IsDir:   fileStmt.IsDir,
+		Type:         fileStmt.Action,
+		Target:       target,
+		Source:       source,
+		Content:      content,
+		IsDir:        fileStmt.IsDir,
+		Replacements: replacements,
 	}
 
 	if e.dryRun {
@@ -35,6 +43,11 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 			return err
 		}
 		_, _ = fmt.Fprintf(e.output, "📁 %s\n", result.Message)
+		if fileStmt.Action == "replace" && len(replacements) > 0 {
+			for oldValue, newValue := range replacements {
+				_, _ = fmt.Fprintf(e.output, "    - %s → %s\n", oldValue, newValue)
+			}
+		}
 		if fileStmt.CaptureVar != "" {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would capture file content in variable '%s'\n", fileStmt.CaptureVar)
 			// Set a placeholder value for the captured variable in dry-run mode
@@ -98,6 +111,8 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 		_, _ = fmt.Fprintf(e.output, "➕ Appending to file: %s\n", target)
 	case "backup":
 		_, _ = fmt.Fprintf(e.output, "💾 Backing up: %s → %s\n", source, target)
+	case "replace":
+		_, _ = fmt.Fprintf(e.output, "🔁 Replacing content in: %s\n", target)
 	}
 
 	// Execute the file operation
@@ -119,6 +134,12 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 		_, _ = fmt.Fprintf(e.output, "✅ %s\n", result.Message)
 	} else {
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", result.Message)
+	}
+
+	if fileStmt.Action == "replace" && len(replacements) > 0 {
+		for oldValue, newValue := range replacements {
+			_, _ = fmt.Fprintf(e.output, "    - %s → %s\n", oldValue, newValue)
+		}
 	}
 
 	return nil

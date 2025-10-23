@@ -981,6 +981,59 @@ orchestrateBody:
 				}
 				stmt.CircuitBreaker = p.curToken.Literal == "true"
 				p.nextToken()
+			case "health_check_interval":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected health check interval string")
+					return nil
+				}
+				stmt.HealthCheckInterval = p.curToken.Literal
+				p.nextToken()
+			case "startup_timeout":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected startup timeout string")
+					return nil
+				}
+				stmt.StartupTimeout = p.curToken.Literal
+				p.nextToken()
+			case "shutdown_timeout":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected shutdown timeout string")
+					return nil
+				}
+				stmt.ShutdownTimeout = p.curToken.Literal
+				p.nextToken()
+			case "pre_task":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected task name string after 'pre_task'")
+					return nil
+				}
+				stmt.PreTask = p.curToken.Literal
+				p.nextToken()
+			case "post_task":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected task name string after 'post_task'")
+					return nil
+				}
+				stmt.PostTask = p.curToken.Literal
+				p.nextToken()
+			case "makefile_timeout":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected makefile timeout string")
+					return nil
+				}
+				stmt.MakefileTimeout = p.curToken.Literal
+				p.nextToken()
+			case "clone_timeout":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected clone timeout string")
+					return nil
+				}
+				stmt.CloneTimeout = p.curToken.Literal
+				p.nextToken()
+			case "makefile_order":
+				stmt.MakefileOrder = p.parseOrchestrationStringArray()
+			case "clone_order":
+				stmt.CloneOrder = p.parseOrchestrationStringArray()
 			default:
 				p.addError(fmt.Sprintf("unexpected identifier in orchestration body: %s", p.curToken.Literal))
 				p.nextToken()

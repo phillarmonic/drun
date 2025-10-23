@@ -222,12 +222,13 @@ func (n *Network) Type() StatementType { return TypeNetwork }
 
 // File represents file operations
 type File struct {
-	Action     string
-	Target     string
-	Source     string
-	Content    string
-	IsDir      bool
-	CaptureVar string
+	Action       string
+	Target       string
+	Source       string
+	Content      string
+	IsDir        bool
+	CaptureVar   string
+	Replacements map[string]string
 }
 
 func (f *File) Type() StatementType { return TypeFile }

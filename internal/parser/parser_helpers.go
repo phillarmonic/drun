@@ -111,7 +111,7 @@ func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL, lexer.ECHO,
 		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
-		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
+		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK, lexer.REPLACE:
 		return true
 	default:
 		return false
@@ -190,6 +190,8 @@ func (p *Parser) isTypeToken(tokenType lexer.TokenType) bool {
 func (p *Parser) isFileActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
+		return true
+	case lexer.REPLACE:
 		return true
 	default:
 		return false

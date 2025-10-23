@@ -53,7 +53,7 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 		// Allow identifier for additional actions like "health_check", "logs", "sync"
 		p.nextToken()
 		switch p.curToken.Literal {
-		case "health_check", "health", "logs", "sync":
+		case "health_check", "health", "logs", "sync", "clone_repositories":
 			stmt.Action = p.curToken.Literal
 		default:
 			p.addError("unknown orchestration action: " + p.curToken.Literal)
@@ -71,6 +71,11 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 			// orchestrate "group" start services ["service1", "service2"]
 			p.nextToken() // consume SERVICES
 			stmt.ServiceFilters = p.parseOrchestrationStringArray()
+		case lexer.SERVICE:
+			p.nextToken() // consume SERVICE
+			if p.expectPeek(lexer.STRING) {
+				stmt.ServiceFilters = append(stmt.ServiceFilters, p.curToken.Literal)
+			}
 		case lexer.WITH:
 			// orchestrate "group" start with timeout "30s"
 			p.nextToken() // consume WITH
@@ -110,4 +115,3 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 		}
 	}
 }
-

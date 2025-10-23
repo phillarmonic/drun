@@ -192,12 +192,13 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 
 	case *ast.FileStatement:
 		return &File{
-			Action:     s.Action,
-			Target:     s.Target,
-			Source:     s.Source,
-			Content:    s.Content,
-			IsDir:      s.IsDir,
-			CaptureVar: s.CaptureVar,
+			Action:       s.Action,
+			Target:       s.Target,
+			Source:       s.Source,
+			Content:      s.Content,
+			IsDir:        s.IsDir,
+			CaptureVar:   s.CaptureVar,
+			Replacements: s.Replacements,
 		}, nil
 
 	case *ast.DetectionStatement:
