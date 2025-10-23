@@ -88,11 +88,6 @@ func findSimilarTaskNames(name string, program *ast.Program) []string {
 func formatTaskMatches(matches []string, partialName string) string {
 	var result strings.Builder
 	for _, match := range matches {
-		// Highlight the matching prefix
-		minLen := len(partialName)
-		if minLen > len(match) {
-			minLen = len(match)
-		}
 		result.WriteString(fmt.Sprintf("  - %s (use: xdrun %s)\n",
 			match, getDisambiguatingPrefix(match, matches)))
 	}

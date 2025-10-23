@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -306,11 +305,4 @@ func getStatelessConfigFile() (string, error) {
 	}
 
 	return configLocation, nil
-}
-
-// normalizeDirectory normalizes a directory path
-func normalizeDirectory(dir string) string {
-	// Remove trailing slashes
-	dir = strings.TrimRight(dir, "/\\")
-	return dir
 }

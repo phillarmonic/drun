@@ -53,18 +53,20 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 	}
 
 	// Expect indent (optional for empty services)
-	if p.peekToken.Type == lexer.INDENT {
+	switch p.peekToken.Type {
+	case lexer.INDENT:
 		p.nextToken() // consume INDENT
-	} else if p.peekToken.Type == lexer.EOF {
+	case lexer.EOF:
 		// Empty service body - return immediately
 		return stmt
-	} else {
+	default:
 		p.addError("expected indent after service declaration")
 		return nil
 	}
 
-	// Parse service body
 	stmt.Environment = make(map[string]string)
+
+serviceBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		// Skip newlines
 		for p.curToken.Type == lexer.NEWLINE {
@@ -143,7 +145,7 @@ func (p *Parser) parseServiceStatement() *ast.ServiceStatement {
 			p.nextToken()
 		case lexer.DEDENT:
 			// End of service body
-			break
+			break serviceBody
 		default:
 			p.addError(fmt.Sprintf("unexpected token in service body: %s", p.curToken.Type))
 			p.nextToken()
@@ -213,6 +215,7 @@ func (p *Parser) parseRepositoryConfig() *ast.RepositoryConfig {
 		return nil
 	}
 
+repoBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -274,7 +277,7 @@ func (p *Parser) parseRepositoryConfig() *ast.RepositoryConfig {
 			config.UpdateOnStart = p.curToken.Literal == "true"
 			p.nextToken()
 		case lexer.DEDENT:
-			break
+			break repoBody
 		default:
 			p.nextToken()
 		}
@@ -309,6 +312,7 @@ func (p *Parser) parseHealthCheckConfig() *ast.HealthCheckConfig {
 
 	config.Headers = make(map[string]string)
 
+healthBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -422,7 +426,7 @@ func (p *Parser) parseHealthCheckConfig() *ast.HealthCheckConfig {
 			config.StartPeriod = p.curToken.Literal
 			p.nextToken()
 		case lexer.DEDENT:
-			break
+			break healthBody
 		default:
 			p.nextToken()
 		}
@@ -449,6 +453,7 @@ func (p *Parser) parseBuildConfig() *ast.BuildConfig {
 		return nil
 	}
 
+buildBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -560,7 +565,7 @@ func (p *Parser) parseBuildConfig() *ast.BuildConfig {
 			config.FallbackCommand = p.curToken.Literal
 			p.nextToken()
 		case lexer.DEDENT:
-			break
+			break buildBody
 		default:
 			p.nextToken()
 		}
@@ -587,6 +592,7 @@ func (p *Parser) parseComposeConfig() *ast.ComposeConfig {
 		return nil
 	}
 
+composeBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -610,7 +616,7 @@ func (p *Parser) parseComposeConfig() *ast.ComposeConfig {
 		case lexer.OPTIONS:
 			config.Options = p.parseComposeOptions()
 		case lexer.DEDENT:
-			break
+			break composeBody
 		default:
 			p.nextToken()
 		}
@@ -637,6 +643,7 @@ func (p *Parser) parseComposeOptions() *ast.ComposeOptions {
 		return nil
 	}
 
+optionsBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -710,7 +717,7 @@ func (p *Parser) parseComposeOptions() *ast.ComposeOptions {
 				p.nextToken()
 			}
 		case lexer.DEDENT:
-			break
+			break optionsBody
 		default:
 			p.nextToken()
 		}
@@ -737,6 +744,7 @@ func (p *Parser) parseEnvFileConfig() *ast.EnvFileConfig {
 		return nil
 	}
 
+envFileBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -758,7 +766,7 @@ func (p *Parser) parseEnvFileConfig() *ast.EnvFileConfig {
 			config.Task = p.curToken.Literal
 			p.nextToken()
 		case lexer.DEDENT:
-			break
+			break envFileBody
 		default:
 			p.nextToken()
 		}
@@ -812,6 +820,8 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 
 	// Parse orchestration body
 	stmt.Scale = make(map[string]int)
+
+orchestrateBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -951,7 +961,7 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 				p.nextToken()
 			}
 		case lexer.DEDENT:
-			break
+			break orchestrateBody
 		case lexer.IDENT:
 			// Handle orchestration options like stop_on_failure, circuit_breaker
 			switch p.curToken.Literal {
@@ -1042,6 +1052,7 @@ func (p *Parser) parseEnvironmentMap() map[string]string {
 		return nil
 	}
 
+envMapBody:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
@@ -1062,7 +1073,7 @@ func (p *Parser) parseEnvironmentMap() map[string]string {
 			envMap[key] = p.curToken.Literal
 			p.nextToken()
 		} else if p.curToken.Type == lexer.DEDENT {
-			break
+			break envMapBody
 		} else {
 			p.nextToken()
 		}
@@ -1162,6 +1173,7 @@ func (p *Parser) parseDockerNetworksConfig() map[string]*ast.DockerNetworkConfig
 			}
 
 			// Parse network properties (direct format without dashes)
+		networkProps:
 			for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 				// Skip newlines
 				for p.curToken.Type == lexer.NEWLINE {
@@ -1212,7 +1224,7 @@ func (p *Parser) parseDockerNetworksConfig() map[string]*ast.DockerNetworkConfig
 					}
 				case lexer.DEDENT:
 					// End of network config
-					break
+					break networkProps
 				default:
 					p.addError(fmt.Sprintf("unexpected token in network config: %s", p.curToken.Type))
 					p.nextToken()

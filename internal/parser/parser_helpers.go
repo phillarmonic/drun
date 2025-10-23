@@ -390,9 +390,17 @@ func (p *Parser) validateVariableName(name string) bool {
 	return true
 }
 
-// expectPeekFileKeyword checks for the "file" keyword (as IDENT)
+// expectPeekFileKeyword checks for the "file" keyword (accepting IDENT or FILE token)
 func (p *Parser) expectPeekFileKeyword() bool {
-	if p.peekToken.Type != lexer.IDENT || p.peekToken.Literal != "file" {
+	switch p.peekToken.Type {
+	case lexer.IDENT:
+		if p.peekToken.Literal != "file" {
+			p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Literal))
+			return false
+		}
+	case lexer.FILE:
+		// Token already represents the keyword; nothing else to validate
+	default:
 		p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Type))
 		return false
 	}

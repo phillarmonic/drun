@@ -64,9 +64,11 @@ func (c *Checker) checkHTTP(ctx context.Context, config *orchestration.HealthChe
 	// Perform request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("HTTP health check failed: %w", err)
+		return fmt.Errorf("http health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Check status code
 	if config.Condition != "" {
@@ -74,12 +76,12 @@ func (c *Checker) checkHTTP(ctx context.Context, config *orchestration.HealthChe
 		actualStatus := fmt.Sprintf("%d", resp.StatusCode)
 
 		if actualStatus != expectedStatus {
-			return fmt.Errorf("HTTP health check failed: expected status %s, got %s", expectedStatus, actualStatus)
+			return fmt.Errorf("http health check failed: expected status %s, got %s", expectedStatus, actualStatus)
 		}
 	} else {
 		// Default: check if status is 2xx
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return fmt.Errorf("HTTP health check failed: status code %d", resp.StatusCode)
+			return fmt.Errorf("http health check failed: status code %d", resp.StatusCode)
 		}
 	}
 
@@ -94,9 +96,11 @@ func (c *Checker) checkTCP(ctx context.Context, config *orchestration.HealthChec
 
 	conn, err := dialer.DialContext(ctx, "tcp", config.Endpoint)
 	if err != nil {
-		return fmt.Errorf("TCP health check failed: %w", err)
+		return fmt.Errorf("tcp health check failed: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	return nil
 }
@@ -107,12 +111,12 @@ func (c *Checker) checkDocker(ctx context.Context, config *orchestration.HealthC
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Health.Status}}", config.Container)
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Docker health check failed: %w", err)
+		return fmt.Errorf("docker health check failed: %w", err)
 	}
 
 	status := strings.TrimSpace(string(output))
 	if status != "healthy" && status != "starting" {
-		return fmt.Errorf("Docker health check failed: container status is %s", status)
+		return fmt.Errorf("docker health check failed: container status is %s", status)
 	}
 
 	return nil

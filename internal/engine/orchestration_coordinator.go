@@ -12,7 +12,6 @@ import (
 // OrchestrationCoordinator coordinates orchestration of multiple services
 type OrchestrationCoordinator struct {
 	executor *OrchestrationExecutor
-	mu       sync.RWMutex
 }
 
 // NewOrchestrationCoordinator creates a new orchestration coordinator
@@ -64,7 +63,9 @@ func (oc *OrchestrationCoordinator) StartOrchestration(ctx context.Context, exec
 
 		// Stop all services if stop_on_failure is enabled
 		if orchestr.StopOnFailure {
-			oc.StopOrchestration(context.Background(), execCtx, orchestrationName)
+			if stopErr := oc.StopOrchestration(context.Background(), execCtx, orchestrationName); stopErr != nil {
+				fmt.Printf("Error stopping orchestration %s: %v\n", orchestrationName, stopErr)
+			}
 		}
 
 		return err
@@ -306,7 +307,9 @@ func (oc *OrchestrationCoordinator) monitorOrchestrationHealth(ctx context.Conte
 
 					if orchestr.StopOnFailure {
 						// Stop all services
-						oc.StopOrchestration(context.Background(), execCtx, orchestr.Name)
+						if stopErr := oc.StopOrchestration(context.Background(), execCtx, orchestr.Name); stopErr != nil {
+							fmt.Printf("Error stopping orchestration %s: %v\n", orchestr.Name, stopErr)
+						}
 					}
 
 					// Attempt recovery if configured

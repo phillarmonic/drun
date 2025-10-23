@@ -178,9 +178,10 @@ func (pd *ProgressDisplay) RenderSummary() {
 
 	for _, svc := range pd.services {
 		svc.mu.RLock()
-		if svc.Status == "healthy" {
+		switch svc.Status {
+		case "healthy":
 			successful++
-		} else if svc.Status == "failed" {
+		case "failed":
 			failed++
 		}
 		svc.mu.RUnlock()
@@ -195,7 +196,7 @@ func (pd *ProgressDisplay) RenderSummary() {
 }
 
 // orchestrateStartWithProgress starts services with BuildKit-style progress display
-func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🚀 Starting orchestration: %s\n", orch.Name)
 	_, _ = fmt.Fprintf(e.output, "   %d services in dependency order\n", len(orderedServices))
 	if orch.CircuitBreaker || orch.StopOnFailure {
@@ -231,6 +232,20 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 		progress.StartService(serviceName)
 		progress.RenderInline(serviceName)
 
+		if service.PreTask != "" {
+			progress.UpdateService(serviceName, "pre", fmt.Sprintf("Running pre-task %s...", service.PreTask))
+			progress.RenderInline(serviceName)
+
+			if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
+				progress.FailService(serviceName, err)
+				progress.RenderInline(serviceName)
+				return err
+			}
+
+			progress.UpdateService(serviceName, "starting", "Pre-task complete")
+			progress.RenderInline(serviceName)
+		}
+
 		// Build the service if build is required
 		if service.Build != nil && service.Build.Required {
 			progress.UpdateService(serviceName, "building", "Building container...")
@@ -239,7 +254,7 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 			// Show build output header
 			_, _ = fmt.Fprintf(e.output, "\n🔨 Building %s:\n", serviceName)
 
-			if err := e.buildServiceWithOutput(service); err != nil {
+			if err := e.performServiceBuild(ctx, service, false); err != nil {
 				progress.FailService(serviceName, err)
 				progress.RenderInline(serviceName)
 
@@ -426,7 +441,7 @@ func (e *Engine) orchestrateStartWithProgress(orch *ast.OrchestrateStatement, or
 }
 
 // orchestrateStopWithProgress stops services with progress display
-func (e *Engine) orchestrateStopWithProgress(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateStopWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🛑 Stopping orchestration: %s\n", orch.Name)
 	_, _ = fmt.Fprintf(e.output, "   %d services in reverse order\n\n", len(orderedServices))
 
@@ -446,6 +461,17 @@ func (e *Engine) orchestrateStopWithProgress(orch *ast.OrchestrateStatement, ord
 			progress.RenderInline(serviceName)
 			// Continue stopping other services
 		} else {
+			if service.PostTask != "" {
+				progress.UpdateService(serviceName, "post", fmt.Sprintf("Running post-task %s...", service.PostTask))
+				progress.RenderInline(serviceName)
+
+				if err := e.runServiceHook(ctx, service.PostTask, serviceName, "post"); err != nil {
+					progress.FailService(serviceName, err)
+					progress.RenderInline(serviceName)
+					return err
+				}
+			}
+
 			progress.UpdateService(serviceName, "stopped", "Stopped")
 			progress.RenderInline(serviceName)
 		}

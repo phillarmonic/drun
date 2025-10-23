@@ -70,7 +70,9 @@ func (m *Manager) Read(filePath string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open env file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	env := make(map[string]string)
 	scanner := bufio.NewScanner(file)
@@ -119,7 +121,9 @@ func (m *Manager) Write(filePath string, env map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create env file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	for key, value := range env {
 		if _, err := fmt.Fprintf(file, "%s=%s\n", key, value); err != nil {
@@ -191,13 +195,17 @@ func (m *Manager) CopyFile(source, destination string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		_ = srcFile.Close()
+	}()
 
 	dstFile, err := os.Create(destination)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer dstFile.Close()
+	defer func() {
+		_ = dstFile.Close()
+	}()
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)

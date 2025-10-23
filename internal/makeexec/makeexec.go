@@ -37,7 +37,7 @@ func (e *Executor) Execute(ctx context.Context, config *orchestration.BuildConfi
 	// Check if Makefile exists
 	makefilePath := filepath.Join(fullPath, config.Makefile)
 	if _, err := os.Stat(makefilePath); os.IsNotExist(err) {
-		return fmt.Errorf("Makefile not found at %s", makefilePath)
+		return fmt.Errorf("makefile not found at %s", makefilePath)
 	}
 
 	// Execute pre-make commands if any
@@ -180,7 +180,7 @@ func (e *Executor) ListTargets(ctx context.Context, makefilePath string) ([]stri
 
 	// Check if Makefile exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("Makefile not found at %s", fullPath)
+		return nil, fmt.Errorf("makefile not found at %s", fullPath)
 	}
 
 	// Use make -qp to list targets
@@ -235,7 +235,7 @@ func (e *Executor) DryRun(ctx context.Context, config *orchestration.BuildConfig
 	// Check if Makefile exists
 	makefilePath := filepath.Join(fullPath, config.Makefile)
 	if _, err := os.Stat(makefilePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("Makefile not found at %s", makefilePath)
+		return "", fmt.Errorf("makefile not found at %s", makefilePath)
 	}
 
 	// Build make command with --dry-run flag
@@ -269,7 +269,7 @@ func (e *Executor) Validate(ctx context.Context, makefilePath string) error {
 
 	// Check if Makefile exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return fmt.Errorf("Makefile not found at %s", fullPath)
+		return fmt.Errorf("makefile not found at %s", fullPath)
 	}
 
 	// Try to parse the Makefile using make --dry-run
@@ -278,7 +278,7 @@ func (e *Executor) Validate(ctx context.Context, makefilePath string) error {
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Makefile validation failed: %w", err)
+		return fmt.Errorf("makefile validation failed: %w", err)
 	}
 
 	return nil

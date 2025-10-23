@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
@@ -28,7 +27,6 @@ type OrchestrationExecutor struct {
 	makeExecutor     *makeexec.Executor
 	envFileManager   *envfile.Manager
 	engine           *Engine
-	mu               sync.RWMutex
 }
 
 // NewOrchestrationExecutor creates a new orchestration executor

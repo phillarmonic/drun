@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -60,22 +61,34 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	// Execute the action
 	switch orchestrStmt.Action {
 	case "start":
-		return e.orchestrateStartWithProgress(orchestration, orderedServices, services)
-	case "stop":
-		return e.orchestrateStopWithProgress(orchestration, orderedServices, services)
-	case "restart":
-		if err := e.orchestrateStop(orchestration, orderedServices, services); err != nil {
+		if err := e.runOrchestrationHook(ctx, orchestration.PreTask, orchestration.Name, "pre"); err != nil {
 			return err
 		}
-		return e.orchestrateStart(orchestration, orderedServices, services)
+		return e.orchestrateStartWithProgress(ctx, orchestration, orderedServices, services)
+	case "stop":
+		errStop := e.orchestrateStopWithProgress(ctx, orchestration, orderedServices, services)
+		errHook := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
+		return errors.Join(errStop, errHook)
+	case "restart":
+		errStop := e.orchestrateStop(ctx, orchestration, orderedServices, services)
+		errPost := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
+		if err := errors.Join(errStop, errPost); err != nil {
+			return err
+		}
+		if err := e.runOrchestrationHook(ctx, orchestration.PreTask, orchestration.Name, "pre"); err != nil {
+			return err
+		}
+		return e.orchestrateStart(ctx, orchestration, orderedServices, services)
 	case "status":
 		return e.orchestrateStatus(orchestration, orderedServices, services)
 	case "build":
-		return e.orchestrateBuild(orchestration, orderedServices, services)
+		return e.orchestrateBuild(ctx, orchestration, orderedServices, services)
 	case "pull":
 		return e.orchestratePull(orchestration, orderedServices, services)
 	case "down":
-		return e.orchestrateDown(orchestration, orderedServices, services)
+		errDown := e.orchestrateDown(ctx, orchestration, orderedServices, services)
+		errHook := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
+		return errors.Join(errDown, errHook)
 	default:
 		return fmt.Errorf("unknown orchestration action: %s", orchestrStmt.Action)
 	}
@@ -129,7 +142,7 @@ func (e *Engine) resolveServiceOrder(serviceNames []string, services map[string]
 }
 
 // orchestrateStart starts services in dependency order
-func (e *Engine) orchestrateStart(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🚀 Starting orchestration: %s\n", orch.Name)
 
 	// Check and provision Docker networks before starting services
@@ -140,6 +153,17 @@ func (e *Engine) orchestrateStart(orch *ast.OrchestrateStatement, orderedService
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Starting %s...\n", serviceName)
+
+		if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
+			return err
+		}
+
+		if service.Build != nil && service.Build.Required {
+			_, _ = fmt.Fprintf(e.output, "    🔨 Building %s...\n", serviceName)
+			if err := e.performServiceBuild(ctx, service, false); err != nil {
+				return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
+			}
+		}
 
 		if err := e.startService(service); err != nil {
 			return fmt.Errorf("failed to start service '%s': %w", serviceName, err)
@@ -164,7 +188,7 @@ func (e *Engine) orchestrateStart(orch *ast.OrchestrateStatement, orderedService
 }
 
 // orchestrateStop stops services in reverse order
-func (e *Engine) orchestrateStop(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateStop(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🛑 Stopping orchestration: %s\n", orch.Name)
 
 	// Reverse order for shutdown
@@ -178,6 +202,9 @@ func (e *Engine) orchestrateStop(orch *ast.OrchestrateStatement, orderedServices
 			// Continue stopping other services
 		} else {
 			_, _ = fmt.Fprintf(e.output, "    ✓ %s stopped\n", serviceName)
+			if err := e.runServiceHook(ctx, service.PostTask, serviceName, "post"); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -199,14 +226,14 @@ func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServic
 }
 
 // orchestrateBuild builds all services
-func (e *Engine) orchestrateBuild(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🔨 Building orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Building %s...\n", serviceName)
 
-		if err := e.buildService(service); err != nil {
+		if err := e.performServiceBuild(ctx, service, true); err != nil {
 			return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
 		}
 
@@ -235,7 +262,7 @@ func (e *Engine) orchestratePull(orch *ast.OrchestrateStatement, orderedServices
 }
 
 // orchestrateDown stops and removes containers
-func (e *Engine) orchestrateDown(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateDown(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🗑️  Taking down orchestration: %s\n", orch.Name)
 
 	for i := len(orderedServices) - 1; i >= 0; i-- {
@@ -247,6 +274,9 @@ func (e *Engine) orchestrateDown(orch *ast.OrchestrateStatement, orderedServices
 			_, _ = fmt.Fprintf(e.output, "    ⚠ Failed to take down %s: %v\n", serviceName, err)
 		} else {
 			_, _ = fmt.Fprintf(e.output, "    ✓ %s taken down\n", serviceName)
+			if err := e.runServiceHook(ctx, service.PostTask, serviceName, "post"); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -261,10 +291,6 @@ func (e *Engine) startService(service *ast.ServiceStatement) error {
 
 func (e *Engine) stopService(service *ast.ServiceStatement) error {
 	return e.runDockerCompose(service, "stop")
-}
-
-func (e *Engine) buildService(service *ast.ServiceStatement) error {
-	return e.runDockerCompose(service, "build")
 }
 
 func (e *Engine) buildServiceWithOutput(service *ast.ServiceStatement) error {
@@ -361,6 +387,332 @@ func (e *Engine) buildDockerComposeCmd(service *ast.ServiceStatement, args ...st
 	return cmd
 }
 
+func (e *Engine) runOrchestrationHook(ctx *ExecutionContext, taskName, orchestrationName, phase string) error {
+	if taskName == "" {
+		return nil
+	}
+
+	if ctx == nil {
+		return fmt.Errorf("orchestration '%s' %s-task '%s' failed: execution context unavailable", orchestrationName, phase, taskName)
+	}
+
+	if err := e.runNamedTask(ctx, taskName); err != nil {
+		return fmt.Errorf("orchestration '%s' %s-task '%s' failed: %w", orchestrationName, phase, taskName, err)
+	}
+
+	return nil
+}
+
+func (e *Engine) runServiceHook(ctx *ExecutionContext, taskName, serviceName, phase string) error {
+	if taskName == "" {
+		return nil
+	}
+
+	if ctx == nil {
+		return fmt.Errorf("service '%s' %s-task '%s' failed: execution context unavailable", serviceName, phase, taskName)
+	}
+
+	if err := e.runNamedTask(ctx, taskName); err != nil {
+		return fmt.Errorf("service '%s' %s-task '%s' failed: %w", serviceName, phase, taskName, err)
+	}
+
+	return nil
+}
+
+func (e *Engine) runNamedTask(ctx *ExecutionContext, taskName string) error {
+	task, namespace, err := e.resolveTaskReference(ctx, taskName)
+	if err != nil {
+		return err
+	}
+
+	hookCtx := &ExecutionContext{
+		Parameters:       ctx.Parameters,
+		Variables:        make(map[string]string, len(ctx.Variables)),
+		Project:          ctx.Project,
+		CurrentFile:      ctx.CurrentFile,
+		CurrentTask:      taskName,
+		CurrentNamespace: namespace,
+		Program:          ctx.Program,
+	}
+
+	for k, v := range ctx.Variables {
+		hookCtx.Variables[k] = v
+	}
+
+	if err := e.setupTaskParameters(task, map[string]string{}, hookCtx); err != nil {
+		return err
+	}
+
+	if err := e.executeTask(task, hookCtx); err != nil {
+		return err
+	}
+
+	for k, v := range hookCtx.Variables {
+		ctx.Variables[k] = v
+	}
+
+	return nil
+}
+
+func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*ast.TaskStatement, string, error) {
+	if ctx == nil || ctx.Program == nil {
+		return nil, "", fmt.Errorf("task '%s' not found: no program context", taskName)
+	}
+
+	var targetTask *ast.TaskStatement
+	var namespace string
+
+	if strings.Contains(taskName, ".") && ctx.Project != nil {
+		namespace = strings.SplitN(taskName, ".", 2)[0]
+
+		if template, exists := ctx.Project.IncludedTemplates[taskName]; exists {
+			targetTask = &ast.TaskStatement{
+				Token:       template.Token,
+				Name:        template.Name,
+				Description: template.Description,
+				Parameters:  template.Parameters,
+				Body:        template.Body,
+			}
+		} else if task, exists := ctx.Project.IncludedTasks[taskName]; exists {
+			targetTask = task
+		}
+	}
+
+	if targetTask == nil {
+		for _, task := range ctx.Program.Tasks {
+			if task.Name == taskName {
+				targetTask = task
+				break
+			}
+		}
+	}
+
+	if targetTask == nil {
+		for _, template := range ctx.Program.Templates {
+			if template.Name == taskName {
+				targetTask = &ast.TaskStatement{
+					Token:       template.Token,
+					Name:        template.Name,
+					Description: template.Description,
+					Parameters:  template.Parameters,
+					Body:        template.Body,
+				}
+				break
+			}
+		}
+	}
+
+	if targetTask == nil {
+		return nil, "", fmt.Errorf("task '%s' not found", taskName)
+	}
+
+	return targetTask, namespace, nil
+}
+
+func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceStatement, allowFallback bool) error {
+	buildCfg := service.Build
+	if buildCfg == nil {
+		if allowFallback {
+			return e.buildServiceWithOutput(service)
+		}
+		return nil
+	}
+
+	if buildCfg.Makefile != "" {
+		return e.executeMakefileBuild(service)
+	}
+
+	if buildCfg.Command != "" {
+		return e.executeBuildCommand(service)
+	}
+
+	if allowFallback || buildCfg.Required {
+		return e.buildServiceWithOutput(service)
+	}
+
+	return nil
+}
+
+func (e *Engine) executeBuildCommand(service *ast.ServiceStatement) error {
+	if service.Build == nil || service.Build.Command == "" {
+		return nil
+	}
+
+	workDir, err := e.resolveBuildWorkingDir(service)
+	if err != nil {
+		return err
+	}
+
+	return e.runShellCommandInDir(service.Build.Command, workDir, true)
+}
+
+func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
+	if service.Build == nil || service.Build.Makefile == "" {
+		return nil
+	}
+
+	workDir, err := e.resolveBuildWorkingDir(service)
+	if err != nil {
+		return err
+	}
+
+	makefilePath := filepath.Join(workDir, service.Build.Makefile)
+	if _, err := os.Stat(makefilePath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("makefile not found at %s", makefilePath)
+		}
+		return fmt.Errorf("checking Makefile at %s: %w", makefilePath, err)
+	}
+
+	for _, cmdStr := range service.Build.PreMakeCommands {
+		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose); err != nil {
+			return fmt.Errorf("pre-make command failed: %w", err)
+		}
+	}
+
+	attempts := 1
+	if service.Build.RetryOnFailure && service.Build.MaxRetries > 0 {
+		attempts += service.Build.MaxRetries
+	}
+
+	var delay time.Duration
+	if service.Build.RetryDelay != "" {
+		if parsed, err := time.ParseDuration(service.Build.RetryDelay); err == nil {
+			delay = parsed
+		}
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 && delay > 0 {
+			time.Sleep(delay)
+		}
+
+		if err := e.runMakeCommand(service.Build, workDir); err != nil {
+			lastErr = err
+			continue
+		}
+
+		lastErr = nil
+		break
+	}
+
+	if lastErr != nil {
+		if service.Build.FallbackCommand != "" {
+			if err := e.runShellCommandInDir(service.Build.FallbackCommand, workDir, true); err != nil {
+				return fmt.Errorf("make command failed and fallback command also failed: %w", err)
+			}
+		} else if service.Build.RetryOnFailure && service.Build.MaxRetries > 0 {
+			return fmt.Errorf("make command failed after %d attempts: %w", attempts, lastErr)
+		} else {
+			return lastErr
+		}
+	}
+
+	for _, cmdStr := range service.Build.PostMakeCommands {
+		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose); err != nil {
+			return fmt.Errorf("post-make command failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) runMakeCommand(buildCfg *ast.BuildConfig, workDir string) error {
+	args := []string{"-f", buildCfg.Makefile}
+
+	if buildCfg.ParallelJobs > 0 {
+		args = append(args, fmt.Sprintf("-j%d", buildCfg.ParallelJobs))
+	}
+
+	if buildCfg.MakeTarget != "" {
+		args = append(args, buildCfg.MakeTarget)
+	}
+
+	args = append(args, buildCfg.MakeArgs...)
+
+	runCtx := context.Background()
+	var cancel context.CancelFunc
+
+	if buildCfg.MakefileTimeout != "" {
+		if timeout, err := time.ParseDuration(buildCfg.MakefileTimeout); err == nil && timeout > 0 {
+			runCtx, cancel = context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+		}
+	}
+
+	cmd := exec.CommandContext(runCtx, "make", args...)
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+
+	if buildCfg.Verbose {
+		cmd.Stdout = e.output
+		cmd.Stderr = e.output
+		if err := cmd.Run(); err != nil {
+			if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("make command timed out after %s", buildCfg.MakefileTimeout)
+			}
+			return fmt.Errorf("make command failed: %w", err)
+		}
+		return nil
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("make command timed out after %s", buildCfg.MakefileTimeout)
+		}
+		return fmt.Errorf("make command failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool) error {
+	parts := strings.Fields(cmdStr)
+	if len(parts) == 0 {
+		return fmt.Errorf("empty command")
+	}
+
+	cmd := exec.CommandContext(context.Background(), parts[0], parts[1:]...)
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+
+	if verbose {
+		cmd.Stdout = e.output
+		cmd.Stderr = e.output
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("command failed: %w", err)
+		}
+		return nil
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("command failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+func (e *Engine) resolveBuildWorkingDir(service *ast.ServiceStatement) (string, error) {
+	workDir := service.Path
+	if service.Build != nil && service.Build.WorkingDirectory != "" {
+		if filepath.IsAbs(service.Build.WorkingDirectory) {
+			workDir = service.Build.WorkingDirectory
+		} else {
+			workDir = filepath.Join(service.Path, service.Build.WorkingDirectory)
+		}
+	}
+
+	absDir, err := filepath.Abs(workDir)
+	if err != nil {
+		return "", fmt.Errorf("resolving build working directory '%s': %w", workDir, err)
+	}
+
+	return absDir, nil
+}
+
 // waitForHealth waits for a service to become healthy based on its health check configuration
 func (e *Engine) waitForHealth(service *ast.ServiceStatement) error {
 	if service.HealthCheck == nil {
@@ -440,7 +792,9 @@ func (e *Engine) checkHTTPHealth(hc *ast.HealthCheckConfig) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Check status code
 	expectedStatus := 200
@@ -459,7 +813,9 @@ func (e *Engine) checkTCPHealth(hc *ast.HealthCheckConfig) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 	return true, nil
 }
 
