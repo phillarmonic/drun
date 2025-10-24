@@ -959,11 +959,11 @@ requires $environment from ["dev", "staging", "production"] defaults to "dev"
 - Emphasizes importance and criticality
 - Can have defaults for convenience while maintaining validation
 
-#### `given` - Optional Parameters with Defaults
+#### `given` - Optional Parameters (with optional defaults)
 
-**Semantic Intent:** "This parameter is configurable but has a sensible default."
+**Semantic Intent:** "This parameter is configurable and optional."
 
-Parameters declared with `given` **ALWAYS** have a default value and are completely optional.
+Parameters declared with `given` are optional. They _may_ specify a default value but are no longer required to do so. When no default is supplied, the parameter resolves to an empty string unless populated at runtime.
 
 ```
 given <name> defaults to <value> [constraints]
@@ -974,6 +974,7 @@ given $timeout defaults to "5m"
 given $force defaults to "false"
 given $tags defaults to [] as list of strings
 given $features defaults to empty  # equivalent to ""
+given $service_name  # optional without explicit default
 
 # Optional with enum validation (NEW!):
 given $log_level from ["error", "warn", "info", "debug"] defaults to "info"
@@ -986,7 +987,7 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 ```
 
 **Key Characteristics:**
-- Default value is **mandatory**
+- Default value is optional (defaults to empty string when omitted)
 - User can override but doesn't have to
 - Used for configuration, feature flags, optional overrides
 - Can also have validation constraints (enums, types)
@@ -996,7 +997,7 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 | Feature | `requires` | `given` |
 |---------|------------|---------|
 | **Must provide value?** | Yes (unless has default) | No (always optional) |
-| **Default value** | Optional | **Mandatory** |
+| **Default value** | Optional | Optional (defaults to empty string) |
 | **Semantic meaning** | Essential/Critical | Configurable/Optional |
 | **Validation** | Recommended | Optional |
 | **Use case** | Core parameters | Configuration options |
@@ -2333,11 +2334,11 @@ This maintains consistency with other global variable access patterns like `{$gl
 
 ### Loop Variables with Array Literals
 
-Loop variables use the `$variable` syntax for consistency with the scoping system:
+Loop variables use the `$variable` syntax for consistency with the scoping system. For readability in prose-style code, bare identifiers (`for service in [...]`) are also accepted and automatically normalised to `$service` within the loop body:
 
 ```
 # Direct array literal in loops
-for each $platform in ["linux", "darwin", "windows"]:
+for each platform in ["linux", "darwin", "windows"]:
   info "Building for {$platform}"
 
 # Using project-defined arrays
@@ -3418,11 +3419,16 @@ move "old-name.txt" to "new-name.txt"
 remove "unwanted-file.txt"
 backup "important-file.txt"
 backup "important-file.txt" as "backup-{now.date}"
+replace in "config/.env":
+    "API_KEY=CHANGE_ME" with "API_KEY={$api_key}"
+    "ENV=dev" with "ENV=production"
 
 # Directory operations
 create directory "new-folder"
 remove directory "old-folder"
 copy directory "src" to "backup/src"
+
+The `replace` action accepts an indented list of `"old" with "new"` clauses, performing multiple replacements within the target file in a single operation.
 ```
 
 #### File Inspection
@@ -5671,7 +5677,7 @@ orchestrate "<name>":
 orchestrate "full_stack":
     services ["database", "redis", "api", "frontend"]
     strategy "dependency-based"
-    circuit true
+    circuit_breaker true
     health_check_interval "30s"
 ```
 
@@ -5679,8 +5685,13 @@ orchestrate "full_stack":
 
 - **services**: List of services to orchestrate
 - **strategy**: Startup strategy (sequential, parallel, dependency-based)
-- **circuit**: Enable circuit breaker (stops all on failure)
-- **health_check_interval**: How often to check health
+- **circuit_breaker**: Enable circuit breaker behaviour (stops dependent services on failure)
+- **stop_on_failure**: Always stop services when any service fails
+- **health_check_interval**: Background health check cadence once started
+- **startup_timeout** / **shutdown_timeout**: Global orchestration-level timeouts
+- **makefile_order** / **makefile_timeout**: Cross-service build sequencing and timeout
+- **clone_order** / **clone_timeout**: Repository cloning sequencing and timeout
+- **pre_task** / **post_task**: Task hooks executed before start / after stop
 
 #### Startup Strategies
 
@@ -5724,9 +5735,12 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `stop` - Stop all services in reverse order
 - `restart` - Stop then start services
 - `status` - Show status of all services
+- `health` / `health_check` - Re-evaluate service health and report failures
 - `build` - Build service images
 - `pull` - Pull latest images
 - `down` - Stop and remove containers
+- `logs` - Stream logs for the selected services (supports filters)
+- `clone_repositories` - Produce the repository cloning plan (dry-run execution)
 
 #### Examples
 
@@ -5742,7 +5756,12 @@ task "restart_api":
 
 task "status":
     orchestrate "my_stack" status
+
+task "show_api_logs":
+    orchestrate "my_stack" logs service "api"
 ```
+
+Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings or interpolated values and are validated against the orchestration's service registry.
 
 ### Progress Display
 
@@ -5790,7 +5809,7 @@ When circuit breaker is enabled, any failure stops and rolls back all services.
 ```drun
 orchestrate "critical":
     services ["database", "api", "frontend"]
-    circuit true  # Enable circuit breaker
+    circuit_breaker true  # Enable circuit breaker
 ```
 
 #### Behavior
@@ -5880,7 +5899,7 @@ service "frontend" in "./services/web":
 orchestrate "platform":
     services ["database", "cache", "api", "frontend"]
     strategy "dependency-based"
-    circuit true
+    circuit_breaker true
 
 # Tasks
 task "start":
@@ -6028,7 +6047,7 @@ orchestrate "stack":
 
 ```drun
 orchestrate "production":
-    circuit true  # Fail fast in production
+    circuit_breaker true  # Fail fast in production
 ```
 
 4. **Group Related Services**
@@ -6259,4 +6278,3 @@ Planned features for future versions:
 - [Orchestration Guide](./docs/ORCHESTRATION.md) - Complete orchestration documentation
 - [Microservices Spec](./spec/microservices-orchestration.md) - Original specification
 - [Examples](./examples/) - Working examples
-

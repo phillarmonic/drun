@@ -131,6 +131,13 @@ service "api" in "./services/api":
 | `in "path"` | Path to service directory containing docker-compose.yml | Yes |
 | `depends on [...]` | List of service dependencies | No |
 | `health check` | Health check configuration (see below) | No |
+| `repository` | Git repository configuration (URL, branch/tag, clone/update behaviour) | No |
+| `build` | Pre-start build configuration (shell command or Makefile, retries, fallback) | No |
+| `compose` | Docker Compose overrides (`file`, `project`, advanced options) | No |
+| `environment` | Inline environment variables (`KEY "value"`) | No |
+| `env_file` | Automatically create/validate `.env` files (optional setup task) | No |
+| `pre_task` / `post_task` | Task hook to run before start / after stop | No |
+| `networks` | Custom Docker network configuration | No |
 
 ## Health Checks
 
@@ -197,6 +204,110 @@ service "custom" in "./custom":
         timeout "5s"
         interval "2s"
         retries 5
+```
+
+## Repository Management
+
+Services can automatically clone or update Git repositories before they start:
+
+```drun
+service "api" in "./services/api":
+    repository:
+        url "https://github.com/acme/api.git"
+        branch "main"
+        clone_if_missing true
+        update_on_start false
+```
+
+Use `url`, optional `branch` / `tag`, `ssh_key`, and flags (`clone_if_missing`, `update_on_start`) to control behaviour. Orchestrations may define a cloning order across services with `clone_order ["service-a", ...]` and a `clone_timeout`.
+
+## Build Configuration
+
+The `build` block supports shell commands or Makefile targets with retries, timeouts, and fallbacks:
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        makefile "Makefile"
+        make_target "build"
+        make_args ["ENV=development"]
+        makefile_timeout "5m"
+        retry_on_failure true
+        max_retries 2
+        retry_delay "5s"
+        fallback_command "npm run build"
+```
+
+When `required` is `true`, the engine honours the full configuration—running pre-/post-make commands, respecting timeouts, retrying on failure, and optionally executing `fallback_command`.
+
+## Environment File Management
+
+Ensure `.env` files exist before a service starts by using `env_file`. You can run a task to generate missing files and take advantage of the new `replace` file action:
+
+```drun
+service "api" in "./services/api":
+    env_file:
+        required true
+        task "setup_api_env"
+
+task "setup_api_env":
+    copy "./services/api/.env.example" to "./services/api/.env"
+    replace in "./services/api/.env":
+        "DB_PASSWORD=CHANGE_ME" with "DB_PASSWORD={$password}"
+        "API_KEY=CHANGE_ME" with "API_KEY={$api_key}"
+    run "chmod 600 ./services/api/.env"
+```
+
+## Advanced Orchestration Configuration
+
+Orchestration groups now support additional lifecycle tuning:
+
+```drun
+orchestrate "all_services":
+    services ["database", "api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    health_check_interval "30s"
+    startup_timeout "5m"
+    shutdown_timeout "1m"
+    makefile_order ["api", "frontend"]
+    makefile_timeout "10m"
+    clone_order ["api", "frontend"]
+    clone_timeout "5m"
+    pre_task "global_setup"
+    post_task "global_cleanup"
+```
+
+- `health_check_interval` schedules background health monitoring after successful start.
+- `startup_timeout` / `shutdown_timeout` apply orchestration-wide SLA bounds.
+- `makefile_order`, `makefile_timeout`, `clone_order`, and `clone_timeout` coordinate builds and repository updates across services.
+- `pre_task` / `post_task` run only once per orchestration start/stop cycle.
+
+## Orchestration Actions in Tasks
+
+The `orchestrate` action supports a growing list of verbs:
+
+| Action | Description |
+|--------|-------------|
+| `start`, `stop`, `restart` | Manage lifecycle while honouring dependencies and hooks |
+| `status` | Print Docker Compose status for each service |
+| `health`, `health_check` | Re-run service health checks and report any failures |
+| `build` | Rebuild services based on their `build` configuration |
+| `pull` | Pull images for all targeted services |
+| `down` | Tear down stacks in reverse dependency order |
+| `logs` | Tail logs for the selected services (`service` filter optional) |
+| `clone_repositories` | Report repository cloning order (dry-run for execution) |
+
+You can filter orchestration actions to specific services directly or via CLI parameters:
+
+```drun
+task "show-api-logs":
+    orchestrate "all_services" logs service "api"
+
+task "rebuild-web-tier":
+    orchestrate "all_services" build services ["frontend"]
 ```
 
 ## Orchestration Groups
@@ -989,4 +1100,3 @@ For issues, feature requests, or questions:
 
 - GitHub Issues: [github.com/phillarmonic/drun/issues](https://github.com/phillarmonic/drun/issues)
 - Documentation: [github.com/phillarmonic/drun](https://github.com/phillarmonic/drun)
-
