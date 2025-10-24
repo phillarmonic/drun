@@ -153,12 +153,13 @@ func (p *Parser) isTaskNamePartToken(tok lexer.Token) bool {
 
 	for i := 0; i < len(tok.Literal); i++ {
 		ch := tok.Literal[i]
-		if !('a' <= ch && ch <= 'z') &&
-			!('A' <= ch && ch <= 'Z') &&
-			!('0' <= ch && ch <= '9') &&
-			ch != '_' {
-			return false
+		if ('a' <= ch && ch <= 'z') ||
+			('A' <= ch && ch <= 'Z') ||
+			('0' <= ch && ch <= '9') ||
+			ch == '_' {
+			continue
 		}
+		return false
 	}
 
 	return true
