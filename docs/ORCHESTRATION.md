@@ -126,18 +126,18 @@ service "api" in "./services/api":
 
 ### Service Properties
 
-| Property | Description | Required |
-|----------|-------------|----------|
-| `in "path"` | Path to service directory containing docker-compose.yml | Yes |
-| `depends on [...]` | List of service dependencies | No |
-| `health check` | Health check configuration (see below) | No |
-| `repository` | Git repository configuration (URL, branch/tag, clone/update behaviour) | No |
-| `build` | Pre-start build configuration (shell command or Makefile, retries, fallback) | No |
-| `compose` | Docker Compose overrides (`file`, `project`, advanced options) | No |
-| `environment` | Inline environment variables (`KEY "value"`) | No |
-| `env_file` | Automatically create/validate `.env` files (optional setup task) | No |
-| `pre_task` / `post_task` | Task hook to run before start / after stop | No |
-| `networks` | Custom Docker network configuration | No |
+| Property                 | Description                                                                  | Required |
+| ------------------------ | ---------------------------------------------------------------------------- | -------- |
+| `in "path"`              | Path to service directory containing docker-compose.yml                      | Yes      |
+| `depends on [...]`       | List of service dependencies                                                 | No       |
+| `health check`           | Health check configuration (see below)                                       | No       |
+| `repository`             | Git repository configuration (URL, branch/tag, clone/update behaviour)       | No       |
+| `build`                  | Pre-start build configuration (shell command or Makefile, retries, fallback) | No       |
+| `compose`                | Docker Compose overrides (`file`, `project`, advanced options)               | No       |
+| `environment`            | Inline environment variables (`KEY "value"`)                                 | No       |
+| `env_file`               | Automatically create/validate `.env` files (optional setup task)             | No       |
+| `pre_task` / `post_task` | Task hook to run before start / after stop                                   | No       |
+| `networks`               | Custom Docker network configuration                                          | No       |
 
 ## Health Checks
 
@@ -289,17 +289,17 @@ orchestrate "all_services":
 
 The `orchestrate` action supports a growing list of verbs:
 
-| Action | Description |
-|--------|-------------|
-| `start`, `stop`, `restart` | Manage lifecycle while honouring dependencies and hooks |
-| `recreate` | Force a fresh deployment by running `down → build → start` for targeted services |
-| `status` | Print Docker Compose status for each service |
-| `health`, `health_check` | Re-run service health checks and report any failures |
-| `build` | Rebuild services based on their `build` configuration |
-| `pull` | Pull images for all targeted services |
-| `down` | Tear down stacks in reverse dependency order |
-| `logs` | Tail logs for the selected services (`service` filter optional) |
-| `clone_repositories` | Report repository cloning order (dry-run for execution) |
+| Action                     | Description                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `start`, `stop`, `restart` | Manage lifecycle while honouring dependencies and hooks                          |
+| `recreate`                 | Force a fresh deployment by running `down → build → start` for targeted services |
+| `status`                   | Print Docker Compose status for each service                                     |
+| `health`, `health_check`   | Re-run service health checks and report any failures                             |
+| `build`                    | Rebuild services based on their `build` configuration                            |
+| `pull`                     | Pull images for all targeted services                                            |
+| `down`                     | Tear down stacks in reverse dependency order                                     |
+| `logs`                     | Tail logs for the selected services (`service` filter optional)                  |
+| `clone_repositories`       | Report repository cloning order (dry-run for execution)                          |
 
 You can filter orchestration actions to specific services directly or via CLI parameters:
 
@@ -321,8 +321,9 @@ Use the optional `with cache "false"` modifier with either `build` or `recreate`
 When your project declares services, task steps can target their working directories without manual `cd` logic:
 
 ```drun
-task "inspect-service" given $servicename defaults to "some-service":
-    run in service $servicename "ls -a"
+task "inspect-service":
+    given $servicename defaults to "some-service"
+    run in service $servicename "ls -a"
     docker compose in service $servicename exec -it app bash
 ```
 
@@ -346,16 +347,17 @@ orchestrate "my-stack":
 
 ### Orchestration Properties
 
-| Property | Description | Default |
-|----------|-------------|---------|
-| `services [...]` | List of services in this group | Required |
-| `strategy "..."` | Startup strategy (see below) | "sequential" |
-| `circuit true/false` | Enable circuit breaker | false |
-| `health_check_interval` | How often to check health | "30s" |
+| Property                | Description                    | Default      |
+| ----------------------- | ------------------------------ | ------------ |
+| `services [...]`        | List of services in this group | Required     |
+| `strategy "..."`        | Startup strategy (see below)   | "sequential" |
+| `circuit true/false`    | Enable circuit breaker         | false        |
+| `health_check_interval` | How often to check health      | "30s"        |
 
 ### Startup Strategies
 
 #### Sequential
+
 Services start one by one in declaration order:
 
 ```drun
@@ -363,9 +365,11 @@ orchestrate "simple":
     services ["a", "b", "c"]
     strategy "sequential"
 ```
+
 Order: a → b → c
 
 #### Dependency-Based (Recommended)
+
 Services start based on dependency graph:
 
 ```drun
@@ -373,9 +377,11 @@ orchestrate "smart":
     services ["frontend", "api", "database"]
     strategy "dependency-based"
 ```
+
 Order: database → api → frontend (based on dependencies)
 
 #### Parallel
+
 Start all services simultaneously (use with caution):
 
 ```drun
@@ -390,15 +396,15 @@ Use orchestration actions within task bodies to manage services:
 
 ### Available Actions
 
-| Action | Description |
-|--------|-------------|
-| `start` | Start all services in dependency order |
-| `stop` | Stop all services in reverse order |
-| `restart` | Stop then start services |
-| `status` | Show status of all services |
-| `build` | Build service images |
-| `pull` | Pull latest images |
-| `down` | Stop and remove containers |
+| Action    | Description                            |
+| --------- | -------------------------------------- |
+| `start`   | Start all services in dependency order |
+| `stop`    | Stop all services in reverse order     |
+| `restart` | Stop then start services               |
+| `status`  | Show status of all services            |
+| `build`   | Build service images                   |
+| `pull`    | Pull latest images                     |
+| `down`    | Stop and remove containers             |
 
 ### Action Examples
 
@@ -406,13 +412,13 @@ Use orchestration actions within task bodies to manage services:
 task "lifecycle-demo":
     # Start services
     orchestrate "my-stack" start
-    
+
     # Check status
     orchestrate "my-stack" status
-    
+
     # Restart specific services
     orchestrate "my-stack" restart services ["api"]
-    
+
     # Stop everything
     orchestrate "my-stack" stop
 ```
@@ -425,14 +431,14 @@ The orchestration system features a real-time progress display inspired by Docke
 
 Each service shows its current status with visual feedback:
 
-| Icon | Status | Description |
-|------|--------|-------------|
-| ⏸️ | Pending | Waiting to start |
-| 🔄 | Starting | Service is starting |
-| ✅ | Healthy | Started and healthy |
-| ❌ | Failed | Failed to start |
-| 🛑 | Stopping | Being stopped |
-| ⏹️ | Stopped | Successfully stopped |
+| Icon | Status   | Description          |
+| ---- | -------- | -------------------- |
+| ⏸️   | Pending  | Waiting to start     |
+| 🔄   | Starting | Service is starting  |
+| ✅    | Healthy  | Started and healthy  |
+| ❌    | Failed   | Failed to start      |
+| 🛑   | Stopping | Being stopped        |
+| ⏹️   | Stopped  | Successfully stopped |
 
 ### Example Output
 
@@ -464,6 +470,7 @@ Each service shows its current status with visual feedback:
 ### Timing Information
 
 Each service displays elapsed time for operations:
+
 - Tracks time from start to completion
 - Shows wait time during health checks
 - Helps identify bottlenecks
@@ -545,6 +552,7 @@ orchestrate "resilient_stack":
 ```
 
 **Causes:**
+
 - Service starts but endpoint not responding
 - Wrong port configuration
 - Service internal error
@@ -557,6 +565,7 @@ orchestrate "resilient_stack":
 ```
 
 **Causes:**
+
 - Incorrect service path
 - Docker Compose file doesn't exist
 - Permission issues
@@ -569,6 +578,7 @@ Output: Error response from daemon: Bind for 0.0.0.0:6379 failed: port is alread
 ```
 
 **Causes:**
+
 - Another container using the same port
 - Previous containers not cleaned up
 - Port already in use by host process
@@ -790,7 +800,7 @@ orchestrate "production":
 # Infrastructure
 orchestrate "infra":
     services ["database", "cache", "queue"]
-    
+
 # Application
 orchestrate "app":
     services ["api", "worker", "frontend"]
@@ -849,32 +859,38 @@ The orchestration system consists of several components:
 ### Components
 
 1. **AST (Abstract Syntax Tree)**
+   
    - `ServiceStatement`: Service declarations
    - `OrchestrateStatement`: Orchestration group declarations
    - `OrchestrationActionStatement`: Actions in task bodies
 
 2. **Parser**
+   
    - Parses service and orchestrate blocks
    - Parses orchestration actions within tasks
    - Validates syntax and structure
 
 3. **Domain Models**
+   
    - `Service`: Runtime service representation
    - `OrchestrationGroup`: Group of services
    - `HealthCheck`: Health check configuration
 
 4. **Execution Engine**
+   
    - `orchestrateStart`: Start services with dependency resolution
    - `orchestrateStop`: Stop services in reverse order
    - `ProgressDisplay`: BuildKit-style visual feedback
    - `waitForHealth`: Health check monitoring
 
 5. **Docker Integration**
+   
    - `runDockerCompose`: Execute docker compose commands
    - `buildDockerComposeCmd`: Build command with environment
    - Service status queries
 
 6. **Health Check System**
+   
    - HTTP health checks
    - TCP health checks
    - Docker native health checks
@@ -929,6 +945,7 @@ This section covers the technical implementation details, edge cases, and minuti
 ### Parser Implementation
 
 #### Infinite Loop Prevention
+
 The orchestration parser includes robust error handling to prevent infinite loops:
 
 - **String Array Parsing**: Added `continue` statements to advance tokens when encountering unexpected types
@@ -952,6 +969,7 @@ for p.curToken.Type != lexer.RBRACKET && p.curToken.Type != lexer.EOF {
 ```
 
 #### Compose File Syntax Support
+
 The parser supports both syntaxes for Docker Compose file specification:
 
 - **Block syntax**: `compose:` with nested configuration
@@ -971,6 +989,7 @@ service "db" in "./database":
 ### Docker Compose Integration
 
 #### Working Directory Management
+
 The orchestration system ensures Docker Compose commands run with the correct working directory:
 
 - **Service Directory**: Each service runs `docker compose` from its own directory
@@ -993,6 +1012,7 @@ cmd.Env = env
 ```
 
 #### BuildKit Output Streaming
+
 Real-time Docker build output is streamed to provide visibility into the build process:
 
 - **Real-time Streaming**: Build output is streamed directly to the user
@@ -1002,6 +1022,7 @@ Real-time Docker build output is streamed to provide visibility into the build p
 ### Circuit Breaker Implementation
 
 #### Smart Rollback Logic
+
 The circuit breaker uses intelligent rollback that only stops dependent services:
 
 - **Dependency-Aware**: Only stops services that were started after the failed service
@@ -1025,6 +1046,7 @@ for i := failedServiceIndex + 1; i < len(orderedServices); i++ {
 ```
 
 #### Build Failure Handling
+
 Circuit breaker is triggered by both startup failures and build failures:
 
 - **Build Failures**: `docker compose build` failures trigger circuit breaker
@@ -1034,6 +1056,7 @@ Circuit breaker is triggered by both startup failures and build failures:
 ### Progress Display System
 
 #### BuildKit-Style Visual Feedback
+
 The progress display provides real-time visual feedback similar to Docker BuildKit:
 
 - **Status Icons**: Different icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
@@ -1042,6 +1065,7 @@ The progress display provides real-time visual feedback similar to Docker BuildK
 - **Summary Display**: Final summary shows success/failure counts
 
 #### Service State Management
+
 Comprehensive state tracking for each service:
 
 - **Thread-Safe**: Uses mutex locks for concurrent access
@@ -1052,6 +1076,7 @@ Comprehensive state tracking for each service:
 ### Error Handling & Recovery
 
 #### Parser Error Recovery
+
 Robust error recovery mechanisms in the parser:
 
 - **Token Synchronization**: Skips to next valid token on parse errors
@@ -1059,6 +1084,7 @@ Robust error recovery mechanisms in the parser:
 - **Graceful Degradation**: Continues parsing other statements when one fails
 
 #### Docker Compose Error Handling
+
 Comprehensive error handling for Docker operations:
 
 - **Command Execution**: Proper error capture and reporting
@@ -1069,6 +1095,7 @@ Comprehensive error handling for Docker operations:
 ### Performance Considerations
 
 #### Parallel vs Sequential Operations
+
 The orchestration system balances safety and performance:
 
 - **Sequential Startup**: Services start one at a time to ensure proper dependency resolution
@@ -1076,6 +1103,7 @@ The orchestration system balances safety and performance:
 - **Concurrent Rollback**: Multiple services can be stopped simultaneously during rollback
 
 #### Memory Management
+
 Efficient memory usage patterns:
 
 - **Streaming Output**: Build output is streamed rather than buffered
@@ -1085,6 +1113,7 @@ Efficient memory usage patterns:
 ### Configuration Flexibility
 
 #### Service Configuration
+
 Comprehensive service configuration options:
 
 - **Health Check Types**: HTTP, TCP, Docker, DNS, and custom health checks
@@ -1093,6 +1122,7 @@ Comprehensive service configuration options:
 - **Environment Variables**: Service-specific environment variable management
 
 #### Orchestration Strategies
+
 Multiple orchestration strategies supported:
 
 - **Dependency-Based**: Services start in dependency order (default)
@@ -1102,6 +1132,7 @@ Multiple orchestration strategies supported:
 ### Testing & Validation
 
 #### Comprehensive Test Coverage
+
 The implementation includes extensive testing:
 
 - **Parser Tests**: Unit tests for all parsing scenarios
@@ -1110,6 +1141,7 @@ The implementation includes extensive testing:
 - **Circuit Breaker Tests**: Specific tests for rollback behavior
 
 #### Real-World Validation
+
 The system has been validated with real projects:
 
 - **Celesta Project**: Production validation with complex microservices

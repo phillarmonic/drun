@@ -1,14 +1,16 @@
 package shell
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -103,99 +105,77 @@ func Execute(command string, opts *Options) (*Result, error) {
 		Command: command,
 	}
 
-	// Handle output capture and streaming
+	var stdoutPipe, stderrPipe io.ReadCloser
 	if opts.CaptureOutput {
-		var stdoutBuf, stderrBuf strings.Builder
-		// Pre-allocate buffers with reasonable capacity to reduce allocations
-		stdoutBuf.Grow(1024)
-		stderrBuf.Grow(512)
+		var err error
+		stdoutPipe, err = cmd.StdoutPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+		}
+
+		stderrPipe, err = cmd.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+		}
+	} else if opts.StreamOutput && opts.Output != nil {
+		cmd.Stdout = opts.Output
+		cmd.Stderr = opts.Output
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
+
+	stopForward := forwardSignals(cmd)
+	defer stopForward()
+
+	if opts.CaptureOutput {
+		var stdoutBuf, stderrBuf bytes.Buffer
+
+		stdoutDone := make(chan error, 1)
+		stderrDone := make(chan error, 1)
+
+		var stdoutWriter io.Writer = &stdoutBuf
+		var stderrWriter io.Writer = &stderrBuf
 
 		if opts.StreamOutput && opts.Output != nil {
-			// Stream and capture simultaneously
-			stdoutPipe, err := cmd.StdoutPipe()
-			if err != nil {
-				return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+			stdoutWriter = io.MultiWriter(opts.Output, &stdoutBuf)
+			stderrWriter = io.MultiWriter(opts.Output, &stderrBuf)
+		}
+
+		go func() {
+			_, err := io.Copy(stdoutWriter, stdoutPipe)
+			stdoutDone <- err
+		}()
+
+		go func() {
+			_, err := io.Copy(stderrWriter, stderrPipe)
+			stderrDone <- err
+		}()
+
+		err := cmd.Wait()
+		stdoutErr := <-stdoutDone
+		stderrErr := <-stderrDone
+
+		if stdoutErr != nil && stdoutErr != io.EOF {
+			return nil, fmt.Errorf("failed reading stdout: %w", stdoutErr)
+		}
+		if stderrErr != nil && stderrErr != io.EOF {
+			return nil, fmt.Errorf("failed reading stderr: %w", stderrErr)
+		}
+
+		result.Stdout = strings.TrimRight(stdoutBuf.String(), "\r\n")
+		result.Stderr = strings.TrimRight(stderrBuf.String(), "\r\n")
+
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				result.ExitCode = exitError.ExitCode()
+			} else {
+				return nil, fmt.Errorf("command execution failed: %w", err)
 			}
-
-			stderrPipe, err := cmd.StderrPipe()
-			if err != nil {
-				return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-			}
-
-			// Start the command
-			if err := cmd.Start(); err != nil {
-				return nil, fmt.Errorf("failed to start command: %w", err)
-			}
-
-			// Use channels to synchronize goroutines
-			stdoutDone := make(chan bool)
-			stderrDone := make(chan bool)
-
-			// Stream stdout
-			go func() {
-				defer close(stdoutDone)
-				scanner := bufio.NewScanner(stdoutPipe)
-				for scanner.Scan() {
-					line := scanner.Text()
-					// More efficient string building
-					stdoutBuf.WriteString(line)
-					stdoutBuf.WriteByte('\n')
-					_, _ = fmt.Fprintln(opts.Output, line)
-				}
-			}()
-
-			// Stream stderr
-			go func() {
-				defer close(stderrDone)
-				scanner := bufio.NewScanner(stderrPipe)
-				for scanner.Scan() {
-					line := scanner.Text()
-					// More efficient string building
-					stderrBuf.WriteString(line)
-					stderrBuf.WriteByte('\n')
-					_, _ = fmt.Fprintln(opts.Output, line)
-				}
-			}()
-
-			// Wait for command completion
-			err = cmd.Wait()
-
-			// Wait for both goroutines to complete
-			<-stdoutDone
-			<-stderrDone
-
-			result.Stdout = strings.TrimSuffix(stdoutBuf.String(), "\n")
-			result.Stderr = strings.TrimSuffix(stderrBuf.String(), "\n")
-
-			if err != nil {
-				if exitError, ok := err.(*exec.ExitError); ok {
-					result.ExitCode = exitError.ExitCode()
-				} else {
-					return nil, fmt.Errorf("command execution failed: %w", err)
-				}
-			}
-		} else {
-			// Just capture without streaming
-			stdout, err := cmd.Output()
-			if err != nil {
-				if exitError, ok := err.(*exec.ExitError); ok {
-					result.ExitCode = exitError.ExitCode()
-					result.Stderr = string(exitError.Stderr)
-				} else {
-					return nil, fmt.Errorf("command execution failed: %w", err)
-				}
-			}
-			result.Stdout = strings.TrimSpace(string(stdout))
 		}
 	} else {
-		// No capture, just run
-		if opts.StreamOutput && opts.Output != nil {
-			cmd.Stdout = opts.Output
-			cmd.Stderr = opts.Output
-		}
-
-		err := cmd.Run()
-		if err != nil {
+		if err := cmd.Wait(); err != nil {
 			if exitError, ok := err.(*exec.ExitError); ok {
 				result.ExitCode = exitError.ExitCode()
 			} else {
@@ -230,4 +210,32 @@ func ExecuteWithOutput(command string, output io.Writer) (*Result, error) {
 	opts.StreamOutput = true
 	opts.Output = output
 	return Execute(command, opts)
+}
+
+func forwardSignals(cmd *exec.Cmd) func() {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case sig, ok := <-signalCh:
+				if !ok {
+					return
+				}
+				if cmd.Process != nil {
+					_ = cmd.Process.Signal(sig)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(done)
+		signal.Stop(signalCh)
+		close(signalCh)
+	}
 }
