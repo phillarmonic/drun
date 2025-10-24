@@ -44,6 +44,13 @@ func FindConfigFile(filename string) (string, error) {
 		return statelessFile, nil
 	}
 
+	// Check directory links stored in the user's home directory
+	if linkedFile, err := getLinkedConfigFile("."); err != nil {
+		return "", err
+	} else if linkedFile != "" {
+		return linkedFile, nil
+	}
+
 	// Check workspace configuration first
 	if workspaceFile := getWorkspaceDefaultFile(); workspaceFile != "" {
 		if _, err := os.Stat(workspaceFile); err == nil {
