@@ -168,7 +168,7 @@ func (e *Engine) resolveServiceOrder(serviceNames []string, services map[string]
 
 // orchestrateStart starts services in dependency order
 func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🚀 Starting orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🚀  Starting orchestration: %s\n", orch.Name)
 
 	// Check and provision Docker networks before starting services
 	if err := e.checkAndProvisionNetworks(services); err != nil {

@@ -150,19 +150,19 @@ func (pd *ProgressDisplay) RenderInline(name string) {
 func (pd *ProgressDisplay) getStatusIcon(status string) string {
 	switch status {
 	case "pending":
-		return "⏸️"
+		return "⏸️ "
 	case "building":
-		return "🔨"
+		return "🔨 "
 	case "starting":
-		return "🔄"
+		return "🔄 "
 	case "healthy":
-		return "✅"
+		return "✅ "
 	case "failed":
-		return "❌"
+		return "❌ "
 	case "stopped":
-		return "⏹️"
+		return "⏹️ "
 	case "stopping":
-		return "🛑"
+		return "🛑 "
 	default:
 		return "  "
 	}
@@ -197,10 +197,10 @@ func (pd *ProgressDisplay) RenderSummary() {
 
 // orchestrateStartWithProgress starts services with BuildKit-style progress display
 func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🚀 Starting orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🚀  Starting orchestration: %s\n", orch.Name)
 	_, _ = fmt.Fprintf(e.output, "   %d services in dependency order\n", len(orderedServices))
 	if orch.CircuitBreaker || orch.StopOnFailure {
-		_, _ = fmt.Fprintf(e.output, "   🔴 Circuit breaker: ENABLED - will stop all on failure\n")
+		_, _ = fmt.Fprintf(e.output, "   🔴  Circuit breaker: ENABLED - will stop all on failure\n")
 	}
 	_, _ = fmt.Fprintf(e.output, "\n")
 

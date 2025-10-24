@@ -161,11 +161,12 @@ func ListAllTasks(eng *engine.Engine, program *ast.Program) error {
 
 // FindDefaultTask finds a default task to run
 func FindDefaultTask(program *ast.Program) string {
-	// Look for common default task names
-	defaultNames := []string{"default", "help", "start", "main"}
+	// Look for common default task names. We restrict this to safe informational
+	// tasks so orchestrations do not launch unless explicitly requested.
+	defaultNames := []string{"default", "help"}
 
-	for _, task := range program.Tasks {
-		for _, defaultName := range defaultNames {
+	for _, defaultName := range defaultNames {
+		for _, task := range program.Tasks {
 			if task.Name == defaultName {
 				return task.Name
 			}
