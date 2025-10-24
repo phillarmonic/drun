@@ -3204,6 +3204,18 @@ run:
   pwd              # Shows /tmp (working directory persists)
 ```
 
+#### Service-Scoped Shell Commands
+
+When services are declared in the program, shell commands can target a service's working directory without manual `cd` operations:
+
+```drun
+task "inspect-service" given $servicename defaults to "some-service":
+    run in service $servicename "ls -a"
+    run in service $servicename "cat Dockerfile"
+```
+
+The runtime resolves the service name (from literals, task parameters, or captured variables), validates that the service exists, and executes the command inside the service directory. If no services are defined, or the service name cannot be resolved, execution fails fast with an explanatory error.
+
 #### Variable Interpolation in Multiline Commands
 
 Variables work seamlessly in multiline blocks:
@@ -3329,6 +3341,16 @@ restart docker compose service "api"
 
 # Scaling
 scale docker compose service "worker" to 3 instances
+
+# Execute commands within a service directory
+docker compose in service "api" exec -it app bash
+```
+
+Service-scoped docker compose commands reuse the registered service paths. The service name can be dynamic—for example, using task parameters:
+
+```drun
+task "open-shell" given $servicename defaults to "some-service":
+    docker compose in service $servicename exec app bash
 ```
 
 ### Kubernetes Actions

@@ -2,8 +2,10 @@ package engine
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/internal/shell"
 )
 
 // Domain: Docker Operations Execution
@@ -15,6 +17,15 @@ import (
 // executeTry executes a try/catch/finally statement
 // executeDocker executes Docker operations
 func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionContext) error {
+	var svcCtx *serviceContextInfo
+	var err error
+	if dockerStmt.ServiceScoped {
+		svcCtx, err = e.resolveServiceContext(dockerStmt.ServiceName, dockerStmt.ServiceNameIsLiteral, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Interpolate variables in Docker statement
 	operation := dockerStmt.Operation
 	resource := dockerStmt.Resource
@@ -26,8 +37,18 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 		options[key] = e.interpolateVariables(value, ctx)
 	}
 
+	commandStr := strings.TrimSpace(e.assembleDockerCommand(operation, resource, name, options))
+	if commandStr == "" {
+		return fmt.Errorf("unable to build docker command for operation '%s'", operation)
+	}
+
 	if e.dryRun {
-		return e.buildDockerCommand(operation, resource, name, options, true)
+		if svcCtx != nil {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command in service '%s' (%s): %s\n", svcCtx.Name, svcCtx.Path, commandStr)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command: %s\n", commandStr)
+		}
+		return nil
 	}
 
 	// Show what we're about to do with appropriate emoji
@@ -109,6 +130,31 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 		_, _ = fmt.Fprintf(e.output, "\n")
 	}
 
-	// Build and execute the actual command
-	return e.buildDockerCommand(operation, resource, name, options, false)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Command: %s\n", commandStr)
+	}
+
+	if svcCtx != nil {
+		opts := e.getPlatformShellConfig(ctx)
+		opts.StreamOutput = true
+		opts.Output = e.output
+		opts.WorkingDir = svcCtx.Path
+
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "📁 Working directory: %s\n", svcCtx.Path)
+		}
+
+		result, err := shell.Execute(commandStr, opts)
+		if err != nil {
+			return fmt.Errorf("docker command failed: %w", err)
+		}
+		if !result.Success {
+			return fmt.Errorf("docker command exited with code %d", result.ExitCode)
+		}
+
+		return nil
+	}
+
+	// Non service-scoped commands fall back to the existing simulated behaviour
+	return nil
 }

@@ -316,6 +316,22 @@ task "bounce-api":
 
 Use the optional `with cache "false"` modifier with either `build` or `recreate` to pass `--no-cache` to underlying `docker compose build` runs when you need a completely fresh image.
 
+## Service-Scoped Task Commands
+
+When your project declares services, task steps can target their working directories without manual `cd` logic:
+
+```drun
+task "inspect-service" given $servicename defaults to "some-service":
+    run in service $servicename "ls -a"
+    docker compose in service $servicename exec -it app bash
+```
+
+- `run in service …` executes the shell command from the resolved service path (with the same path resolution used by orchestrations).
+- `docker compose in service …` anchors Docker Compose commands to the service directory while preserving streamed output.
+- Service names may come from literals, task parameters, or captured variables; the engine resolves them before execution.
+
+Commands fail fast if no services are defined or the requested service cannot be found.
+
 ## Orchestration Groups
 
 Group services together with shared lifecycle management:

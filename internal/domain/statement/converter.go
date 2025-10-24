@@ -19,12 +19,15 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 
 	case *ast.ShellStatement:
 		return &Shell{
-			Action:       s.Action,
-			Command:      s.Command,
-			Commands:     s.Commands,
-			CaptureVar:   s.CaptureVar,
-			StreamOutput: s.StreamOutput,
-			IsMultiline:  s.IsMultiline,
+			Action:               s.Action,
+			Command:              s.Command,
+			Commands:             s.Commands,
+			CaptureVar:           s.CaptureVar,
+			StreamOutput:         s.StreamOutput,
+			IsMultiline:          s.IsMultiline,
+			ServiceScoped:        s.ServiceScoped,
+			ServiceName:          s.ServiceName,
+			ServiceNameIsLiteral: s.ServiceNameIsLiteral,
 		}, nil
 
 	case *ast.VariableStatement:
@@ -137,10 +140,13 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 
 	case *ast.DockerStatement:
 		return &Docker{
-			Operation: s.Operation,
-			Resource:  s.Resource,
-			Name:      s.Name,
-			Options:   s.Options,
+			Operation:            s.Operation,
+			Resource:             s.Resource,
+			Name:                 s.Name,
+			Options:              s.Options,
+			ServiceScoped:        s.ServiceScoped,
+			ServiceName:          s.ServiceName,
+			ServiceNameIsLiteral: s.ServiceNameIsLiteral,
 		}, nil
 
 	case *ast.GitStatement:

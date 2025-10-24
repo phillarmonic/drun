@@ -173,3 +173,79 @@ task "test":
 		}
 	}
 }
+
+func TestParser_RunInService(t *testing.T) {
+	input := `version: 2.0
+
+task "svc":
+  run in service "api" "ls"
+`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		t.Fatalf("Parser errors: %v", p.Errors())
+	}
+
+	if len(program.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(program.Tasks))
+	}
+
+	task := program.Tasks[0]
+	if len(task.Body) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(task.Body))
+	}
+
+	shellStmt, ok := task.Body[0].(*ast.ShellStatement)
+	if !ok {
+		t.Fatalf("expected ShellStatement, got %T", task.Body[0])
+	}
+
+	if !shellStmt.ServiceScoped {
+		t.Fatalf("expected service-scoped run statement")
+	}
+
+	if shellStmt.ServiceName != "api" {
+		t.Errorf("expected service name 'api', got %s", shellStmt.ServiceName)
+	}
+
+	if !shellStmt.ServiceNameIsLiteral {
+		t.Errorf("expected literal service name")
+	}
+}
+
+func TestParser_RunInServiceWithVariable(t *testing.T) {
+	input := `version: 2.0
+
+task "svc":
+  run in service $servicename "ls"
+`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		t.Fatalf("Parser errors: %v", p.Errors())
+	}
+
+	task := program.Tasks[0]
+	shellStmt, ok := task.Body[0].(*ast.ShellStatement)
+	if !ok {
+		t.Fatalf("expected ShellStatement, got %T", task.Body[0])
+	}
+
+	if !shellStmt.ServiceScoped {
+		t.Fatalf("expected service-scoped run statement")
+	}
+
+	if shellStmt.ServiceName != "$servicename" {
+		t.Errorf("expected raw service name '$servicename', got %s", shellStmt.ServiceName)
+	}
+
+	if shellStmt.ServiceNameIsLiteral {
+		t.Errorf("expected non-literal service name")
+	}
+}

@@ -46,12 +46,15 @@ func (a *Action) Type() StatementType { return TypeAction }
 
 // Shell represents a shell command execution
 type Shell struct {
-	Action       string
-	Command      string
-	Commands     []string
-	CaptureVar   string
-	StreamOutput bool
-	IsMultiline  bool
+	Action               string
+	Command              string
+	Commands             []string
+	CaptureVar           string
+	StreamOutput         bool
+	IsMultiline          bool
+	ServiceScoped        bool
+	ServiceName          string
+	ServiceNameIsLiteral bool
 }
 
 func (s *Shell) Type() StatementType { return TypeShell }
@@ -158,10 +161,13 @@ func (tft *TaskFromTemplate) Type() StatementType { return TypeTaskFromTemplate 
 
 // Docker represents Docker operations
 type Docker struct {
-	Operation string
-	Resource  string
-	Name      string
-	Options   map[string]string
+	Operation            string
+	Resource             string
+	Name                 string
+	Options              map[string]string
+	ServiceScoped        bool
+	ServiceName          string
+	ServiceNameIsLiteral bool
 }
 
 func (d *Docker) Type() StatementType { return TypeDocker }

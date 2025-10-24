@@ -719,7 +719,7 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 				// Special handling for RUN token - check context
 				if p.curToken.Type == lexer.RUN {
 					// Look ahead to determine if this is shell or docker command
-					if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
+					if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON || p.peekToken.Type == lexer.IN {
 						// This is "run 'command'" or "run:" - shell command
 						shell := p.parseShellStatement()
 						if shell != nil {

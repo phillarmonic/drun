@@ -17,14 +17,23 @@ import (
 
 // executeShell executes a shell command statement
 func (e *Engine) executeShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
-	if shellStmt.IsMultiline {
-		return e.executeMultilineShell(shellStmt, ctx)
+	var svcCtx *serviceContextInfo
+	var err error
+	if shellStmt.ServiceScoped {
+		svcCtx, err = e.resolveServiceContext(shellStmt.ServiceName, shellStmt.ServiceNameIsLiteral, ctx)
+		if err != nil {
+			return err
+		}
 	}
-	return e.executeSingleLineShell(shellStmt, ctx)
+
+	if shellStmt.IsMultiline {
+		return e.executeMultilineShell(shellStmt, ctx, svcCtx)
+	}
+	return e.executeSingleLineShell(shellStmt, ctx, svcCtx)
 }
 
 // executeMultilineShell executes multiline shell commands as a single shell session
-func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
+func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *ExecutionContext, svcCtx *serviceContextInfo) error {
 	// Interpolate variables in all commands
 	var interpolatedCommands []string
 	for _, cmd := range shellStmt.Commands {
@@ -36,7 +45,11 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	script := strings.Join(interpolatedCommands, "\n")
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands:\n")
+		if svcCtx != nil {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands in service '%s' (%s):\n", svcCtx.Name, svcCtx.Path)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands:\n")
+		}
 		for i, cmd := range interpolatedCommands {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN]   %d: %s\n", i+1, cmd)
 		}
@@ -53,12 +66,19 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	opts.CaptureOutput = true
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output
+	if svcCtx != nil {
+		opts.WorkingDir = svcCtx.Path
+	}
 
 	// Show what we're about to execute (verbose mode only)
 	if e.verbose {
 		switch shellStmt.Action {
 		case "run":
-			_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+			if svcCtx != nil {
+				_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands in service '%s' (%d lines):\n", svcCtx.Name, len(interpolatedCommands))
+			} else {
+				_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+			}
 		case "exec":
 			_, _ = fmt.Fprintf(e.output, "⚡ Executing multiline commands (%d lines):\n", len(interpolatedCommands))
 		case "shell":
