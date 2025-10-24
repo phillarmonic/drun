@@ -179,6 +179,15 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Starting %s...\n", serviceName)
 
+		alreadyHealthy, stateErr := e.serviceIsRunningAndHealthy(service)
+		if stateErr != nil && e.verbose {
+			_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to confirm current state for %s: %v\n", serviceName, stateErr)
+		}
+		if alreadyHealthy && stateErr == nil {
+			_, _ = fmt.Fprintf(e.output, "    ✓ %s already running and healthy (skipping)\n", serviceName)
+			continue
+		}
+
 		if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
 			return err
 		}
@@ -391,6 +400,11 @@ func (e *Engine) orchestrateDown(ctx *ExecutionContext, orch *ast.OrchestrateSta
 // Helper functions for Docker Compose operations
 
 func (e *Engine) startService(service *ast.ServiceStatement) error {
+	alreadyHealthy, err := e.serviceIsRunningAndHealthy(service)
+	if err == nil && alreadyHealthy {
+		return nil
+	}
+
 	return e.runDockerCompose(service, "up", "-d")
 }
 
@@ -441,6 +455,24 @@ func (e *Engine) getServiceStatus(service *ast.ServiceStatement) string {
 	}
 
 	return "stopped"
+}
+
+func (e *Engine) serviceIsRunningAndHealthy(service *ast.ServiceStatement) (bool, error) {
+	status := e.getServiceStatus(service)
+	if status != "running" {
+		return false, nil
+	}
+
+	if service.HealthCheck == nil {
+		return true, nil
+	}
+
+	healthy, err := e.performHealthCheck(service)
+	if err != nil {
+		return false, err
+	}
+
+	return healthy, nil
 }
 
 func (e *Engine) runDockerCompose(service *ast.ServiceStatement, args ...string) error {

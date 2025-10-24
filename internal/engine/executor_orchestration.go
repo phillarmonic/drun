@@ -201,6 +201,15 @@ func (oe *OrchestrationExecutor) StartService(ctx context.Context, execCtx *Exec
 		return fmt.Errorf("service not found: %w", err)
 	}
 
+	alreadyHealthy, stateErr := oe.isServiceRunningAndHealthy(ctx, service)
+	if stateErr != nil && oe.engine != nil && oe.engine.verbose {
+		_, _ = fmt.Fprintf(oe.engine.output, "    [VERBOSE] Unable to confirm current state for %s: %v\n", serviceName, stateErr)
+	}
+	if alreadyHealthy && stateErr == nil {
+		service.MarkHealthy()
+		return nil
+	}
+
 	// Mark service as starting
 	service.MarkStarting()
 
@@ -432,4 +441,60 @@ func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, wor
 	}
 
 	return nil
+}
+
+func (oe *OrchestrationExecutor) isServiceRunningAndHealthy(ctx context.Context, service *orchestration.Service) (bool, error) {
+	running, err := oe.isServiceRunning(ctx, service)
+	if err != nil {
+		return false, err
+	}
+
+	if !running {
+		return false, nil
+	}
+
+	if service.HealthCheck == nil {
+		return true, nil
+	}
+
+	if err := oe.healthChecker.Check(ctx, service.HealthCheck); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (oe *OrchestrationExecutor) isServiceRunning(ctx context.Context, service *orchestration.Service) (bool, error) {
+	args := []string{"compose"}
+
+	if service.Compose != nil && service.Compose.Project != "" {
+		args = append(args, "-p", service.Compose.Project)
+	}
+
+	composeFile := "docker-compose.yml"
+	if service.Compose != nil && service.Compose.File != "" {
+		composeFile = service.Compose.File
+	}
+	args = append(args, "-f", composeFile, "ps", "--format", "json")
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Dir = filepath.Join(oe.workDir, service.Path)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("docker compose ps failed: %w\nOutput: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	data := strings.TrimSpace(string(output))
+	if data == "" || data == "[]" {
+		return false, nil
+	}
+
+	if strings.Contains(data, `"State":"running"`) ||
+		strings.Contains(data, `"Running":true`) ||
+		strings.Contains(data, `"Status":"running"`) {
+		return true, nil
+	}
+
+	return false, nil
 }

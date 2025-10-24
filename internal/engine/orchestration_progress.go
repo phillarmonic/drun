@@ -230,6 +230,20 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 
 		// Update to starting
 		progress.StartService(serviceName)
+		progress.UpdateService(serviceName, "starting", "Checking current state...")
+		progress.RenderInline(serviceName)
+
+		alreadyHealthy, stateErr := e.serviceIsRunningAndHealthy(service)
+		if stateErr != nil && e.verbose {
+			_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to confirm current state for %s: %v\n", serviceName, stateErr)
+		}
+		if alreadyHealthy && stateErr == nil {
+			progress.CompleteService(serviceName, "Already running")
+			progress.RenderInline(serviceName)
+			continue
+		}
+
+		progress.UpdateService(serviceName, "starting", "Starting service...")
 		progress.RenderInline(serviceName)
 
 		if service.PreTask != "" {
