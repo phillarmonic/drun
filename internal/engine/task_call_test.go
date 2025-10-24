@@ -125,6 +125,38 @@ task "main":
 	}
 }
 
+func TestTaskCallKebabNameUnquoted(t *testing.T) {
+	input := `
+version: 2.0
+
+task "run-action":
+  info "running action"
+
+task "main":
+  call task run-action
+`
+
+	l := lexer.NewLexer(input)
+	p := parser.NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser errors: %v", p.Errors())
+	}
+
+	var buf bytes.Buffer
+	engine := NewEngine(&buf)
+
+	if err := engine.Execute(program, "main"); err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+
+	output := buf.String()
+	if !contains(output, "running action") {
+		t.Errorf("Expected output to contain 'running action', got: %s", output)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) &&
 		(s == substr ||

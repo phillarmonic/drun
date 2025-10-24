@@ -136,6 +136,60 @@ func (p *Parser) isValidTaskNameToken(tokenType lexer.TokenType) bool {
 	}
 }
 
+// isTaskNamePartToken checks if a token type can be part of an unquoted task name
+func (p *Parser) isTaskNamePartToken(tok lexer.Token) bool {
+	switch tok.Type {
+	case lexer.IDENT, lexer.NUMBER:
+		return true
+	default:
+		if p.isValidTaskNameToken(tok.Type) {
+			return true
+		}
+	}
+
+	if tok.Literal == "" {
+		return false
+	}
+
+	for i := 0; i < len(tok.Literal); i++ {
+		ch := tok.Literal[i]
+		if !('a' <= ch && ch <= 'z') &&
+			!('A' <= ch && ch <= 'Z') &&
+			!('0' <= ch && ch <= '9') &&
+			ch != '_' {
+			return false
+		}
+	}
+
+	return true
+}
+
+// collectDashedName consumes subsequent "- part" segments and returns the combined name
+func (p *Parser) collectDashedName(initial string) (string, bool) {
+	if p.peekToken.Type != lexer.MINUS {
+		return initial, true
+	}
+
+	var builder strings.Builder
+	builder.WriteString(initial)
+
+	for p.peekToken.Type == lexer.MINUS {
+		p.nextToken() // consume '-'
+
+		if !p.isTaskNamePartToken(p.peekToken) {
+			p.addError("expected identifier after '-' in task name")
+			return "", false
+		}
+
+		builder.WriteString("-")
+
+		p.nextToken() // consume next segment
+		builder.WriteString(p.curToken.Literal)
+	}
+
+	return builder.String(), true
+}
+
 // isKeywordToken checks if a token type is a keyword (can be used as a parameter name)
 func (p *Parser) isKeywordToken(tokenType lexer.TokenType) bool {
 	// Return false for basic tokens, structural keywords, and statement-starting keywords

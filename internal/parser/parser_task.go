@@ -453,8 +453,15 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 			return nil
 		}
 
+		name := p.curToken.Literal
+		if combined, ok := p.collectDashedName(name); ok {
+			name = combined
+		} else {
+			return nil
+		}
+
 		dep := ast.DependencyItem{
-			Name:     p.curToken.Literal,
+			Name:     name,
 			Parallel: false, // default
 		}
 

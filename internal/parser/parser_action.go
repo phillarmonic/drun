@@ -67,15 +67,23 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 	}
 	p.nextToken() // consume TASK
 
-	// Expect task name as string, identifier, or valid keyword
-	// Note: Unquoted names must be single tokens (no hyphens unless quoted)
-	if p.peekToken.Type != lexer.STRING && p.peekToken.Type != lexer.IDENT && !p.isValidTaskNameToken(p.peekToken.Type) {
-		p.addError("expected task name as string or identifier (use quotes for names with hyphens or spaces)")
-		return nil
-	}
+	// Expect task name as string or identifier (allow dashed names without quotes)
+	if p.peekToken.Type == lexer.STRING {
+		p.nextToken() // consume string literal
+		stmt.TaskName = p.curToken.Literal
+	} else {
+		if !p.isTaskNamePartToken(p.peekToken) {
+			p.addError("expected task name as string or identifier (use quotes for complex names)")
+			return nil
+		}
 
-	p.nextToken() // consume the task name token
-	stmt.TaskName = p.curToken.Literal
+		p.nextToken() // consume first part of the task name
+		name, ok := p.collectDashedName(p.curToken.Literal)
+		if !ok {
+			return nil
+		}
+		stmt.TaskName = name
+	}
 
 	// Check for optional "with" parameters
 	if p.peekToken.Type == lexer.WITH {
