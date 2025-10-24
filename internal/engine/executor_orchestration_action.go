@@ -47,7 +47,21 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	// Find all service definitions
 	services := make(map[string]*ast.ServiceStatement)
 	if ctx.Program != nil {
+		baseDir := ""
+		if ctx != nil && ctx.CurrentFile != "" {
+			baseDir = filepath.Dir(ctx.CurrentFile)
+			if filepath.Base(baseDir) == ".drun" {
+				baseDir = filepath.Dir(baseDir)
+			}
+		} else if cwd, err := os.Getwd(); err == nil {
+			baseDir = cwd
+		}
+
 		for _, svc := range ctx.Program.Services {
+			if baseDir != "" && svc.Path != "" && !filepath.IsAbs(svc.Path) {
+				resolved := filepath.Join(baseDir, svc.Path)
+				svc.Path = filepath.Clean(resolved)
+			}
 			services[svc.Name] = svc
 		}
 	}
