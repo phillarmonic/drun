@@ -98,6 +98,9 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 			return err
 		}
 		return e.orchestrateStart(ctx, orchestration, orderedServices, services)
+	case "recreate":
+		useCache := resolveCacheOption(orchestrStmt.Options, true)
+		return e.orchestrateRecreate(ctx, orchestration, orderedServices, services, useCache)
 	case "status":
 		return e.orchestrateStatus(orchestration, orderedServices, services)
 	case "health", "health_check":
@@ -105,7 +108,8 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	case "logs":
 		return e.orchestrateLogs(ctx, orchestration, orderedServices, services)
 	case "build":
-		return e.orchestrateBuild(ctx, orchestration, orderedServices, services)
+		useCache := resolveCacheOption(orchestrStmt.Options, true)
+		return e.orchestrateBuild(ctx, orchestration, orderedServices, services, useCache)
 	case "pull":
 		return e.orchestratePull(orchestration, orderedServices, services)
 	case "down":
@@ -117,6 +121,34 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	default:
 		return fmt.Errorf("unknown orchestration action: %s", orchestrStmt.Action)
 	}
+}
+
+func parseBoolOption(options map[string]string, key string) (bool, bool) {
+	raw, ok := options[key]
+	if !ok {
+		return false, false
+	}
+
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "true", "yes", "1", "on", "enabled":
+		return true, true
+	case "false", "no", "0", "off", "disabled":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func resolveCacheOption(options map[string]string, defaultValue bool) bool {
+	if value, ok := parseBoolOption(options, "cache"); ok {
+		return value
+	}
+
+	if value, ok := parseBoolOption(options, "no_cache"); ok {
+		return !value
+	}
+
+	return defaultValue
 }
 
 // resolveServiceOrder resolves service dependencies and returns services in startup order
@@ -194,7 +226,7 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 
 		if service.Build != nil && service.Build.Required {
 			_, _ = fmt.Fprintf(e.output, "    🔨 Building %s...\n", serviceName)
-			if err := e.performServiceBuild(ctx, service, false); err != nil {
+			if err := e.performServiceBuild(ctx, service, false, true); err != nil {
 				return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
 			}
 		}
@@ -340,14 +372,14 @@ func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, or
 }
 
 // orchestrateBuild builds all services
-func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, useCache bool) error {
 	_, _ = fmt.Fprintf(e.output, "🔨 Building orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Building %s...\n", serviceName)
 
-		if err := e.performServiceBuild(ctx, service, true); err != nil {
+		if err := e.performServiceBuild(ctx, service, true, useCache); err != nil {
 			return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
 		}
 
@@ -373,6 +405,27 @@ func (e *Engine) orchestratePull(orch *ast.OrchestrateStatement, orderedServices
 	}
 
 	return nil
+}
+
+// orchestrateRecreate forces recreation of services by taking them down, rebuilding, and starting again
+func (e *Engine) orchestrateRecreate(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, useCache bool) error {
+	_, _ = fmt.Fprintf(e.output, "🔁 Force recreating orchestration: %s\n", orch.Name)
+
+	errDown := e.orchestrateDown(ctx, orch, orderedServices, services)
+	errPost := e.runOrchestrationHook(ctx, orch.PostTask, orch.Name, "post")
+	if err := errors.Join(errDown, errPost); err != nil {
+		return err
+	}
+
+	if err := e.runOrchestrationHook(ctx, orch.PreTask, orch.Name, "pre"); err != nil {
+		return err
+	}
+
+	if err := e.orchestrateBuild(ctx, orch, orderedServices, services, useCache); err != nil {
+		return err
+	}
+
+	return e.orchestrateStartWithProgress(ctx, orch, orderedServices, services)
 }
 
 // orchestrateDown stops and removes containers
@@ -412,8 +465,13 @@ func (e *Engine) stopService(service *ast.ServiceStatement) error {
 	return e.runDockerCompose(service, "stop")
 }
 
-func (e *Engine) buildServiceWithOutput(service *ast.ServiceStatement) error {
-	cmd := e.buildDockerComposeCmd(service, "build")
+func (e *Engine) buildServiceWithOutput(service *ast.ServiceStatement, useCache bool) error {
+	args := []string{"build"}
+	if !useCache {
+		args = append(args, "--no-cache")
+	}
+
+	cmd := e.buildDockerComposeCmd(service, args...)
 
 	if e.verbose {
 		_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Running: %s\n", strings.Join(cmd.Args, " "))
@@ -646,11 +704,11 @@ func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*
 	return targetTask, namespace, nil
 }
 
-func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceStatement, allowFallback bool) error {
+func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceStatement, allowFallback bool, useCache bool) error {
 	buildCfg := service.Build
 	if buildCfg == nil {
 		if allowFallback {
-			return e.buildServiceWithOutput(service)
+			return e.buildServiceWithOutput(service, useCache)
 		}
 		return nil
 	}
@@ -664,7 +722,7 @@ func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceSt
 	}
 
 	if allowFallback || buildCfg.Required {
-		return e.buildServiceWithOutput(service)
+		return e.buildServiceWithOutput(service, useCache)
 	}
 
 	return nil

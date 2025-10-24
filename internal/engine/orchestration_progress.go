@@ -268,7 +268,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			// Show build output header
 			_, _ = fmt.Fprintf(e.output, "\n🔨 Building %s:\n", serviceName)
 
-			if err := e.performServiceBuild(ctx, service, false); err != nil {
+			if err := e.performServiceBuild(ctx, service, false, true); err != nil {
 				progress.FailService(serviceName, err)
 				progress.RenderInline(serviceName)
 

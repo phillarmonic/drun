@@ -31,6 +31,9 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 	case lexer.RESTART:
 		p.nextToken()
 		stmt.Action = "restart"
+	case lexer.RECREATE:
+		p.nextToken()
+		stmt.Action = "recreate"
 	case lexer.STATUS:
 		p.nextToken()
 		stmt.Action = "status"
@@ -81,9 +84,22 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 			p.nextToken() // consume WITH
 			// Parse key-value pairs
 			for {
-				if p.peekToken.Type == lexer.IDENT {
+				switch p.peekToken.Type {
+				case lexer.IDENT, lexer.CACHE:
 					p.nextToken()
 					key := p.curToken.Literal
+					if p.peekToken.Type == lexer.STRING {
+						p.nextToken()
+						stmt.Options[key] = p.curToken.Literal
+					}
+				case lexer.NO:
+					// Support "no cache" style options by combining tokens
+					p.nextToken()
+					key := p.curToken.Literal
+					if p.peekToken.Type == lexer.CACHE {
+						p.nextToken()
+						key = key + "_" + p.curToken.Literal
+					}
 					if p.peekToken.Type == lexer.STRING {
 						p.nextToken()
 						stmt.Options[key] = p.curToken.Literal

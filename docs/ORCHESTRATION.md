@@ -292,6 +292,7 @@ The `orchestrate` action supports a growing list of verbs:
 | Action | Description |
 |--------|-------------|
 | `start`, `stop`, `restart` | Manage lifecycle while honouring dependencies and hooks |
+| `recreate` | Force a fresh deployment by running `down → build → start` for targeted services |
 | `status` | Print Docker Compose status for each service |
 | `health`, `health_check` | Re-run service health checks and report any failures |
 | `build` | Rebuild services based on their `build` configuration |
@@ -308,7 +309,12 @@ task "show-api-logs":
 
 task "rebuild-web-tier":
     orchestrate "all_services" build services ["frontend"]
+
+task "bounce-api":
+    orchestrate "all_services" recreate services ["api"] with cache "false"
 ```
+
+Use the optional `with cache "false"` modifier with either `build` or `recreate` to pass `--no-cache` to underlying `docker compose build` runs when you need a completely fresh image.
 
 ## Orchestration Groups
 

@@ -5734,6 +5734,7 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `start` - Start all services in dependency order
 - `stop` - Stop all services in reverse order
 - `restart` - Stop then start services
+- `recreate` - Force a fresh deployment by running `down → build → start`
 - `status` - Show status of all services
 - `health` / `health_check` - Re-evaluate service health and report failures
 - `build` - Build service images
@@ -5754,6 +5755,9 @@ task "stop":
 task "restart_api":
     orchestrate "my_stack" restart services ["api"]
 
+task "recreate_api":
+    orchestrate "my_stack" recreate services ["api"] with cache "false"
+
 task "status":
     orchestrate "my_stack" status
 
@@ -5762,6 +5766,8 @@ task "show_api_logs":
 ```
 
 Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings or interpolated values and are validated against the orchestration's service registry.
+
+The `build` and `recreate` actions accept a `with cache "false"` modifier to disable Docker's build cache (`docker compose build --no-cache`) for services that need a completely fresh image.
 
 ### Progress Display
 
