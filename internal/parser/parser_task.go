@@ -15,7 +15,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 		// Provide helpful error message for unquoted task names
 		p.addErrorWithHelpAtPeek(
 			fmt.Sprintf("expected task name as quoted string, got %s instead", p.peekToken.Type),
-			"Task names must be quoted. Use: task \""+p.peekToken.Literal+"\" instead of: task "+p.peekToken.Literal,
+			"Task names must be quoted on definition. Use: task \""+p.peekToken.Literal+"\" instead of: task "+p.peekToken.Literal,
 		)
 		return nil
 	}
