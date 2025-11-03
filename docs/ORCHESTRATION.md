@@ -333,6 +333,18 @@ task "inspect-service":
 
 Commands fail fast if no services are defined or the requested service cannot be found.
 
+Need to fan out across several services? Capture the stack definition into a variable and iterate:
+
+```drun
+let $services be {orchestrate services "celesta-sb-stack"}
+
+for each $service in $services:
+    info "Checking {$service}"
+    orchestrate "celesta-sb-stack" status services [$service]
+```
+
+The `{orchestrate services "…"}` builtin returns an array literal, so it plugs straight into `for each` loops or other list-aware features.
+
 ## Orchestration Groups
 
 Group services together with shared lifecycle management:

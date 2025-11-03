@@ -5791,6 +5791,16 @@ Service filters can be supplied inline (`services ["api"]`, `service "api"`) or 
 
 The `build` and `recreate` actions accept a `with cache "false"` modifier to disable Docker's build cache (`docker compose build --no-cache`) for services that need a completely fresh image.
 
+You can retrieve an orchestration's service list in tasks via the builtin expression `{orchestrate services "stack_name"}` which yields an array literal suitable for loops:
+
+```drun
+let $services be {orchestrate services "celesta-sb-stack"}
+
+for each $service in $services:
+    info "Ensuring {$service} is healthy"
+    orchestrate "celesta-sb-stack" health services [$service]
+```
+
 ### Progress Display
 
 The orchestration system features a BuildKit-inspired real-time progress display.

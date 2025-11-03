@@ -28,11 +28,11 @@ task "sec" means "Security checks (high)":
 
 task "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
-	step "Checking for regressions"
-	run "./scripts/test-regressions.sh"
-	step "Unit tests"
-	call task test
 	step "Linter"
 	call task lint
+	step "Unit tests"
+	call task test
+	step "Checking for regressions"
+	run "./scripts/test-regressions.sh"
 	step "Security checks"
 	call task sec

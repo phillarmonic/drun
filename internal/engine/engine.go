@@ -159,6 +159,14 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 	interp.SetResolveBuiltinCallback(func(funcName string, args []string, ctx interface{}) (string, error) {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
+			switch strings.ToLower(funcName) {
+			case "orchestrate services", "orchestration services":
+				if len(args) == 0 {
+					return "", fmt.Errorf("orchestrate services requires an orchestration name")
+				}
+				return e.resolveOrchestrateServicesBuiltin(execCtx, args)
+			}
+
 			// Create builtin context
 			builtinCtx := &BuiltinContext{
 				execCtx:        execCtx,
