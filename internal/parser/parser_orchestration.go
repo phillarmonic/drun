@@ -202,7 +202,7 @@ func (p *Parser) parseServiceDependencies() []string {
 // parseRepositoryConfig parses repository configuration
 func (p *Parser) parseRepositoryConfig() *ast.RepositoryConfig {
 	config := &ast.RepositoryConfig{
-		CloneIfMissing: true, // default to true
+		Clone: true, // default to true
 	}
 
 	if !p.expectPeek(lexer.COLON) {
@@ -254,14 +254,11 @@ repoBody:
 			config.SSHKey = p.curToken.Literal
 			p.nextToken()
 		case lexer.CLONE:
-			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "if_missing" {
-				p.nextToken() // consume 'if_missing'
-			}
 			if !p.expectPeek(lexer.BOOLEAN) {
-				p.addError("expected boolean for clone_if_missing")
+				p.addError("expected boolean for clone")
 				return nil
 			}
-			config.CloneIfMissing = p.curToken.Literal == "true"
+			config.Clone = p.curToken.Literal == "true"
 			p.nextToken()
 		case lexer.UPDATE:
 			if p.peekToken.Type == lexer.ON {

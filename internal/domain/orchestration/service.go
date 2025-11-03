@@ -44,12 +44,12 @@ const (
 
 // Repository represents Git repository configuration
 type Repository struct {
-	URL            string
-	Branch         string
-	Tag            string
-	SSHKey         string
-	CloneIfMissing bool
-	UpdateOnStart  bool
+	URL           string
+	Branch        string
+	Tag           string
+	SSHKey        string
+	Clone         bool
+	UpdateOnStart bool
 }
 
 // HealthCheck represents health check configuration

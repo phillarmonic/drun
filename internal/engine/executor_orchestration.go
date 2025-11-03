@@ -59,12 +59,12 @@ func (oe *OrchestrationExecutor) RegisterService(serviceStmt *ast.ServiceStateme
 	// Convert repository config
 	if serviceStmt.Repository != nil {
 		service.Repository = &orchestration.Repository{
-			URL:            serviceStmt.Repository.URL,
-			Branch:         serviceStmt.Repository.Branch,
-			Tag:            serviceStmt.Repository.Tag,
-			SSHKey:         serviceStmt.Repository.SSHKey,
-			CloneIfMissing: serviceStmt.Repository.CloneIfMissing,
-			UpdateOnStart:  serviceStmt.Repository.UpdateOnStart,
+			URL:           serviceStmt.Repository.URL,
+			Branch:        serviceStmt.Repository.Branch,
+			Tag:           serviceStmt.Repository.Tag,
+			SSHKey:        serviceStmt.Repository.SSHKey,
+			Clone:         serviceStmt.Repository.Clone,
+			UpdateOnStart: serviceStmt.Repository.UpdateOnStart,
 		}
 	}
 

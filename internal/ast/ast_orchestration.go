@@ -101,12 +101,12 @@ func (ss *ServiceStatement) String() string {
 
 // RepositoryConfig represents Git repository configuration
 type RepositoryConfig struct {
-	URL            string
-	Branch         string
-	Tag            string
-	SSHKey         string
-	CloneIfMissing bool
-	UpdateOnStart  bool
+	URL           string
+	Branch        string
+	Tag           string
+	SSHKey        string
+	Clone         bool
+	UpdateOnStart bool
 }
 
 func (rc *RepositoryConfig) String() string {
@@ -122,7 +122,9 @@ func (rc *RepositoryConfig) String() string {
 	if rc.SSHKey != "" {
 		out.WriteString(fmt.Sprintf("        ssh_key \"%s\"\n", rc.SSHKey))
 	}
-	out.WriteString(fmt.Sprintf("        clone_if_missing %v\n", rc.CloneIfMissing))
+	if !rc.Clone {
+		out.WriteString(fmt.Sprintf("        clone %v\n", rc.Clone))
+	}
 	out.WriteString(fmt.Sprintf("        update_on_start %v\n", rc.UpdateOnStart))
 	return out.String()
 }

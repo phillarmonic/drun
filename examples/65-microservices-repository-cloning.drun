@@ -9,7 +9,7 @@ service "user-service" in "./services/user-service" means "User Management Servi
     repository:
         url "https://github.com/{$organization}/user-service.git"
         branch "main"
-        clone_if_missing true
+        clone true  # default, can be omitted
         update_on_start false
     depends on ["database", "redis"]
     health check:
@@ -37,7 +37,7 @@ service "order-service" in "./services/order-service" means "Order Management Se
     repository:
         url "https://github.com/{$organization}/order-service.git"
         tag "v1.2.0"
-        clone_if_missing true
+        # clone defaults to true, omitted here
     depends on ["user-service", "database"]
     health check:
         type "http"

@@ -236,7 +236,7 @@ service "api" in "./services/api" means "REST API":
     repository:
         url "https://github.com/company/api.git"
         branch "main"
-        clone_if_missing true
+        clone true  # default, can be omitted
     health check:
         type "http"
         endpoint "http://localhost:8080/health"

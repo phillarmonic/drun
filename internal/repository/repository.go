@@ -25,13 +25,26 @@ func NewManager(workDir string) *Manager {
 
 // Clone clones a repository if it doesn't exist
 func (m *Manager) Clone(ctx context.Context, config *orchestration.Repository, targetPath string) error {
-	// Check if target path exists
 	fullPath := filepath.Join(m.workDir, targetPath)
+
+	// Check if target path already exists (as a directory or git repository)
 	if _, err := os.Stat(fullPath); err == nil {
-		if config.CloneIfMissing {
-			// Directory exists, skip cloning
+		// Directory exists, check if it's already a git repository
+		if _, err := os.Stat(filepath.Join(fullPath, ".git")); err == nil {
+			// Already a git repository, skip cloning
 			return nil
 		}
+		// Directory exists but is not a git repository
+		// If Clone is false, don't clone into existing directory
+		if !config.Clone {
+			return fmt.Errorf("target path '%s' exists but is not a git repository and clone is false", targetPath)
+		}
+		// Clone is true, proceed with cloning (will overwrite or fail)
+	}
+
+	// If Clone is false and directory doesn't exist, don't clone
+	if !config.Clone {
+		return fmt.Errorf("repository at '%s' does not exist and clone is false", targetPath)
 	}
 
 	// Prepare clone command
@@ -193,7 +206,13 @@ func (m *Manager) EnsureRepository(ctx context.Context, config *orchestration.Re
 
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
-		// Repository doesn't exist, clone it
+		// Repository doesn't exist
+		// Only clone if Clone is true (defaults to true)
+		if !config.Clone {
+			return fmt.Errorf("repository at '%s' does not exist and clone is false", targetPath)
+		}
+
+		// Clone the repository
 		if err := m.Clone(ctx, config, targetPath); err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}

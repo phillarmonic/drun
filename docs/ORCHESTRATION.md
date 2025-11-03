@@ -215,11 +215,11 @@ service "api" in "./services/api":
     repository:
         url "https://github.com/acme/api.git"
         branch "main"
-        clone_if_missing true
+        clone true  # default, can be omitted
         update_on_start false
 ```
 
-Use `url`, optional `branch` / `tag`, `ssh_key`, and flags (`clone_if_missing`, `update_on_start`) to control behaviour. Orchestrations may define a cloning order across services with `clone_order ["service-a", ...]` and a `clone_timeout`.
+Use `url`, optional `branch` / `tag`, `ssh_key`, and flags (`clone`, `update_on_start`) to control behaviour. The `clone` flag defaults to `true` (auto-clone missing repositories), set to `false` to disable. Orchestrations may define a cloning order across services with `clone_order ["service-a", ...]` and a `clone_timeout`.
 
 ## Build Configuration
 
