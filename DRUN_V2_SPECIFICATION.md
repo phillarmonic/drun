@@ -5583,6 +5583,13 @@ Services represent Docker Compose projects that can be orchestrated together.
 ```drun
 service "<name>" in "<path>":
     [depends on ["service1", "service2", ...]]
+    [repository:
+        url "<url>"
+        [branch "<branch>"]
+        [tag "<tag>"]
+        [ssh_key "<path>"]
+        [clone <boolean>]  # defaults to true, can be omitted
+        [update_on_start <boolean>]]
     [health check:
         type "<type>"
         endpoint "<endpoint>"
@@ -5597,6 +5604,11 @@ service "<name>" in "<path>":
 ```drun
 service "api" in "./services/api":
     depends on ["database", "redis"]
+    repository:
+        url "https://github.com/acme/api.git"
+        branch "main"
+        clone true  # default, can be omitted
+        update_on_start false
     health check:
         type "http"
         endpoint "http://localhost:8080/health"
@@ -5611,6 +5623,13 @@ service "api" in "./services/api":
 - **name**: Unique identifier for the service
 - **path**: Directory containing docker-compose.yml
 - **depends on**: List of service dependencies (optional)
+- **repository**: Git repository configuration (optional)
+  - **url**: Repository URL (required if repository is specified)
+  - **branch**: Branch to checkout (optional)
+  - **tag**: Tag to checkout (optional, mutually exclusive with branch)
+  - **ssh_key**: Path to SSH key for private repositories (optional)
+  - **clone**: Auto-clone missing repositories (defaults to `true`, can be omitted)
+  - **update_on_start**: Pull latest changes on start (defaults to `false`)
 - **health check**: Health check configuration (optional)
 
 ### Health Check Types
@@ -6301,10 +6320,6 @@ Production validation with actual projects:
 
 Planned features for future versions:
 
-- Pre/post lifecycle tasks
-- Environment file management
-- Makefile integration during build
-- Git repository auto-cloning
 - Service discovery integration
 - Metrics and monitoring
 - Automatic rollback support
