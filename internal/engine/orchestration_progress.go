@@ -1,12 +1,16 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/internal/repository"
 )
 
 // ServiceProgress tracks the progress of a service operation
@@ -257,6 +261,44 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			}
 
 			progress.UpdateService(serviceName, "starting", "Pre-task complete")
+			progress.RenderInline(serviceName)
+		}
+
+		// Clone/update repository if configured
+		if service.Repository != nil {
+			progress.UpdateService(serviceName, "cloning", "Setting up repository...")
+			progress.RenderInline(serviceName)
+
+			workDir, err := os.Getwd()
+			if err != nil {
+				progress.FailService(serviceName, fmt.Errorf("failed to get working directory: %w", err))
+				progress.RenderInline(serviceName)
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+
+			repoManager := repository.NewManager(workDir)
+			repoConfig := &orchestration.Repository{
+				URL:           service.Repository.URL,
+				Branch:        service.Repository.Branch,
+				Tag:           service.Repository.Tag,
+				SSHKey:        service.Repository.SSHKey,
+				Clone:         service.Repository.Clone,
+				UpdateOnStart: service.Repository.UpdateOnStart,
+			}
+
+			if err := repoManager.EnsureRepository(context.Background(), repoConfig, service.Path); err != nil {
+				progress.FailService(serviceName, fmt.Errorf("repository setup failed: %w", err))
+				progress.RenderInline(serviceName)
+
+				// Check if we should stop on failure
+				if orch.StopOnFailure || orch.CircuitBreaker {
+					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+					return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+				}
+				return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+			}
+
+			progress.UpdateService(serviceName, "starting", "Repository ready")
 			progress.RenderInline(serviceName)
 		}
 

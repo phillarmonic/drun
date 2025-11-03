@@ -246,6 +246,30 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			return err
 		}
 
+		// Clone/update repository if configured
+		if service.Repository != nil {
+			workDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+
+			repoManager := repository.NewManager(workDir)
+			repoConfig := &orchestration.Repository{
+				URL:           service.Repository.URL,
+				Branch:        service.Repository.Branch,
+				Tag:           service.Repository.Tag,
+				SSHKey:        service.Repository.SSHKey,
+				Clone:         service.Repository.Clone,
+				UpdateOnStart: service.Repository.UpdateOnStart,
+			}
+
+			_, _ = fmt.Fprintf(e.output, "    📦 Setting up repository for %s...\n", serviceName)
+			if err := repoManager.EnsureRepository(context.Background(), repoConfig, service.Path); err != nil {
+				return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+			}
+			_, _ = fmt.Fprintf(e.output, "    ✓ Repository ready for %s\n", serviceName)
+		}
+
 		if service.Build != nil && service.Build.Required {
 			_, _ = fmt.Fprintf(e.output, "    🔨 Building %s...\n", serviceName)
 			if err := e.performServiceBuild(ctx, service, false, true); err != nil {
