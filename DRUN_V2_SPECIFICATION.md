@@ -5590,6 +5590,17 @@ service "<name>" in "<path>":
         [ssh_key "<path>"]
         [clone <boolean>]  # defaults to true, can be omitted
         [update_on_start <boolean>]]
+    [build:
+        required <boolean>
+        [command "<command>"]
+        [makefile "<path>"]
+        [make_target "<target>"]
+        [make_args ["arg1", "arg2", ...]]
+        [makefile_timeout "<duration>"]
+        [retry_on_failure <boolean>]
+        [max_retries <number>]
+        [retry_delay "<duration>"]
+        [fallback_command "<command>"]]
     [health check:
         type "<type>"
         endpoint "<endpoint>"
@@ -5609,6 +5620,9 @@ service "api" in "./services/api":
         branch "main"
         clone true  # default, can be omitted
         update_on_start false
+    build:
+        required true
+        command "npm install && npm run build"
     health check:
         type "http"
         endpoint "http://localhost:8080/health"
@@ -5630,7 +5644,155 @@ service "api" in "./services/api":
   - **ssh_key**: Path to SSH key for private repositories (optional)
   - **clone**: Auto-clone missing repositories (defaults to `true`, can be omitted)
   - **update_on_start**: Pull latest changes on start (defaults to `false`)
+- **build**: Build configuration (optional)
+  - **required**: Whether the build is mandatory (defaults to `false`)
+  - **command**: Shell command to execute (supports multiline strings)
+  - **allocate_tty**: Allocate a pseudo-TTY for the command (defaults to `false`)
+  - **makefile**: Path to Makefile (alternative to command)
+  - **make_target**: Makefile target to execute
+  - **make_args**: Additional arguments to pass to make
+  - **makefile_timeout**: Maximum time for make command execution
+  - **retry_on_failure**: Retry on build failure (defaults to `false`)
+  - **max_retries**: Maximum number of retry attempts
+  - **retry_delay**: Delay between retries
+  - **fallback_command**: Command to run if make fails
 - **health check**: Health check configuration (optional)
+
+### Build Configuration
+
+The build configuration allows you to specify custom build commands or Makefile targets to execute before starting a service.
+
+#### Simple Build Command
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        command "npm install && npm run build"
+```
+
+#### Multiline Build Commands
+
+**The `command` field supports multiline strings**, allowing complex multi-step build processes:
+
+```drun
+service "backend" in "./backend":
+    build:
+        required true
+        command "echo 'Installing dependencies...'
+npm install
+echo 'Running tests...'
+npm test
+echo 'Building application...'
+npm run build
+echo 'Build complete!'"
+```
+
+#### Line Continuation
+
+Use backslash (`\`) for line continuation to join lines without newlines:
+
+```drun
+service "frontend" in "./frontend":
+    build:
+        required true
+        command "docker build \
+            --tag myapp:latest \
+            --build-arg ENV=production \
+            --build-arg VERSION=1.0.0 \
+            ."
+```
+
+#### Makefile-Based Build
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        makefile "Makefile"
+        make_target "build"
+        make_args ["ENV=production", "VERBOSE=1"]
+        makefile_timeout "10m"
+        retry_on_failure true
+        max_retries 2
+        retry_delay "5s"
+        fallback_command "docker compose build"
+```
+
+#### Build with Variable Interpolation
+
+```drun
+project "myapp" version "1.0":
+    parameter $environment defaults to "development"
+    parameter $version defaults to "1.0.0"
+
+service "api" in "./api":
+    build:
+        required true
+        command "echo 'Building for {$environment}...'
+go mod download
+go test ./...
+go build -ldflags=\"-X main.version={$version}\" -o bin/api
+echo 'Build complete for version {$version}'"
+```
+
+#### Build with TTY Allocation
+
+For commands that require interactive terminal access (like `docker compose exec`):
+
+```drun
+service "gateway" in "./celesta-gateway":
+    compose file "docker-compose.dev.yml"
+    build:
+        required true
+        allocate_tty true
+        command "make build && make init"
+    health check:
+        type "http"
+        endpoint "http://localhost:93/"
+```
+
+**When to use `allocate_tty`:**
+- ✅ When your build uses `docker compose exec` to run commands inside containers
+- ✅ When scripts require a TTY (check for "input device is not a TTY" errors)
+- ✅ When commands need interactive terminal features
+- ❌ Not needed for regular shell commands, docker build, or make
+
+#### Complex Real-World Example
+
+```drun
+service "web-app" in "./webapp":
+    repository:
+        url "git@github.com:acme/webapp.git"
+        branch "main"
+        clone true
+    build:
+        required true
+        command "echo 'Installing frontend dependencies...'
+cd frontend && npm ci
+echo 'Building frontend assets...'
+npm run build
+cd ..
+echo 'Installing backend dependencies...'
+cd backend && go mod download
+echo 'Running backend tests...'
+go test ./...
+echo 'Building backend binary...'
+go build -o ../bin/server
+cd ..
+echo 'Build pipeline complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+```
+
+**Key Features:**
+- **Multiline Support**: Write complex multi-step commands naturally
+- **Line Continuation**: Use `\` to join long single commands
+- **Variable Interpolation**: Use `{$var}` syntax in build commands
+- **Escaped Quotes**: Use `\"` for quotes within commands
+- **Make Integration**: Alternative Makefile-based builds with fallback
+- **Retry Logic**: Automatic retries with configurable delays
 
 ### Health Check Types
 
@@ -5772,7 +5934,8 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 
 #### Available Actions
 
-- `start` - Start all services in dependency order
+- `start` - Start services (skip if running and no updates detected)
+- `up` - Bring up services with fresh rebuild and repo updates on default branches
 - `stop` - Stop all services in reverse order
 - `restart` - Stop then start services
 - `recreate` - Force a fresh deployment by running `down → build → start`
@@ -5785,11 +5948,24 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `clone repositories` - Produce the repository cloning plan (dry-run execution)
 - `update repositories` - Update repositories to latest version (optionally filter by branch)
 
+**Difference between `start` and `up`:**
+
+| Feature | `start` | `up` |
+|---------|---------|------|
+| Skip if healthy | ✅ Yes | ❌ No |
+| Check for updates | ✅ Yes | ✅ Yes |
+| Force repo updates on main/master | ❌ No | ✅ Yes |
+| Force rebuild | ❌ No | ✅ Yes |
+| **Use for** | Quick restarts | Development, fresh deploys |
+
 #### Examples
 
 ```drun
 task "start":
     orchestrate "my_stack" start
+
+task "up":
+    orchestrate "my_stack" up
 
 task "stop":
     orchestrate "my_stack" stop

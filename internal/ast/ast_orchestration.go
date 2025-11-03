@@ -212,6 +212,7 @@ type BuildConfig struct {
 	MaxRetries       int
 	RetryDelay       string
 	FallbackCommand  string
+	AllocateTTY      bool
 }
 
 func (bc *BuildConfig) String() string {

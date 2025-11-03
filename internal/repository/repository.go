@@ -200,6 +200,57 @@ func (m *Manager) IsClean(ctx context.Context, targetPath string) (bool, error) 
 	return strings.TrimSpace(status) == "", nil
 }
 
+// HasRemoteUpdates checks if there are updates available from the remote repository
+// Returns true if the local branch is behind the remote branch
+func (m *Manager) HasRemoteUpdates(ctx context.Context, config *orchestration.Repository, targetPath string) (bool, error) {
+	fullPath := filepath.Join(m.workDir, targetPath)
+
+	// Check if repository exists
+	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
+		return false, fmt.Errorf("repository at '%s' does not exist", targetPath)
+	}
+
+	// Fetch latest changes from remote
+	fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin")
+	fetchCmd.Dir = fullPath
+
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return false, fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+
+		fetchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	if output, err := fetchCmd.CombinedOutput(); err != nil {
+		return false, fmt.Errorf("failed to fetch repository: %w\nOutput: %s", err, string(output))
+	}
+
+	// Get current branch
+	branch := config.Branch
+	if branch == "" {
+		currentBranch, err := m.GetCurrentBranch(ctx, targetPath)
+		if err != nil {
+			return false, fmt.Errorf("failed to get current branch: %w", err)
+		}
+		branch = currentBranch
+	}
+
+	// Check if local branch is behind remote
+	// git rev-list HEAD..origin/<branch> --count
+	revListCmd := exec.CommandContext(ctx, "git", "rev-list", fmt.Sprintf("HEAD..origin/%s", branch), "--count")
+	revListCmd.Dir = fullPath
+
+	output, err := revListCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check remote updates: %w", err)
+	}
+
+	count := strings.TrimSpace(string(output))
+	return count != "0", nil
+}
+
 // EnsureRepository ensures a repository is cloned and optionally updated
 func (m *Manager) EnsureRepository(ctx context.Context, config *orchestration.Repository, targetPath string) error {
 	fullPath := filepath.Join(m.workDir, targetPath)

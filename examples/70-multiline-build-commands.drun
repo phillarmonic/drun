@@ -1,0 +1,207 @@
+# Multiline Build Commands in Services
+# This example demonstrates the multiline string support in build commands
+
+version: 2.0
+
+project "multiline-builds" version "1.0":
+    parameter $environment defaults to "development"
+    parameter $version defaults to "1.0.0"
+
+# Example 1: Simple multiline build
+service "simple-frontend" in "./services/simple-frontend":
+    build:
+        required true
+        command "echo 'Installing dependencies...'
+npm install
+echo 'Running linter...'
+npm run lint
+echo 'Building application...'
+npm run build
+echo 'Build complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:3000"
+
+# Example 2: Build with line continuation
+service "api-gateway" in "./services/api-gateway":
+    build:
+        required true
+        command "docker build \
+            --tag api-gateway:latest \
+            --build-arg ENV={$environment} \
+            --build-arg VERSION={$version} \
+            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            ."
+    health check:
+        type "tcp"
+        endpoint "localhost:8080"
+
+# Example 3: Complex multi-step build with tests
+service "backend-api" in "./services/backend":
+    repository:
+        url "git@github.com:example/backend-api.git"
+        branch "main"
+        clone true
+    build:
+        required true
+        command "echo '═══════════════════════════════════'
+echo '  Building Backend API ({$version})'
+echo '═══════════════════════════════════'
+echo ''
+echo '📦 Installing dependencies...'
+go mod download
+echo '✓ Dependencies installed'
+echo ''
+echo '🧪 Running tests...'
+go test -v ./...
+echo '✓ Tests passed'
+echo ''
+echo '🔨 Building binary...'
+go build -ldflags=\"-X main.version={$version} -X main.environment={$environment}\" -o bin/api ./cmd/api
+echo '✓ Binary built: bin/api'
+echo ''
+echo '✅ Build complete for {$environment} environment'"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "30s"
+
+# Example 4: Monorepo build with multiple packages
+service "web-app" in "./services/webapp":
+    build:
+        required true
+        command "echo 'Building monorepo workspace...'
+echo ''
+# Install all workspace dependencies
+echo '📦 Installing workspace dependencies...'
+npm install --workspaces
+echo ''
+# Build shared packages first
+echo '🔧 Building shared packages...'
+npm run build --workspace=packages/shared
+echo ''
+# Build frontend
+echo '🎨 Building frontend...'
+cd packages/frontend
+npm run test
+npm run build
+cd ../..
+echo ''
+# Build backend
+echo '⚙️  Building backend...'
+cd packages/backend
+go mod download
+go test ./...
+go build -o ../../bin/server
+cd ../..
+echo ''
+echo '✅ Monorepo build complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:3000"
+
+# Example 5: Build with conditional steps and variable interpolation
+service "microservice" in "./services/microservice":
+    build:
+        required true
+        command "echo 'Starting build for {$environment}...'
+echo ''
+# Set build flags based on environment
+if [ \"{$environment}\" = \"production\" ]; then
+    echo '🏭 Production build mode'
+    BUILD_FLAGS=\"-tags production -ldflags='-s -w'\"
+else
+    echo '🔧 Development build mode'
+    BUILD_FLAGS=\"-race\"
+fi
+echo ''
+# Download dependencies
+echo '📦 Downloading Go modules...'
+go mod download
+go mod verify
+echo ''
+# Run security checks
+echo '🔒 Running security checks...'
+go list -json -m all | nancy sleuth
+echo ''
+# Run tests
+echo '🧪 Running tests...'
+go test -cover ./...
+echo ''
+# Build the application
+echo '🔨 Building microservice...'
+go build $BUILD_FLAGS -o bin/service ./cmd/service
+echo ''
+# Generate build info
+echo '{$version}' > bin/VERSION
+echo '{$environment}' > bin/ENVIRONMENT
+echo ''
+echo '✅ Build complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:9000/health"
+
+# Example 6: Docker build with custom Dockerfile
+service "containerized-app" in "./services/containerized":
+    build:
+        required true
+        command "echo 'Building container image...'
+# Build multi-stage Docker image
+docker build \
+    -f Dockerfile.{$environment} \
+    -t myapp:{$version}-{$environment} \
+    --build-arg VERSION={$version} \
+    --build-arg BUILD_DATE=\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\" \
+    --target production \
+    .
+echo 'Container image built successfully'
+# Tag as latest for this environment
+docker tag myapp:{$version}-{$environment} myapp:latest-{$environment}
+echo 'Tagged as latest-{$environment}'"
+    health check:
+        type "docker"
+        container "containerized-app"
+
+# Create orchestration group
+orchestrate "build-stack":
+    services [
+        "simple-frontend",
+        "api-gateway",
+        "backend-api",
+        "web-app",
+        "microservice",
+        "containerized-app"
+    ]
+    strategy "sequential"
+    circuit true
+
+# Task to build all services
+task "build:all" means "Build all services":
+    info "🚀 Building all services in the stack..."
+    orchestrate "build-stack" build
+    success "✅ All services built successfully!"
+
+# Task to build and start all services
+task "up" means "Build and start all services":
+    info "🚀 Building and starting the complete stack..."
+    orchestrate "build-stack" start
+    success "✅ All services are running!"
+
+# Task to stop all services
+task "down" means "Stop all services":
+    info "🛑 Stopping all services..."
+    orchestrate "build-stack" stop
+    success "✅ All services stopped"
+
+# Task to check status
+task "status" means "Check service status":
+    info "📊 Checking service status..."
+    orchestrate "build-stack" status
+
+task "default":
+    info "Available tasks:"
+    info "  • build:all - Build all services"
+    info "  • up        - Build and start all services"
+    info "  • down      - Stop all services"
+    info "  • status    - Check service status"
+

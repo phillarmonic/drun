@@ -253,7 +253,7 @@ func (oe *OrchestrationExecutor) StartService(ctx context.Context, execCtx *Exec
 				return fmt.Errorf("build failed: %w", err)
 			}
 		} else if service.Build.Command != "" {
-			if err := oe.executeCommand(ctx, service.Build.Command, service.Path); err != nil {
+			if err := oe.executeCommand(ctx, service.Build.Command, service.Path, service.Build.AllocateTTY); err != nil {
 				service.MarkFailed()
 				return fmt.Errorf("build command failed: %w", err)
 			}
@@ -426,14 +426,36 @@ func (oe *OrchestrationExecutor) executeTask(ctx context.Context, execCtx *Execu
 }
 
 // executeCommand executes a shell command
-func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, workDir string) error {
-	parts := strings.Fields(cmdStr)
-	if len(parts) == 0 {
+func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, workDir string, allocateTTY bool) error {
+	if cmdStr == "" {
 		return fmt.Errorf("empty command")
 	}
 
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	// Run command through shell to support operators like &&, ||, |, etc.
+	var cmd *exec.Cmd
+	if allocateTTY {
+		// Use script command to allocate a pseudo-TTY
+		// This allows commands like "docker compose exec" to work properly
+		cmd = exec.CommandContext(ctx, "script", "-q", "-c", cmdStr, "/dev/null")
+	} else {
+		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
+	}
+
 	cmd.Dir = filepath.Join(oe.workDir, workDir)
+	cmd.Env = os.Environ()
+
+	if allocateTTY {
+		// For TTY allocation, connect stdin
+		cmd.Stdin = os.Stdin
+		if oe.engine != nil && oe.engine.output != nil {
+			cmd.Stdout = oe.engine.output
+			cmd.Stderr = oe.engine.output
+		}
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("command failed: %w", err)
+		}
+		return nil
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

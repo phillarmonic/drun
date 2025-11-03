@@ -190,6 +190,7 @@ const (
 	PRE           // pre
 	JOBS          // jobs
 	VERBOSE       // verbose
+	ALLOCATE_TTY  // allocate_tty
 	SSH           // ssh
 	KEY           // key
 	FALLBACK      // fallback
@@ -779,6 +780,8 @@ func (t TokenType) String() string {
 		return "JOBS"
 	case VERBOSE:
 		return "VERBOSE"
+	case ALLOCATE_TTY:
+		return "ALLOCATE_TTY"
 	case SSH:
 		return "SSH"
 	case KEY:
@@ -1367,6 +1370,7 @@ var keywords = map[string]TokenType{
 	"pre":           PRE,
 	"jobs":          JOBS,
 	"verbose":       VERBOSE,
+	"allocate_tty":  ALLOCATE_TTY,
 	"ssh":           SSH,
 	"key":           KEY,
 	"fallback":      FALLBACK,

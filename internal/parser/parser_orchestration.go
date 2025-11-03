@@ -527,6 +527,13 @@ buildBody:
 			}
 			config.Verbose = p.curToken.Literal == "true"
 			p.nextToken()
+		case lexer.ALLOCATE_TTY:
+			if !p.expectPeek(lexer.BOOLEAN) {
+				p.addError("expected boolean for allocate_tty")
+				return nil
+			}
+			config.AllocateTTY = p.curToken.Literal == "true"
+			p.nextToken()
 		case lexer.RETRY:
 			if p.peekToken.Type == lexer.ON {
 				p.nextToken() // consume 'on'

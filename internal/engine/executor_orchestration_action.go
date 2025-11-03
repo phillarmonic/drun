@@ -99,7 +99,12 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		if err := e.runOrchestrationHook(ctx, orchestration.PreTask, orchestration.Name, "pre"); err != nil {
 			return err
 		}
-		return e.orchestrateStartWithProgress(ctx, orchestration, orderedServices, services)
+		return e.orchestrateStartWithProgress(ctx, orchestration, orderedServices, services, false, false)
+	case "up":
+		if err := e.runOrchestrationHook(ctx, orchestration.PreTask, orchestration.Name, "pre"); err != nil {
+			return err
+		}
+		return e.orchestrateUpWithProgress(ctx, orchestration, orderedServices, services)
 	case "stop":
 		errStop := e.orchestrateStopWithProgress(ctx, orchestration, orderedServices, services)
 		errHook := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
@@ -237,16 +242,10 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 		if stateErr != nil && e.verbose {
 			_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to confirm current state for %s: %v\n", serviceName, stateErr)
 		}
-		if alreadyHealthy && stateErr == nil {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s already running and healthy (skipping)\n", serviceName)
-			continue
-		}
 
-		if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
-			return err
-		}
-
-		// Clone/update repository if configured
+		// Check for repository updates first (if repository is configured)
+		hasRepoUpdates := false
+		needsClone := false
 		if service.Repository != nil {
 			workDir, err := os.Getwd()
 			if err != nil {
@@ -263,11 +262,73 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 				UpdateOnStart: service.Repository.UpdateOnStart,
 			}
 
-			_, _ = fmt.Fprintf(e.output, "    📦 Setting up repository for %s...\n", serviceName)
-			if err := repoManager.EnsureRepository(context.Background(), repoConfig, service.Path); err != nil {
-				return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+			// Check if repository exists
+			fullPath := filepath.Join(workDir, service.Path)
+			if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
+				// Repository doesn't exist, needs to be cloned
+				needsClone = true
+			} else {
+				// Repository exists, check for updates
+				_, _ = fmt.Fprintf(e.output, "    🔍 Checking for repository updates for %s...\n", serviceName)
+
+				hasUpdates, err := repoManager.HasRemoteUpdates(context.Background(), repoConfig, service.Path)
+				if err != nil {
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to check for updates for %s: %v\n", serviceName, err)
+					}
+					// If we can't check for updates, proceed with existing logic
+				} else {
+					hasRepoUpdates = hasUpdates
+					if hasUpdates {
+						_, _ = fmt.Fprintf(e.output, "    📥 Repository updates available for %s\n", serviceName)
+					}
+				}
 			}
+		}
+
+		// If service is already healthy and no repository updates, skip it
+		if alreadyHealthy && stateErr == nil && !hasRepoUpdates && !needsClone {
+			_, _ = fmt.Fprintf(e.output, "    ✓ %s already running and healthy (no updates)\n", serviceName)
+			continue
+		}
+
+		// Clone/update repository FIRST if configured
+		if service.Repository != nil {
+			workDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+
+			repoManager := repository.NewManager(workDir)
+			repoConfig := &orchestration.Repository{
+				URL:           service.Repository.URL,
+				Branch:        service.Repository.Branch,
+				Tag:           service.Repository.Tag,
+				SSHKey:        service.Repository.SSHKey,
+				Clone:         service.Repository.Clone,
+				UpdateOnStart: service.Repository.UpdateOnStart,
+			}
+
+			if needsClone {
+				// Repository doesn't exist, clone it
+				_, _ = fmt.Fprintf(e.output, "    📦 Cloning repository for %s...\n", serviceName)
+				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
+					return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
+				}
+			} else if hasRepoUpdates {
+				// Repository exists and has updates, pull them
+				_, _ = fmt.Fprintf(e.output, "    📥 Pulling repository updates for %s...\n", serviceName)
+				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
+					return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
+				}
+			}
+
 			_, _ = fmt.Fprintf(e.output, "    ✓ Repository ready for %s\n", serviceName)
+		}
+
+		// Run pre-task after repository is ready
+		if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
+			return err
 		}
 
 		if service.Build != nil && service.Build.Required {
@@ -570,7 +631,7 @@ func (e *Engine) orchestrateRecreate(ctx *ExecutionContext, orch *ast.Orchestrat
 		return err
 	}
 
-	return e.orchestrateStartWithProgress(ctx, orch, orderedServices, services)
+	return e.orchestrateStartWithProgress(ctx, orch, orderedServices, services, false, false)
 }
 
 // orchestrateDown stops and removes containers
@@ -883,7 +944,7 @@ func (e *Engine) executeBuildCommand(service *ast.ServiceStatement) error {
 		return err
 	}
 
-	return e.runShellCommandInDir(service.Build.Command, workDir, true)
+	return e.runShellCommandInDir(service.Build.Command, workDir, true, service.Build.AllocateTTY)
 }
 
 func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
@@ -905,7 +966,7 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 	}
 
 	for _, cmdStr := range service.Build.PreMakeCommands {
-		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose); err != nil {
+		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose, false); err != nil {
 			return fmt.Errorf("pre-make command failed: %w", err)
 		}
 	}
@@ -939,7 +1000,7 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 
 	if lastErr != nil {
 		if service.Build.FallbackCommand != "" {
-			if err := e.runShellCommandInDir(service.Build.FallbackCommand, workDir, true); err != nil {
+			if err := e.runShellCommandInDir(service.Build.FallbackCommand, workDir, true, service.Build.AllocateTTY); err != nil {
 				return fmt.Errorf("make command failed and fallback command also failed: %w", err)
 			}
 		} else if service.Build.RetryOnFailure && service.Build.MaxRetries > 0 {
@@ -950,7 +1011,7 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 	}
 
 	for _, cmdStr := range service.Build.PostMakeCommands {
-		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose); err != nil {
+		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose, false); err != nil {
 			return fmt.Errorf("post-make command failed: %w", err)
 		}
 	}
@@ -1008,19 +1069,31 @@ func (e *Engine) runMakeCommand(buildCfg *ast.BuildConfig, workDir string) error
 	return nil
 }
 
-func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool) error {
-	parts := strings.Fields(cmdStr)
-	if len(parts) == 0 {
+func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool, allocateTTY bool) error {
+	if cmdStr == "" {
 		return fmt.Errorf("empty command")
 	}
 
-	cmd := exec.CommandContext(context.Background(), parts[0], parts[1:]...)
+	// Run command through shell to support operators like &&, ||, |, etc.
+	var cmd *exec.Cmd
+	if allocateTTY {
+		// Use script command to allocate a pseudo-TTY
+		// This allows commands like "docker compose exec" to work properly
+		cmd = exec.CommandContext(context.Background(), "script", "-q", "-c", cmdStr, "/dev/null")
+	} else {
+		cmd = exec.CommandContext(context.Background(), "sh", "-c", cmdStr)
+	}
+
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
 
 	if verbose {
 		cmd.Stdout = e.output
 		cmd.Stderr = e.output
+		if allocateTTY {
+			// For TTY allocation, also connect stdin
+			cmd.Stdin = os.Stdin
+		}
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("command failed: %w", err)
 		}

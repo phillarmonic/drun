@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -199,9 +200,19 @@ func (pd *ProgressDisplay) RenderSummary() {
 	}
 }
 
+// orchestrateUpWithProgress brings up services with full rebuild and repository updates
+func (e *Engine) orchestrateUpWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	// "up" command: update repos on default branches and force rebuild
+	return e.orchestrateStartWithProgress(ctx, orch, orderedServices, services, true, true)
+}
+
 // orchestrateStartWithProgress starts services with BuildKit-style progress display
-func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🚀  Starting orchestration: %s\n", orch.Name)
+func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, updateRepos bool, forceBuild bool) error {
+	actionVerb := "Starting"
+	if updateRepos || forceBuild {
+		actionVerb = "Bringing up"
+	}
+	_, _ = fmt.Fprintf(e.output, "🚀  %s orchestration: %s\n", actionVerb, orch.Name)
 	_, _ = fmt.Fprintf(e.output, "   %d services in dependency order\n", len(orderedServices))
 	if orch.CircuitBreaker || orch.StopOnFailure {
 		_, _ = fmt.Fprintf(e.output, "   🔴  Circuit breaker: ENABLED - will stop all on failure\n")
@@ -241,34 +252,11 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 		if stateErr != nil && e.verbose {
 			_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to confirm current state for %s: %v\n", serviceName, stateErr)
 		}
-		if alreadyHealthy && stateErr == nil {
-			progress.CompleteService(serviceName, "Already running")
-			progress.RenderInline(serviceName)
-			continue
-		}
 
-		progress.UpdateService(serviceName, "starting", "Starting service...")
-		progress.RenderInline(serviceName)
-
-		if service.PreTask != "" {
-			progress.UpdateService(serviceName, "pre", fmt.Sprintf("Running pre-task %s...", service.PreTask))
-			progress.RenderInline(serviceName)
-
-			if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
-				progress.FailService(serviceName, err)
-				progress.RenderInline(serviceName)
-				return err
-			}
-
-			progress.UpdateService(serviceName, "starting", "Pre-task complete")
-			progress.RenderInline(serviceName)
-		}
-
-		// Clone/update repository if configured
+		// Check for repository updates first (if repository is configured)
+		hasRepoUpdates := false
+		needsClone := false
 		if service.Repository != nil {
-			progress.UpdateService(serviceName, "cloning", "Setting up repository...")
-			progress.RenderInline(serviceName)
-
 			workDir, err := os.Getwd()
 			if err != nil {
 				progress.FailService(serviceName, fmt.Errorf("failed to get working directory: %w", err))
@@ -286,24 +274,126 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				UpdateOnStart: service.Repository.UpdateOnStart,
 			}
 
-			if err := repoManager.EnsureRepository(context.Background(), repoConfig, service.Path); err != nil {
-				progress.FailService(serviceName, fmt.Errorf("repository setup failed: %w", err))
+			// Check if repository exists
+			fullPath := filepath.Join(workDir, service.Path)
+			if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
+				// Repository doesn't exist, needs to be cloned
+				needsClone = true
+			} else {
+				// Repository exists
+				if updateRepos {
+					// For "up" command: check if on default branch and force update
+					currentBranch, err := repoManager.GetCurrentBranch(context.Background(), service.Path)
+					if err == nil && (currentBranch == "main" || currentBranch == "master") {
+						hasRepoUpdates = true
+						_, _ = fmt.Fprintf(e.output, "\n  📥 Updating repository on default branch (%s) for %s\n", currentBranch, serviceName)
+					}
+				} else {
+					// For "start" command: only check for updates, don't force
+					progress.UpdateService(serviceName, "checking", "Checking for repository updates...")
+					progress.RenderInline(serviceName)
+
+					hasUpdates, err := repoManager.HasRemoteUpdates(context.Background(), repoConfig, service.Path)
+					if err != nil {
+						if e.verbose {
+							_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to check for updates for %s: %v\n", serviceName, err)
+						}
+						// If we can't check for updates, proceed with existing logic
+					} else {
+						hasRepoUpdates = hasUpdates
+						if hasUpdates {
+							_, _ = fmt.Fprintf(e.output, "\n  📥 Repository updates available for %s\n", serviceName)
+						}
+					}
+				}
+			}
+		}
+
+		// If service is already healthy and no repository updates and not forcing rebuild, skip it
+		if alreadyHealthy && stateErr == nil && !hasRepoUpdates && !needsClone && !forceBuild {
+			progress.CompleteService(serviceName, "Already running (no updates)")
+			progress.RenderInline(serviceName)
+			continue
+		}
+
+		// Clone/update repository FIRST if configured
+		if service.Repository != nil {
+			workDir, err := os.Getwd()
+			if err != nil {
+				progress.FailService(serviceName, fmt.Errorf("failed to get working directory: %w", err))
+				progress.RenderInline(serviceName)
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+
+			repoManager := repository.NewManager(workDir)
+			repoConfig := &orchestration.Repository{
+				URL:           service.Repository.URL,
+				Branch:        service.Repository.Branch,
+				Tag:           service.Repository.Tag,
+				SSHKey:        service.Repository.SSHKey,
+				Clone:         service.Repository.Clone,
+				UpdateOnStart: service.Repository.UpdateOnStart,
+			}
+
+			if needsClone {
+				// Repository doesn't exist, clone it
+				progress.UpdateService(serviceName, "cloning", "Cloning repository...")
 				progress.RenderInline(serviceName)
 
-				// Check if we should stop on failure
-				if orch.StopOnFailure || orch.CircuitBreaker {
-					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
-					return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
+					progress.FailService(serviceName, fmt.Errorf("repository clone failed: %w", err))
+					progress.RenderInline(serviceName)
+
+					if orch.StopOnFailure || orch.CircuitBreaker {
+						_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+						return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
+					}
+					return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
 				}
-				return fmt.Errorf("failed to setup repository for service '%s': %w", serviceName, err)
+			} else if hasRepoUpdates {
+				// Repository exists and has updates, pull them
+				progress.UpdateService(serviceName, "updating", "Pulling repository updates...")
+				progress.RenderInline(serviceName)
+
+				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
+					progress.FailService(serviceName, fmt.Errorf("repository update failed: %w", err))
+					progress.RenderInline(serviceName)
+
+					if orch.StopOnFailure || orch.CircuitBreaker {
+						_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+						return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
+					}
+					return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
+				}
+				_, _ = fmt.Fprintf(e.output, "  ✓ Repository updated for %s\n\n", serviceName)
 			}
 
 			progress.UpdateService(serviceName, "starting", "Repository ready")
 			progress.RenderInline(serviceName)
 		}
 
-		// Build the service if build is required
-		if service.Build != nil && service.Build.Required {
+		// Run pre-task if specified
+		if service.PreTask != "" {
+			progress.UpdateService(serviceName, "pre", fmt.Sprintf("Running pre-task %s...", service.PreTask))
+			progress.RenderInline(serviceName)
+
+			if err := e.runServiceHook(ctx, service.PreTask, serviceName, "pre"); err != nil {
+				progress.FailService(serviceName, err)
+				progress.RenderInline(serviceName)
+				return err
+			}
+
+			progress.UpdateService(serviceName, "starting", "Pre-task complete")
+			progress.RenderInline(serviceName)
+		}
+
+		// Now display "Starting service..." before build and start
+		progress.UpdateService(serviceName, "starting", "Starting service...")
+		progress.RenderInline(serviceName)
+
+		// Build the service if build is required OR if forceBuild is set
+		shouldBuild := (service.Build != nil && service.Build.Required) || forceBuild
+		if shouldBuild {
 			progress.UpdateService(serviceName, "building", "Building container...")
 			progress.RenderInline(serviceName)
 

@@ -199,6 +199,9 @@ Created 6 comprehensive examples:
 ### Build System
 - ✅ Makefile execution
 - ✅ Make targets and arguments
+- ✅ Shell command execution (supports multiline strings)
+- ✅ Line continuation with backslash
+- ✅ Variable interpolation in build commands
 - ✅ Parallel jobs
 - ✅ Pre/post commands
 - ✅ Retry on failure
@@ -246,8 +249,10 @@ service "api" in "./services/api" means "REST API":
         condition "200"
     build:
         required true
-        makefile "Makefile"
-        make_target "build"
+        command "npm install && npm test && npm run build"
+        # Alternatively, use Makefile:
+        # makefile "Makefile"
+        # make_target "build"
     compose:
         file "docker-compose.yml"
     environment:

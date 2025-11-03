@@ -64,6 +64,11 @@ task "start":
     orchestrate "full_stack" start
     success "All services running!"
 
+task "up":
+    info "📦 Bringing up full stack with fresh build..."
+    orchestrate "full_stack" up
+    success "All services rebuilt and running!"
+
 task "stop":
     info "🛑 Stopping services..."
     orchestrate "full_stack" stop
@@ -84,8 +89,11 @@ task "down":
 ### Running the Example
 
 ```bash
-# Start all services with dependency resolution
+# Start services (skip if already running and no updates detected)
 drun start
+
+# Bring up services (force rebuild and update repos on main/master)
+drun up
 
 # Check status
 drun status
@@ -96,6 +104,22 @@ drun stop
 # Remove all containers
 drun down
 ```
+
+### Difference Between `start` and `up`
+
+#### `orchestrate "stack" start`
+- ✅ Checks if services are healthy
+- ✅ Checks for repository updates (but doesn't force update)
+- ✅ Only rebuilds if `build: required true` is set
+- ✅ Skips services that are already running with no updates
+- 🎯 **Use for**: Quick starts when nothing has changed
+
+#### `orchestrate "stack" up`
+- ✅ Updates all repositories on default branches (main/master)
+- ✅ Forces rebuild of all services (even without `build: required`)
+- ✅ Recreates containers with latest code
+- ✅ Never skips services
+- 🎯 **Use for**: Development workflow, pulling latest changes, ensuring fresh build
 
 ## Service Declaration
 
@@ -248,7 +272,50 @@ The `update repositories` action will:
 
 ## Build Configuration
 
-The `build` block supports shell commands or Makefile targets with retries, timeouts, and fallbacks:
+The `build` block supports shell commands or Makefile targets with retries, timeouts, and fallbacks.
+
+### Simple Build Command
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        command "npm install && npm run build"
+```
+
+### Multiline Build Commands
+
+**The `command` field fully supports multiline strings**, enabling complex multi-step build processes:
+
+```drun
+service "backend" in "./backend":
+    build:
+        required true
+        command "echo 'Installing dependencies...'
+npm install
+echo 'Running tests...'
+npm test
+echo 'Building application...'
+npm run build
+echo 'Build complete!'"
+```
+
+### Line Continuation
+
+Use backslash (`\`) for line continuation to join lines without newlines:
+
+```drun
+service "frontend" in "./frontend":
+    build:
+        required true
+        command "docker build \
+            --tag myapp:latest \
+            --build-arg ENV=production \
+            --build-arg VERSION=1.0.0 \
+            ."
+```
+
+### Makefile-Based Builds
 
 ```drun
 service "api" in "./services/api":
@@ -264,7 +331,100 @@ service "api" in "./services/api":
         fallback_command "npm run build"
 ```
 
-When `required` is `true`, the engine honours the full configuration—running pre-/post-make commands, respecting timeouts, retrying on failure, and optionally executing `fallback_command`.
+### Build with Variable Interpolation
+
+```drun
+project "myapp" version "1.0":
+    parameter $environment defaults to "development"
+    parameter $version defaults to "1.0.0"
+
+service "api" in "./api":
+    build:
+        required true
+        command "echo 'Building for {$environment}...'
+go mod download
+go test ./...
+go build -ldflags=\"-X main.version={$version}\" -o bin/api
+echo 'Build complete for version {$version}'"
+```
+
+### Complex Real-World Example
+
+```drun
+service "web-app" in "./webapp":
+    repository:
+        url "git@github.com:acme/webapp.git"
+        branch "main"
+        clone true
+    build:
+        required true
+        command "echo 'Setting up monorepo build...'
+# Install all dependencies
+npm install --workspaces
+# Build frontend
+echo 'Building frontend...'
+cd packages/frontend
+npm run test
+npm run build
+cd ../..
+# Build backend
+echo 'Building backend...'
+cd packages/backend
+go mod download
+go test ./...
+go build -o ../../bin/server
+cd ../..
+echo 'Monorepo build complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+```
+
+### Build with TTY Allocation
+
+For commands that require interactive terminal access (like `docker compose exec`):
+
+```drun
+service "gateway" in "./celesta-gateway":
+    compose file "docker-compose.dev.yml"
+    build:
+        required true
+        allocate_tty true
+        command "make build && make init"
+    health check:
+        type "http"
+        endpoint "http://localhost:93/"
+```
+
+**When to use `allocate_tty`:**
+- ✅ When your build uses `docker compose exec` to run commands inside containers
+- ✅ When scripts require a TTY (resolves "input device is not a TTY" errors)
+- ✅ When commands need interactive terminal features
+- ❌ Not needed for regular shell commands, docker build, or make
+
+### Build Configuration Options
+
+When `required` is `true`, the engine honours the full configuration:
+
+- **command**: Shell command(s) to execute (supports multiline strings)
+- **allocate_tty**: Allocate a pseudo-TTY for the command (defaults to `false`)
+- **makefile**: Path to Makefile (alternative to command)
+- **make_target**: Specific Makefile target to execute
+- **make_args**: Additional arguments to pass to make
+- **makefile_timeout**: Maximum execution time for make command
+- **retry_on_failure**: Automatically retry on build failure
+- **max_retries**: Maximum number of retry attempts
+- **retry_delay**: Delay between retry attempts
+- **fallback_command**: Command to run if make fails
+
+**Key Features:**
+- ✅ **Multiline Support**: Write complex multi-step commands naturally
+- ✅ **Line Continuation**: Use `\` to join long single commands  
+- ✅ **Variable Interpolation**: Use `{$var}` syntax in build commands
+- ✅ **Escaped Quotes**: Use `\"` for quotes within commands
+- ✅ **TTY Allocation**: Enable for commands requiring terminal access
+- ✅ **Make Integration**: Alternative Makefile-based builds with fallback
+- ✅ **Retry Logic**: Automatic retries with configurable delays
 
 ## Environment File Management
 

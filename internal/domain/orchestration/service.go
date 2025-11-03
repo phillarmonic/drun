@@ -88,6 +88,7 @@ type BuildConfig struct {
 	MaxRetries       int
 	RetryDelay       time.Duration
 	FallbackCommand  string
+	AllocateTTY      bool
 }
 
 // ComposeConfig represents Docker Compose configuration

@@ -25,6 +25,9 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 	case lexer.START:
 		p.nextToken()
 		stmt.Action = "start"
+	case lexer.UP:
+		p.nextToken()
+		stmt.Action = "up"
 	case lexer.STOP:
 		p.nextToken()
 		stmt.Action = "stop"
