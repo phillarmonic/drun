@@ -436,7 +436,8 @@ func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, wor
 	if allocateTTY {
 		// Use script command to allocate a pseudo-TTY
 		// This allows commands like "docker compose exec" to work properly
-		cmd = exec.CommandContext(ctx, "script", "-q", "-c", cmdStr, "/dev/null")
+		// The -e flag ensures script returns the exit code of the child process
+		cmd = exec.CommandContext(ctx, "script", "-q", "-e", "-c", cmdStr, "/dev/null")
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 	}

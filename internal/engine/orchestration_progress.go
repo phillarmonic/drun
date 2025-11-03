@@ -583,6 +583,10 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 	}
 
 	progress.RenderSummary()
+
+	// Display HTTP service URLs
+	e.displayServiceURLs(orderedServices, services)
+
 	return nil
 }
 
@@ -625,4 +629,34 @@ func (e *Engine) orchestrateStopWithProgress(ctx *ExecutionContext, orch *ast.Or
 
 	_, _ = fmt.Fprintf(e.output, "\n✅ All services stopped\n")
 	return nil
+}
+
+// displayServiceURLs displays HTTP health check URLs for all services
+func (e *Engine) displayServiceURLs(orderedServices []string, services map[string]*ast.ServiceStatement) {
+	httpServices := []struct {
+		name string
+		url  string
+	}{}
+
+	// Collect all services with HTTP health checks
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		if service.HealthCheck != nil && service.HealthCheck.Type == "http" && service.HealthCheck.Endpoint != "" {
+			httpServices = append(httpServices, struct {
+				name string
+				url  string
+			}{
+				name: serviceName,
+				url:  service.HealthCheck.Endpoint,
+			})
+		}
+	}
+
+	// Display URLs if any found
+	if len(httpServices) > 0 {
+		_, _ = fmt.Fprintf(e.output, "\n🌐 Service URLs:\n")
+		for _, svc := range httpServices {
+			_, _ = fmt.Fprintf(e.output, "   • %s: %s\n", svc.name, svc.url)
+		}
+	}
 }
