@@ -48,16 +48,41 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 		stmt.Action = "down"
 	case lexer.UPDATE:
 		p.nextToken()
-		stmt.Action = "update"
+		// Check if next token is "repositories" for "update repositories" action
+		if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "repositories" {
+			p.nextToken() // consume "repositories"
+			stmt.Action = "update repositories"
+		} else {
+			stmt.Action = "update"
+		}
 	case lexer.SCALE:
 		p.nextToken()
 		stmt.Action = "scale"
+	case lexer.CLONE:
+		p.nextToken()
+		// Check if next token is "repositories" for "clone repositories" action
+		if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "repositories" {
+			p.nextToken() // consume "repositories"
+			stmt.Action = "clone repositories"
+		} else {
+			p.addError("expected 'repositories' after 'clone'")
+			return nil
+		}
 	case lexer.IDENT:
 		// Allow identifier for additional actions like "health_check", "logs", "sync"
 		p.nextToken()
 		switch p.curToken.Literal {
 		case "health_check", "health", "logs", "sync", "clone_repositories":
 			stmt.Action = p.curToken.Literal
+		case "clone":
+			// Check if next token is "repositories" for "clone repositories" action
+			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "repositories" {
+				p.nextToken() // consume "repositories"
+				stmt.Action = "clone repositories"
+			} else {
+				p.addError("unknown orchestration action: " + p.curToken.Literal)
+				return nil
+			}
 		default:
 			p.addError("unknown orchestration action: " + p.curToken.Literal)
 			return nil
@@ -81,11 +106,12 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 			}
 		case lexer.WITH:
 			// orchestrate "group" start with timeout "30s"
+			// orchestrate "group" update repositories with branch "main"
 			p.nextToken() // consume WITH
 			// Parse key-value pairs
 			for {
 				switch p.peekToken.Type {
-				case lexer.IDENT, lexer.CACHE:
+				case lexer.IDENT, lexer.CACHE, lexer.BRANCH:
 					p.nextToken()
 					key := p.curToken.Literal
 					if p.peekToken.Type == lexer.STRING {

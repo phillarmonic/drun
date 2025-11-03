@@ -5782,7 +5782,8 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `pull` - Pull latest images
 - `down` - Stop and remove containers
 - `logs` - Stream logs for the selected services (supports filters)
-- `clone_repositories` - Produce the repository cloning plan (dry-run execution)
+- `clone repositories` - Produce the repository cloning plan (dry-run execution)
+- `update repositories` - Update repositories to latest version (optionally filter by branch)
 
 #### Examples
 
@@ -5798,6 +5799,14 @@ task "restart_api":
 
 task "recreate_api":
     orchestrate "my_stack" recreate services ["api"] with cache "false"
+
+task "update_repos":
+    # Update all repositories
+    orchestrate "my_stack" update repositories
+
+task "update_main_branch":
+    # Update only repositories on main/master branch
+    orchestrate "my_stack" update repositories with branch "main"
 
 task "status":
     orchestrate "my_stack" status

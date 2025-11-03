@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/phillarmonic/drun/cmd/drun/app"
+	"github.com/phillarmonic/drun/cmd/xdrun/app"
 )
 
 // Version information (set at build time)

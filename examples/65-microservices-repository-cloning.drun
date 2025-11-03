@@ -88,7 +88,7 @@ orchestrate "all_services" means "Complete platform with cloning":
 
 task "setup_repositories" means "Clone all service repositories":
     info "Setting up service repositories..."
-    orchestrate "all_services" clone_repositories
+    orchestrate "all_services" clone repositories
     success "All repositories cloned!"
 
 task "start_all" means "Start all services with cloning":

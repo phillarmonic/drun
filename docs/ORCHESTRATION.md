@@ -221,6 +221,31 @@ service "api" in "./services/api":
 
 Use `url`, optional `branch` / `tag`, `ssh_key`, and flags (`clone`, `update_on_start`) to control behaviour. The `clone` flag defaults to `true` (auto-clone missing repositories), set to `false` to disable. Orchestrations may define a cloning order across services with `clone_order ["service-a", ...]` and a `clone_timeout`.
 
+### Updating Repositories
+
+You can update all repositories or filter by branch name:
+
+```drun
+task "update_all":
+    # Update all repositories in the orchestration
+    orchestrate "my_stack" update repositories
+
+task "update_main_branch":
+    # Update only repositories on main/master branch
+    orchestrate "my_stack" update repositories with branch "main"
+
+task "update_specific_services":
+    # Update specific services
+    orchestrate "my_stack" update repositories services ["api", "frontend"]
+```
+
+The `update repositories` action will:
+- Skip services without repository configuration
+- Skip repositories that aren't cloned locally
+- When a branch filter is specified, only update services currently on that branch (main/master are treated as equivalent)
+- Pull the latest changes from the remote branch
+- Provide a summary of updated, skipped, and failed repositories
+
 ## Build Configuration
 
 The `build` block supports shell commands or Makefile targets with retries, timeouts, and fallbacks:
@@ -299,7 +324,8 @@ The `orchestrate` action supports a growing list of verbs:
 | `pull`                     | Pull images for all targeted services                                            |
 | `down`                     | Tear down stacks in reverse dependency order                                     |
 | `logs`                     | Tail logs for the selected services (`service` filter optional)                  |
-| `clone_repositories`       | Report repository cloning order (dry-run for execution)                          |
+| `clone repositories`       | Report repository cloning order (dry-run for execution)                          |
+| `update repositories`      | Update repositories to latest version (optionally filter by branch)             |
 
 You can filter orchestration actions to specific services directly or via CLI parameters:
 

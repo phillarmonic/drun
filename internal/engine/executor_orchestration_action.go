@@ -15,7 +15,9 @@ import (
 
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/docker"
+	"github.com/phillarmonic/drun/internal/domain/orchestration"
 	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/internal/repository"
 )
 
 // executeOrchestration executes orchestration action statements from task bodies
@@ -130,8 +132,14 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		errDown := e.orchestrateDown(ctx, orchestration, orderedServices, services)
 		errHook := e.runOrchestrationHook(ctx, orchestration.PostTask, orchestration.Name, "post")
 		return errors.Join(errDown, errHook)
-	case "clone_repositories":
+	case "clone_repositories", "clone repositories":
 		return e.orchestrateCloneRepositories(orchestration, orderedServices, services)
+	case "update repositories":
+		branchFilter := ""
+		if branch, ok := orchestrStmt.Options["branch"]; ok {
+			branchFilter = branch
+		}
+		return e.orchestrateUpdateRepositories(context.Background(), orchestration, orderedServices, services, branchFilter)
 	default:
 		return fmt.Errorf("unknown orchestration action: %s", orchestrStmt.Action)
 	}
@@ -383,6 +391,105 @@ func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, or
 	}
 
 	return nil
+}
+
+// orchestrateUpdateRepositories updates repositories for services
+func (e *Engine) orchestrateUpdateRepositories(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, branchFilter string) error {
+	_, _ = fmt.Fprintf(e.output, "🔄 Updating repositories for orchestration: %s\n", orch.Name)
+	if branchFilter != "" {
+		_, _ = fmt.Fprintf(e.output, "  Filter: only updating services on branch '%s'\n", branchFilter)
+	}
+
+	// Get working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Create repository manager
+	repoManager := repository.NewManager(workDir)
+
+	updatedCount := 0
+	skippedCount := 0
+	errorCount := 0
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		if service.Repository == nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ℹ️  no repository configured, skipping\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Convert AST repository config to domain model
+		repoConfig := &orchestration.Repository{
+			URL:           service.Repository.URL,
+			Branch:        service.Repository.Branch,
+			Tag:           service.Repository.Tag,
+			SSHKey:        service.Repository.SSHKey,
+			Clone:         service.Repository.Clone,
+			UpdateOnStart: service.Repository.UpdateOnStart,
+		}
+
+		// Check if repository exists
+		fullPath := filepath.Join(workDir, service.Path)
+		gitPath := filepath.Join(fullPath, ".git")
+		if _, err := os.Stat(gitPath); os.IsNotExist(err) {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally, skipping update\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// If branch filter is specified, check current branch
+		if branchFilter != "" {
+			currentBranch, err := repoManager.GetCurrentBranch(ctx, service.Path)
+			if err != nil {
+				_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get current branch: %v\n", serviceName, err)
+				errorCount++
+				continue
+			}
+
+			// Normalize branch names for comparison (handle master/main aliases)
+			normalizedCurrent := normalizeBranchName(currentBranch)
+			normalizedFilter := normalizeBranchName(branchFilter)
+
+			if normalizedCurrent != normalizedFilter {
+				_, _ = fmt.Fprintf(e.output, "  %s: ⏭️  on branch '%s' (not '%s'), skipping\n", serviceName, currentBranch, branchFilter)
+				skippedCount++
+				continue
+			}
+		}
+
+		// Update the repository
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 updating...", serviceName)
+		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
+			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			errorCount++
+			continue
+		}
+
+		currentBranch, _ := repoManager.GetCurrentBranch(ctx, service.Path)
+		_, _ = fmt.Fprintf(e.output, " ✅ updated (branch: %s)\n", currentBranch)
+		updatedCount++
+	}
+
+	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d updated, %d skipped, %d errors\n", updatedCount, skippedCount, errorCount)
+
+	if errorCount > 0 {
+		return fmt.Errorf("repository update completed with %d error(s)", errorCount)
+	}
+
+	return nil
+}
+
+// normalizeBranchName normalizes branch names for comparison (handles master/main aliases)
+func normalizeBranchName(branch string) string {
+	branch = strings.ToLower(strings.TrimSpace(branch))
+	// Treat master and main as equivalent
+	if branch == "master" || branch == "main" {
+		return "main"
+	}
+	return branch
 }
 
 // orchestrateBuild builds all services
