@@ -23,6 +23,14 @@ type Interpolator struct {
 	resolveVariableOps func(expr string, ctx interface{}) string
 	resolveBuiltinOps  func(funcName string, operations string, ctx interface{}) (string, error)
 	resolveBuiltin     func(funcName string, args []string, ctx interface{}) (string, error)
+
+	// Error collection during interpolation
+	builtinErrors []string
+
+	// Future: allowedFailures can be used to allow specific builtins to fail silently
+	// Example: allowedFailures = map[string]bool{"optional_function": true}
+	// Currently unused - all builtin failures cause task failures for predictability
+	allowedFailures map[string]bool //nolint:unused
 }
 
 // NewInterpolator creates a new interpolator
@@ -86,6 +94,9 @@ func (i *Interpolator) Interpolate(s string, ctx Context) string {
 
 // InterpolateWithError performs variable and environment variable interpolation with error reporting
 func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string, error) {
+	// Reset error collection
+	i.builtinErrors = nil
+
 	// First pass: resolve ${VAR} environment variables (shell-style)
 	// Quick check: if there are no ${...} patterns, skip this phase
 	if strings.Contains(message, "${") {
@@ -189,6 +200,14 @@ func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string
 			return result, fmt.Errorf("undefined variable: {%s}", undefinedVars[0])
 		}
 		return result, fmt.Errorf("undefined variables: {%s}", strings.Join(undefinedVars, "}, {"))
+	}
+
+	// Check for builtin errors (e.g., secret() calls that failed)
+	if len(i.builtinErrors) > 0 {
+		if len(i.builtinErrors) == 1 {
+			return result, fmt.Errorf("%s", i.builtinErrors[0])
+		}
+		return result, fmt.Errorf("multiple errors: %s", strings.Join(i.builtinErrors, "; "))
 	}
 
 	return result, nil

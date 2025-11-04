@@ -1,6 +1,7 @@
 package interpolation
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -148,11 +149,19 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 		if i.resolveBuiltin != nil {
 			if result, err := i.resolveBuiltin(expr, nil, ctx); err == nil {
 				return result
+			} else {
+				// Builtin function failed - capture error for later reporting
+				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				return "" // Return empty to avoid printing literal
 			}
 		}
 		// Fall back to legacy non-context call
 		if result, err := builtins.CallBuiltinLegacy(expr); err == nil {
 			return result
+		} else {
+			// Builtin function failed - capture error for later reporting
+			i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+			return "" // Return empty to avoid printing literal
 		}
 	}
 
@@ -170,11 +179,19 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 			if i.resolveBuiltin != nil {
 				if result, err := i.resolveBuiltin(funcName, args, ctx); err == nil {
 					return result
+				} else {
+					// Builtin function failed - capture error for later reporting
+					i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+					return "" // Return empty to avoid printing literal
 				}
 			}
 			// Fall back to legacy non-context call
 			if result, err := builtins.CallBuiltinLegacy(funcName, args...); err == nil {
 				return result
+			} else {
+				// Builtin function failed - capture error for later reporting
+				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				return "" // Return empty to avoid printing literal
 			}
 		}
 	}
@@ -192,6 +209,10 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 				if builtins.IsBuiltin(funcName) {
 					if result, err := builtins.CallBuiltinLegacy(funcName, paramValue.AsString()); err == nil {
 						return result
+					} else {
+						// Builtin function failed - capture error for later reporting
+						i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+						return "" // Return empty to avoid printing literal
 					}
 				}
 			}
