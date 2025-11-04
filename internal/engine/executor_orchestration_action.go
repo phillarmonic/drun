@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -1077,10 +1078,7 @@ func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool, allo
 	// Run command through shell to support operators like &&, ||, |, etc.
 	var cmd *exec.Cmd
 	if allocateTTY {
-		// Use script command to allocate a pseudo-TTY
-		// This allows commands like "docker compose exec" to work properly
-		// The -e flag ensures script returns the exit code of the child process
-		cmd = exec.CommandContext(context.Background(), "script", "-q", "-e", "-c", cmdStr, "/dev/null")
+		cmd = e.createTTYCommand(cmdStr)
 	} else {
 		cmd = exec.CommandContext(context.Background(), "sh", "-c", cmdStr)
 	}
@@ -1107,6 +1105,20 @@ func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool, allo
 	}
 
 	return nil
+}
+
+// createTTYCommand creates a command with a pseudo-TTY allocated
+// This is OS-specific because Linux and macOS have different `script` command syntax
+func (e *Engine) createTTYCommand(cmdStr string) *exec.Cmd {
+	// Detect OS using runtime package
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS: script -q /dev/null sh -c "command"
+		return exec.CommandContext(context.Background(), "script", "-q", "/dev/null", "sh", "-c", cmdStr)
+	default:
+		// Linux and others: script -q -e -c "command" /dev/null
+		return exec.CommandContext(context.Background(), "script", "-q", "-e", "-c", cmdStr, "/dev/null")
+	}
 }
 
 func (e *Engine) resolveBuildWorkingDir(service *ast.ServiceStatement) (string, error) {

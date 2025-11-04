@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -434,10 +435,7 @@ func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, wor
 	// Run command through shell to support operators like &&, ||, |, etc.
 	var cmd *exec.Cmd
 	if allocateTTY {
-		// Use script command to allocate a pseudo-TTY
-		// This allows commands like "docker compose exec" to work properly
-		// The -e flag ensures script returns the exit code of the child process
-		cmd = exec.CommandContext(ctx, "script", "-q", "-e", "-c", cmdStr, "/dev/null")
+		cmd = oe.createTTYCommand(ctx, cmdStr)
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 	}
@@ -464,6 +462,20 @@ func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, wor
 	}
 
 	return nil
+}
+
+// createTTYCommand creates a command with a pseudo-TTY allocated
+// This is OS-specific because Linux and macOS have different `script` command syntax
+func (oe *OrchestrationExecutor) createTTYCommand(ctx context.Context, cmdStr string) *exec.Cmd {
+	// Detect OS using runtime package
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS: script -q /dev/null sh -c "command"
+		return exec.CommandContext(ctx, "script", "-q", "/dev/null", "sh", "-c", cmdStr)
+	default:
+		// Linux and others: script -q -e -c "command" /dev/null
+		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", cmdStr, "/dev/null")
+	}
 }
 
 func (oe *OrchestrationExecutor) isServiceRunningAndHealthy(ctx context.Context, service *orchestration.Service) (bool, error) {
