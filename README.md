@@ -1291,7 +1291,7 @@ Secrets can be stored in different scopes (namespaces):
 #### Add Secrets
 
 ```bash
-# Add to default namespace (prompts for value if not provided)
+# Add to default namespace (auto-detects project if in drun workspace, prompts for value)
 xdrun cmd:secret add api_key
 
 # Add with value directly (visible in command history - use with caution)
@@ -1303,23 +1303,29 @@ xdrun cmd:secret add api_key --masked
 # Add to global scope (shared across all projects)
 xdrun cmd:secret add --global shared_token "team-token-123"
 
-# Add to project scope (uses current directory name)
+# Add to project scope (auto-detects project name from drun config)
 xdrun cmd:secret add --project db_password "secret-pass"
 
 # Add to custom namespace
 xdrun cmd:secret add --namespace team-alpha team_key "alpha-secret"
 ```
 
+**Automatic Workspace Detection:**
+When you run `cmd:secret` commands without specifying a namespace, drun automatically detects your project name from the current workspace's `.drun/spec.drun` or configured drun file. This means:
+- If you're in a project directory with a drun config, secrets are automatically scoped to that project
+- No need to manually specify `--project` or remember to use the correct namespace
+- A message will inform you when auto-detection occurs
+
 #### List Secrets
 
 ```bash
-# List secrets in default namespace
+# List secrets in default namespace (auto-detects project if in workspace)
 xdrun cmd:secret list
 
 # List secrets in global scope
 xdrun cmd:secret list --global
 
-# List secrets in project scope
+# List secrets in project scope (auto-detects project name)
 xdrun cmd:secret list --project
 
 # List secrets in custom namespace
@@ -1336,13 +1342,13 @@ xdrun cmd:secret list-all --show-values
 #### Remove Secrets
 
 ```bash
-# Remove from default namespace
+# Remove from default namespace (auto-detects project if in workspace)
 xdrun cmd:secret remove api_key
 
 # Remove from global scope
 xdrun cmd:secret remove --global shared_token
 
-# Remove from project scope
+# Remove from project scope (auto-detects project name)
 xdrun cmd:secret rm --project db_password  # 'rm' is an alias
 
 # Remove from custom namespace
@@ -1414,7 +1420,10 @@ xdrun cmd:secret remove --project db_password
 - **macOS**: Keychain Access (`com.phillarmonic.drun` service)
 - **Windows**: Credential Manager (`drun:` prefix)
 - **Linux**: Secret Service API (GNOME Keyring, KWallet) with index file (`~/.drun/secrets-index.json`)
-- **Fallback**: AES-256-GCM encrypted file (`~/.drun/secrets.enc`) when native keychain unavailable
+- **Fallback**: AES-256-GCM encrypted file (`~/.drun/secrets.enc`) when native keychain is unavailable or inaccessible
+
+**Automatic Fallback:**
+If the platform keychain is unavailable or returns permission errors, drun automatically falls back to encrypted file storage. You'll see a message like "Using encrypted file storage" when this occurs. The fallback provides the same security guarantees with AES-256-GCM encryption.
 
 ### Help and Documentation
 

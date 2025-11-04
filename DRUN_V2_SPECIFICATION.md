@@ -4117,9 +4117,9 @@ drun v2 provides secure, built-in secrets management for storing and retrieving 
 
 ### Features
 
-- **Automatic Project Isolation**: Secrets are automatically namespaced by project name
+- **Automatic Project Isolation**: Secrets are automatically namespaced by project name from drun config
 - **Platform Integration**: Uses native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
-- **Encrypted Fallback**: AES-256-GCM encrypted file storage when platform keychain is unavailable
+- **Automatic Fallback**: Seamlessly falls back to AES-256-GCM encrypted file storage when platform keychain is unavailable or has permission issues
 - **Interpolation Support**: Access secrets directly in strings using `{secret('key')}`
 - **Namespace Override**: Optionally specify custom namespaces for shared secrets
 
@@ -4278,16 +4278,19 @@ xdrun cmd:secret remove <key> [flags]
 
 #### Namespace Flags
 
-- `--project`, `-p`: Use project scope (current directory name as namespace)
+- `--project`, `-p`: Use project scope (auto-detects project name from drun config)
 - `--global`, `-g`: Use global scope (shared across all projects)
 - `--namespace <name>`, `-n <name>`: Use custom namespace
+
+**Automatic Workspace Detection:**
+When you run `cmd:secret` commands without specifying a namespace, drun automatically detects your project name from the current workspace's `.drun/spec.drun` or configured drun file. This provides automatic project isolation without manual namespace management.
 
 #### Examples
 
 **Add Secrets:**
 
 ```bash
-# Add to default namespace (prompts for value)
+# Add to default namespace (auto-detects project if in workspace, prompts for value)
 xdrun cmd:secret add api_key
 
 # Add with masked input (secure)
@@ -4296,7 +4299,7 @@ xdrun cmd:secret add api_key --masked
 # Add to global scope
 xdrun cmd:secret add --global shared_token "team-token-123"
 
-# Add to project scope
+# Add to project scope (auto-detects project name from drun config)
 xdrun cmd:secret add --project db_password "secret-pass"
 
 # Add to custom namespace
@@ -4306,13 +4309,13 @@ xdrun cmd:secret add --namespace team-alpha team_key "alpha-secret"
 **List Secrets:**
 
 ```bash
-# List in default namespace
+# List in default namespace (auto-detects project if in workspace)
 xdrun cmd:secret list
 
 # List in global scope
 xdrun cmd:secret list --global
 
-# List in project scope
+# List in project scope (auto-detects project name)
 xdrun cmd:secret list --project
 
 # List all secrets across all namespaces
@@ -4325,13 +4328,13 @@ xdrun cmd:secret list --show-values
 **Remove Secrets:**
 
 ```bash
-# Remove from default namespace
+# Remove from default namespace (auto-detects project if in workspace)
 xdrun cmd:secret remove api_key
 
 # Remove from global scope
 xdrun cmd:secret rm --global shared_token  # 'rm' is an alias
 
-# Remove from project scope
+# Remove from project scope (auto-detects project name)
 xdrun cmd:secret delete --project db_password  # 'delete' is an alias
 ```
 
