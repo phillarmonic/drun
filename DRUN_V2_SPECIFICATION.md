@@ -6069,6 +6069,44 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 | Force rebuild | ❌ No | ✅ Yes |
 | **Use for** | Quick restarts | Development, fresh deploys |
 
+#### Resume from a Specific Service
+
+You can resume an orchestration from a specific service using the `starting from` modifier. This is useful when an orchestration fails partway through and you've fixed the issue. The system will verify that all dependencies before the specified service are running and healthy before starting from that point.
+
+**Syntax:**
+```drun
+orchestrate "<group_name>" <action> starting from "<service_name>"
+orchestrate "<group_name>" <action> starting from {$variable}
+orchestrate "<group_name>" <action> starting from $variable
+```
+
+**Example:**
+```drun
+task "up" means "Start the stack":
+    given $service defaults to empty
+    
+    when $service is not empty:
+        # Resume from a specific service if provided
+        orchestrate "my_stack" up starting from {$service}
+    otherwise:
+        # Start the full stack
+        orchestrate "my_stack" up
+```
+
+**Behavior:**
+1. Verifies all dependencies before `$service` are running and healthy
+2. If any dependency is not running or healthy, fails with an error
+3. If all dependencies are satisfied, starts from `$service` onwards in dependency order
+
+**Usage:**
+```bash
+# Start full stack
+xdrun up
+
+# Resume from 'api' service (assumes database, cache are already running)
+xdrun up service=api
+```
+
 #### Examples
 
 ```drun
@@ -6102,7 +6140,19 @@ task "show_api_logs":
     orchestrate "my_stack" logs service "api"
 ```
 
-Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings or interpolated values and are validated against the orchestration's service registry.
+Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings, variables (`$service`), or interpolated values (`{$service}`) and are validated against the orchestration's service registry.
+
+**Variable support in service filters:**
+```drun
+task "restart_service":
+    given $service defaults to empty
+    
+    when $service is not empty:
+        # All three syntaxes work:
+        orchestrate "stack" restart service "api"        # Literal
+        orchestrate "stack" restart service $service     # Variable
+        orchestrate "stack" restart service {$service}   # Interpolation
+```
 
 The `build` and `recreate` actions accept a `with cache "false"` modifier to disable Docker's build cache (`docker compose build --no-cache`) for services that need a completely fresh image.
 

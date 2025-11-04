@@ -173,6 +173,32 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 					stmt.Options["wait_for"] = p.curToken.Literal
 				}
 			}
+		case lexer.STARTING:
+			// orchestrate "group" up starting from "service-name"
+			// orchestrate "group" up starting from {$service}
+			p.nextToken() // consume STARTING
+			if p.peekToken.Type == lexer.FROM {
+				p.nextToken() // consume FROM
+				// Accept STRING, VARIABLE, or {VARIABLE} interpolation
+				switch p.peekToken.Type {
+				case lexer.STRING:
+					p.nextToken()
+					stmt.Options["starting_from"] = p.curToken.Literal
+				case lexer.VARIABLE:
+					p.nextToken()
+					stmt.Options["starting_from"] = "{" + p.curToken.Literal + "}"
+				case lexer.LBRACE:
+					p.nextToken() // consume LBRACE
+					if p.expectPeek(lexer.VARIABLE) {
+						varName := p.curToken.Literal
+						if p.expectPeek(lexer.RBRACE) {
+							stmt.Options["starting_from"] = "{" + varName + "}"
+						}
+					}
+				default:
+					p.addError("expected service name as string, variable, or interpolation after 'from'")
+				}
+			}
 		default:
 			// No more options
 			return stmt

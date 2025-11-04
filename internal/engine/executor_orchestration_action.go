@@ -94,6 +94,44 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		orderedServices = filteredServices
 	}
 
+	// Handle "starting from" option for resuming orchestration
+	if startingFrom, ok := orchestrStmt.Options["starting_from"]; ok {
+		resolved := e.interpolateVariables(startingFrom, ctx)
+		if resolved == "" {
+			return fmt.Errorf("starting_from service name is empty after interpolation")
+		}
+
+		// Find the index of the starting service
+		startIdx := -1
+		for i, svc := range orderedServices {
+			if svc == resolved {
+				startIdx = i
+				break
+			}
+		}
+
+		if startIdx == -1 {
+			return fmt.Errorf("starting_from service '%s' not found in orchestration '%s'", resolved, orchestration.Name)
+		}
+
+		// Check that all dependencies before the starting service are running and healthy
+		_, _ = fmt.Fprintf(e.output, "🔍  Checking dependencies before '%s'...\n", resolved)
+		for i := 0; i < startIdx; i++ {
+			serviceName := orderedServices[i]
+			service := services[serviceName]
+
+			healthy, err := e.serviceIsRunningAndHealthy(service)
+			if err != nil || !healthy {
+				return fmt.Errorf("cannot start from '%s': dependency '%s' is not running or healthy (run full 'up' first)", resolved, serviceName)
+			}
+			_, _ = fmt.Fprintf(e.output, "  ✓ %s is running and healthy\n", serviceName)
+		}
+
+		// Filter to start from the specified service onwards
+		_, _ = fmt.Fprintf(e.output, "✅ All dependencies satisfied. Starting from '%s'...\n\n", resolved)
+		orderedServices = orderedServices[startIdx:]
+	}
+
 	// Execute the action
 	switch orchestrStmt.Action {
 	case "start":

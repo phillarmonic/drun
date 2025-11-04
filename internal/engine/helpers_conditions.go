@@ -16,7 +16,8 @@ import (
 func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
 	// For conditions, we only need to check simple variable references like "$var is value"
 	// Complex expressions in conditions are handled by the condition evaluation itself
-	re := regexp.MustCompile(`\$\w+`)
+	// Match variables with alphanumeric, underscore, hyphen, and dot characters
+	re := regexp.MustCompile(`\$[\w.-]+`)
 	matches := re.FindAllString(condition, -1)
 
 	var undefinedVars []string

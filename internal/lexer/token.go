@@ -62,6 +62,7 @@ const (
 	TAG       // tag
 	REMOVE    // remove
 	START     // start
+	STARTING  // starting
 	STOP      // stop
 	UP        // up
 	DOWN      // down
@@ -540,6 +541,8 @@ func (t TokenType) String() string {
 		return "REMOVE"
 	case START:
 		return "START"
+	case STARTING:
+		return "STARTING"
 	case STOP:
 		return "STOP"
 	case UP:
@@ -1250,6 +1253,7 @@ var keywords = map[string]TokenType{
 	"tag":           TAG,
 	"remove":        REMOVE,
 	"start":         START,
+	"starting":      STARTING,
 	"stop":          STOP,
 	"up":            UP,
 	"down":          DOWN,
