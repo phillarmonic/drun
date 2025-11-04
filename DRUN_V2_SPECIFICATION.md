@@ -4253,6 +4253,114 @@ run "deploy --token {secret('deploy_token', '', 'ci-secrets')}"
 run "curl -u admin:{secret('password')} https://api.example.com"
 ```
 
+### CLI Secret Management
+
+In addition to managing secrets within tasks, drun provides a standalone `cmd:secret` command for managing secrets directly from the command line. This is useful for:
+
+- Setting up secrets before running tasks
+- Managing secrets across multiple projects
+- Inspecting and listing stored secrets
+- Team collaboration via shared namespaces
+
+#### Command Syntax
+
+```bash
+# Add secrets
+xdrun cmd:secret add <key> [value] [flags]
+
+# List secrets
+xdrun cmd:secret list [flags]
+xdrun cmd:secret list-all [flags]
+
+# Remove secrets
+xdrun cmd:secret remove <key> [flags]
+```
+
+#### Namespace Flags
+
+- `--project`, `-p`: Use project scope (current directory name as namespace)
+- `--global`, `-g`: Use global scope (shared across all projects)
+- `--namespace <name>`, `-n <name>`: Use custom namespace
+
+#### Examples
+
+**Add Secrets:**
+
+```bash
+# Add to default namespace (prompts for value)
+xdrun cmd:secret add api_key
+
+# Add with masked input (secure)
+xdrun cmd:secret add api_key --masked
+
+# Add to global scope
+xdrun cmd:secret add --global shared_token "team-token-123"
+
+# Add to project scope
+xdrun cmd:secret add --project db_password "secret-pass"
+
+# Add to custom namespace
+xdrun cmd:secret add --namespace team-alpha team_key "alpha-secret"
+```
+
+**List Secrets:**
+
+```bash
+# List in default namespace
+xdrun cmd:secret list
+
+# List in global scope
+xdrun cmd:secret list --global
+
+# List in project scope
+xdrun cmd:secret list --project
+
+# List all secrets across all namespaces
+xdrun cmd:secret list-all
+
+# Show secret values (use with caution)
+xdrun cmd:secret list --show-values
+```
+
+**Remove Secrets:**
+
+```bash
+# Remove from default namespace
+xdrun cmd:secret remove api_key
+
+# Remove from global scope
+xdrun cmd:secret rm --global shared_token  # 'rm' is an alias
+
+# Remove from project scope
+xdrun cmd:secret delete --project db_password  # 'delete' is an alias
+```
+
+#### Using CLI-Managed Secrets in Tasks
+
+Secrets managed via CLI are accessible in tasks using the `secret()` function:
+
+```drun
+version: 2.0
+project "my-app" version "1.0":
+
+task "deploy":
+  # Access project-scoped secret
+  info "Deploying with key: {secret('api_key')}"
+  
+  # Access global secret
+  info "Team token: {secret('shared_token', '', 'global')}"
+  
+  # Access custom namespace secret
+  info "Alpha key: {secret('team_key', '', 'team-alpha')}"
+```
+
+#### Security Notes
+
+1. **Masked Input**: Use `--masked` flag for secure password entry
+2. **Command History**: Avoid passing secrets directly on command line
+3. **Show Values**: Only use `--show-values` in secure environments
+4. **Platform Storage**: Secrets stored in native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+
 ### Best Practices
 
 1. **Use Project Namespaces**: Let drun automatically scope secrets to projects

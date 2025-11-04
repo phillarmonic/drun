@@ -75,7 +75,8 @@ Built-in Commands:
   xdrun cmd:completion bash      # Generate shell completion
   xdrun cmd:from makefile        # Convert Makefile to drun
   xdrun cmd:dump-env             # Dump all environment variables
-  xdrun cmd:link services/api    # Link directories to this task file`,
+  xdrun cmd:link services/api    # Link directories to this task file
+  xdrun cmd:secret add key       # Manage secrets (add, remove, list)`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: CompleteTaskNames,
@@ -135,6 +136,7 @@ func (a *App) setupCommands() {
 	a.rootCmd.AddCommand(a.createLinkCommand())
 	a.rootCmd.AddCommand(a.createUnlinkCommand())
 	a.rootCmd.AddCommand(a.createUnlinkAllCommand())
+	a.rootCmd.AddCommand(a.createSecretsCommand())
 }
 
 // run is the main command handler

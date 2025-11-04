@@ -3,24 +3,47 @@
 package secrets
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/zalando/go-keyring"
 )
 
 // SecretServiceBackend provides Linux Secret Service storage (GNOME Keyring, KWallet)
+// with an index file for listing keys
 type SecretServiceBackend struct {
-	service string
+	service   string
+	indexPath string
+	mu        sync.RWMutex
 }
 
 // NewSecretServiceBackend creates a new Linux Secret Service backend
 func NewSecretServiceBackend() (Backend, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "."
+	}
+
+	secretsDir := filepath.Join(homeDir, ".drun")
+	_ = os.MkdirAll(secretsDir, 0700)
+
+	indexPath := filepath.Join(secretsDir, "secrets-index.json")
+
 	return &SecretServiceBackend{
-		service: "drun",
+		service:   "drun",
+		indexPath: indexPath,
 	}, nil
 }
 
 // Set stores a secret in the secret service
 func (s *SecretServiceBackend) Set(key, value string) error {
-	return keyring.Set(s.service, key, value)
+	if err := keyring.Set(s.service, key, value); err != nil {
+		return err
+	}
+	// Update index
+	return s.addToIndex(key)
 }
 
 // Get retrieves a secret from the secret service
@@ -41,7 +64,8 @@ func (s *SecretServiceBackend) Delete(key string) error {
 	if err != nil && err != keyring.ErrNotFound {
 		return err
 	}
-	return nil
+	// Update index
+	return s.removeFromIndex(key)
 }
 
 // Exists checks if a secret exists in the secret service
@@ -57,12 +81,84 @@ func (s *SecretServiceBackend) Exists(key string) (bool, error) {
 }
 
 // List returns all secret keys
-// Note: The go-keyring library doesn't support listing all keys,
-// so we fall back to the fallback backend for this operation
 func (s *SecretServiceBackend) List() ([]string, error) {
-	// Unfortunately, the freedesktop.org Secret Service API and go-keyring
-	// don't provide a way to list all keys for a service.
-	// We would need to maintain a separate index or use a different approach.
-	// For now, return an empty list or implement a workaround.
-	return []string{}, nil
+	return s.loadIndex()
+}
+
+// addToIndex adds a key to the index file
+func (s *SecretServiceBackend) addToIndex(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	keys, err := s.loadIndexUnsafe()
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Check if key already exists
+	for _, k := range keys {
+		if k == key {
+			return nil // Already in index
+		}
+	}
+
+	keys = append(keys, key)
+	return s.saveIndexUnsafe(keys)
+}
+
+// removeFromIndex removes a key from the index file
+func (s *SecretServiceBackend) removeFromIndex(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	keys, err := s.loadIndexUnsafe()
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Filter out the key
+	newKeys := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if k != key {
+			newKeys = append(newKeys, k)
+		}
+	}
+
+	return s.saveIndexUnsafe(newKeys)
+}
+
+// loadIndex loads the index file (thread-safe)
+func (s *SecretServiceBackend) loadIndex() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.loadIndexUnsafe()
+}
+
+// loadIndexUnsafe loads the index file (not thread-safe, caller must lock)
+func (s *SecretServiceBackend) loadIndexUnsafe() ([]string, error) {
+	data, err := os.ReadFile(s.indexPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	var keys []string
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
+// saveIndexUnsafe saves the index file (not thread-safe, caller must lock)
+func (s *SecretServiceBackend) saveIndexUnsafe(keys []string) error {
+	data, err := json.Marshal(keys)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(s.indexPath, data, 0600)
 }
