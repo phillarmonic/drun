@@ -3,7 +3,7 @@
 
 version: 2.0
 
-project "Drunp" version "2.0":
+project "Drun" version "2.0":
 
 
 task "default" means "Welcome to drun v2":
@@ -25,6 +25,11 @@ task "sec-strict" means "Security tests":
 task "sec" means "Security checks (high)":
 	info "Running gosec (setting to high only)"
 	run "gosec -severity high ./..."
+
+task "install" means "Install xdrun with build info":
+	info "Installing xdrun with embedded build date/time..."
+	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
+	success "xdrun installed to $GOPATH/bin"
 
 task "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
