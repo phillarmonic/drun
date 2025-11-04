@@ -269,19 +269,28 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 				// Repository doesn't exist, needs to be cloned
 				needsClone = true
 			} else {
-				// Repository exists, check for updates
-				_, _ = fmt.Fprintf(e.output, "    🔍 Checking for repository updates for %s...\n", serviceName)
-
-				hasUpdates, err := repoManager.HasRemoteUpdates(context.Background(), repoConfig, service.Path)
-				if err != nil {
+				// Repository exists - check if we should update it
+				// Respect the "update on start" setting
+				if !service.Repository.UpdateOnStart {
+					// Skip update check if explicitly disabled
 					if e.verbose {
-						_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to check for updates for %s: %v\n", serviceName, err)
+						_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Repository update disabled for %s (update on start: false)\n", serviceName)
 					}
-					// If we can't check for updates, proceed with existing logic
 				} else {
-					hasRepoUpdates = hasUpdates
-					if hasUpdates {
-						_, _ = fmt.Fprintf(e.output, "    📥 Repository updates available for %s\n", serviceName)
+					// Check for updates
+					_, _ = fmt.Fprintf(e.output, "    🔍 Checking for repository updates for %s...\n", serviceName)
+
+					hasUpdates, err := repoManager.HasRemoteUpdates(context.Background(), repoConfig, service.Path)
+					if err != nil {
+						if e.verbose {
+							_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Unable to check for updates for %s: %v\n", serviceName, err)
+						}
+						// If we can't check for updates, proceed with existing logic
+					} else {
+						hasRepoUpdates = hasUpdates
+						if hasUpdates {
+							_, _ = fmt.Fprintf(e.output, "    📥 Repository updates available for %s\n", serviceName)
+						}
 					}
 				}
 			}

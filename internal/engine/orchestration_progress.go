@@ -280,8 +280,14 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				// Repository doesn't exist, needs to be cloned
 				needsClone = true
 			} else {
-				// Repository exists
-				if updateRepos {
+				// Repository exists - check if we should update it
+				// Respect the "update on start" setting
+				if !service.Repository.UpdateOnStart {
+					// Skip update check if explicitly disabled
+					if e.verbose {
+						_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Repository update disabled for %s (update on start: false)\n", serviceName)
+					}
+				} else if updateRepos {
 					// For "up" command: check if on default branch and force update
 					currentBranch, err := repoManager.GetCurrentBranch(context.Background(), service.Path)
 					if err == nil && (currentBranch == "main" || currentBranch == "master") {
