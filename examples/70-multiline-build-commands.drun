@@ -164,7 +164,14 @@ echo 'Tagged as latest-{$environment}'"
 
 # Create orchestration group
 orchestrate "build-stack":
-    services ["simple-frontend", "api-gateway", "backend-api", "web-app", "microservice", "containerized-app"]
+    services [
+        "simple-frontend",
+        "api-gateway",
+        "backend-api",
+        "web-app",
+        "microservice",
+        "containerized-app"
+    ]
     strategy "sequential"
     circuit true
 

@@ -1059,6 +1059,13 @@ orchestrateBody:
 }
 
 // parseOrchestrationStringArray parses an array of strings ["string1", "string2"]
+// Supports both single-line and multiline arrays:
+//
+//	services ["item1", "item2"]
+//	services [
+//	    "item1",
+//	    "item2"
+//	]
 func (p *Parser) parseOrchestrationStringArray() []string {
 	result := []string{}
 
@@ -1069,9 +1076,24 @@ func (p *Parser) parseOrchestrationStringArray() []string {
 
 	p.nextToken()
 
+	// Skip optional INDENT/NEWLINE after opening bracket
+	for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT {
+		p.nextToken()
+	}
+
 	for p.curToken.Type != lexer.RBRACKET && p.curToken.Type != lexer.EOF {
+		// Skip whitespace tokens (NEWLINE, INDENT, DEDENT)
+		if p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
+			p.nextToken()
+			continue
+		}
+
 		if p.curToken.Type == lexer.STRING {
 			result = append(result, p.curToken.Literal)
+		} else if p.curToken.Type == lexer.COMMA {
+			// Skip comma, it will be handled below
+			p.nextToken()
+			continue
 		} else {
 			p.addError(fmt.Sprintf("expected string in array, got %s", p.curToken.Type))
 			// Advance to avoid infinite loop
@@ -1081,9 +1103,23 @@ func (p *Parser) parseOrchestrationStringArray() []string {
 
 		p.nextToken()
 
-		if p.curToken.Type == lexer.COMMA {
+		// Skip optional whitespace after string
+		for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
 			p.nextToken()
 		}
+
+		if p.curToken.Type == lexer.COMMA {
+			p.nextToken()
+			// Skip optional whitespace after comma
+			for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
+		}
+	}
+
+	// Skip optional DEDENT/NEWLINE before closing bracket
+	for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
+		p.nextToken()
 	}
 
 	if p.curToken.Type != lexer.RBRACKET {
