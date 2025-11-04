@@ -39,8 +39,9 @@ type Backend interface {
 
 // DefaultManager implements Manager using platform-specific backends
 type DefaultManager struct {
-	backend   Backend
-	separator string // Separator for namespace:key format
+	backend     Backend
+	separator   string // Separator for namespace:key format
+	backendType string // Type of backend being used (for debugging)
 }
 
 // Logger interface for optional logging
@@ -76,6 +77,7 @@ func NewManager(opts ...ManagerOption) (Manager, error) {
 
 	// Select backend
 	var backend Backend
+	var backendType string
 	var err error
 
 	if config.forceFallback {
@@ -84,16 +86,18 @@ func NewManager(opts ...ManagerOption) (Manager, error) {
 		} else {
 			backend = NewFallbackBackend()
 		}
+		backendType = "fallback"
 	} else {
-		backend, err = detectBackend()
+		backend, backendType, err = detectBackendWithType()
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	mgr := &DefaultManager{
-		backend:   backend,
-		separator: ":",
+		backend:     backend,
+		separator:   ":",
+		backendType: backendType,
 	}
 
 	return mgr, nil
@@ -120,18 +124,56 @@ func WithFallbackLegacy() Option {
 	}
 }
 
-// detectBackend chooses the appropriate backend for the platform
-func detectBackend() (Backend, error) {
+// detectBackendWithType chooses the appropriate backend for the platform
+// Automatically falls back to encrypted storage if platform backend fails
+// Returns the backend and a string describing which backend is being used
+func detectBackendWithType() (Backend, string, error) {
+	var backend Backend
+	var err error
+
 	switch runtime.GOOS {
 	case "darwin":
-		return NewKeychainBackend()
+		backend, err = NewKeychainBackend()
+		if err != nil {
+			// Keychain not available, fall back to encrypted storage
+			return NewFallbackBackend(), "fallback (keychain unavailable)", nil
+		}
+		// Test if keychain is actually accessible
+		testKey := "drun-test-access"
+		testErr := backend.Set(testKey, "test")
+		if testErr != nil {
+			// Keychain access failed (permissions issue), fall back
+			return NewFallbackBackend(), "fallback (keychain permission denied)", nil
+		}
+		// Clean up test
+		_ = backend.Delete(testKey)
+		return backend, "keychain", nil
+
 	case "windows":
-		return NewCredentialBackend()
+		backend, err = NewCredentialBackend()
+		if err != nil {
+			// Credential Manager not available, fall back
+			return NewFallbackBackend(), "fallback (credential manager unavailable)", nil
+		}
+		return backend, "credential-manager", nil
+
 	case "linux":
-		return NewSecretServiceBackend()
+		backend, err = NewSecretServiceBackend()
+		if err != nil {
+			// Secret Service not available, fall back
+			return NewFallbackBackend(), "fallback (secret service unavailable)", nil
+		}
+		return backend, "secret-service", nil
+
 	default:
-		return NewFallbackBackend(), nil
+		return NewFallbackBackend(), "fallback", nil
 	}
+}
+
+// detectBackend chooses the appropriate backend for the platform (backward compatible)
+func detectBackend() (Backend, error) {
+	backend, _, err := detectBackendWithType()
+	return backend, err
 }
 
 // Set stores a secret value
@@ -279,6 +321,11 @@ func validateKey(key string) error {
 		return ErrInvalidKey
 	}
 	return nil
+}
+
+// GetBackendType returns the type of backend being used
+func (m *DefaultManager) GetBackendType() string {
+	return m.backendType
 }
 
 // ClearString clears a string from memory (best effort)

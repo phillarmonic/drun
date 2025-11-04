@@ -52,12 +52,15 @@ func createSecretAddCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <key> [value]",
 		Short: "Add or update a secret",
-		Long: `Add or update a secret in the keychain.
+		Long: `Add or update a secret in secure storage.
 
-By default, secrets are stored in the "default" namespace.
-Use --project to store in project scope (uses current directory name).
-Use --global to store in global scope.
-Use --namespace to specify a custom namespace.
+When run from a drun workspace, automatically uses the project namespace.
+Otherwise, secrets are stored in the "default" namespace.
+
+To override:
+  --project     Store in project scope (uses current directory name)
+  --global      Store in global scope
+  --namespace   Specify a custom namespace
 
 If no value is provided, you'll be prompted to enter it securely.`,
 		Args: cobra.RangeArgs(1, 2),
@@ -84,9 +87,9 @@ If no value is provided, you'll be prompted to enter it securely.`,
 			}
 
 			// Determine namespace
-			ns, err := determineNamespace(namespace, projectScope, globalScope)
-			if err != nil {
-				return err
+			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
+			if ns == "" {
+				return fmt.Errorf("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -95,12 +98,24 @@ If no value is provided, you'll be prompted to enter it securely.`,
 				return fmt.Errorf("failed to initialize secrets manager: %w", err)
 			}
 
+			// Show backend info if verbose or using fallback
+			if dm, ok := mgr.(*secrets.DefaultManager); ok {
+				backendType := dm.GetBackendType()
+				if strings.Contains(backendType, "fallback") {
+					fmt.Printf("ℹ️  Using encrypted storage (%s)\n", backendType)
+				}
+			}
+
 			// Store the secret
 			if err := mgr.Set(ns, key, secretValue); err != nil {
 				return fmt.Errorf("failed to store secret: %w", err)
 			}
 
-			fmt.Printf("✓ Secret '%s' stored in namespace '%s'\n", key, ns)
+			if isAutoDetected {
+				fmt.Printf("✓ Secret '%s' stored securely in project namespace '%s'\n", key, ns)
+			} else {
+				fmt.Printf("✓ Secret '%s' stored securely in namespace '%s'\n", key, ns)
+			}
 			return nil
 		},
 	}
@@ -126,20 +141,23 @@ func createSecretRemoveCommand() *cobra.Command {
 		Use:     "remove <key>",
 		Aliases: []string{"delete", "rm"},
 		Short:   "Remove a secret",
-		Long: `Remove a secret from the keychain.
+		Long: `Remove a secret from secure storage.
 
-By default, removes from the "default" namespace.
-Use --project to remove from project scope (uses current directory name).
-Use --global to remove from global scope.
-Use --namespace to specify a custom namespace.`,
+When run from a drun workspace, automatically uses the project namespace.
+Otherwise, removes from the "default" namespace.
+
+To override:
+  --project     Remove from project scope (uses current directory name)
+  --global      Remove from global scope
+  --namespace   Specify a custom namespace`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			// Determine namespace
-			ns, err := determineNamespace(namespace, projectScope, globalScope)
-			if err != nil {
-				return err
+			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
+			if ns == "" {
+				return fmt.Errorf("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -153,7 +171,11 @@ Use --namespace to specify a custom namespace.`,
 				return fmt.Errorf("failed to delete secret: %w", err)
 			}
 
-			fmt.Printf("✓ Secret '%s' removed from namespace '%s'\n", key, ns)
+			if isAutoDetected {
+				fmt.Printf("✓ Secret '%s' removed from project namespace '%s'\n", key, ns)
+			} else {
+				fmt.Printf("✓ Secret '%s' removed from namespace '%s'\n", key, ns)
+			}
 			return nil
 		},
 	}
@@ -180,18 +202,21 @@ func createSecretListCommand() *cobra.Command {
 		Short:   "List secrets in a namespace",
 		Long: `List all secrets in a specific namespace.
 
-By default, lists secrets from the "default" namespace.
-Use --project to list from project scope (uses current directory name).
-Use --global to list from global scope.
-Use --namespace to specify a custom namespace.
+When run from a drun workspace, automatically uses the project namespace.
+Otherwise, lists secrets from the "default" namespace.
+
+To override:
+  --project     List from project scope (uses current directory name)
+  --global      List from global scope
+  --namespace   Specify a custom namespace
 
 Note: By default, only secret keys are shown, not values.
 Use --show-values to display secret values (use with caution).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Determine namespace
-			ns, err := determineNamespace(namespace, projectScope, globalScope)
-			if err != nil {
-				return err
+			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
+			if ns == "" {
+				return fmt.Errorf("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -207,14 +232,23 @@ Use --show-values to display secret values (use with caution).`,
 			}
 
 			if len(keys) == 0 {
-				fmt.Printf("No secrets found in namespace '%s'\n", ns)
+				if isAutoDetected {
+					fmt.Printf("No secrets found in project namespace '%s'\n", ns)
+				} else {
+					fmt.Printf("No secrets found in namespace '%s'\n", ns)
+				}
 				return nil
 			}
 
 			// Sort keys for consistent output
 			sort.Strings(keys)
 
-			fmt.Printf("Secrets in namespace '%s':\n", ns)
+			if isAutoDetected {
+				fmt.Printf("Secrets in project namespace '%s':\n", ns)
+			} else {
+				fmt.Printf("Secrets in namespace '%s':\n", ns)
+			}
+
 			for _, key := range keys {
 				if showValues {
 					value, err := mgr.Get(ns, key)
@@ -317,8 +351,8 @@ Use --show-values to display secret values (use with caution).`,
 
 // Helper functions
 
-// determineNamespace determines which namespace to use based on flags
-func determineNamespace(namespace string, projectScope, globalScope bool) (string, error) {
+// determineNamespaceWithInfo determines which namespace to use and whether it was auto-detected
+func determineNamespaceWithInfo(namespace string, projectScope, globalScope bool) (string, bool) {
 	// Count how many options are set
 	options := 0
 	if namespace != "" {
@@ -333,29 +367,85 @@ func determineNamespace(namespace string, projectScope, globalScope bool) (strin
 
 	// Only one option should be set
 	if options > 1 {
-		return "", fmt.Errorf("only one of --namespace, --project, or --global can be specified")
+		return "", false
 	}
 
 	// Determine the namespace
 	if namespace != "" {
-		return namespace, nil
+		return namespace, false
 	}
 
 	if projectScope {
 		// Use current directory name as project name
 		cwd, err := os.Getwd()
 		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %w", err)
+			return "", false
 		}
-		return filepath.Base(cwd), nil
+		return filepath.Base(cwd), false
 	}
 
 	if globalScope {
-		return "global", nil
+		return "global", false
+	}
+
+	// Auto-detect workspace namespace if in a drun workspace
+	if workspaceNs := detectWorkspaceNamespace(); workspaceNs != "" {
+		return workspaceNs, true // Auto-detected!
 	}
 
 	// Default namespace
-	return "default", nil
+	return "default", false
+}
+
+// detectWorkspaceNamespace tries to detect if we're in a drun workspace
+// and returns the project name as the namespace
+func detectWorkspaceNamespace() string {
+	// Try to find a drun config file
+	configFile, err := FindConfigFile("")
+	if err != nil {
+		return ""
+	}
+
+	// Read the file
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return ""
+	}
+
+	// Parse to extract project name
+	projectName := extractProjectName(string(content))
+	return projectName
+}
+
+// extractProjectName extracts the project name from drun file content
+// Looks for: project "name" version "1.0":
+func extractProjectName(content string) string {
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Skip comments
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Look for project declaration: project "name" version ...
+		if strings.HasPrefix(line, "project ") {
+			// Extract the project name between quotes
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				projectNamePart := parts[1]
+				// Remove quotes
+				projectName := strings.Trim(projectNamePart, "\"'")
+				if projectName != "" {
+					return projectName
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
 // promptForSecret prompts for a secret value (masked input)
