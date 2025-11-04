@@ -104,8 +104,27 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 			stmt.ServiceFilters = p.parseOrchestrationStringArray()
 		case lexer.SERVICE:
 			p.nextToken() // consume SERVICE
-			if p.expectPeek(lexer.STRING) {
+			// Accept STRING, VARIABLE, or {VARIABLE} interpolation
+			switch p.peekToken.Type {
+			case lexer.STRING:
+				p.nextToken()
 				stmt.ServiceFilters = append(stmt.ServiceFilters, p.curToken.Literal)
+			case lexer.VARIABLE:
+				p.nextToken()
+				// Store variable with interpolation syntax so it can be resolved at runtime
+				stmt.ServiceFilters = append(stmt.ServiceFilters, "{"+p.curToken.Literal+"}")
+			case lexer.LBRACE:
+				// Handle {$variable} interpolation syntax
+				p.nextToken() // consume LBRACE
+				if p.expectPeek(lexer.VARIABLE) {
+					varName := p.curToken.Literal
+					if p.expectPeek(lexer.RBRACE) {
+						// Store with interpolation syntax
+						stmt.ServiceFilters = append(stmt.ServiceFilters, "{"+varName+"}")
+					}
+				}
+			default:
+				p.addError("expected service name as string, variable, or interpolation after 'service'")
 			}
 		case lexer.WITH:
 			// orchestrate "group" start with timeout "30s"
