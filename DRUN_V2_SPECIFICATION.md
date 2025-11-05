@@ -5993,6 +5993,8 @@ orchestrate "full_stack":
     strategy "dependency-based"
     circuit_breaker true
     health_check_interval "30s"
+    git_ssh_key "~/.ssh/id_rsa"
+    dns_checks ["api.local", "db.local", "frontend.local"]
 ```
 
 #### Properties
@@ -6006,6 +6008,8 @@ orchestrate "full_stack":
 - **makefile_order** / **makefile_timeout**: Cross-service build sequencing and timeout
 - **clone_order** / **clone_timeout**: Repository cloning sequencing and timeout
 - **pre_task** / **post_task**: Task hooks executed before start / after stop
+- **git_ssh_key**: Default SSH key path for all Git operations (services can override)
+- **dns_checks**: Array of domains to validate DNS resolution before orchestration actions
 
 #### Startup Strategies
 
@@ -6033,6 +6037,54 @@ orchestrate "workers":
     strategy "parallel"
 ```
 
+#### Git SSH Key Configuration
+
+Orchestrations can specify a default SSH key for all Git repository operations. This key is used as a fallback for any service that doesn't specify its own SSH key.
+
+```drun
+orchestrate "microservices":
+    services ["api", "frontend", "worker"]
+    strategy "dependency-based"
+    git_ssh_key "~/.ssh/id_rsa"
+```
+
+**Behavior:**
+- Services without their own `ssh_key` configuration will use the orchestration's key
+- Services with their own `ssh_key` configuration override the orchestration default
+- Supports path expansion (`~` for home directory)
+- Applied to all Git operations: clone, fetch, pull
+
+#### DNS Resolution Checks
+
+Orchestrations can validate that specific domains resolve before starting services. This is useful for catching missing `/etc/hosts` entries in local development environments.
+
+```drun
+orchestrate "local_stack":
+    services ["database", "api", "frontend"]
+    strategy "dependency-based"
+    dns_checks [
+        "api.local",
+        "db.local",
+        "frontend.local"
+    ]
+```
+
+**Behavior:**
+- DNS checks run before `start`, `up`, `down`, and `status` actions
+- Each domain has a 500ms timeout for fast failure detection
+- Failures are non-blocking warnings (orchestration continues)
+- Silent when all domains resolve (only shows output on failures)
+- Helpful warning message suggests adding entries to `/etc/hosts`
+
+**Example Output (on failure):**
+```
+🔍 DNS resolution check:
+   ❌ api.local - not resolvable
+
+⚠️  DNS resolution failed for: api.local
+These domains may need to be added to your /etc/hosts file
+```
+
 ### Orchestration Actions
 
 Use orchestration actions within task bodies to manage services.
@@ -6051,6 +6103,7 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `restart` - Stop then start services
 - `recreate` - Force a fresh deployment by running `down → build → start`
 - `status` - Show status of all services
+- `show-endpoints` / `endpoints` - List all service endpoints (URLs from health checks)
 - `health` / `health_check` - Re-evaluate service health and report failures
 - `build` - Build service images
 - `pull` - Pull latest images
@@ -6136,6 +6189,9 @@ task "update_main_branch":
 task "status":
     orchestrate "my_stack" status
 
+task "endpoints":
+    orchestrate "my_stack" show-endpoints
+
 task "show_api_logs":
     orchestrate "my_stack" logs service "api"
 ```
@@ -6165,6 +6221,39 @@ for each $service in $services:
     info "Ensuring {$service} is healthy"
     orchestrate "celesta-sb-stack" health services [$service]
 ```
+
+#### Show Endpoints
+
+The `show-endpoints` (alias: `endpoints`) action displays all service endpoints with health check URLs. This is useful for quickly accessing running services or sharing URLs with team members.
+
+```drun
+task "endpoints":
+    orchestrate "my_stack" show-endpoints
+```
+
+**Example Output:**
+```
+🌐 Service endpoints for orchestration: my_stack
+
+✅ Running services with endpoints:
+   • api: http://localhost:8080/health
+   • frontend: http://localhost:3000/
+   • admin: http://localhost:9000/admin
+
+✅ Running services (no endpoints):
+   • database
+   • redis
+
+⏹️  Stopped services:
+   • worker
+   • scheduler
+```
+
+**Behavior:**
+- Shows services grouped by status: running with endpoints, running without, stopped
+- Only displays URLs from HTTP health checks
+- Services without health checks appear in "running without endpoints"
+- Services that are not running appear in the stopped section
 
 ### Progress Display
 
