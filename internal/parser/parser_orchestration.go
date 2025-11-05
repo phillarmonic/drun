@@ -1038,6 +1038,15 @@ orchestrateBody:
 				stmt.MakefileOrder = p.parseOrchestrationStringArray()
 			case "clone_order":
 				stmt.CloneOrder = p.parseOrchestrationStringArray()
+			case "git_ssh_key":
+				if !p.expectPeek(lexer.STRING) {
+					p.addError("expected SSH key path string after 'git_ssh_key'")
+					return nil
+				}
+				stmt.GitSSHKey = p.curToken.Literal
+				p.nextToken()
+			case "dns_checks":
+				stmt.DNSChecks = p.parseOrchestrationStringArray()
 			default:
 				p.addError(fmt.Sprintf("unexpected identifier in orchestration body: %s", p.curToken.Literal))
 				p.nextToken()

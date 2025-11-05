@@ -351,6 +351,8 @@ type OrchestrateStatement struct {
 	UpdateStrategy      string
 	MaxUnavailable      int
 	UpdateTimeout       string
+	GitSSHKey           string   // Optional: default SSH key for git repository operations
+	DNSChecks           []string // Optional: domains to check DNS resolution for (warns if not resolvable)
 }
 
 func (os *OrchestrateStatement) statementNode()      {}

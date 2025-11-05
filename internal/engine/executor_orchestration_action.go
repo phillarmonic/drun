@@ -275,6 +275,12 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 		return fmt.Errorf("network provisioning failed: %w", err)
 	}
 
+	// Check DNS resolution for specified domains
+	if err := e.checkDNSResolution(orch); err != nil {
+		// DNS check failures are warnings, not errors
+		_, _ = fmt.Fprintf(e.output, "⚠️  %v\n\n", err)
+	}
+
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Starting %s...\n", serviceName)
@@ -294,11 +300,18 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			}
 
 			repoManager := repository.NewManager(workDir)
+
+			// Use orchestration's SSH key as fallback if service doesn't have one
+			sshKey := service.Repository.SSHKey
+			if sshKey == "" && orch.GitSSHKey != "" {
+				sshKey = orch.GitSSHKey
+			}
+
 			repoConfig := &orchestration.Repository{
 				URL:           service.Repository.URL,
 				Branch:        service.Repository.Branch,
 				Tag:           service.Repository.Tag,
-				SSHKey:        service.Repository.SSHKey,
+				SSHKey:        sshKey,
 				Clone:         service.Repository.Clone,
 				UpdateOnStart: service.Repository.UpdateOnStart,
 			}
@@ -350,11 +363,18 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			}
 
 			repoManager := repository.NewManager(workDir)
+
+			// Use orchestration's SSH key as fallback if service doesn't have one
+			sshKey := service.Repository.SSHKey
+			if sshKey == "" && orch.GitSSHKey != "" {
+				sshKey = orch.GitSSHKey
+			}
+
 			repoConfig := &orchestration.Repository{
 				URL:           service.Repository.URL,
 				Branch:        service.Repository.Branch,
 				Tag:           service.Repository.Tag,
-				SSHKey:        service.Repository.SSHKey,
+				SSHKey:        sshKey,
 				Clone:         service.Repository.Clone,
 				UpdateOnStart: service.Repository.UpdateOnStart,
 			}
@@ -438,6 +458,12 @@ func (e *Engine) orchestrateStop(ctx *ExecutionContext, orch *ast.OrchestrateSta
 // orchestrateStatus shows status of all services
 func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "📊 Status of orchestration: %s\n", orch.Name)
+
+	// Check DNS resolution for specified domains
+	if err := e.checkDNSResolution(orch); err != nil {
+		// DNS check failures are warnings, not errors
+		_, _ = fmt.Fprintf(e.output, "⚠️  %v\n\n", err)
+	}
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -630,11 +656,17 @@ func (e *Engine) orchestrateUpdateRepositories(ctx context.Context, orch *ast.Or
 		}
 
 		// Convert AST repository config to domain model
+		// Use orchestration's SSH key as fallback if service doesn't have one
+		sshKey := service.Repository.SSHKey
+		if sshKey == "" && orch.GitSSHKey != "" {
+			sshKey = orch.GitSSHKey
+		}
+
 		repoConfig := &orchestration.Repository{
 			URL:           service.Repository.URL,
 			Branch:        service.Repository.Branch,
 			Tag:           service.Repository.Tag,
-			SSHKey:        service.Repository.SSHKey,
+			SSHKey:        sshKey,
 			Clone:         service.Repository.Clone,
 			UpdateOnStart: service.Repository.UpdateOnStart,
 		}
@@ -760,6 +792,12 @@ func (e *Engine) orchestrateRecreate(ctx *ExecutionContext, orch *ast.Orchestrat
 // orchestrateDown stops and removes containers
 func (e *Engine) orchestrateDown(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
 	_, _ = fmt.Fprintf(e.output, "🗑️  Taking down orchestration: %s\n", orch.Name)
+
+	// Check DNS resolution for specified domains (helpful before any orchestration action)
+	if err := e.checkDNSResolution(orch); err != nil {
+		// DNS check failures are warnings, not errors
+		_, _ = fmt.Fprintf(e.output, "⚠️  %v\n\n", err)
+	}
 
 	for i := len(orderedServices) - 1; i >= 0; i-- {
 		serviceName := orderedServices[i]
@@ -1459,5 +1497,51 @@ func (e *Engine) checkAndProvisionNetworks(services map[string]*ast.ServiceState
 		}
 	}
 
+	return nil
+}
+
+// checkDNSResolution checks if specified domains resolve correctly
+func (e *Engine) checkDNSResolution(orch *ast.OrchestrateStatement) error {
+	if len(orch.DNSChecks) == 0 {
+		return nil
+	}
+
+	var failedDomains []string
+
+	// Use a custom resolver with timeout
+	resolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: 500 * time.Millisecond, // 500ms timeout per DNS query
+			}
+			return d.DialContext(ctx, network, address)
+		},
+	}
+
+	for _, domain := range orch.DNSChecks {
+		// Create context with short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+
+		// Try to resolve the domain with timeout
+		_, err := resolver.LookupHost(ctx, domain)
+		cancel()
+
+		if err != nil {
+			failedDomains = append(failedDomains, domain)
+		}
+	}
+
+	// Only show output if there are failures
+	if len(failedDomains) > 0 {
+		_, _ = fmt.Fprintf(e.output, "🔍 DNS resolution check:\n")
+		for _, domain := range failedDomains {
+			_, _ = fmt.Fprintf(e.output, "   ❌ %s - not resolvable\n", domain)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+		return fmt.Errorf("DNS resolution failed for: %s\nThese domains may need to be added to your /etc/hosts file", strings.Join(failedDomains, ", "))
+	}
+
+	// All domains resolved - no output needed
 	return nil
 }

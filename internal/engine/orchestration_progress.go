@@ -227,6 +227,12 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 		return fmt.Errorf("network provisioning failed: %w", err)
 	}
 
+	// Check DNS resolution for specified domains
+	if err := e.checkDNSResolution(orch); err != nil {
+		// DNS check failures are warnings, not errors
+		_, _ = fmt.Fprintf(e.output, "⚠️  %v\n\n", err)
+	}
+
 	// Initialize all services as pending
 	for _, name := range orderedServices {
 		progress.services[name] = &ServiceProgress{

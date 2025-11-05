@@ -470,12 +470,16 @@ orchestrate "all_services":
     clone_timeout "5m"
     pre_task "global_setup"
     post_task "global_cleanup"
+    git_ssh_key "~/.ssh/id_rsa"
+    dns_checks ["api.local", "db.local", "frontend.local"]
 ```
 
 - `health_check_interval` schedules background health monitoring after successful start.
 - `startup_timeout` / `shutdown_timeout` apply orchestration-wide SLA bounds.
 - `makefile_order`, `makefile_timeout`, `clone_order`, and `clone_timeout` coordinate builds and repository updates across services.
 - `pre_task` / `post_task` run only once per orchestration start/stop cycle.
+- `git_ssh_key` sets a default SSH key for all Git operations (services can override with their own SSH key).
+- `dns_checks` validates domain resolution before starting services, warning if domains don't resolve (useful for `/etc/hosts` entries).
 
 ## Orchestration Actions in Tasks
 
