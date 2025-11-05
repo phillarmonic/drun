@@ -163,6 +163,8 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		return e.orchestrateRecreate(ctx, orchestration, orderedServices, services, useCache)
 	case "status":
 		return e.orchestrateStatus(orchestration, orderedServices, services)
+	case "show-endpoints", "endpoints":
+		return e.orchestrateShowEndpoints(orchestration, orderedServices, services)
 	case "health", "health_check":
 		return e.orchestrateHealth(orchestration, orderedServices, services)
 	case "logs":
@@ -441,6 +443,79 @@ func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServic
 		service := services[serviceName]
 		status := e.getServiceStatus(service)
 		_, _ = fmt.Fprintf(e.output, "  %s: %s\n", serviceName, status)
+	}
+
+	return nil
+}
+
+// orchestrateShowEndpoints displays all service endpoints
+func (e *Engine) orchestrateShowEndpoints(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	_, _ = fmt.Fprintf(e.output, "🌐 Service endpoints for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "\n")
+
+	var runningWithEndpoints []struct {
+		name     string
+		endpoint string
+		status   string
+	}
+	var noEndpoint []string
+	var stopped []string
+
+	// Collect all service information
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		status := e.getServiceStatus(service)
+
+		if status != "running" {
+			stopped = append(stopped, serviceName)
+			continue
+		}
+
+		if service.HealthCheck == nil || service.HealthCheck.Endpoint == "" {
+			noEndpoint = append(noEndpoint, serviceName)
+			continue
+		}
+
+		runningWithEndpoints = append(runningWithEndpoints, struct {
+			name     string
+			endpoint string
+			status   string
+		}{
+			name:     serviceName,
+			endpoint: service.HealthCheck.Endpoint,
+			status:   status,
+		})
+	}
+
+	// Display running services with endpoints
+	if len(runningWithEndpoints) > 0 {
+		_, _ = fmt.Fprintf(e.output, "✅ Running services:\n")
+		for _, svc := range runningWithEndpoints {
+			_, _ = fmt.Fprintf(e.output, "   • %-20s %s\n", svc.name+":", svc.endpoint)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	}
+
+	// Display running services without endpoints
+	if len(noEndpoint) > 0 {
+		_, _ = fmt.Fprintf(e.output, "ℹ️  Running (no endpoint configured):\n")
+		for _, name := range noEndpoint {
+			_, _ = fmt.Fprintf(e.output, "   • %s\n", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	}
+
+	// Display stopped services
+	if len(stopped) > 0 {
+		_, _ = fmt.Fprintf(e.output, "⏹️  Stopped services:\n")
+		for _, name := range stopped {
+			_, _ = fmt.Fprintf(e.output, "   • %s\n", name)
+		}
+		_, _ = fmt.Fprintf(e.output, "\n")
+	}
+
+	if len(runningWithEndpoints) == 0 {
+		_, _ = fmt.Fprintf(e.output, "⚠️  No running services with endpoints found\n")
 	}
 
 	return nil

@@ -75,7 +75,7 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 		// Allow identifier for additional actions like "health_check", "logs", "sync"
 		p.nextToken()
 		switch p.curToken.Literal {
-		case "health_check", "health", "logs", "sync", "clone_repositories":
+		case "health_check", "health", "logs", "sync", "clone_repositories", "show-endpoints", "endpoints":
 			stmt.Action = p.curToken.Literal
 		case "clone":
 			// Check if next token is "repositories" for "clone repositories" action

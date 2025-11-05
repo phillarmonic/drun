@@ -81,6 +81,10 @@ task "status":
     info "📊 Service status:"
     orchestrate "full_stack" status
 
+task "endpoints":
+    info "🌐 Service endpoints:"
+    orchestrate "full_stack" show-endpoints
+
 task "down":
     info "🗑️  Removing containers..."
     orchestrate "full_stack" down
@@ -97,6 +101,9 @@ drun up
 
 # Check status
 drun status
+
+# View service endpoints
+drun endpoints
 
 # Stop gracefully (reverse order)
 drun stop
@@ -594,15 +601,16 @@ Use orchestration actions within task bodies to manage services:
 
 ### Available Actions
 
-| Action    | Description                            |
-| --------- | -------------------------------------- |
-| `start`   | Start all services in dependency order |
-| `stop`    | Stop all services in reverse order     |
-| `restart` | Stop then start services               |
-| `status`  | Show status of all services            |
-| `build`   | Build service images                   |
-| `pull`    | Pull latest images                     |
-| `down`    | Stop and remove containers             |
+| Action            | Description                            |
+| ----------------- | -------------------------------------- |
+| `start`           | Start all services in dependency order |
+| `stop`            | Stop all services in reverse order     |
+| `restart`         | Stop then start services               |
+| `status`          | Show status of all services            |
+| `show-endpoints`  | List all service endpoints             |
+| `build`           | Build service images                   |
+| `pull`            | Pull latest images                     |
+| `down`            | Stop and remove containers             |
 
 ### Action Examples
 
@@ -613,6 +621,9 @@ task "lifecycle-demo":
 
     # Check status
     orchestrate "my-stack" status
+
+    # View service endpoints
+    orchestrate "my-stack" show-endpoints
 
     # Restart specific services
     orchestrate "my-stack" restart services ["api"]
