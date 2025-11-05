@@ -958,7 +958,7 @@ func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*
 	return targetTask, namespace, nil
 }
 
-func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceStatement, allowFallback bool, useCache bool) error {
+func (e *Engine) performServiceBuild(ctx *ExecutionContext, service *ast.ServiceStatement, allowFallback bool, useCache bool) error {
 	buildCfg := service.Build
 	if buildCfg == nil {
 		if allowFallback {
@@ -968,11 +968,11 @@ func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceSt
 	}
 
 	if buildCfg.Makefile != "" {
-		return e.executeMakefileBuild(service)
+		return e.executeMakefileBuild(ctx, service)
 	}
 
 	if buildCfg.Command != "" {
-		return e.executeBuildCommand(service)
+		return e.executeBuildCommand(ctx, service)
 	}
 
 	if allowFallback || buildCfg.Required {
@@ -982,7 +982,7 @@ func (e *Engine) performServiceBuild(_ *ExecutionContext, service *ast.ServiceSt
 	return nil
 }
 
-func (e *Engine) executeBuildCommand(service *ast.ServiceStatement) error {
+func (e *Engine) executeBuildCommand(ctx *ExecutionContext, service *ast.ServiceStatement) error {
 	if service.Build == nil || service.Build.Command == "" {
 		return nil
 	}
@@ -992,10 +992,16 @@ func (e *Engine) executeBuildCommand(service *ast.ServiceStatement) error {
 		return err
 	}
 
-	return e.runShellCommandInDir(service.Build.Command, workDir, true, service.Build.AllocateTTY)
+	// Interpolate variables and secrets in the build command
+	interpolatedCommand, err := e.interpolateVariablesWithError(service.Build.Command, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to interpolate build command: %w", err)
+	}
+
+	return e.runShellCommandInDir(interpolatedCommand, workDir, true, service.Build.AllocateTTY)
 }
 
-func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
+func (e *Engine) executeMakefileBuild(ctx *ExecutionContext, service *ast.ServiceStatement) error {
 	if service.Build == nil || service.Build.Makefile == "" {
 		return nil
 	}
@@ -1013,8 +1019,13 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 		return fmt.Errorf("checking Makefile at %s: %w", makefilePath, err)
 	}
 
+	// Interpolate and execute pre-make commands
 	for _, cmdStr := range service.Build.PreMakeCommands {
-		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose, false); err != nil {
+		interpolatedCmd, err := e.interpolateVariablesWithError(cmdStr, ctx)
+		if err != nil {
+			return fmt.Errorf("failed to interpolate pre-make command: %w", err)
+		}
+		if err := e.runShellCommandInDir(interpolatedCmd, workDir, service.Build.Verbose, false); err != nil {
 			return fmt.Errorf("pre-make command failed: %w", err)
 		}
 	}
@@ -1048,7 +1059,12 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 
 	if lastErr != nil {
 		if service.Build.FallbackCommand != "" {
-			if err := e.runShellCommandInDir(service.Build.FallbackCommand, workDir, true, service.Build.AllocateTTY); err != nil {
+			// Interpolate the fallback command
+			interpolatedFallback, err := e.interpolateVariablesWithError(service.Build.FallbackCommand, ctx)
+			if err != nil {
+				return fmt.Errorf("failed to interpolate fallback command: %w", err)
+			}
+			if err := e.runShellCommandInDir(interpolatedFallback, workDir, true, service.Build.AllocateTTY); err != nil {
 				return fmt.Errorf("make command failed and fallback command also failed: %w", err)
 			}
 		} else if service.Build.RetryOnFailure && service.Build.MaxRetries > 0 {
@@ -1058,8 +1074,13 @@ func (e *Engine) executeMakefileBuild(service *ast.ServiceStatement) error {
 		}
 	}
 
+	// Interpolate and execute post-make commands
 	for _, cmdStr := range service.Build.PostMakeCommands {
-		if err := e.runShellCommandInDir(cmdStr, workDir, service.Build.Verbose, false); err != nil {
+		interpolatedCmd, err := e.interpolateVariablesWithError(cmdStr, ctx)
+		if err != nil {
+			return fmt.Errorf("failed to interpolate post-make command: %w", err)
+		}
+		if err := e.runShellCommandInDir(interpolatedCmd, workDir, service.Build.Verbose, false); err != nil {
 			return fmt.Errorf("post-make command failed: %w", err)
 		}
 	}
