@@ -60,9 +60,8 @@ func ExecuteTask(
 		_, _ = fmt.Fprintf(os.Stdout, "✅ Parsed successfully\n")
 	}
 
-	// Initialize secrets manager - use fallback backend for now
-	// TODO: Fix platform backends to handle all characters in namespace names
-	secretsMgr, err := secrets.NewManager(secrets.WithFallback())
+	// Initialize secrets manager using platform-appropriate backend
+	secretsMgr, err := secrets.NewManager()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Warning: Failed to initialize secrets manager: %v\n", err)
 		secretsMgr = nil
