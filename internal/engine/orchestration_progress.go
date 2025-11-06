@@ -281,10 +281,23 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			}
 
 			// Check if repository exists
-			fullPath := filepath.Join(workDir, service.Path)
+			// Service path is already absolute after resolution, so use it directly
+			fullPath := service.Path
+			if !filepath.IsAbs(fullPath) {
+				// Fallback: join with workDir if somehow still relative
+				fullPath = filepath.Join(workDir, service.Path)
+			}
+
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Checking repository at: %s\n", fullPath)
+			}
+
 			if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
 				// Repository doesn't exist, needs to be cloned
 				needsClone = true
+				if e.verbose {
+					_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Repository not found at %s, will clone\n", fullPath)
+				}
 			} else {
 				// Repository exists - check if we should update it
 				// Respect the "update on start" setting
@@ -352,6 +365,8 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				progress.UpdateService(serviceName, "cloning", "Cloning repository...")
 				progress.RenderInline(serviceName)
 
+				_, _ = fmt.Fprintf(e.output, "\n  📂 Cloning to: %s\n", service.Path)
+
 				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
 					progress.FailService(serviceName, fmt.Errorf("repository clone failed: %w", err))
 					progress.RenderInline(serviceName)
@@ -366,6 +381,8 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				// Repository exists and has updates, pull them
 				progress.UpdateService(serviceName, "updating", "Pulling repository updates...")
 				progress.RenderInline(serviceName)
+
+				_, _ = fmt.Fprintf(e.output, "\n  📂 Updating repository at: %s\n", service.Path)
 
 				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
 					progress.FailService(serviceName, fmt.Errorf("repository update failed: %w", err))

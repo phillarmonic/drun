@@ -317,10 +317,23 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			}
 
 			// Check if repository exists
-			fullPath := filepath.Join(workDir, service.Path)
+			// Service path is already absolute after resolution, so use it directly
+			fullPath := service.Path
+			if !filepath.IsAbs(fullPath) {
+				// Fallback: join with workDir if somehow still relative
+				fullPath = filepath.Join(workDir, service.Path)
+			}
+
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Checking repository at: %s\n", fullPath)
+			}
+
 			if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
 				// Repository doesn't exist, needs to be cloned
 				needsClone = true
+				if e.verbose {
+					_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Repository not found at %s, will clone\n", fullPath)
+				}
 			} else {
 				// Repository exists - check if we should update it
 				// Respect the "update on start" setting
@@ -382,12 +395,14 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			if needsClone {
 				// Repository doesn't exist, clone it
 				_, _ = fmt.Fprintf(e.output, "    📦 Cloning repository for %s...\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "    📂 Target directory: %s\n", service.Path)
 				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
 					return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
 				}
 			} else if hasRepoUpdates {
 				// Repository exists and has updates, pull them
 				_, _ = fmt.Fprintf(e.output, "    📥 Pulling repository updates for %s...\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "    📂 Repository directory: %s\n", service.Path)
 				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
 					return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
 				}
@@ -672,10 +687,20 @@ func (e *Engine) orchestrateUpdateRepositories(ctx context.Context, orch *ast.Or
 		}
 
 		// Check if repository exists
-		fullPath := filepath.Join(workDir, service.Path)
+		// Service path is already absolute after resolution, so use it directly
+		fullPath := service.Path
+		if !filepath.IsAbs(fullPath) {
+			// Fallback: join with workDir if somehow still relative
+			fullPath = filepath.Join(workDir, service.Path)
+		}
+
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "  [VERBOSE] Checking repository for %s at: %s\n", serviceName, fullPath)
+		}
+
 		gitPath := filepath.Join(fullPath, ".git")
 		if _, err := os.Stat(gitPath); os.IsNotExist(err) {
-			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally, skipping update\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally at %s, skipping update\n", serviceName, fullPath)
 			skippedCount++
 			continue
 		}
@@ -922,8 +947,25 @@ func (e *Engine) buildDockerComposeCmd(service *ast.ServiceStatement, args ...st
 		composeFile = service.Compose.File
 	}
 
-	// Get absolute path to service directory
-	servicePath, _ := filepath.Abs(service.Path)
+	// Service path should already be absolute at this point (resolved during orchestration setup)
+	// We must NOT call filepath.Abs here as it would resolve relative paths from CWD instead of spec file location
+	servicePath := service.Path
+	if !filepath.IsAbs(servicePath) {
+		// This should never happen - paths should be resolved earlier
+		// If we hit this, use Abs as a fallback but log a warning
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "    [WARNING] Service path is relative, resolving from CWD: %s\n", servicePath)
+		}
+		absPath, err := filepath.Abs(servicePath)
+		if err != nil {
+			// Fall back to using the relative path and let docker fail with a better error
+			if e.verbose {
+				_, _ = fmt.Fprintf(e.output, "    [WARNING] Failed to resolve absolute path: %v\n", err)
+			}
+		} else {
+			servicePath = absPath
+		}
+	}
 
 	cmdArgs := []string{"compose", "-f", composeFile}
 	cmdArgs = append(cmdArgs, args...)
