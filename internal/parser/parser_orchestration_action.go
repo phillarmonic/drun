@@ -71,11 +71,86 @@ func (p *Parser) parseOrchestrationActionStatement() *ast.OrchestrationActionSta
 			p.addError("expected 'repositories' after 'clone'")
 			return nil
 		}
+	case lexer.SHOW:
+		p.nextToken()
+		// Check if next token is "endpoints" for "show endpoints" action
+		if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "endpoints" {
+			p.nextToken() // consume "endpoints"
+			stmt.Action = "show endpoints"
+		} else {
+			p.addError("expected 'endpoints' after 'show'")
+			return nil
+		}
+	case lexer.LIST:
+		p.nextToken()
+		// Check if next token is "branches" for "list branches" action
+		if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "branches" {
+			p.nextToken() // consume "branches"
+			stmt.Action = "list branches"
+			// Check if a branch name is provided: "list branches "branch name""
+			if p.peekToken.Type == lexer.STRING {
+				p.nextToken() // consume the string
+				stmt.Options["branch"] = p.curToken.Literal
+			}
+		} else {
+			p.addError("expected 'branches' after 'list'")
+			return nil
+		}
+	case lexer.SWITCH:
+		p.nextToken()
+		// Check for "switch branch to default" action
+		if p.peekToken.Type == lexer.BRANCH {
+			p.nextToken() // consume "branch"
+			if p.peekToken.Type == lexer.TO {
+				p.nextToken() // consume "to"
+				if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "default" {
+					p.nextToken() // consume "default"
+					stmt.Action = "switch branch to default"
+				} else {
+					p.addError("expected 'default' after 'switch branch to'")
+					return nil
+				}
+			} else {
+				p.addError("expected 'to' after 'switch branch'")
+				return nil
+			}
+		} else {
+			p.addError("expected 'branch' after 'switch'")
+			return nil
+		}
+	case lexer.SET:
+		p.nextToken()
+		// Check for "set all branches to default" action
+		if p.peekToken.Type == lexer.ALL {
+			p.nextToken() // consume "all"
+			if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "branches" {
+				p.nextToken() // consume "branches"
+				if p.peekToken.Type == lexer.TO {
+					p.nextToken() // consume "to"
+					if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "default" {
+						p.nextToken() // consume "default"
+						stmt.Action = "set all branches to default"
+					} else {
+						p.addError("expected 'default' after 'set all branches to'")
+						return nil
+					}
+				} else {
+					p.addError("expected 'to' after 'set all branches'")
+					return nil
+				}
+			} else {
+				p.addError("expected 'branches' after 'set all'")
+				return nil
+			}
+		} else {
+			p.addError("expected 'all' after 'set'")
+			return nil
+		}
 	case lexer.IDENT:
 		// Allow identifier for additional actions like "health_check", "logs", "sync"
 		p.nextToken()
 		switch p.curToken.Literal {
-		case "health_check", "health", "logs", "sync", "clone_repositories", "show-endpoints", "endpoints":
+		case "health_check", "health", "logs", "sync", "clone_repositories", "endpoints":
 			stmt.Action = p.curToken.Literal
 		case "clone":
 			// Check if next token is "repositories" for "clone repositories" action

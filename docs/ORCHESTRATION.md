@@ -83,7 +83,7 @@ task "status":
 
 task "endpoints":
     info "🌐 Service endpoints:"
-    orchestrate "full_stack" show-endpoints
+    orchestrate "full_stack" show endpoints
 
 task "down":
     info "🗑️  Removing containers..."
@@ -276,6 +276,39 @@ The `update repositories` action will:
 - When a branch filter is specified, only update services currently on that branch (main/master are treated as equivalent)
 - Pull the latest changes from the remote branch
 - Provide a summary of updated, skipped, and failed repositories
+
+### Branch Management
+
+You can check which branch each repository is on and switch them back to default:
+
+```drun
+task "check_branches":
+    # List all repositories with their current branch
+    orchestrate "my_stack" list branches
+
+task "check_main_branch":
+    # Show all repositories checked out on "main" branch
+    orchestrate "my_stack" list branches "main"
+
+task "switch_service_branch":
+    # Switch a specific service to its default branch
+    orchestrate "my_stack" switch branch to default service "api"
+
+task "switch_all_branches":
+    # Switch all services to their default branch
+    orchestrate "my_stack" set all branches to default
+```
+
+The branch management actions will:
+- **`list branches`**: Lists all repositories with their current branch. Shows services without repository configuration and any errors encountered.
+- **`list branches "branch name"`**: Shows only repositories that are checked out on the specified branch. Useful for finding which services are on a particular branch.
+- **`switch branch to default`**: Switches a specific service (if `service` filter is provided) or all services to their default branch. Skips repositories with uncommitted changes (for safety) and pulls latest changes after switching.
+- **`set all branches to default`**: Sets all services to their default branch. Same safety checks as `switch branch to default`.
+
+**Safety Features:**
+- Repositories with uncommitted changes are skipped (you'll need to commit or stash changes first)
+- The default branch is automatically detected from the remote repository (checks `origin/HEAD`, falls back to `main` or `master`)
+- After switching, the latest changes are pulled from the default branch
 
 ## Build Configuration
 
@@ -497,6 +530,10 @@ The `orchestrate` action supports a growing list of verbs:
 | `logs`                     | Tail logs for the selected services (`service` filter optional)                  |
 | `clone repositories`       | Report repository cloning order (dry-run for execution)                          |
 | `update repositories`      | Update repositories to latest version (optionally filter by branch)             |
+| `list branches`            | List all repositories with their current branch                                  |
+| `list branches "branch"`   | Show all repositories checked out on the specified branch                        |
+| `switch branch to default` | Switch a specific service (or all) to its default branch                         |
+| `set all branches to default` | Set all services to their default branch                                        |
 
 You can filter orchestration actions to specific services directly or via CLI parameters:
 
@@ -611,7 +648,7 @@ Use orchestration actions within task bodies to manage services:
 | `stop`            | Stop all services in reverse order     |
 | `restart`         | Stop then start services               |
 | `status`          | Show status of all services            |
-| `show-endpoints`  | List all service endpoints             |
+| `show endpoints`  | List all service endpoints             |
 | `build`           | Build service images                   |
 | `pull`            | Pull latest images                     |
 | `down`            | Stop and remove containers             |
@@ -627,7 +664,7 @@ task "lifecycle-demo":
     orchestrate "my-stack" status
 
     # View service endpoints
-    orchestrate "my-stack" show-endpoints
+    orchestrate "my-stack" show endpoints
 
     # Restart specific services
     orchestrate "my-stack" restart services ["api"]

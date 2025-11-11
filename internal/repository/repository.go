@@ -23,9 +23,19 @@ func NewManager(workDir string) *Manager {
 	}
 }
 
+// resolvePath resolves a target path, handling both absolute and relative paths correctly
+func (m *Manager) resolvePath(targetPath string) string {
+	// If path is already absolute, use it directly
+	if filepath.IsAbs(targetPath) {
+		return targetPath
+	}
+	// Otherwise, join with workDir
+	return filepath.Join(m.workDir, targetPath)
+}
+
 // Clone clones a repository if it doesn't exist
 func (m *Manager) Clone(ctx context.Context, config *orchestration.Repository, targetPath string) error {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	// Check if target path already exists (as a directory or git repository)
 	if _, err := os.Stat(fullPath); err == nil {
@@ -84,7 +94,7 @@ func (m *Manager) Clone(ctx context.Context, config *orchestration.Repository, t
 
 // Update updates a repository by pulling latest changes
 func (m *Manager) Update(ctx context.Context, config *orchestration.Repository, targetPath string) error {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
@@ -131,7 +141,7 @@ func (m *Manager) Update(ctx context.Context, config *orchestration.Repository, 
 
 // Checkout checks out a specific branch or tag
 func (m *Manager) Checkout(ctx context.Context, targetPath, ref string) error {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	cmd := exec.CommandContext(ctx, "git", "checkout", ref)
 	cmd.Dir = fullPath
@@ -146,7 +156,7 @@ func (m *Manager) Checkout(ctx context.Context, targetPath, ref string) error {
 
 // GetCurrentBranch returns the current branch name
 func (m *Manager) GetCurrentBranch(ctx context.Context, targetPath string) (string, error) {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = fullPath
@@ -161,7 +171,7 @@ func (m *Manager) GetCurrentBranch(ctx context.Context, targetPath string) (stri
 
 // GetCurrentTag returns the current tag if any
 func (m *Manager) GetCurrentTag(ctx context.Context, targetPath string) (string, error) {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	cmd := exec.CommandContext(ctx, "git", "describe", "--exact-match", "--tags", "HEAD")
 	cmd.Dir = fullPath
@@ -175,9 +185,103 @@ func (m *Manager) GetCurrentTag(ctx context.Context, targetPath string) (string,
 	return strings.TrimSpace(string(output)), nil
 }
 
+// GetDefaultBranch returns the default branch name from the remote repository
+// Falls back to checking origin/HEAD, then tries "main" and "master"
+func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Repository, targetPath string) (string, error) {
+	fullPath := m.resolvePath(targetPath)
+
+	// First, try to get the default branch from origin/HEAD
+	cmd := exec.CommandContext(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd.Dir = fullPath
+
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return "", fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+		cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	output, err := cmd.Output()
+	if err == nil {
+		// Parse output like "refs/remotes/origin/main" or "refs/remotes/origin/master"
+		ref := strings.TrimSpace(string(output))
+		if strings.HasPrefix(ref, "refs/remotes/origin/") {
+			branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
+			return branch, nil
+		}
+	}
+
+	// If origin/HEAD is not set, try to fetch and set it
+	fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin")
+	fetchCmd.Dir = fullPath
+
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err != nil {
+			return "", fmt.Errorf("failed to expand SSH key path: %w", err)
+		}
+		fetchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+	}
+
+	_ = fetchCmd.Run() // Ignore errors, just try to fetch
+
+	// Try again after fetch
+	cmd = exec.CommandContext(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd.Dir = fullPath
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err == nil {
+			cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+		}
+	}
+
+	output, err = cmd.Output()
+	if err == nil {
+		ref := strings.TrimSpace(string(output))
+		if strings.HasPrefix(ref, "refs/remotes/origin/") {
+			branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
+			return branch, nil
+		}
+	}
+
+	// Fallback: check if main or master branches exist on remote
+	checkBranchCmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", "main")
+	checkBranchCmd.Dir = fullPath
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err == nil {
+			checkBranchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+		}
+	}
+
+	output, err = checkBranchCmd.Output()
+	if err == nil && len(output) > 0 {
+		return "main", nil
+	}
+
+	// Try master
+	checkBranchCmd = exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", "master")
+	checkBranchCmd.Dir = fullPath
+	if config.SSHKey != "" {
+		sshKeyPath, err := expandPath(config.SSHKey)
+		if err == nil {
+			checkBranchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
+		}
+	}
+
+	output, err = checkBranchCmd.Output()
+	if err == nil && len(output) > 0 {
+		return "master", nil
+	}
+
+	// Last resort: default to main
+	return "main", nil
+}
+
 // GetStatus returns the repository status
 func (m *Manager) GetStatus(ctx context.Context, targetPath string) (string, error) {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	cmd := exec.CommandContext(ctx, "git", "status", "--short")
 	cmd.Dir = fullPath
@@ -203,7 +307,7 @@ func (m *Manager) IsClean(ctx context.Context, targetPath string) (bool, error) 
 // HasRemoteUpdates checks if there are updates available from the remote repository
 // Returns true if the local branch is behind the remote branch
 func (m *Manager) HasRemoteUpdates(ctx context.Context, config *orchestration.Repository, targetPath string) (bool, error) {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {
@@ -253,7 +357,7 @@ func (m *Manager) HasRemoteUpdates(ctx context.Context, config *orchestration.Re
 
 // EnsureRepository ensures a repository is cloned and optionally updated
 func (m *Manager) EnsureRepository(ctx context.Context, config *orchestration.Repository, targetPath string) error {
-	fullPath := filepath.Join(m.workDir, targetPath)
+	fullPath := m.resolvePath(targetPath)
 
 	// Check if repository exists
 	if _, err := os.Stat(filepath.Join(fullPath, ".git")); os.IsNotExist(err) {

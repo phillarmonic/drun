@@ -163,7 +163,7 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 		return e.orchestrateRecreate(ctx, orchestration, orderedServices, services, useCache)
 	case "status":
 		return e.orchestrateStatus(orchestration, orderedServices, services)
-	case "show-endpoints", "endpoints":
+	case "show endpoints", "endpoints":
 		return e.orchestrateShowEndpoints(orchestration, orderedServices, services)
 	case "health", "health_check":
 		return e.orchestrateHealth(orchestration, orderedServices, services)
@@ -186,6 +186,21 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 			branchFilter = branch
 		}
 		return e.orchestrateUpdateRepositories(context.Background(), orchestration, orderedServices, services, branchFilter)
+	case "list branches":
+		branchFilter := ""
+		if branch, ok := orchestrStmt.Options["branch"]; ok {
+			branchFilter = e.interpolateVariables(branch, ctx)
+		}
+		return e.orchestrateListBranches(context.Background(), orchestration, orderedServices, services, branchFilter)
+	case "switch branch to default":
+		// Check if a service filter was specified (e.g., "orchestrate group switch branch to default service name")
+		serviceFilter := ""
+		if len(orchestrStmt.ServiceFilters) > 0 {
+			serviceFilter = e.interpolateVariables(orchestrStmt.ServiceFilters[0], ctx)
+		}
+		return e.orchestrateSwitchToDefault(context.Background(), orchestration, orderedServices, services, serviceFilter)
+	case "set all branches to default":
+		return e.orchestrateSetAllDefault(context.Background(), orchestration, orderedServices, services)
 	default:
 		return fmt.Errorf("unknown orchestration action: %s", orchestrStmt.Action)
 	}
@@ -755,6 +770,381 @@ func normalizeBranchName(branch string) string {
 		return "main"
 	}
 	return branch
+}
+
+// orchestrateListBranches lists repositories and their current branches
+// If branchFilter is provided, only shows repositories on that branch
+func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, branchFilter string) error {
+	if branchFilter != "" {
+		_, _ = fmt.Fprintf(e.output, "🌿 Repositories on branch '%s' for orchestration: %s\n", branchFilter, orch.Name)
+	} else {
+		_, _ = fmt.Fprintf(e.output, "🌿 Branch status for orchestration: %s\n", orch.Name)
+	}
+
+	// Get working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Create repository manager
+	repoManager := repository.NewManager(workDir)
+
+	var matchingRepos []struct {
+		serviceName   string
+		currentBranch string
+	}
+	var noRepo []string
+	var errors []string
+	var skipped []string
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		if service.Repository == nil {
+			noRepo = append(noRepo, serviceName)
+			continue
+		}
+
+		// Check if repository exists
+		fullPath := service.Path
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(workDir, service.Path)
+		}
+
+		gitPath := filepath.Join(fullPath, ".git")
+		if _, err := os.Stat(gitPath); os.IsNotExist(err) {
+			if branchFilter == "" {
+				_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally\n", serviceName)
+			}
+			errors = append(errors, fmt.Sprintf("%s (not cloned)", serviceName))
+			continue
+		}
+
+		// Get current branch
+		currentBranch, err := repoManager.GetCurrentBranch(ctx, service.Path)
+		if err != nil {
+			if branchFilter == "" {
+				_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get current branch: %v\n", serviceName, err)
+			}
+			errors = append(errors, fmt.Sprintf("%s (%v)", serviceName, err))
+			continue
+		}
+
+		// If branch filter is provided, only show repos on that branch
+		if branchFilter != "" {
+			normalizedCurrent := normalizeBranchName(currentBranch)
+			normalizedFilter := normalizeBranchName(branchFilter)
+
+			if normalizedCurrent == normalizedFilter {
+				matchingRepos = append(matchingRepos, struct {
+					serviceName   string
+					currentBranch string
+				}{
+					serviceName:   serviceName,
+					currentBranch: currentBranch,
+				})
+			} else {
+				skipped = append(skipped, serviceName)
+			}
+		} else {
+			// No filter: show all repos with their current branch
+			matchingRepos = append(matchingRepos, struct {
+				serviceName   string
+				currentBranch string
+			}{
+				serviceName:   serviceName,
+				currentBranch: currentBranch,
+			})
+		}
+	}
+
+	// Display results
+	if len(matchingRepos) > 0 {
+		if branchFilter != "" {
+			_, _ = fmt.Fprintf(e.output, "\n✅ Repositories on branch '%s':\n", branchFilter)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "\n📋 Repository branches:\n")
+		}
+		for _, item := range matchingRepos {
+			_, _ = fmt.Fprintf(e.output, "  • %-20s  branch: %s\n", item.serviceName+":", item.currentBranch)
+		}
+	} else if branchFilter != "" {
+		_, _ = fmt.Fprintf(e.output, "\n⚠️  No repositories found on branch '%s'\n", branchFilter)
+	}
+
+	if len(noRepo) > 0 && branchFilter == "" {
+		_, _ = fmt.Fprintf(e.output, "\nℹ️  Services without repository:\n")
+		for _, name := range noRepo {
+			_, _ = fmt.Fprintf(e.output, "  • %s\n", name)
+		}
+	}
+
+	if len(errors) > 0 && branchFilter == "" {
+		_, _ = fmt.Fprintf(e.output, "\n❌ Errors:\n")
+		for _, errMsg := range errors {
+			_, _ = fmt.Fprintf(e.output, "  • %s\n", errMsg)
+		}
+	}
+
+	if branchFilter != "" {
+		_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d on branch '%s', %d skipped, %d without repo, %d errors\n",
+			len(matchingRepos), branchFilter, len(skipped), len(noRepo), len(errors))
+	} else {
+		_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d repositories, %d without repo, %d errors\n",
+			len(matchingRepos), len(noRepo), len(errors))
+	}
+
+	return nil
+}
+
+// orchestrateSwitchToDefault switches a specific service (or all if no service specified) to the default branch
+func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, serviceFilter string) error {
+	_, _ = fmt.Fprintf(e.output, "🔄 Switching to default branch for orchestration: %s\n", orch.Name)
+	if serviceFilter != "" {
+		_, _ = fmt.Fprintf(e.output, "  Filter: only switching service '%s'\n", serviceFilter)
+	}
+
+	// Get working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Create repository manager
+	repoManager := repository.NewManager(workDir)
+
+	switchedCount := 0
+	skippedCount := 0
+	errorCount := 0
+
+	for _, serviceName := range orderedServices {
+		// Apply service filter if provided
+		if serviceFilter != "" && serviceName != serviceFilter {
+			continue
+		}
+
+		service := services[serviceName]
+		if service.Repository == nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ℹ️  no repository configured, skipping\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Convert AST repository config to domain model
+		sshKey := service.Repository.SSHKey
+		if sshKey == "" && orch.GitSSHKey != "" {
+			sshKey = orch.GitSSHKey
+		}
+
+		repoConfig := &orchestration.Repository{
+			URL:           service.Repository.URL,
+			Branch:        service.Repository.Branch,
+			Tag:           service.Repository.Tag,
+			SSHKey:        sshKey,
+			Clone:         service.Repository.Clone,
+			UpdateOnStart: service.Repository.UpdateOnStart,
+		}
+
+		// Check if repository exists
+		fullPath := service.Path
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(workDir, service.Path)
+		}
+
+		gitPath := filepath.Join(fullPath, ".git")
+		if _, err := os.Stat(gitPath); os.IsNotExist(err) {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally, skipping\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Get current branch
+		currentBranch, err := repoManager.GetCurrentBranch(ctx, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get current branch: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		// Get default branch
+		defaultBranch, err := repoManager.GetDefaultBranch(ctx, repoConfig, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get default branch: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		// Check if already on default branch
+		normalizedCurrent := normalizeBranchName(currentBranch)
+		normalizedDefault := normalizeBranchName(defaultBranch)
+
+		if normalizedCurrent == normalizedDefault {
+			_, _ = fmt.Fprintf(e.output, "  %s: ✓ already on default branch (%s), skipping\n", serviceName, currentBranch)
+			skippedCount++
+			continue
+		}
+
+		// Check if repository has uncommitted changes
+		isClean, err := repoManager.IsClean(ctx, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to check repository status: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		if !isClean {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  has uncommitted changes, skipping (use 'git stash' or commit changes first)\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Switch to default branch
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 switching from %s to %s...", serviceName, currentBranch, defaultBranch)
+		if err := repoManager.Checkout(ctx, service.Path, defaultBranch); err != nil {
+			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			errorCount++
+			continue
+		}
+
+		// Pull latest changes
+		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
+			_, _ = fmt.Fprintf(e.output, " ⚠️  switched but failed to pull: %v\n", err)
+		} else {
+			_, _ = fmt.Fprintf(e.output, " ✅ switched and updated\n")
+		}
+		switchedCount++
+	}
+
+	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
+
+	if errorCount > 0 {
+		return fmt.Errorf("branch switch completed with %d error(s)", errorCount)
+	}
+
+	if serviceFilter != "" && switchedCount == 0 {
+		return fmt.Errorf("service '%s' not found or could not be switched", serviceFilter)
+	}
+
+	return nil
+}
+
+// orchestrateSetAllDefault sets all services to their default branch
+func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
+	_, _ = fmt.Fprintf(e.output, "🔄 Setting all repositories to default branch for orchestration: %s\n", orch.Name)
+
+	// Get working directory
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Create repository manager
+	repoManager := repository.NewManager(workDir)
+
+	switchedCount := 0
+	skippedCount := 0
+	errorCount := 0
+
+	for _, serviceName := range orderedServices {
+		service := services[serviceName]
+		if service.Repository == nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ℹ️  no repository configured, skipping\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Convert AST repository config to domain model
+		sshKey := service.Repository.SSHKey
+		if sshKey == "" && orch.GitSSHKey != "" {
+			sshKey = orch.GitSSHKey
+		}
+
+		repoConfig := &orchestration.Repository{
+			URL:           service.Repository.URL,
+			Branch:        service.Repository.Branch,
+			Tag:           service.Repository.Tag,
+			SSHKey:        sshKey,
+			Clone:         service.Repository.Clone,
+			UpdateOnStart: service.Repository.UpdateOnStart,
+		}
+
+		// Check if repository exists
+		fullPath := service.Path
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(workDir, service.Path)
+		}
+
+		gitPath := filepath.Join(fullPath, ".git")
+		if _, err := os.Stat(gitPath); os.IsNotExist(err) {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally, skipping\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Get current branch
+		currentBranch, err := repoManager.GetCurrentBranch(ctx, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get current branch: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		// Get default branch
+		defaultBranch, err := repoManager.GetDefaultBranch(ctx, repoConfig, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to get default branch: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		// Check if already on default branch
+		normalizedCurrent := normalizeBranchName(currentBranch)
+		normalizedDefault := normalizeBranchName(defaultBranch)
+
+		if normalizedCurrent == normalizedDefault {
+			_, _ = fmt.Fprintf(e.output, "  %s: ✓ already on default branch (%s), skipping\n", serviceName, currentBranch)
+			skippedCount++
+			continue
+		}
+
+		// Check if repository has uncommitted changes
+		isClean, err := repoManager.IsClean(ctx, service.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  failed to check repository status: %v\n", serviceName, err)
+			errorCount++
+			continue
+		}
+
+		if !isClean {
+			_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  has uncommitted changes, skipping (use 'git stash' or commit changes first)\n", serviceName)
+			skippedCount++
+			continue
+		}
+
+		// Switch to default branch
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 switching from %s to %s...", serviceName, currentBranch, defaultBranch)
+		if err := repoManager.Checkout(ctx, service.Path, defaultBranch); err != nil {
+			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			errorCount++
+			continue
+		}
+
+		// Pull latest changes
+		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
+			_, _ = fmt.Fprintf(e.output, " ⚠️  switched but failed to pull: %v\n", err)
+		} else {
+			_, _ = fmt.Fprintf(e.output, " ✅ switched and updated\n")
+		}
+		switchedCount++
+	}
+
+	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
+
+	if errorCount > 0 {
+		return fmt.Errorf("branch switch completed with %d error(s)", errorCount)
+	}
+
+	return nil
 }
 
 // orchestrateBuild builds all services

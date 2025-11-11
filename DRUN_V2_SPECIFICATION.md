@@ -6103,7 +6103,7 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `restart` - Stop then start services
 - `recreate` - Force a fresh deployment by running `down → build → start`
 - `status` - Show status of all services
-- `show-endpoints` / `endpoints` - List all service endpoints (URLs from health checks)
+- `show endpoints` / `endpoints` - List all service endpoints (URLs from health checks)
 - `health` / `health_check` - Re-evaluate service health and report failures
 - `build` - Build service images
 - `pull` - Pull latest images
@@ -6111,6 +6111,10 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 - `logs` - Stream logs for the selected services (supports filters)
 - `clone repositories` - Produce the repository cloning plan (dry-run execution)
 - `update repositories` - Update repositories to latest version (optionally filter by branch)
+- `list branches` - List all repositories with their current branch
+- `list branches "branch name"` - Show all repositories checked out on the specified branch
+- `switch branch to default` - Switch a specific service (or all) to its default branch
+- `set all branches to default` - Set all services to their default branch
 
 **Difference between `start` and `up`:**
 
@@ -6190,13 +6194,59 @@ task "status":
     orchestrate "my_stack" status
 
 task "endpoints":
-    orchestrate "my_stack" show-endpoints
+    orchestrate "my_stack" show endpoints
 
 task "show_api_logs":
     orchestrate "my_stack" logs service "api"
+
+task "check_branches":
+    # List all repositories with their current branch
+    orchestrate "my_stack" list branches
+
+task "check_main_branch":
+    # Show all repositories checked out on "main" branch
+    orchestrate "my_stack" list branches "main"
+
+task "switch_service_branch":
+    # Switch a specific service to its default branch
+    orchestrate "my_stack" switch branch to default service "api"
+
+task "switch_all_branches":
+    # Switch all services to their default branch
+    orchestrate "my_stack" set all branches to default
 ```
 
 Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings, variables (`$service`), or interpolated values (`{$service}`) and are validated against the orchestration's service registry.
+
+#### Branch Management Actions
+
+The branch management actions help you keep repositories aligned with their default branches:
+
+**`list branches`** - Lists all repositories with their current branch:
+- Shows all repositories with their current branch name
+- Lists services without repository configuration
+- Provides a summary count
+
+**`list branches "branch name"`** - Shows repositories on a specific branch:
+- Filters to show only repositories checked out on the specified branch
+- Useful for finding which services are on a particular branch
+- Normalizes branch names (main/master are treated as equivalent)
+
+**`switch branch to default`** - Switches repositories to their default branch:
+- If a `service` filter is provided, only switches that service
+- If no filter is provided, switches all services
+- Skips repositories with uncommitted changes (safety feature)
+- Automatically pulls latest changes after switching
+- The default branch is detected from the remote repository
+
+**`set all branches to default`** - Sets all services to their default branch:
+- Same behavior as `switch branch to default` but applies to all services
+- Useful for resetting all repositories to their default state
+
+**Safety Features:**
+- Repositories with uncommitted changes are skipped (you must commit or stash changes first)
+- The default branch is automatically detected from `origin/HEAD` or by checking for `main`/`master` branches
+- After switching, the latest changes are pulled from the default branch
 
 **Variable support in service filters:**
 ```drun
@@ -6224,11 +6274,11 @@ for each $service in $services:
 
 #### Show Endpoints
 
-The `show-endpoints` (alias: `endpoints`) action displays all service endpoints with health check URLs. This is useful for quickly accessing running services or sharing URLs with team members.
+The `show endpoints` (alias: `endpoints`) action displays all service endpoints with health check URLs. This is useful for quickly accessing running services or sharing URLs with team members.
 
 ```drun
 task "endpoints":
-    orchestrate "my_stack" show-endpoints
+    orchestrate "my_stack" show endpoints
 ```
 
 **Example Output:**
