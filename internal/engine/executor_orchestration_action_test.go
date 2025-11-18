@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -49,8 +50,25 @@ func TestBuildServiceWithOutput_NoCacheFlag(t *testing.T) {
 	scriptDir := t.TempDir()
 	argsFile := filepath.Join(scriptDir, "args.txt")
 
-	scriptPath := filepath.Join(scriptDir, "docker")
-	scriptContent := "#!/bin/sh\nprintf '%s' \"$*\" > \"$DRUN_TEST_ARGS_FILE\"\n"
+	var scriptPath string
+	var scriptContent string
+
+	if runtime.GOOS == "windows" {
+		// On Windows, create a .cmd file (Windows will execute this when looking for "docker")
+		scriptPath = filepath.Join(scriptDir, "docker.cmd")
+		// Write all arguments to the file
+		// %* expands to all arguments, but we need to handle it properly
+		// Use a simple approach: redirect all args to the file
+		scriptContent = "@echo off\n" +
+			"(\n" +
+			"  echo %*\n" +
+			") > \"" + argsFile + "\"\n"
+	} else {
+		// On Unix-like systems, create a shell script
+		scriptPath = filepath.Join(scriptDir, "docker")
+		scriptContent = "#!/bin/sh\nprintf '%s' \"$*\" > \"$DRUN_TEST_ARGS_FILE\"\n"
+	}
+
 	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o755); err != nil {
 		t.Fatalf("failed to write mock docker script: %v", err)
 	}

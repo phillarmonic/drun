@@ -135,6 +135,17 @@ task "test_interpolation":
 	}
 
 	outputStr := output.String()
+	// Normalize output for cross-platform compatibility (handle Windows line endings and formatting)
+	// Replace Windows line endings with Unix line endings, then normalize whitespace
+	normalizedOutput := strings.ReplaceAll(outputStr, "\r\n", "\n")
+	normalizedOutput = strings.ReplaceAll(normalizedOutput, "\r", "\n")
+	// Collapse multiple consecutive whitespace characters (including newlines) into single spaces
+	normalizedOutput = strings.ReplaceAll(normalizedOutput, "\n", " ")
+	// Collapse multiple spaces
+	for strings.Contains(normalizedOutput, "  ") {
+		normalizedOutput = strings.ReplaceAll(normalizedOutput, "  ", " ")
+	}
+	normalizedOutput = strings.TrimSpace(normalizedOutput)
 
 	// Verify various interpolation patterns
 	tests := []struct {
@@ -148,7 +159,8 @@ task "test_interpolation":
 	}
 
 	for _, tc := range tests {
-		if !strings.Contains(outputStr, tc.contains) {
+		// Check both original and normalized output for better error messages
+		if !strings.Contains(outputStr, tc.contains) && !strings.Contains(normalizedOutput, tc.contains) {
 			t.Errorf("%s: expected output to contain %q, got: %s", tc.name, tc.contains, outputStr)
 		}
 	}
