@@ -131,15 +131,13 @@ jobs:
     - name: Install UPX (macOS)
       if: matrix.runner == 'macos-latest'
       run: |
-        UPX_VERSION=5.0.2
-        echo "Installing UPX version $UPX_VERSION"
-        
-        # Download UPX for macOS
-        curl -L https://github.com/upx/upx/releases/download/v$UPX_VERSION/upx-$UPX_VERSION-macos_arm64.tar.xz -o upx.tar.xz
-        tar -xf upx.tar.xz
-        sudo mv upx-$UPX_VERSION-macos_arm64/upx /usr/local/bin/
-        rm -rf upx.tar.xz upx-$UPX_VERSION-macos_arm64
-        upx --version
+        # UPX doesn't provide official macOS binaries, try installing via Homebrew
+        if command -v brew &> /dev/null; then
+          echo "Installing UPX via Homebrew..."
+          brew install upx || echo "⚠️  UPX installation via Homebrew failed, compression will be skipped"
+        else
+          echo "⚠️  Homebrew not available, UPX compression will be skipped for macOS"
+        fi
       shell: bash
 
     - name: Set binary name
@@ -218,11 +216,15 @@ jobs:
             fi
           fi
         elif [ "${{ matrix.goos }}" = "darwin" ]; then
-          # macOS binaries - UPX often has issues with macOS binaries
-          if upx --best "$BINARY_PATH" 2>/dev/null; then
-            echo "✅ macOS binary compressed successfully"
+          # macOS binaries - UPX may not be available or may have issues
+          if command -v upx &> /dev/null; then
+            if upx --best "$BINARY_PATH" 2>/dev/null; then
+              echo "✅ macOS binary compressed successfully"
+            else
+              echo "⚠️  UPX compression failed for macOS binary (this is normal)"
+            fi
           else
-            echo "⚠️  UPX compression failed for macOS binary (this is normal)"
+            echo "ℹ️  UPX not available for macOS, skipping compression"
           fi
         else
           # Linux binaries - use --best compression (should always work)
@@ -251,11 +253,15 @@ jobs:
           # Windows ARM64 - UPX compression was skipped
           echo "ℹ️  Windows ARM64 binary not compressed with UPX (platform not supported)"
         elif [ "${{ matrix.goos }}" = "darwin" ]; then
-          # For macOS, only verify if UPX compression succeeded
-          if upx -t "$BINARY_PATH" 2>/dev/null; then
-            echo "✅ macOS binary successfully compressed with UPX"
+          # For macOS, only verify if UPX is available and compression succeeded
+          if command -v upx &> /dev/null; then
+            if upx -t "$BINARY_PATH" 2>/dev/null; then
+              echo "✅ macOS binary successfully compressed with UPX"
+            else
+              echo "ℹ️  macOS binary not compressed with UPX (this is normal)"
+            fi
           else
-            echo "ℹ️  macOS binary not compressed with UPX (this is normal if compression failed)"
+            echo "ℹ️  UPX not available for macOS, verification skipped"
           fi
         else
           # For Linux and Windows x64, verify UPX compression
