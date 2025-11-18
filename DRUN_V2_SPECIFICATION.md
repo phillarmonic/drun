@@ -5312,7 +5312,7 @@ drun/
 │       └── engine/   # Execution engine domain
 │           ├── engine.go   # Direct execution engine
 │           └── engine_test.go
-└── cmd/drun/
+└── cmd/xdrun/
     └── main.go       # CLI integration for both v1 and v2
 ```
 

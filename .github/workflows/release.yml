@@ -135,7 +135,7 @@ jobs:
         go build \
           -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           -o dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.filename }} \
-          ./cmd/drun
+          ./cmd/xdrun
 
     - name: Verify binary is statically linked (Linux only)
       if: matrix.goos == 'linux'

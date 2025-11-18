@@ -59,7 +59,7 @@ go tool cover -func=coverage/coverage.out | tail -1
 
 # Check build with version info (like GHA)
 echo "🔨 Testing build..."
-go build -ldflags "-X main.version=ci-build -X main.commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/drun
+go build -ldflags "-X main.version=ci-build -X main.commit=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/xdrun
 
 if [ $? -ne 0 ]; then
     echo "❌ Build failed!"

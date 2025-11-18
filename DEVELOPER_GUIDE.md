@@ -121,7 +121,7 @@ Read these in order:
 
 ```
 ┌─────────────────────────────────────┐
-│  CLI Layer (cmd/drun/)              │  User interaction & debug flags
+│  CLI Layer (cmd/xdrun/)             │  User interaction & debug flags
 ├─────────────────────────────────────┤
 │  Domain Layer (internal/domain/)    │  Business logic (decoupled from AST)
 │    • task/ - Task entities          │

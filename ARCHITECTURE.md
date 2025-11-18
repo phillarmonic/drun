@@ -68,7 +68,7 @@ graph LR
 ```mermaid
 graph TB
     subgraph "CLI Layer"
-        CLI[cmd/drun/main.go]
+        CLI[cmd/xdrun/main.go]
         UPDATE[app/update.go]
         CONFIG[app/config.go]
         COMPLETE[app/completion.go]
@@ -261,7 +261,7 @@ graph TB
 
 ```
 drun/
-├── cmd/drun/              # CLI entry point and commands
+├── cmd/xdrun/             # CLI entry point and commands
 │   ├── main.go            # Minimal entry point (440 lines)
 │   └── app/               # CLI application modules
 │       ├── update.go      # Self-update logic (387 lines)

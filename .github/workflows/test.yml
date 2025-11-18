@@ -113,7 +113,7 @@ jobs:
         fi
         
         echo "Building the binary..."
-        go build -o bin/xdrun.exe ./cmd/drun
+        go build -o bin/xdrun.exe ./cmd/xdrun
         if [ $? -ne 0 ]; then
           echo "❌ Build failed!"
           exit 1
@@ -160,14 +160,14 @@ jobs:
     - name: Build binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/drun
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/xdrun
         ./bin/xdrun --version
 
     - name: Build binary (Windows)
       if: runner.os == 'Windows'
       shell: bash
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun.exe ./cmd/drun
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun.exe ./cmd/xdrun
         ./bin/xdrun.exe --version
 
     - name: Upload artifacts
@@ -214,13 +214,13 @@ jobs:
     - name: Build drun binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -o bin/xdrun ./cmd/drun
+        go build -o bin/xdrun ./cmd/xdrun
         ./bin/xdrun --version
 
     - name: Build drun binary (Windows)
       if: runner.os == 'Windows'
       run: |
-        go build -o bin/xdrun.exe ./cmd/drun
+        go build -o bin/xdrun.exe ./cmd/xdrun
         ./bin/xdrun.exe --version
 
     - name: Test parsing of all example files

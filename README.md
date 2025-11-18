@@ -1595,7 +1595,7 @@ git clone https://github.com/phillarmonic/drun.git
 cd drun
 
 # Build drun
-go build -o bin/xdrun ./cmd/drun
+go build -o bin/xdrun ./cmd/xdrun
 
 # Or use the build script for all platforms
 ./scripts/build.sh

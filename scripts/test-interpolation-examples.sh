@@ -24,7 +24,7 @@ echo
 
 # Build fresh binary
 echo -e "${BLUE}📦 Building fresh drun binary...${NC}"
-go build -o drun ./cmd/drun
+go build -o drun ./cmd/xdrun
 echo -e "${GREEN}✅ Build completed${NC}"
 echo
 

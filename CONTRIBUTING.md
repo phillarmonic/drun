@@ -43,7 +43,7 @@ Thank you for your interest in contributing to drun! This guide will help you ge
 
 ```bash
 cd drun
-go build -o xdrun ./cmd/drun
+go build -o xdrun ./cmd/xdrun
 ```
 
 ### Run Tests
@@ -66,7 +66,7 @@ go test -cover ./...
 
 ```bash
 # Install to $GOPATH/bin
-go install ./cmd/drun
+go install ./cmd/xdrun
 
 # Or use the build script
 ./scripts/build.sh
@@ -79,7 +79,7 @@ go install ./cmd/drun
 drun follows a clean, layered architecture:
 
 ```
-cmd/drun/              # CLI entry point
+cmd/xdrun/             # CLI entry point
 ├── main.go            # Main entry (440 lines)
 └── app/               # CLI modules
     ├── update.go      # Self-update logic

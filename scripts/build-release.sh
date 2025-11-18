@@ -45,7 +45,7 @@ for platform in "${PLATFORMS[@]}"; do
     env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build \
         -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$DATE" \
         -o "dist/$BINARY_NAME" \
-        ./cmd/drun
+        ./cmd/xdrun
     
     # Show file info before compression
     echo "  📦 Built: $(ls -lh dist/$BINARY_NAME | awk '{print $5}')"

@@ -342,7 +342,7 @@ test_build() {
     log_section "Testing Build"
     
     log_info "Building drun binary..."
-    if go build -o bin/xdrun ./cmd/drun; then
+    if go build -o bin/xdrun ./cmd/xdrun; then
         log_success "Build successful"
         
         # Test basic functionality
@@ -367,7 +367,7 @@ test_examples() {
     log_section "Testing Example Configurations"
     
     # Build binary for example testing
-    if ! go build -o bin/xdrun ./cmd/drun; then
+    if ! go build -o bin/xdrun ./cmd/xdrun; then
         log_error "Failed to build binary for example testing"
         return 1
     fi
