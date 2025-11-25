@@ -45,12 +45,19 @@ func getSecret(ctx Context, args ...string) (string, error) {
 
 	secretsMgr := ctx.GetSecretsManager()
 
+	// Check if we're in dry-run mode
+	isDryRun := ctx.IsDryRun()
+
 	// Try to get the secret
 	value, err := secretsMgr.Get(namespace, key)
 	if err != nil {
 		// If secret not found and we have a default, use it
 		if defaultValue != "" {
 			return defaultValue, nil
+		}
+		// In dry-run mode, return a placeholder instead of failing
+		if isDryRun {
+			return fmt.Sprintf("[SECRET:%s:%s]", namespace, key), nil
 		}
 		return "", fmt.Errorf("secret %s:%s not found: %w", namespace, key, err)
 	}

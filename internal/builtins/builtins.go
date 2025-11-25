@@ -15,6 +15,7 @@ import (
 type Context interface {
 	GetProjectName() string
 	GetSecretsManager() SecretsManager
+	IsDryRun() bool
 }
 
 // SecretsManager provides access to secrets

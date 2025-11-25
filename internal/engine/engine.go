@@ -147,6 +147,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 			builtinCtx := &BuiltinContext{
 				execCtx:        execCtx,
 				secretsManager: e.secretsManager,
+				dryRun:         e.dryRun,
 			}
 			if result, err := builtins.CallBuiltin(funcName, builtinCtx); err == nil {
 				if chain, err := e.parseBuiltinOperations(operations); err == nil && chain != nil {
@@ -171,6 +172,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 			builtinCtx := &BuiltinContext{
 				execCtx:        execCtx,
 				secretsManager: e.secretsManager,
+				dryRun:         e.dryRun,
 			}
 			return builtins.CallBuiltin(funcName, builtinCtx, args...)
 		}
@@ -266,6 +268,17 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	plan, err := e.planner.Plan(taskName, program, plannerCtx)
 	if err != nil {
 		return fmt.Errorf("execution planning failed: %w", err)
+	}
+
+	// Validate all secret references before execution starts
+	// This ensures we fail fast if any secrets are missing, similar to Docker's COPY behavior
+	// We validate after planning so we can check which secrets will be set during execution
+	projectName := ""
+	if projectCtx != nil {
+		projectName = projectCtx.Name
+	}
+	if err := e.validateSecrets(program, plan, projectName); err != nil {
+		return fmt.Errorf("secret validation failed: %w", err)
 	}
 
 	if e.dryRun {

@@ -8,6 +8,7 @@ import (
 type BuiltinContext struct {
 	execCtx        *ExecutionContext
 	secretsManager SecretsManager
+	dryRun         bool
 }
 
 // GetProjectName returns the current project name
@@ -26,4 +27,9 @@ func (bc *BuiltinContext) GetSecretsManager() builtins.SecretsManager {
 	}
 	// The SecretsManager interface matches, so we can return it directly
 	return bc.secretsManager
+}
+
+// IsDryRun returns whether we're in dry-run mode
+func (bc *BuiltinContext) IsDryRun() bool {
+	return bc.dryRun
 }
