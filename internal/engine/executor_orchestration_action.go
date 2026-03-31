@@ -213,9 +213,9 @@ func parseBoolOption(options map[string]string, key string) (bool, bool) {
 	}
 
 	switch strings.TrimSpace(strings.ToLower(raw)) {
-	case "true", "yes", "1", "on", "enabled":
+	case "true", "yes", "y", "1", "on", "enabled":
 		return true, true
-	case "false", "no", "0", "off", "disabled":
+	case "false", "no", "n", "0", "off", "disabled":
 		return false, true
 	default:
 		return false, false
