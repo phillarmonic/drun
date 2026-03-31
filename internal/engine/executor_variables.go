@@ -53,7 +53,9 @@ func (e *Engine) executeLetStatement(varStmt *statement.Variable, ctx *Execution
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "📝  Set variable %s = %s\n", varName, interpolatedValue)
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "📝  Set variable %s = %s\n", varName, interpolatedValue)
+	}
 
 	return nil
 }
