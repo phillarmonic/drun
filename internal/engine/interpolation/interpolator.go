@@ -14,10 +14,9 @@ type Interpolator struct {
 	allowUndefined bool
 
 	// Cached regex patterns for performance
-	interpolationRegex *regexp.Regexp
-	envVarRegex        *regexp.Regexp
-	quotedArgRegex     *regexp.Regexp
-	paramArgRegex      *regexp.Regexp
+	envVarRegex    *regexp.Regexp
+	quotedArgRegex *regexp.Regexp
+	paramArgRegex  *regexp.Regexp
 
 	// Callback functions for complex resolution (provided by engine)
 	resolveVariableOps func(expr string, ctx interface{}) string
@@ -36,10 +35,9 @@ type Interpolator struct {
 // NewInterpolator creates a new interpolator
 func NewInterpolator() *Interpolator {
 	return &Interpolator{
-		interpolationRegex: regexp.MustCompile(`\{([^}]+)\}`),
-		envVarRegex:        regexp.MustCompile(`\$\{([^}]+)\}`),
-		quotedArgRegex:     regexp.MustCompile(`^([^(]+)\((.+)\)$`),
-		paramArgRegex:      regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
+		envVarRegex:    regexp.MustCompile(`\$\{([^}]+)\}`),
+		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
+		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
 }
 
@@ -140,59 +138,14 @@ func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string
 		}
 	}
 
-	// Second pass: resolve {$var} Drun variables
+	// Second pass: resolve {$var} Drun variables. Placeholders use balanced { } so
+	// nested {$x} inside a ternary branch (e.g. {$a ? 'prefix-{$b}' : ''}) is one span.
 	var undefinedVars []string
-
-	// Use cached regex for better performance
-	result := i.interpolationRegex.ReplaceAllStringFunc(message, func(match string) string {
-		// Extract content (remove { and })
-		content := match[1 : len(match)-1]
-
-		// Try to resolve simple variables first (most common case)
-		if resolved, found := i.resolveSimpleVariableDirectly(content, ctx); found {
-			return resolved
-		}
-
-		// Check for conditional expressions first (they can return empty strings)
-		// Ternary: "$var ? 'true_val' : 'false_val'"
-		if strings.Contains(content, "?") && strings.Contains(content, ":") {
-			if result, matched := i.resolveTernaryExpression(content, ctx); matched {
-				return result // Accept even if empty
-			}
-		}
-
-		// If-then-else: "if $var then 'val1' else 'val2'"
-		if strings.HasPrefix(strings.TrimSpace(content), "if ") && strings.Contains(content, " then ") && strings.Contains(content, " else ") {
-			if result, matched := i.resolveIfThenElse(content, ctx); matched {
-				return result // Accept even if empty
-			}
-		}
-
-		// Fall back to complex expression resolution
-		if resolved := i.resolveExpression(content, ctx); resolved != "" {
-			return resolved
-		}
-
-		// If nothing worked, check if we should be strict about undefined variables
-		if !i.allowUndefined {
-			// For complex expressions, check if the base variable exists
-			if i.isComplexExpression(content) {
-				baseVar := i.extractBaseVariable(content)
-				if baseVar != "" && !i.variableExists(baseVar, ctx) {
-					undefinedVars = append(undefinedVars, baseVar)
-					return match
-				}
-				// If base variable exists but expression failed, allow it (might be a function call or other valid expression)
-			} else {
-				// For simple variables, report as undefined
-				undefinedVars = append(undefinedVars, content)
-			}
-			return match // Return original placeholder for now
-		}
-
-		// If allowing undefined variables, return the original placeholder
-		return match
-	})
+	result, err := i.expandDrunBraceInterpolations(message, ctx, &undefinedVars)
+	if err != nil {
+		return message, err
+	}
+	undefinedVars = dedupeStrings(undefinedVars)
 
 	// If we found undefined variables in strict mode, return an error
 	if len(undefinedVars) > 0 {
@@ -211,4 +164,131 @@ func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string
 	}
 
 	return result, nil
+}
+
+const maxDrunInterpolationPasses = 64
+
+func dedupeStrings(a []string) []string {
+	if len(a) < 2 {
+		return a
+	}
+	seen := make(map[string]struct{}, len(a))
+	out := a[:0]
+	for _, s := range a {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
+
+// findBalancedInterpolationSpan returns the first {...} span at or after start, using brace
+// depth so nested {$var} inside the placeholder is part of the same span.
+func findBalancedInterpolationSpan(s string, start int) (begin, end int, ok bool) {
+	for i := start; i < len(s); i++ {
+		if s[i] != '{' {
+			continue
+		}
+		begin = i
+		depth := 0
+		for j := i; j < len(s); j++ {
+			switch s[j] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return begin, j + 1, true
+				}
+			}
+		}
+		return 0, 0, false
+	}
+	return 0, 0, false
+}
+
+// expandDrunBraceInterpolations repeatedly expands {$...} placeholders until none change
+// (so a ternary can yield text that still contains {$x}).
+func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context, undefinedVars *[]string) (string, error) {
+	for pass := 0; pass < maxDrunInterpolationPasses; pass++ {
+		var b strings.Builder
+		pos := 0
+		changed := false
+		for pos < len(message) {
+			begin, end, ok := findBalancedInterpolationSpan(message, pos)
+			if !ok {
+				b.WriteString(message[pos:])
+				break
+			}
+			b.WriteString(message[pos:begin])
+			match := message[begin:end]
+			content := message[begin+1 : end-1]
+			// Legacy regex required [^}]+ — empty {} is literal text (e.g. in expanded param values).
+			if len(content) == 0 {
+				b.WriteString(match)
+				pos = end
+				continue
+			}
+			repl := i.resolveDrunBraceContent(content, match, ctx, undefinedVars)
+			if repl != match {
+				changed = true
+			}
+			b.WriteString(repl)
+			pos = end
+		}
+		message = b.String()
+		if !changed {
+			break
+		}
+	}
+	return message, nil
+}
+
+func (i *Interpolator) resolveDrunBraceContent(content, match string, ctx Context, undefinedVars *[]string) string {
+	// Try to resolve simple variables first (most common case)
+	if resolved, found := i.resolveSimpleVariableDirectly(content, ctx); found {
+		return resolved
+	}
+
+	// Check for conditional expressions first (they can return empty strings)
+	// Ternary: "$var ? 'true_val' : 'false_val'"
+	if strings.Contains(content, "?") && strings.Contains(content, ":") {
+		if result, matched := i.resolveTernaryExpression(content, ctx); matched {
+			return result // Accept even if empty
+		}
+	}
+
+	// If-then-else: "if $var then 'val1' else 'val2'"
+	if strings.HasPrefix(strings.TrimSpace(content), "if ") && strings.Contains(content, " then ") && strings.Contains(content, " else ") {
+		if result, matched := i.resolveIfThenElse(content, ctx); matched {
+			return result // Accept even if empty
+		}
+	}
+
+	// Fall back to complex expression resolution
+	if resolved := i.resolveExpression(content, ctx); resolved != "" {
+		return resolved
+	}
+
+	// If nothing worked, check if we should be strict about undefined variables
+	if !i.allowUndefined {
+		// For complex expressions, check if the base variable exists
+		if i.isComplexExpression(content) {
+			baseVar := i.extractBaseVariable(content)
+			if baseVar != "" && !i.variableExists(baseVar, ctx) {
+				*undefinedVars = append(*undefinedVars, baseVar)
+				return match
+			}
+			// If base variable exists but expression failed, allow it (might be a function call or other valid expression)
+		} else {
+			// For simple variables, report as undefined
+			*undefinedVars = append(*undefinedVars, content)
+		}
+		return match // Return original placeholder for now
+	}
+
+	// If allowing undefined variables, return the original placeholder
+	return match
 }
