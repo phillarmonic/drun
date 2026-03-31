@@ -165,7 +165,7 @@ func (p *Parser) readCommandTokens() []string {
 
 		// Add the current token to the line
 		if p.curToken.Type == lexer.STRING {
-			currentLine.WriteString(fmt.Sprintf("\"%s\"", p.curToken.Literal))
+			fmt.Fprintf(&currentLine, "\"%s\"", p.curToken.Literal)
 		} else {
 			currentLine.WriteString(p.curToken.Literal)
 		}

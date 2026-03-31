@@ -20,22 +20,22 @@ type TaskStatement struct {
 func (ts *TaskStatement) statementNode() {}
 func (ts *TaskStatement) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("task \"%s\"", ts.Name))
+	fmt.Fprintf(&out, "task \"%s\"", ts.Name)
 	if ts.Description != "" {
-		out.WriteString(fmt.Sprintf(" means \"%s\"", ts.Description))
+		fmt.Fprintf(&out, " means \"%s\"", ts.Description)
 	}
 	out.WriteString(":\n")
 
 	for _, dep := range ts.Dependencies {
-		out.WriteString(fmt.Sprintf("  %s\n", dep.String()))
+		fmt.Fprintf(&out, "  %s\n", dep.String())
 	}
 
 	for _, param := range ts.Parameters {
-		out.WriteString(fmt.Sprintf("  %s\n", param.String()))
+		fmt.Fprintf(&out, "  %s\n", param.String())
 	}
 
 	for _, stmt := range ts.Body {
-		out.WriteString(fmt.Sprintf("  %s\n", stmt.String()))
+		fmt.Fprintf(&out, "  %s\n", stmt.String())
 	}
 	return out.String()
 }
@@ -50,11 +50,11 @@ type TaskCallStatement struct {
 func (tcs *TaskCallStatement) statementNode() {}
 func (tcs *TaskCallStatement) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("call task \"%s\"", tcs.TaskName))
+	fmt.Fprintf(&out, "call task \"%s\"", tcs.TaskName)
 	if len(tcs.Parameters) > 0 {
 		out.WriteString(" with")
 		for key, value := range tcs.Parameters {
-			out.WriteString(fmt.Sprintf(" %s=\"%s\"", key, value))
+			fmt.Fprintf(&out, " %s=\"%s\"", key, value)
 		}
 	}
 	return out.String()
@@ -109,18 +109,18 @@ type TaskTemplateStatement struct {
 func (tts *TaskTemplateStatement) statementNode() {}
 func (tts *TaskTemplateStatement) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("template task \"%s\"", tts.Name))
+	fmt.Fprintf(&out, "template task \"%s\"", tts.Name)
 	if tts.Description != "" {
-		out.WriteString(fmt.Sprintf(" means \"%s\"", tts.Description))
+		fmt.Fprintf(&out, " means \"%s\"", tts.Description)
 	}
 	out.WriteString(":\n")
 
 	for _, param := range tts.Parameters {
-		out.WriteString(fmt.Sprintf("  %s\n", param.String()))
+		fmt.Fprintf(&out, "  %s\n", param.String())
 	}
 
 	for _, stmt := range tts.Body {
-		out.WriteString(fmt.Sprintf("  %s\n", stmt.String()))
+		fmt.Fprintf(&out, "  %s\n", stmt.String())
 	}
 	return out.String()
 }
@@ -136,12 +136,12 @@ type TaskFromTemplateStatement struct {
 func (tfts *TaskFromTemplateStatement) statementNode() {}
 func (tfts *TaskFromTemplateStatement) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("task \"%s\" from template \"%s\"", tfts.Name, tfts.TemplateName))
+	fmt.Fprintf(&out, "task \"%s\" from template \"%s\"", tfts.Name, tfts.TemplateName)
 
 	if len(tfts.Overrides) > 0 {
 		out.WriteString(":\n  with")
 		for key, value := range tfts.Overrides {
-			out.WriteString(fmt.Sprintf(" %s=\"%s\"", key, value))
+			fmt.Fprintf(&out, " %s=\"%s\"", key, value)
 		}
 	}
 

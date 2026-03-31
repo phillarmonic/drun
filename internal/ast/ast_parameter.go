@@ -70,10 +70,10 @@ func (pps *ProjectParameterStatement) statementNode()      {}
 func (pps *ProjectParameterStatement) projectSettingNode() {}
 func (pps *ProjectParameterStatement) String() string {
 	var out strings.Builder
-	out.WriteString(fmt.Sprintf("parameter $%s", pps.Name))
+	fmt.Fprintf(&out, "parameter $%s", pps.Name)
 
 	if pps.DataType != "" {
-		out.WriteString(fmt.Sprintf(" as %s", pps.DataType))
+		fmt.Fprintf(&out, " as %s", pps.DataType)
 	}
 
 	if len(pps.Constraints) > 0 {
@@ -82,13 +82,13 @@ func (pps *ProjectParameterStatement) String() string {
 			if i > 0 {
 				out.WriteString(", ")
 			}
-			out.WriteString(fmt.Sprintf("\"%s\"", c))
+			fmt.Fprintf(&out, "\"%s\"", c)
 		}
 		out.WriteString("]")
 	}
 
 	if pps.HasDefault {
-		out.WriteString(fmt.Sprintf(" defaults to \"%s\"", pps.DefaultValue))
+		fmt.Fprintf(&out, " defaults to \"%s\"", pps.DefaultValue)
 	}
 
 	return out.String()

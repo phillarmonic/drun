@@ -88,8 +88,8 @@ func findSimilarTaskNames(name string, program *ast.Program) []string {
 func formatTaskMatches(matches []string, partialName string) string {
 	var result strings.Builder
 	for _, match := range matches {
-		result.WriteString(fmt.Sprintf("  - %s (use: xdrun %s)\n",
-			match, getDisambiguatingPrefix(match, matches)))
+		fmt.Fprintf(&result, "  - %s (use: xdrun %s)\n",
+			match, getDisambiguatingPrefix(match, matches))
 	}
 	return result.String()
 }
@@ -98,7 +98,7 @@ func formatTaskMatches(matches []string, partialName string) string {
 func formatTaskSuggestions(suggestions []string) string {
 	var result strings.Builder
 	for _, suggestion := range suggestions {
-		result.WriteString(fmt.Sprintf("  - %s\n", suggestion))
+		fmt.Fprintf(&result, "  - %s\n", suggestion)
 	}
 	return result.String()
 }

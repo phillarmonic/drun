@@ -21,7 +21,7 @@ func GenerateDrun(makefile *Makefile) string {
 		for key, value := range makefile.Variables {
 			drunVarName := strings.ToLower(key)
 			drunValue := convertMakeVariableValue(value)
-			sb.WriteString(fmt.Sprintf("# - $%s = \"%s\"\n", drunVarName, drunValue))
+			fmt.Fprintf(&sb, "# - $%s = \"%s\"\n", drunVarName, drunValue)
 		}
 		sb.WriteString("\n")
 	}

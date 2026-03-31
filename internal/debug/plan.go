@@ -116,7 +116,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		if planInfo.ProjectVersion != "" {
 			label += " v" + planInfo.ProjectVersion
 		}
-		b.WriteString(fmt.Sprintf("  label=\"%s\";\n", escapeGraphviz(label)))
+		fmt.Fprintf(&b, "  label=\"%s\";\n", escapeGraphviz(label))
 		b.WriteString("  labelloc=t;\n")
 		b.WriteString("  fontsize=16;\n")
 		b.WriteString("  \n")
@@ -147,8 +147,8 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 			label += fmt.Sprintf("\\n(%d params)", len(taskInfo.Parameters))
 		}
 
-		b.WriteString(fmt.Sprintf("  \"%s\" [fillcolor=%s, style=\"rounded,filled\", label=\"%s\"];\n",
-			taskName, color, label))
+		fmt.Fprintf(&b, "  \"%s\" [fillcolor=%s, style=\"rounded,filled\", label=\"%s\"];\n",
+			taskName, color, label)
 	}
 	b.WriteString("  \n")
 
@@ -175,7 +175,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 			if !isDep {
 				style = "dashed"
 			}
-			b.WriteString(fmt.Sprintf("  \"%s\" -> \"%s\" [style=%s];\n", from, to, style))
+			fmt.Fprintf(&b, "  \"%s\" -> \"%s\" [style=%s];\n", from, to, style)
 			seen[edgeKey] = true
 		}
 	}
@@ -211,7 +211,7 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 		if planInfo.ProjectVersion != "" {
 			title += " v" + planInfo.ProjectVersion
 		}
-		b.WriteString(fmt.Sprintf("  title[%s]\n", escapeMermaid(title)))
+		fmt.Fprintf(&b, "  title[%s]\n", escapeMermaid(title))
 		b.WriteString("  style title fill:#f9f,stroke:#333,stroke-width:2px\n")
 	}
 
@@ -233,14 +233,14 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 
 		// Determine node style
 		if taskName == planInfo.TargetTask {
-			b.WriteString(fmt.Sprintf("  %s[\"%s\"]\n", nodeID, label))
-			b.WriteString(fmt.Sprintf("  style %s fill:#90EE90\n", nodeID))
+			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
+			fmt.Fprintf(&b, "  style %s fill:#90EE90\n", nodeID)
 		} else if taskInfo.Namespace != "" {
-			b.WriteString(fmt.Sprintf("  %s[\"%s\"]\n", nodeID, label))
-			b.WriteString(fmt.Sprintf("  style %s fill:#FFFFE0\n", nodeID))
+			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
+			fmt.Fprintf(&b, "  style %s fill:#FFFFE0\n", nodeID)
 		} else {
-			b.WriteString(fmt.Sprintf("  %s[\"%s\"]\n", nodeID, label))
-			b.WriteString(fmt.Sprintf("  style %s fill:#ADD8E6\n", nodeID))
+			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
+			fmt.Fprintf(&b, "  style %s fill:#ADD8E6\n", nodeID)
 		}
 	}
 
@@ -248,7 +248,7 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 	for i := 0; i < len(planInfo.ExecutionOrder)-1; i++ {
 		fromID := strings.ReplaceAll(planInfo.ExecutionOrder[i], ".", "_")
 		toID := strings.ReplaceAll(planInfo.ExecutionOrder[i+1], ".", "_")
-		b.WriteString(fmt.Sprintf("  %s --> %s\n", fromID, toID))
+		fmt.Fprintf(&b, "  %s --> %s\n", fromID, toID)
 	}
 
 	b.WriteString("```\n")
