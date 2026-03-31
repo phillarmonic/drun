@@ -23,22 +23,22 @@ func TestDrunLifecycleHooks(t *testing.T) {
 
 project "myapp":
   on drun setup:
-    info "🚀 Starting drun execution pipeline"
-    info "📊 Tool version: v2.0"
+    info "🚀  Starting drun execution pipeline"
+    info "📊  Tool version: v2.0"
   
   on drun teardown:
     info "🏁 Drun execution pipeline completed"
-    info "📊 Total execution time: 5s"
+    info "📊  Total execution time: 5s"
 
 task "deploy":
   info "Deploying application"`,
 			taskName: "deploy",
 			expectedOutput: []string{
-				"🚀 Starting drun execution pipeline",
-				"📊 Tool version: v2.0",
+				"🚀  Starting drun execution pipeline",
+				"📊  Tool version: v2.0",
 				"Deploying application",
 				"🏁 Drun execution pipeline completed",
-				"📊 Total execution time: 5s",
+				"📊  Total execution time: 5s",
 			},
 			shouldFail: false,
 		},

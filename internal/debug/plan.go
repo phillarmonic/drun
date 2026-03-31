@@ -20,22 +20,22 @@ type ExecutionPlanInfo struct {
 
 // TaskInfo represents a task in the execution plan
 type TaskInfo struct {
-	Name         string         `json:"name"`
-	Description  string         `json:"description,omitempty"`
-	Namespace    string         `json:"namespace,omitempty"`
-	Source       string         `json:"source,omitempty"`
-	Parameters   []ParameterInfo `json:"parameters,omitempty"`
-	Dependencies []string       `json:"dependencies,omitempty"`
-	StatementCount int          `json:"statement_count"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description,omitempty"`
+	Namespace      string          `json:"namespace,omitempty"`
+	Source         string          `json:"source,omitempty"`
+	Parameters     []ParameterInfo `json:"parameters,omitempty"`
+	Dependencies   []string        `json:"dependencies,omitempty"`
+	StatementCount int             `json:"statement_count"`
 }
 
 // ParameterInfo represents parameter metadata
 type ParameterInfo struct {
-	Name       string   `json:"name"`
-	Type       string   `json:"type"`
-	Required   bool     `json:"required"`
-	HasDefault bool     `json:"has_default"`
-	DataType   string   `json:"data_type,omitempty"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Required   bool   `json:"required"`
+	HasDefault bool   `json:"has_default"`
+	DataType   string `json:"data_type,omitempty"`
 }
 
 // HookInfo represents lifecycle hooks in the plan
@@ -60,7 +60,7 @@ func DebugExecutionPlan(plan interface{}) {
 		GetProjectVersion() string
 		GetNamespaces() []string
 	}); ok {
-		fmt.Println("📊 Plan Overview:")
+		fmt.Println("📊  Plan Overview:")
 		fmt.Printf("  Target Task: %s\n", p.GetTargetTask())
 		fmt.Printf("  Total Tasks: %d\n", p.GetTaskCount())
 		fmt.Printf("  Project: %s", p.GetProjectName())
@@ -68,14 +68,14 @@ func DebugExecutionPlan(plan interface{}) {
 			fmt.Printf(" v%s", version)
 		}
 		fmt.Println()
-		
+
 		namespaces := p.GetNamespaces()
 		if len(namespaces) > 0 {
 			fmt.Printf("  Namespaces: %s\n", strings.Join(namespaces, ", "))
 		}
 		fmt.Println()
 
-		fmt.Println("🔄 Execution Order:")
+		fmt.Println("🔄  Execution Order:")
 		order := p.GetExecutionOrder()
 		for i, taskName := range order {
 			marker := "  →"
@@ -103,13 +103,13 @@ func ExportExecutionPlanJSON(planInfo ExecutionPlanInfo) (string, error) {
 // ExportExecutionPlanGraphviz exports the execution plan as Graphviz DOT format
 func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 	var b strings.Builder
-	
+
 	// Start digraph
 	b.WriteString("digraph ExecutionPlan {\n")
 	b.WriteString("  rankdir=LR;\n")
 	b.WriteString("  node [shape=box, style=rounded];\n")
 	b.WriteString("  \n")
-	
+
 	// Add graph metadata
 	if planInfo.ProjectName != "" {
 		label := planInfo.ProjectName
@@ -121,7 +121,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		b.WriteString("  fontsize=16;\n")
 		b.WriteString("  \n")
 	}
-	
+
 	// Node definitions with colors
 	b.WriteString("  // Task nodes\n")
 	for _, taskName := range planInfo.ExecutionOrder {
@@ -129,7 +129,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		if !exists {
 			continue
 		}
-		
+
 		// Determine node color based on task type
 		color := "lightblue"
 		if taskName == planInfo.TargetTask {
@@ -137,7 +137,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		} else if taskInfo.Namespace != "" {
 			color = "lightyellow"
 		}
-		
+
 		// Build label with description
 		label := taskName
 		if taskInfo.Description != "" {
@@ -146,19 +146,19 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		if len(taskInfo.Parameters) > 0 {
 			label += fmt.Sprintf("\\n(%d params)", len(taskInfo.Parameters))
 		}
-		
-		b.WriteString(fmt.Sprintf("  \"%s\" [fillcolor=%s, style=\"rounded,filled\", label=\"%s\"];\n", 
+
+		b.WriteString(fmt.Sprintf("  \"%s\" [fillcolor=%s, style=\"rounded,filled\", label=\"%s\"];\n",
 			taskName, color, label))
 	}
 	b.WriteString("  \n")
-	
+
 	// Dependency edges
 	b.WriteString("  // Dependencies\n")
 	seen := make(map[string]bool)
 	for i := 0; i < len(planInfo.ExecutionOrder)-1; i++ {
 		from := planInfo.ExecutionOrder[i]
 		to := planInfo.ExecutionOrder[i+1]
-		
+
 		// Check if this is a real dependency or just execution order
 		taskInfo := planInfo.Tasks[to]
 		isDep := false
@@ -168,7 +168,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 				break
 			}
 		}
-		
+
 		edgeKey := from + "->" + to
 		if !seen[edgeKey] {
 			style := "solid"
@@ -180,7 +180,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 		}
 	}
 	b.WriteString("  \n")
-	
+
 	// Add legend
 	b.WriteString("  // Legend\n")
 	b.WriteString("  subgraph cluster_legend {\n")
@@ -192,19 +192,19 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 	b.WriteString("    \"Target Task\" -> \"Regular Task\" [label=\"dependency\", style=solid];\n")
 	b.WriteString("    \"Regular Task\" -> \"Namespaced Task\" [label=\"execution order\", style=dashed];\n")
 	b.WriteString("  }\n")
-	
+
 	b.WriteString("}\n")
-	
+
 	return b.String()
 }
 
 // ExportExecutionPlanMermaid exports the execution plan as Mermaid diagram
 func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 	var b strings.Builder
-	
+
 	b.WriteString("```mermaid\n")
 	b.WriteString("graph LR\n")
-	
+
 	// Add title
 	if planInfo.ProjectName != "" {
 		title := planInfo.ProjectName
@@ -214,23 +214,23 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 		b.WriteString(fmt.Sprintf("  title[%s]\n", escapeMermaid(title)))
 		b.WriteString("  style title fill:#f9f,stroke:#333,stroke-width:2px\n")
 	}
-	
+
 	// Node definitions
 	for _, taskName := range planInfo.ExecutionOrder {
 		taskInfo, exists := planInfo.Tasks[taskName]
 		if !exists {
 			continue
 		}
-		
+
 		// Create node ID (mermaid doesn't like dots)
 		nodeID := strings.ReplaceAll(taskName, ".", "_")
-		
+
 		// Build label
 		label := taskName
 		if taskInfo.Description != "" {
 			label += "<br/>" + escapeMermaid(taskInfo.Description)
 		}
-		
+
 		// Determine node style
 		if taskName == planInfo.TargetTask {
 			b.WriteString(fmt.Sprintf("  %s[\"%s\"]\n", nodeID, label))
@@ -243,16 +243,16 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 			b.WriteString(fmt.Sprintf("  style %s fill:#ADD8E6\n", nodeID))
 		}
 	}
-	
+
 	// Edges
 	for i := 0; i < len(planInfo.ExecutionOrder)-1; i++ {
 		fromID := strings.ReplaceAll(planInfo.ExecutionOrder[i], ".", "_")
 		toID := strings.ReplaceAll(planInfo.ExecutionOrder[i+1], ".", "_")
 		b.WriteString(fmt.Sprintf("  %s --> %s\n", fromID, toID))
 	}
-	
+
 	b.WriteString("```\n")
-	
+
 	return b.String()
 }
 
@@ -271,4 +271,3 @@ func escapeMermaid(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	return s
 }
-

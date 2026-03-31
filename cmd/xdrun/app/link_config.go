@@ -181,7 +181,7 @@ func UnlinkDirectories(directories []string) error {
 
 		if _, exists := config.Links[absDir]; exists {
 			delete(config.Links, absDir)
-			fmt.Printf("❌ Unlinked %s\n", absDir)
+			fmt.Printf("❌  Unlinked %s\n", absDir)
 			changed = true
 		} else {
 			fmt.Printf("ℹ️  Directory %s was not linked\n", absDir)

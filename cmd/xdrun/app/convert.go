@@ -92,10 +92,10 @@ func convertMakefile(inputFile, outputFile string) error {
 		return fmt.Errorf("error parsing Makefile: %w", err)
 	}
 
-	fmt.Printf("✅ Found %d targets and %d variables\n", len(makefile.Targets), len(makefile.Variables))
+	fmt.Printf("✅  Found %d targets and %d variables\n", len(makefile.Targets), len(makefile.Variables))
 
 	// Generate drun file
-	fmt.Printf("🔄 Converting to drun v2 syntax...\n")
+	fmt.Printf("🔄  Converting to drun v2 syntax...\n")
 	drunContent := make2drun.GenerateDrun(makefile)
 
 	// Write output file
@@ -105,7 +105,7 @@ func convertMakefile(inputFile, outputFile string) error {
 		return fmt.Errorf("error writing output file: %w", err)
 	}
 
-	fmt.Printf("🎉 Successfully converted Makefile to drun!\n")
+	fmt.Printf("🎉  Successfully converted Makefile to drun!\n")
 	fmt.Printf("\nYou can now run your tasks with:\n")
 	fmt.Printf("  xdrun -f %s <task-name>\n", output)
 

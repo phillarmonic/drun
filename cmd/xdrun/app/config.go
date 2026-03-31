@@ -203,7 +203,7 @@ func InitializeConfig(filename string, saveAsDefault bool) error {
 		return fmt.Errorf("failed to write task file: %w", err)
 	}
 
-	fmt.Printf("✅ Created %s\n", targetFile)
+	fmt.Printf("✅  Created %s\n", targetFile)
 
 	// Save as workspace default if requested or if using custom filename
 	if saveAsDefault || (filename != "" && filename != ".drun/spec.drun") {
@@ -214,7 +214,7 @@ func InitializeConfig(filename string, saveAsDefault bool) error {
 		}
 	}
 
-	fmt.Println("🚀 Get started with: xdrun --list")
+	fmt.Println("🚀  Get started with: xdrun --list")
 	return nil
 }
 
@@ -264,7 +264,7 @@ func SetWorkspaceDefault(filename string) error {
 		return fmt.Errorf("failed to save workspace configuration: %w", err)
 	}
 
-	fmt.Printf("✅ Set workspace default task file to: %s\n", filename)
+	fmt.Printf("✅  Set workspace default task file to: %s\n", filename)
 	fmt.Printf("💾 Saved to .drun/.drun_workspace.yml\n")
 	return nil
 }

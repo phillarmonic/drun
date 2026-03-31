@@ -155,7 +155,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 		return err
 	}
 
-	fmt.Printf("✅ Marked '%s' as stateless\n", absPath)
+	fmt.Printf("✅  Marked '%s' as stateless\n", absPath)
 	fmt.Printf("📁 Configuration will be stored at: %s\n", configLocation)
 
 	// Create template if requested
@@ -177,7 +177,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 			return fmt.Errorf("failed to create template: %w", err)
 		}
 
-		fmt.Printf("📝 Created template configuration file\n")
+		fmt.Printf("📝  Created template configuration file\n")
 	} else {
 		fmt.Printf("💡 Run 'xdrun --init' in this directory to create a configuration file\n")
 	}
@@ -227,7 +227,7 @@ func RemoveStatelessDirectory(directory string, deleteConfig bool) error {
 		return err
 	}
 
-	fmt.Printf("✅ Removed stateless marking from '%s'\n", absPath)
+	fmt.Printf("✅  Removed stateless marking from '%s'\n", absPath)
 	return nil
 }
 
@@ -277,7 +277,7 @@ func ShowStatelessInfo() error {
 			fmt.Printf("   Status: ⚠️  Config file does not exist\n")
 			fmt.Printf("   Run 'xdrun --init' to create it\n")
 		} else {
-			fmt.Printf("   Status: ✅ Config file exists\n")
+			fmt.Printf("   Status: ✅  Config file exists\n")
 		}
 	} else {
 		fmt.Printf("📁 Current directory is NOT marked as stateless\n")

@@ -112,9 +112,9 @@ If no value is provided, you'll be prompted to enter it securely.`,
 			}
 
 			if isAutoDetected {
-				fmt.Printf("✓ Secret '%s' stored securely in project namespace '%s'\n", key, ns)
+				fmt.Printf("✓  Secret '%s' stored securely in project namespace '%s'\n", key, ns)
 			} else {
-				fmt.Printf("✓ Secret '%s' stored securely in namespace '%s'\n", key, ns)
+				fmt.Printf("✓  Secret '%s' stored securely in namespace '%s'\n", key, ns)
 			}
 			return nil
 		},
@@ -172,9 +172,9 @@ To override:
 			}
 
 			if isAutoDetected {
-				fmt.Printf("✓ Secret '%s' removed from project namespace '%s'\n", key, ns)
+				fmt.Printf("✓  Secret '%s' removed from project namespace '%s'\n", key, ns)
 			} else {
-				fmt.Printf("✓ Secret '%s' removed from namespace '%s'\n", key, ns)
+				fmt.Printf("✓  Secret '%s' removed from namespace '%s'\n", key, ns)
 			}
 			return nil
 		},

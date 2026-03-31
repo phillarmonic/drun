@@ -35,7 +35,7 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 	}
 
 	// Execute try block (domain statements)
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing try block\n")
+	_, _ = fmt.Fprintf(e.output, "🔄  Executing try block\n")
 	for _, stmt := range tryStmt.TryBody {
 		if err := e.executeStatement(stmt, ctx); err != nil {
 			tryError = err
@@ -54,7 +54,7 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 				// Set error variable if specified
 				if catchClause.ErrorVar != "" {
 					ctx.Variables[catchClause.ErrorVar] = tryError.Error()
-					_, _ = fmt.Fprintf(e.output, "📦 Captured error in variable '%s'\n", catchClause.ErrorVar)
+					_, _ = fmt.Fprintf(e.output, "📦  Captured error in variable '%s'\n", catchClause.ErrorVar)
 				}
 
 				// Execute catch body (domain statements)
@@ -72,18 +72,18 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 		}
 
 		if !handled {
-			_, _ = fmt.Fprintf(e.output, "❌ Unhandled error: %v\n", tryError)
+			_, _ = fmt.Fprintf(e.output, "❌  Unhandled error: %v\n", tryError)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "✅ Error handled successfully\n")
+			_, _ = fmt.Fprintf(e.output, "✅  Error handled successfully\n")
 			tryError = nil // Error was handled
 		}
 	} else {
-		_, _ = fmt.Fprintf(e.output, "✅ Try block completed successfully\n")
+		_, _ = fmt.Fprintf(e.output, "✅  Try block completed successfully\n")
 	}
 
 	// Always execute finally block (domain statements)
 	if len(tryStmt.FinallyBody) > 0 {
-		_, _ = fmt.Fprintf(e.output, "🔄 Executing finally block\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Executing finally block\n")
 		for _, stmt := range tryStmt.FinallyBody {
 			if err := e.executeStatement(stmt, ctx); err != nil {
 				finallyError = err
@@ -93,7 +93,7 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 		}
 
 		if finallyError == nil {
-			_, _ = fmt.Fprintf(e.output, "✅ Finally block completed successfully\n")
+			_, _ = fmt.Fprintf(e.output, "✅  Finally block completed successfully\n")
 		}
 	}
 
@@ -121,10 +121,10 @@ func (e *Engine) executeThrow(throwStmt *statement.Throw, ctx *ExecutionContext)
 	switch throwStmt.Action {
 	case "throw":
 		message := e.interpolateVariables(throwStmt.Message, ctx)
-		_, _ = fmt.Fprintf(e.output, "💥 Throwing error: %s\n", message)
+		_, _ = fmt.Fprintf(e.output, "💥  Throwing error: %s\n", message)
 		return fmt.Errorf("thrown error: %s", message)
 	case "rethrow":
-		_, _ = fmt.Fprintf(e.output, "🔄 Rethrowing current error\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Rethrowing current error\n")
 		// In a real implementation, we'd need to track the current error context
 		return fmt.Errorf("rethrown error")
 	case "ignore":

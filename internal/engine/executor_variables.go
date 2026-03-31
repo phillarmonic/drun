@@ -115,7 +115,7 @@ func (e *Engine) executeTransformStatement(varStmt *statement.Variable, ctx *Exe
 			varName, varStmt.Function, currentValue, newValue)
 		return nil
 	}
-	_, _ = fmt.Fprintf(e.output, "🔄 Transformed variable %s with %s: %s -> %s\n",
+	_, _ = fmt.Fprintf(e.output, "🔄  Transformed variable %s with %s: %s -> %s\n",
 		varName, varStmt.Function, currentValue, newValue)
 
 	return nil
@@ -142,7 +142,7 @@ func (e *Engine) executeCaptureStatement(varStmt *statement.Variable, ctx *Execu
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "📥 Captured %s: %s\n",
+		_, _ = fmt.Fprintf(e.output, "📥  Captured %s: %s\n",
 			varName, value)
 	}
 
@@ -178,7 +178,7 @@ func (e *Engine) executeCaptureShellStatement(varStmt *statement.Variable, ctx *
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "📥 Captured %s from shell: %s\n",
+		_, _ = fmt.Fprintf(e.output, "📥  Captured %s from shell: %s\n",
 			varName, value)
 	}
 

@@ -43,19 +43,19 @@ func (e *Engine) executeHTTP(httpStmt *statement.HTTP, ctx *ExecutionContext) er
 	// Show what we're about to do with appropriate emoji
 	switch method {
 	case "GET":
-		_, _ = fmt.Fprintf(e.output, "📥 GET request to: %s\n", url)
+		_, _ = fmt.Fprintf(e.output, "📥  GET request to: %s\n", url)
 	case "POST":
 		_, _ = fmt.Fprintf(e.output, "📤 POST request to: %s\n", url)
 	case "PUT":
-		_, _ = fmt.Fprintf(e.output, "🔄 PUT request to: %s\n", url)
+		_, _ = fmt.Fprintf(e.output, "🔄  PUT request to: %s\n", url)
 	case "PATCH":
 		_, _ = fmt.Fprintf(e.output, "🔧 PATCH request to: %s\n", url)
 	case "DELETE":
 		_, _ = fmt.Fprintf(e.output, "🗑️  DELETE request to: %s\n", url)
 	case "HEAD":
-		_, _ = fmt.Fprintf(e.output, "🔍 HEAD request to: %s\n", url)
+		_, _ = fmt.Fprintf(e.output, "🔍  HEAD request to: %s\n", url)
 	default:
-		_, _ = fmt.Fprintf(e.output, "🌐 %s request to: %s\n", method, url)
+		_, _ = fmt.Fprintf(e.output, "🌐  %s request to: %s\n", method, url)
 	}
 
 	// Handle special HTTP operations

@@ -239,27 +239,27 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 		case "shell":
 			_, _ = fmt.Fprintf(e.output, "🐚 Shell: %s\n", interpolatedCommand)
 		case "capture":
-			_, _ = fmt.Fprintf(e.output, "📥 Capturing: %s\n", interpolatedCommand)
+			_, _ = fmt.Fprintf(e.output, "📥  Capturing: %s\n", interpolatedCommand)
 		}
 	}
 
 	// Execute the command
 	result, err := shell.Execute(interpolatedCommand, opts)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ Command failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  Command failed: %v\n", err)
 		return err
 	}
 
 	// Handle capture
 	if shellStmt.CaptureVar != "" && shellStmt.Action == "capture" {
 		ctx.Variables[shellStmt.CaptureVar] = result.Stdout
-		_, _ = fmt.Fprintf(e.output, "📦 Captured output in variable '%s'\n", shellStmt.CaptureVar)
+		_, _ = fmt.Fprintf(e.output, "📦  Captured output in variable '%s'\n", shellStmt.CaptureVar)
 	}
 
 	// Show execution summary
 	if result.Success {
 		if e.verbose {
-			_, _ = fmt.Fprintf(e.output, "✅ Command completed successfully (exit code: %d, duration: %v)\n",
+			_, _ = fmt.Fprintf(e.output, "✅  Command completed successfully (exit code: %d, duration: %v)\n",
 				result.ExitCode, result.Duration)
 		}
 	} else {

@@ -42,13 +42,13 @@ func (e *Engine) executeBreak(breakStmt *statement.Break, ctx *ExecutionContext)
 	if condition != "" {
 		// Evaluate the condition
 		if e.evaluateSimpleCondition(condition, ctx) {
-			_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop (condition: %s)\n", condition)
+			_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop (condition: %s)\n", condition)
 			return BreakError{Condition: condition}
 		}
 		// Condition not met, don't break
 		return nil
 	} else {
-		_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop\n")
 		return BreakError{Condition: condition}
 	}
 }
@@ -69,13 +69,13 @@ func (e *Engine) executeContinue(continueStmt *statement.Continue, ctx *Executio
 	if condition != "" {
 		// Evaluate the condition
 		if e.evaluateSimpleCondition(condition, ctx) {
-			_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop (condition: %s)\n", condition)
+			_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop (condition: %s)\n", condition)
 			return ContinueError{Condition: condition}
 		}
 		// Condition not met, don't continue
 		return nil
 	} else {
-		_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop\n")
 		return ContinueError{Condition: condition}
 	}
 }
@@ -147,7 +147,7 @@ func (e *Engine) executeLoop(stmt *statement.Loop, ctx *ExecutionContext) error 
 // executeSequentialLoop executes loop items sequentially
 func (e *Engine) executeSequentialLoop(stmt *statement.Loop, items []string, ctx *ExecutionContext) error {
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+		_, _ = fmt.Fprintf(e.output, "🔄  Executing %d items sequentially\n", len(items))
 	}
 
 	for i, item := range items {
@@ -164,13 +164,13 @@ func (e *Engine) executeSequentialLoop(stmt *statement.Loop, items []string, ctx
 				// Check for break/continue control flow
 				if breakErr, ok := err.(BreakError); ok {
 					if e.verbose {
-						_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+						_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop: %s\n", breakErr.Error())
 					}
 					return nil // Break out of the entire loop
 				}
 				if continueErr, ok := err.(ContinueError); ok {
 					if e.verbose {
-						_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+						_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop: %s\n", continueErr.Error())
 					}
 					break // Break out of the body execution, continue to next item
 				}
@@ -180,7 +180,7 @@ func (e *Engine) executeSequentialLoop(stmt *statement.Loop, items []string, ctx
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+		_, _ = fmt.Fprintf(e.output, "✅  Sequential loop completed: %d items processed\n", len(items))
 	}
 	return nil
 }
@@ -283,7 +283,7 @@ func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing range loop from %s to %s step %s (%d items)\n", start, end, step, len(items))
+	_, _ = fmt.Fprintf(e.output, "🔄  Executing range loop from %s to %s step %s (%d items)\n", start, end, step, len(items))
 
 	// Apply filter if present
 	if stmt.Filter != nil {
@@ -337,7 +337,7 @@ func (e *Engine) executeMatchLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 	// For now, we'll simulate with some sample matches
 	matches := []string{"match1", "match2"}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Finding matches for pattern: %s (%d matches)\n", pattern, len(matches))
+	_, _ = fmt.Fprintf(e.output, "🔍  Finding matches for pattern: %s (%d matches)\n", pattern, len(matches))
 
 	// Apply filter if present
 	if stmt.Filter != nil {
@@ -519,7 +519,7 @@ func (e *Engine) applyFilter(items []string, filter *statement.Filter, ctx *Exec
 	}
 
 	if len(filtered) != len(items) {
-		_, _ = fmt.Fprintf(e.output, "🔍 Filter applied: %d items match condition '%s %s %s'\n",
+		_, _ = fmt.Fprintf(e.output, "🔍  Filter applied: %d items match condition '%s %s %s'\n",
 			len(filtered), filter.Variable, filter.Operator, filterValue)
 	}
 

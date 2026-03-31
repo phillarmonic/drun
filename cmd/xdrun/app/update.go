@@ -28,7 +28,7 @@ type GitHubRelease struct {
 
 // HandleSelfUpdate handles the --self-update flag
 func HandleSelfUpdate(versionStr string) error {
-	fmt.Println("🔄 Checking for drun updates...")
+	fmt.Println("🔄  Checking for drun updates...")
 
 	// Get current executable path
 	currentExe, err := os.Executable()
@@ -46,11 +46,11 @@ func HandleSelfUpdate(versionStr string) error {
 	currentVersion := normalizeVersion(versionStr)
 	normalizedLatest := normalizeVersion(latestVersion)
 	if currentVersion == normalizedLatest {
-		fmt.Printf("✅ You're already running the latest version: %s\n", versionStr)
+		fmt.Printf("✅  You're already running the latest version: %s\n", versionStr)
 		return nil
 	}
 
-	fmt.Printf("📦 New version available: %s (current: %s)\n", latestVersion, versionStr)
+	fmt.Printf("📦  New version available: %s (current: %s)\n", latestVersion, versionStr)
 
 	// Ask for user confirmation
 	if !askForConfirmation("Do you want to update now?") {
@@ -69,16 +69,16 @@ func HandleSelfUpdate(versionStr string) error {
 	// Download and install new version
 	if err := downloadAndInstall(latestVersion, currentExe); err != nil {
 		// Restore backup on failure
-		fmt.Printf("❌ Update failed: %v\n", err)
-		fmt.Println("🔄 Restoring backup...")
+		fmt.Printf("❌  Update failed: %v\n", err)
+		fmt.Println("🔄  Restoring backup...")
 		if restoreErr := restoreBackup(backupPath, currentExe); restoreErr != nil {
 			return fmt.Errorf("update failed and backup restoration failed: %v (original error: %w)", restoreErr, err)
 		}
-		fmt.Println("✅ Backup restored successfully")
+		fmt.Println("✅  Backup restored successfully")
 		return err
 	}
 
-	fmt.Printf("🎉 Successfully updated to version %s!\n", latestVersion)
+	fmt.Printf("🎉  Successfully updated to version %s!\n", latestVersion)
 	fmt.Printf("💾 Backup available at: %s\n", backupPath)
 
 	// Display the actual version from the updated binary
@@ -202,7 +202,7 @@ func downloadAndInstall(version, targetPath string) error {
 
 	downloadURL := fmt.Sprintf("https://github.com/phillarmonic/drun/releases/download/%s/%s", version, binaryName)
 
-	fmt.Printf("📥 Downloading %s...\n", binaryName)
+	fmt.Printf("📥  Downloading %s...\n", binaryName)
 
 	// Download the binary
 	client := &http.Client{Timeout: 60 * time.Second}
@@ -247,14 +247,14 @@ func downloadAndInstall(version, targetPath string) error {
 	}
 
 	// Verify the binary works
-	fmt.Println("🔍 Verifying downloaded binary...")
+	fmt.Println("🔍  Verifying downloaded binary...")
 	cmd := exec.Command(tempFile.Name(), "--version")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("downloaded binary failed verification: %w", err)
 	}
 
 	// Install the binary (may require elevated permissions)
-	fmt.Println("📦 Installing new version...")
+	fmt.Println("📦  Installing new version...")
 	if err := installBinary(tempFile.Name(), targetPath); err != nil {
 		return fmt.Errorf("failed to install binary: %w", err)
 	}
@@ -270,7 +270,7 @@ func installBinary(sourcePath, targetPath string) error {
 	}
 
 	// If direct copy failed, try with elevated permissions
-	fmt.Println("🔐 Requesting elevated permissions...")
+	fmt.Println("🔐  Requesting elevated permissions...")
 
 	switch runtime.GOOS {
 	case "darwin", "linux":

@@ -54,7 +54,7 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 	// Show what we're about to do with appropriate emoji
 	switch operation {
 	case "build":
-		_, _ = fmt.Fprintf(e.output, "🔨 Building Docker image")
+		_, _ = fmt.Fprintf(e.output, "🔨  Building Docker image")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
@@ -69,13 +69,13 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "pull":
-		_, _ = fmt.Fprintf(e.output, "📥 Pulling Docker image")
+		_, _ = fmt.Fprintf(e.output, "📥  Pulling Docker image")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "run":
-		_, _ = fmt.Fprintf(e.output, "🚀 Running Docker container")
+		_, _ = fmt.Fprintf(e.output, "🚀  Running Docker container")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
@@ -84,7 +84,7 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "stop":
-		_, _ = fmt.Fprintf(e.output, "🛑 Stopping Docker container")
+		_, _ = fmt.Fprintf(e.output, "🛑  Stopping Docker container")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
@@ -99,18 +99,18 @@ func (e *Engine) executeDocker(dockerStmt *statement.Docker, ctx *ExecutionConte
 		command := options["command"]
 		switch command {
 		case "up":
-			_, _ = fmt.Fprintf(e.output, "🚀 Starting Docker Compose services\n")
+			_, _ = fmt.Fprintf(e.output, "🚀  Starting Docker Compose services\n")
 		case "down":
-			_, _ = fmt.Fprintf(e.output, "🛑 Stopping Docker Compose services\n")
+			_, _ = fmt.Fprintf(e.output, "🛑  Stopping Docker Compose services\n")
 		case "build":
-			_, _ = fmt.Fprintf(e.output, "🔨 Building Docker Compose services\n")
+			_, _ = fmt.Fprintf(e.output, "🔨  Building Docker Compose services\n")
 		default:
 			_, _ = fmt.Fprintf(e.output, "🐳 Running Docker Compose: %s\n", command)
 		}
 	case "scale":
 		if resource == "compose" {
 			replicas := options["replicas"]
-			_, _ = fmt.Fprintf(e.output, "📊 Scaling Docker Compose service")
+			_, _ = fmt.Fprintf(e.output, "📊  Scaling Docker Compose service")
 			if name != "" {
 				_, _ = fmt.Fprintf(e.output, " %s", name)
 			}

@@ -84,7 +84,7 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 		case "shell":
 			_, _ = fmt.Fprintf(e.output, "🐚 Shell multiline commands (%d lines):\n", len(interpolatedCommands))
 		case "capture":
-			_, _ = fmt.Fprintf(e.output, "📥 Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
+			_, _ = fmt.Fprintf(e.output, "📥  Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
 		}
 
 		// Show each command with line numbers
@@ -96,20 +96,20 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	// Execute the script as a single shell session
 	result, err := shell.Execute(script, opts)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ Multiline command failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  Multiline command failed: %v\n", err)
 		return err
 	}
 
 	// Handle capture
 	if shellStmt.CaptureVar != "" && shellStmt.Action == "capture" {
 		ctx.Variables[shellStmt.CaptureVar] = result.Stdout
-		_, _ = fmt.Fprintf(e.output, "📦 Captured output in variable '%s'\n", shellStmt.CaptureVar)
+		_, _ = fmt.Fprintf(e.output, "📦  Captured output in variable '%s'\n", shellStmt.CaptureVar)
 	}
 
 	// Show execution summary
 	if result.Success {
 		if e.verbose {
-			_, _ = fmt.Fprintf(e.output, "✅ Multiline commands completed successfully (exit code: %d, duration: %v)\n",
+			_, _ = fmt.Fprintf(e.output, "✅  Multiline commands completed successfully (exit code: %d, duration: %v)\n",
 				result.ExitCode, result.Duration)
 		}
 	} else {

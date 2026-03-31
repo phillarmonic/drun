@@ -20,7 +20,7 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *stat
 			if e.dryRun {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would detect project types: %v\n", types)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "🔍 Detected project types: %v\n", types)
+				_, _ = fmt.Fprintf(e.output, "🔍  Detected project types: %v\n", types)
 			}
 		}
 	default:
@@ -30,7 +30,7 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *stat
 			if e.dryRun {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would detect %s version: %s\n", stmt.Target, version)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "🔍 Detected %s version: %s\n", stmt.Target, version)
+				_, _ = fmt.Fprintf(e.output, "🔍  Detected %s version: %s\n", stmt.Target, version)
 			}
 			// Set the detected version in variables (e.g., docker_version)
 			ctx.Variables[stmt.Target+"_version"] = version
@@ -39,7 +39,7 @@ func (e *Engine) executeDetectOperation(detector *detection.Detector, stmt *stat
 			if e.dryRun {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s is available: %t\n", stmt.Target, available)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "🔍 %s available: %t\n", stmt.Target, available)
+				_, _ = fmt.Fprintf(e.output, "🔍  %s available: %t\n", stmt.Target, available)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔍 Checking if %s: %t\n", conditionText, conditionMet)
+		_, _ = fmt.Fprintf(e.output, "🔍  Checking if %s: %t\n", conditionText, conditionMet)
 	}
 
 	if conditionMet {
@@ -161,7 +161,7 @@ func (e *Engine) executeIfVersion(detector *detection.Detector, stmt *statement.
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔍 Checking %s version %s %s %s: %t (current: %s)\n",
+		_, _ = fmt.Fprintf(e.output, "🔍  Checking %s version %s %s %s: %t (current: %s)\n",
 			stmt.Target, version, stmt.Condition, targetVersion, matches, version)
 	}
 
@@ -202,7 +202,7 @@ func (e *Engine) executeWhenEnvironment(detector *detection.Detector, stmt *stat
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔍 Checking if in %s environment: %t (current: %s)\n",
+		_, _ = fmt.Fprintf(e.output, "🔍  Checking if in %s environment: %t (current: %s)\n",
 			stmt.Target, matches, currentEnv)
 	}
 
@@ -255,23 +255,23 @@ func (e *Engine) executeDetectAvailable(detector *detection.Detector, stmt *stat
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔍 Detecting available tool from: %v\n", toolsToTry)
+		_, _ = fmt.Fprintf(e.output, "🔍  Detecting available tool from: %v\n", toolsToTry)
 	}
 
 	if found {
 		if e.verbose {
-			_, _ = fmt.Fprintf(e.output, "✅ Found: %s\n", workingTool)
+			_, _ = fmt.Fprintf(e.output, "✅  Found: %s\n", workingTool)
 		}
 
 		// Capture the working tool variant in a variable if specified
 		if stmt.CaptureVar != "" {
 			ctx.Variables[stmt.CaptureVar] = workingTool
 			if e.verbose {
-				_, _ = fmt.Fprintf(e.output, "📝 Captured as %s: %s\n", stmt.CaptureVar, workingTool)
+				_, _ = fmt.Fprintf(e.output, "📝  Captured as %s: %s\n", stmt.CaptureVar, workingTool)
 			}
 		}
 	} else {
-		_, _ = fmt.Fprintf(e.output, "❌ None of the tools are available: %v\n", toolsToTry)
+		_, _ = fmt.Fprintf(e.output, "❌  None of the tools are available: %v\n", toolsToTry)
 	}
 
 	return nil

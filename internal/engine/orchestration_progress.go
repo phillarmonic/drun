@@ -155,19 +155,19 @@ func (pd *ProgressDisplay) RenderInline(name string) {
 func (pd *ProgressDisplay) getStatusIcon(status string) string {
 	switch status {
 	case "pending":
-		return "⏸️ "
+		return "⏸️  "
 	case "building":
-		return "🔨 "
+		return "🔨  "
 	case "starting":
-		return "🔄 "
+		return "🔄  "
 	case "healthy":
-		return "✅ "
+		return "✅  "
 	case "failed":
-		return "❌ "
+		return "❌  "
 	case "stopped":
-		return "⏹️ "
+		return "⏹️  "
 	case "stopping":
-		return "🛑 "
+		return "🛑  "
 	default:
 		return "  "
 	}
@@ -194,9 +194,9 @@ func (pd *ProgressDisplay) RenderSummary() {
 
 	_, _ = fmt.Fprintf(pd.output, "\n")
 	if failed > 0 {
-		_, _ = fmt.Fprintf(pd.output, "❌ %d/%d services failed\n", failed, total)
+		_, _ = fmt.Fprintf(pd.output, "❌  %d/%d services failed\n", failed, total)
 	} else {
-		_, _ = fmt.Fprintf(pd.output, "✅ %d/%d services completed successfully\n", successful, total)
+		_, _ = fmt.Fprintf(pd.output, "✅  %d/%d services completed successfully\n", successful, total)
 	}
 }
 
@@ -311,7 +311,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 					currentBranch, err := repoManager.GetCurrentBranch(context.Background(), service.Path)
 					if err == nil && (currentBranch == "main" || currentBranch == "master") {
 						hasRepoUpdates = true
-						_, _ = fmt.Fprintf(e.output, "\n  📥 Updating repository on default branch (%s) for %s\n", currentBranch, serviceName)
+						_, _ = fmt.Fprintf(e.output, "\n  📥  Updating repository on default branch (%s) for %s\n", currentBranch, serviceName)
 					}
 				} else {
 					// For "start" command: only check for updates, don't force
@@ -327,7 +327,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 					} else {
 						hasRepoUpdates = hasUpdates
 						if hasUpdates {
-							_, _ = fmt.Fprintf(e.output, "\n  📥 Repository updates available for %s\n", serviceName)
+							_, _ = fmt.Fprintf(e.output, "\n  📥  Repository updates available for %s\n", serviceName)
 						}
 					}
 				}
@@ -365,14 +365,14 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				progress.UpdateService(serviceName, "cloning", "Cloning repository...")
 				progress.RenderInline(serviceName)
 
-				_, _ = fmt.Fprintf(e.output, "\n  📂 Cloning to: %s\n", service.Path)
+				_, _ = fmt.Fprintf(e.output, "\n  📂  Cloning to: %s\n", service.Path)
 
 				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
 					progress.FailService(serviceName, fmt.Errorf("repository clone failed: %w", err))
 					progress.RenderInline(serviceName)
 
 					if orch.StopOnFailure || orch.CircuitBreaker {
-						_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+						_, _ = fmt.Fprintf(e.output, "\n🔴  Circuit breaker triggered! Rolling back dependent services...\n\n")
 						return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
 					}
 					return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
@@ -382,19 +382,19 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				progress.UpdateService(serviceName, "updating", "Pulling repository updates...")
 				progress.RenderInline(serviceName)
 
-				_, _ = fmt.Fprintf(e.output, "\n  📂 Updating repository at: %s\n", service.Path)
+				_, _ = fmt.Fprintf(e.output, "\n  📂  Updating repository at: %s\n", service.Path)
 
 				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
 					progress.FailService(serviceName, fmt.Errorf("repository update failed: %w", err))
 					progress.RenderInline(serviceName)
 
 					if orch.StopOnFailure || orch.CircuitBreaker {
-						_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+						_, _ = fmt.Fprintf(e.output, "\n🔴  Circuit breaker triggered! Rolling back dependent services...\n\n")
 						return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
 					}
 					return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
 				}
-				_, _ = fmt.Fprintf(e.output, "  ✓ Repository updated for %s\n\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "  ✓  Repository updated for %s\n\n", serviceName)
 			}
 
 			progress.UpdateService(serviceName, "starting", "Repository ready")
@@ -427,7 +427,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			progress.RenderInline(serviceName)
 
 			// Show build output header
-			_, _ = fmt.Fprintf(e.output, "\n🔨 Building %s:\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "\n🔨  Building %s:\n", serviceName)
 
 			if err := e.performServiceBuild(ctx, service, false, true); err != nil {
 				progress.FailService(serviceName, err)
@@ -435,7 +435,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 
 				// Check if we should stop on failure
 				if orch.StopOnFailure || orch.CircuitBreaker {
-					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+					_, _ = fmt.Fprintf(e.output, "\n🔴  Circuit breaker triggered! Rolling back dependent services...\n\n")
 
 					// Only stop services that depend on the failed service
 					startedServices := []string{}
@@ -483,7 +483,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			}
 
 			// Show build completion and update progress
-			_, _ = fmt.Fprintf(e.output, "✅ Build completed for %s\n\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "✅  Build completed for %s\n\n", serviceName)
 			progress.UpdateService(serviceName, "starting", "Build complete, starting...")
 			progress.RenderInline(serviceName)
 		}
@@ -495,7 +495,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 
 			// Check if we should stop on failure
 			if orch.StopOnFailure || orch.CircuitBreaker {
-				_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+				_, _ = fmt.Fprintf(e.output, "\n🔴  Circuit breaker triggered! Rolling back dependent services...\n\n")
 
 				// Only stop services that depend on the failed service
 				// For now, we'll stop all services that were started after the failed one
@@ -556,7 +556,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 
 				// Check if we should stop on failure
 				if orch.StopOnFailure || orch.CircuitBreaker {
-					_, _ = fmt.Fprintf(e.output, "\n🔴 Circuit breaker triggered! Rolling back dependent services...\n\n")
+					_, _ = fmt.Fprintf(e.output, "\n🔴  Circuit breaker triggered! Rolling back dependent services...\n\n")
 
 					// Only stop services that depend on the failed service
 					startedServices := []string{}
@@ -621,7 +621,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 
 // orchestrateStopWithProgress stops services with progress display
 func (e *Engine) orchestrateStopWithProgress(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🛑 Stopping orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🛑  Stopping orchestration: %s\n", orch.Name)
 	_, _ = fmt.Fprintf(e.output, "   %d services in reverse order\n\n", len(orderedServices))
 
 	progress := NewProgressDisplay(e.output)
@@ -656,7 +656,7 @@ func (e *Engine) orchestrateStopWithProgress(ctx *ExecutionContext, orch *ast.Or
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "\n✅ All services stopped\n")
+	_, _ = fmt.Fprintf(e.output, "\n✅  All services stopped\n")
 	return nil
 }
 
@@ -683,7 +683,7 @@ func (e *Engine) displayServiceURLs(orderedServices []string, services map[strin
 
 	// Display URLs if any found
 	if len(httpServices) > 0 {
-		_, _ = fmt.Fprintf(e.output, "\n🌐 Service URLs:\n")
+		_, _ = fmt.Fprintf(e.output, "\n🌐  Service URLs:\n")
 		for _, svc := range httpServices {
 			_, _ = fmt.Fprintf(e.output, "   • %s: %s\n", svc.name, svc.url)
 		}

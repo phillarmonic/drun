@@ -139,7 +139,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 				if s.Value != nil {
 					ctx.GetIncludedSettings()[namespacedKey] = s.Value.String()
 					if r.verbose {
-						_, _ = fmt.Fprintf(r.output, "  ✓ Loaded setting: %s\n", namespacedKey)
+						_, _ = fmt.Fprintf(r.output, "  ✓  Loaded setting: %s\n", namespacedKey)
 					}
 				}
 			case *ast.ProjectParameterStatement:
@@ -147,7 +147,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 				namespacedName := namespace + "." + s.Name
 				ctx.GetIncludedParams()[namespacedName] = s
 				if r.verbose {
-					_, _ = fmt.Fprintf(r.output, "  ✓ Loaded parameter: %s\n", namespacedName)
+					_, _ = fmt.Fprintf(r.output, "  ✓  Loaded parameter: %s\n", namespacedName)
 				}
 			case *ast.SnippetStatement:
 				// Namespace snippets (only if includeSnippets is true)
@@ -155,7 +155,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 					namespacedName := namespace + "." + s.Name
 					ctx.GetIncludedSnippets()[namespacedName] = s
 					if r.verbose {
-						_, _ = fmt.Fprintf(r.output, "  ✓ Loaded snippet: %s\n", namespacedName)
+						_, _ = fmt.Fprintf(r.output, "  ✓  Loaded snippet: %s\n", namespacedName)
 					}
 				}
 			}
@@ -168,7 +168,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 			namespacedName := namespace + "." + template.Name
 			ctx.GetIncludedTemplates()[namespacedName] = template
 			if r.verbose {
-				_, _ = fmt.Fprintf(r.output, "  ✓ Loaded template: %s\n", namespacedName)
+				_, _ = fmt.Fprintf(r.output, "  ✓  Loaded template: %s\n", namespacedName)
 			}
 		}
 	}
@@ -179,13 +179,13 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 			namespacedName := namespace + "." + task.Name
 			ctx.GetIncludedTasks()[namespacedName] = task
 			if r.verbose {
-				_, _ = fmt.Fprintf(r.output, "  ✓ Loaded task: %s\n", namespacedName)
+				_, _ = fmt.Fprintf(r.output, "  ✓  Loaded task: %s\n", namespacedName)
 			}
 		}
 	}
 
 	if r.verbose {
-		_, _ = fmt.Fprintf(r.output, "✓ Included %s as namespace '%s'\n", include.Path, namespace)
+		_, _ = fmt.Fprintf(r.output, "✓  Included %s as namespace '%s'\n", include.Path, namespace)
 	}
 }
 
@@ -239,7 +239,7 @@ func (r *Resolver) fetchRemoteInclude(url string) (string, error) {
 	if r.cacheManager != nil {
 		if content, hit, err := r.cacheManager.Get(cacheKey); err == nil && hit {
 			if r.verbose {
-				_, _ = fmt.Fprintf(r.output, "  ✓ Cache hit for %s\n", url)
+				_, _ = fmt.Fprintf(r.output, "  ✓  Cache hit for %s\n", url)
 			}
 			return r.writeTempFile(content, url)
 		}
@@ -262,9 +262,9 @@ func (r *Resolver) fetchRemoteInclude(url string) (string, error) {
 	}
 
 	if r.verbose {
-		_, _ = fmt.Fprintf(r.output, "🌐 Fetching remote include: %s\n", url)
+		_, _ = fmt.Fprintf(r.output, "🌐  Fetching remote include: %s\n", url)
 		if protocol == "github" && ref == "" {
-			_, _ = fmt.Fprintf(r.output, "  ✓ Detecting default branch...\n")
+			_, _ = fmt.Fprintf(r.output, "  ✓  Detecting default branch...\n")
 		}
 	}
 
@@ -283,7 +283,7 @@ func (r *Resolver) fetchRemoteInclude(url string) (string, error) {
 	}
 
 	if r.verbose {
-		_, _ = fmt.Fprintf(r.output, "  ✓ Downloaded %.1f KB\n", float64(len(content))/1024)
+		_, _ = fmt.Fprintf(r.output, "  ✓  Downloaded %.1f KB\n", float64(len(content))/1024)
 	}
 
 	// Store in cache
@@ -294,7 +294,7 @@ func (r *Resolver) fetchRemoteInclude(url string) (string, error) {
 				_, _ = fmt.Fprintf(r.output, "  ⚠️  Failed to cache: %v\n", err)
 			}
 		} else if r.verbose {
-			_, _ = fmt.Fprintf(r.output, "  ✓ Cached with 1m expiration\n")
+			_, _ = fmt.Fprintf(r.output, "  ✓  Cached with 1m expiration\n")
 		}
 	}
 

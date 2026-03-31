@@ -33,7 +33,7 @@ func (e *Engine) executeGit(gitStmt *statement.Git, ctx *ExecutionContext) error
 	case "create":
 		switch resource {
 		case "branch":
-			_, _ = fmt.Fprintf(e.output, "🌿 Creating Git branch")
+			_, _ = fmt.Fprintf(e.output, "🌿  Creating Git branch")
 			if name != "" {
 				_, _ = fmt.Fprintf(e.output, ": %s", name)
 			}
@@ -79,7 +79,7 @@ func (e *Engine) executeGit(gitStmt *statement.Git, ctx *ExecutionContext) error
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "clone":
-		_, _ = fmt.Fprintf(e.output, "📥 Cloning Git repository")
+		_, _ = fmt.Fprintf(e.output, "📥  Cloning Git repository")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
@@ -93,10 +93,10 @@ func (e *Engine) executeGit(gitStmt *statement.Git, ctx *ExecutionContext) error
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "status":
-		_, _ = fmt.Fprintf(e.output, "📊 Checking Git status\n")
+		_, _ = fmt.Fprintf(e.output, "📊  Checking Git status\n")
 	case "show":
 		if resource == "branch" {
-			_, _ = fmt.Fprintf(e.output, "🌿 Showing current Git branch\n")
+			_, _ = fmt.Fprintf(e.output, "🌿  Showing current Git branch\n")
 		} else {
 			_, _ = fmt.Fprintf(e.output, "📖 Showing Git information\n")
 		}

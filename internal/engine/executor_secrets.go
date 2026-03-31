@@ -57,7 +57,7 @@ func (e *Engine) executeSecretSet(secretStmt *statement.Secret, ctx *ExecutionCo
 		if err := e.secretsManager.Set(namespace, secretStmt.Key, interpolatedValue); err != nil {
 			return fmt.Errorf("failed to set secret %s:%s: %w", namespace, secretStmt.Key, err)
 		}
-		_, _ = fmt.Fprintf(e.output, "🔐 Secret %s stored securely (namespace: %s)\n", secretStmt.Key, namespace)
+		_, _ = fmt.Fprintf(e.output, "🔐  Secret %s stored securely (namespace: %s)\n", secretStmt.Key, namespace)
 	} else {
 		return fmt.Errorf("secrets manager not initialized")
 	}
@@ -167,9 +167,9 @@ func (e *Engine) executeSecretExists(secretStmt *statement.Secret, ctx *Executio
 		}
 
 		if exists {
-			_, _ = fmt.Fprintf(e.output, "✅ Secret %s exists (namespace: %s)\n", secretStmt.Key, namespace)
+			_, _ = fmt.Fprintf(e.output, "✅  Secret %s exists (namespace: %s)\n", secretStmt.Key, namespace)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "❌ Secret %s does not exist (namespace: %s)\n", secretStmt.Key, namespace)
+			_, _ = fmt.Fprintf(e.output, "❌  Secret %s does not exist (namespace: %s)\n", secretStmt.Key, namespace)
 		}
 	} else {
 		return fmt.Errorf("secrets manager not initialized")

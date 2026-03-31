@@ -32,7 +32,7 @@ func ExecuteTask(
 
 	// Verbose: Show we're starting
 	if verbose {
-		_, _ = fmt.Fprintf(os.Stdout, "📂 Loading: %s\n", actualConfigFile)
+		_, _ = fmt.Fprintf(os.Stdout, "📂  Loading: %s\n", actualConfigFile)
 	}
 
 	// Read the drun file
@@ -42,7 +42,7 @@ func ExecuteTask(
 	}
 
 	if verbose {
-		_, _ = fmt.Fprintf(os.Stdout, "🔍 Parsing drun file...\n")
+		_, _ = fmt.Fprintf(os.Stdout, "🔍  Parsing drun file...\n")
 	}
 
 	// Parse the drun file
@@ -57,7 +57,7 @@ func ExecuteTask(
 	}
 
 	if verbose {
-		_, _ = fmt.Fprintf(os.Stdout, "✅ Parsed successfully\n")
+		_, _ = fmt.Fprintf(os.Stdout, "✅  Parsed successfully\n")
 	}
 
 	// Initialize secrets manager using platform-appropriate backend

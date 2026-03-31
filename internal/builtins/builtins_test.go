@@ -313,7 +313,7 @@ func TestProgressFunctions(t *testing.T) {
 		t.Fatalf("finishProgress() failed: %v", err)
 	}
 
-	if !strings.Contains(result, "✅ Task completed") {
+	if !strings.Contains(result, "✅  Task completed") {
 		t.Errorf("Expected result to contain completion message, got %q", result)
 	}
 	if !strings.Contains(result, "(completed in") {
@@ -326,7 +326,7 @@ func TestProgressFunctions(t *testing.T) {
 		t.Fatalf("finishProgress() with custom name failed: %v", err)
 	}
 
-	if !strings.Contains(result, "✅ Custom task completed") {
+	if !strings.Contains(result, "✅  Custom task completed") {
 		t.Errorf("Expected result to contain completion message, got %q", result)
 	}
 

@@ -56,7 +56,7 @@ version: 2.0
 project "clipboarder" version "1.0":
 
 task "usage" means "Show available tasks and usage information":
-	info "🚀 Clipboarder Development Tasks"
+	info "🚀  Clipboarder Development Tasks"
 `,
 		},
 	}

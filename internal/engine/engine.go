@@ -860,11 +860,11 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 	case "warn":
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
-		_, _ = fmt.Fprintf(e.output, "❌ %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "❌  %s\n", interpolatedMessage)
 	case "success":
-		_, _ = fmt.Fprintf(e.output, "✅ %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "✅  %s\n", interpolatedMessage)
 	case "fail":
-		_, _ = fmt.Fprintf(e.output, "💥 %s\n", interpolatedMessage)
+		_, _ = fmt.Fprintf(e.output, "💥  %s\n", interpolatedMessage)
 		return fmt.Errorf("task failed: %s", interpolatedMessage)
 	case "echo":
 		// Process \n escape sequences for newlines

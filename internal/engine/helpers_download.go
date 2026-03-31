@@ -121,7 +121,7 @@ func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, o
 	// Calculate final stats
 	duration := time.Since(startTime)
 	speed := float64(downloaded) / duration.Seconds()
-	_, _ = fmt.Fprintf(e.output, "   📊 %s in %s (%.2f MB/s)\n",
+	_, _ = fmt.Fprintf(e.output, "   📊  %s in %s (%.2f MB/s)\n",
 		formatBytes(downloaded),
 		duration.Round(time.Millisecond),
 		speed/1024/1024)
@@ -133,7 +133,7 @@ func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, o
 func (e *Engine) showDownloadProgress(downloaded, total int64, elapsed time.Duration) {
 	if total <= 0 {
 		// Unknown size, just show downloaded amount
-		_, _ = fmt.Fprintf(e.output, "\r   📥 Downloaded: %s", formatBytes(downloaded))
+		_, _ = fmt.Fprintf(e.output, "\r   📥  Downloaded: %s", formatBytes(downloaded))
 		return
 	}
 
@@ -156,7 +156,7 @@ func (e *Engine) showDownloadProgress(downloaded, total int64, elapsed time.Dura
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
 	// Format output
-	_, _ = fmt.Fprintf(e.output, "\r   📥 [%s] %.1f%% | %s/%s | %.2f MB/s | ETA: %s",
+	_, _ = fmt.Fprintf(e.output, "\r   📥  [%s] %.1f%% | %s/%s | %.2f MB/s | ETA: %s",
 		bar,
 		percent,
 		formatBytes(downloaded),

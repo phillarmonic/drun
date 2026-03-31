@@ -33,9 +33,9 @@ func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionCo
 	// Show what we're about to do with appropriate emoji
 	switch networkStmt.Action {
 	case "health_check":
-		_, _ = fmt.Fprintf(e.output, "🏥 Health check: %s\n", target)
+		_, _ = fmt.Fprintf(e.output, "🏥  Health check: %s\n", target)
 	case "wait_for_service":
-		_, _ = fmt.Fprintf(e.output, "⏳ Waiting for service: %s\n", target)
+		_, _ = fmt.Fprintf(e.output, "⏳  Waiting for service: %s\n", target)
 	case "port_check":
 		if port != "" {
 			_, _ = fmt.Fprintf(e.output, "🔌 Port check: %s:%s\n", target, port)
@@ -45,7 +45,7 @@ func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionCo
 	case "ping":
 		_, _ = fmt.Fprintf(e.output, "🏓 Ping: %s\n", target)
 	default:
-		_, _ = fmt.Fprintf(e.output, "🌐 Network operation: %s on %s\n", networkStmt.Action, target)
+		_, _ = fmt.Fprintf(e.output, "🌐  Network operation: %s on %s\n", networkStmt.Action, target)
 	}
 
 	// Build and execute the actual network command
@@ -79,7 +79,7 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 	// Check if file exists and handle overwrite
 	if !downloadStmt.AllowOverwrite && e.fileExists(path) {
 		errMsg := fmt.Sprintf("file already exists: %s (use 'allow overwrite' to replace)", path)
-		_, _ = fmt.Fprintf(e.output, "❌ %s\n", errMsg)
+		_, _ = fmt.Fprintf(e.output, "❌  %s\n", errMsg)
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -108,22 +108,22 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 	// Perform the download with progress tracking
 	err := e.downloadFileWithProgress(url, path, headers, auth, options)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ Download failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  Download failed: %v\n", err)
 		return fmt.Errorf("download failed: %w", err)
 	}
 
 	// Extract archive if requested
 	if downloadStmt.ExtractTo != "" {
 		extractTo := e.interpolateVariables(downloadStmt.ExtractTo, ctx)
-		_, _ = fmt.Fprintf(e.output, "📦 Extracting archive to: %s\n", extractTo)
+		_, _ = fmt.Fprintf(e.output, "📦  Extracting archive to: %s\n", extractTo)
 
 		err = e.extractArchive(path, extractTo)
 		if err != nil {
-			_, _ = fmt.Fprintf(e.output, "❌ Extraction failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, "❌  Extraction failed: %v\n", err)
 			return fmt.Errorf("extraction failed: %w", err)
 		}
 
-		_, _ = fmt.Fprintf(e.output, "✅ Extraction completed\n")
+		_, _ = fmt.Fprintf(e.output, "✅  Extraction completed\n")
 
 		// Remove archive if requested
 		if downloadStmt.RemoveArchive {
@@ -132,7 +132,7 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 			if err != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to remove archive: %v\n", err)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "✅ Archive removed\n")
+				_, _ = fmt.Fprintf(e.output, "✅  Archive removed\n")
 			}
 		}
 	} else {
@@ -154,6 +154,6 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ Downloaded successfully to: %s\n", path)
+	_, _ = fmt.Fprintf(e.output, "✅  Downloaded successfully to: %s\n", path)
 	return nil
 }

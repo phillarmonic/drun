@@ -88,7 +88,7 @@ func (m *MemoryMonitor) checkMemory() {
 	// Critical threshold - dump and exit
 	if allocMB > CriticalThresholdMB {
 		m.dumpDiagnostics(mem)
-		fmt.Fprintf(os.Stderr, "\n❌ CRITICAL: Memory usage exceeded %d MB (current: %d MB)\n", CriticalThresholdMB, allocMB)
+		fmt.Fprintf(os.Stderr, "\n❌  CRITICAL: Memory usage exceeded %d MB (current: %d MB)\n", CriticalThresholdMB, allocMB)
 		fmt.Fprintf(os.Stderr, "Diagnostic information dumped to drun-crash-dump.json\n")
 		fmt.Fprintf(os.Stderr, "This likely indicates an infinite loop or runaway recursion.\n")
 		os.Exit(1)

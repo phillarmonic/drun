@@ -59,7 +59,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 	debug.DebugDomain(debugInfo)
 
 	// Show dependency resolution for each task
-	fmt.Println("🔍 Dependency Resolution Analysis:")
+	fmt.Println("🔍  Dependency Resolution Analysis:")
 	fmt.Println()
 	tasks := taskReg.List()
 	if len(tasks) == 0 {
@@ -73,9 +73,9 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 				// Try to resolve dependencies
 				resolved, err := depResolver.Resolve(fullName)
 				if err != nil {
-					fmt.Printf("    ❌ Resolution failed: %v\n", err)
+					fmt.Printf("    ❌  Resolution failed: %v\n", err)
 				} else {
-					fmt.Printf("    ✅ Execution order (%d tasks):\n", len(resolved))
+					fmt.Printf("    ✅  Execution order (%d tasks):\n", len(resolved))
 					for i, dep := range resolved {
 						marker := "→"
 						if i == len(resolved)-1 {
@@ -87,7 +87,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 					// Check for parallel opportunities
 					groups, err := depResolver.GetParallelGroups(domainTask)
 					if err == nil && len(groups) > 1 {
-						fmt.Printf("    🚀 Parallel execution opportunities: %d groups\n", len(groups))
+						fmt.Printf("    🚀  Parallel execution opportunities: %d groups\n", len(groups))
 						for i, group := range groups {
 							if len(group) > 1 {
 								fmt.Printf("       Group %d (parallel): %d tasks\n", i+1, len(group))
@@ -157,7 +157,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 			// Generate execution plan
 			plan, err := plannerInstance.Plan(fullName, program, projectCtx)
 			if err != nil {
-				fmt.Printf("    ❌ Failed to create plan: %v\n", err)
+				fmt.Printf("    ❌  Failed to create plan: %v\n", err)
 				continue
 			}
 
@@ -174,9 +174,9 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 				dot := debug.ExportExecutionPlanGraphviz(planInfo)
 				filename := fmt.Sprintf("%s-%s.dot", opts.ExportGraphviz, fullName)
 				if err := os.WriteFile(filename, []byte(dot), 0644); err != nil {
-					fmt.Printf("    ❌ Failed to write Graphviz file: %v\n", err)
+					fmt.Printf("    ❌  Failed to write Graphviz file: %v\n", err)
 				} else {
-					fmt.Printf("    ✅ Graphviz exported to: %s\n", filename)
+					fmt.Printf("    ✅  Graphviz exported to: %s\n", filename)
 					fmt.Printf("       Render with: dot -Tpng %s -o %s.png\n", filename, filename)
 				}
 			}
@@ -185,22 +185,22 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 				mermaid := debug.ExportExecutionPlanMermaid(planInfo)
 				filename := fmt.Sprintf("%s-%s.mmd", opts.ExportMermaid, fullName)
 				if err := os.WriteFile(filename, []byte(mermaid), 0644); err != nil {
-					fmt.Printf("    ❌ Failed to write Mermaid file: %v\n", err)
+					fmt.Printf("    ❌  Failed to write Mermaid file: %v\n", err)
 				} else {
-					fmt.Printf("    ✅ Mermaid exported to: %s\n", filename)
+					fmt.Printf("    ✅  Mermaid exported to: %s\n", filename)
 				}
 			}
 
 			if opts.ExportJSON != "" {
 				jsonStr, err := debug.ExportExecutionPlanJSON(planInfo)
 				if err != nil {
-					fmt.Printf("    ❌ Failed to export JSON: %v\n", err)
+					fmt.Printf("    ❌  Failed to export JSON: %v\n", err)
 				} else {
 					filename := fmt.Sprintf("%s-%s.json", opts.ExportJSON, fullName)
 					if err := os.WriteFile(filename, []byte(jsonStr), 0644); err != nil {
-						fmt.Printf("    ❌ Failed to write JSON file: %v\n", err)
+						fmt.Printf("    ❌  Failed to write JSON file: %v\n", err)
 					} else {
-						fmt.Printf("    ✅ JSON exported to: %s\n", filename)
+						fmt.Printf("    ✅  JSON exported to: %s\n", filename)
 					}
 				}
 			}

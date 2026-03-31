@@ -23,7 +23,7 @@ Examples:
 			if err := LinkDirectories(args, taskFile); err != nil {
 				return err
 			}
-			fmt.Println("✅ Link configuration updated")
+			fmt.Println("✅  Link configuration updated")
 			return nil
 		},
 	}

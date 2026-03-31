@@ -124,11 +124,11 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 			if err != nil || !healthy {
 				return fmt.Errorf("cannot start from '%s': dependency '%s' is not running or healthy (run full 'up' first)", resolved, serviceName)
 			}
-			_, _ = fmt.Fprintf(e.output, "  ✓ %s is running and healthy\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "  ✓  %s is running and healthy\n", serviceName)
 		}
 
 		// Filter to start from the specified service onwards
-		_, _ = fmt.Fprintf(e.output, "✅ All dependencies satisfied. Starting from '%s'...\n\n", resolved)
+		_, _ = fmt.Fprintf(e.output, "✅  All dependencies satisfied. Starting from '%s'...\n\n", resolved)
 		orderedServices = orderedServices[startIdx:]
 	}
 
@@ -359,7 +359,7 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 					}
 				} else {
 					// Check for updates
-					_, _ = fmt.Fprintf(e.output, "    🔍 Checking for repository updates for %s...\n", serviceName)
+					_, _ = fmt.Fprintf(e.output, "    🔍  Checking for repository updates for %s...\n", serviceName)
 
 					hasUpdates, err := repoManager.HasRemoteUpdates(context.Background(), repoConfig, service.Path)
 					if err != nil {
@@ -370,7 +370,7 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 					} else {
 						hasRepoUpdates = hasUpdates
 						if hasUpdates {
-							_, _ = fmt.Fprintf(e.output, "    📥 Repository updates available for %s\n", serviceName)
+							_, _ = fmt.Fprintf(e.output, "    📥  Repository updates available for %s\n", serviceName)
 						}
 					}
 				}
@@ -379,7 +379,7 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 
 		// If service is already healthy and no repository updates, skip it
 		if alreadyHealthy && stateErr == nil && !hasRepoUpdates && !needsClone {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s already running and healthy (no updates)\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  %s already running and healthy (no updates)\n", serviceName)
 			continue
 		}
 
@@ -409,21 +409,21 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 
 			if needsClone {
 				// Repository doesn't exist, clone it
-				_, _ = fmt.Fprintf(e.output, "    📦 Cloning repository for %s...\n", serviceName)
-				_, _ = fmt.Fprintf(e.output, "    📂 Target directory: %s\n", service.Path)
+				_, _ = fmt.Fprintf(e.output, "    📦  Cloning repository for %s...\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "    📂  Target directory: %s\n", service.Path)
 				if err := repoManager.Clone(context.Background(), repoConfig, service.Path); err != nil {
 					return fmt.Errorf("failed to clone repository for service '%s': %w", serviceName, err)
 				}
 			} else if hasRepoUpdates {
 				// Repository exists and has updates, pull them
-				_, _ = fmt.Fprintf(e.output, "    📥 Pulling repository updates for %s...\n", serviceName)
-				_, _ = fmt.Fprintf(e.output, "    📂 Repository directory: %s\n", service.Path)
+				_, _ = fmt.Fprintf(e.output, "    📥  Pulling repository updates for %s...\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "    📂  Repository directory: %s\n", service.Path)
 				if err := repoManager.Update(context.Background(), repoConfig, service.Path); err != nil {
 					return fmt.Errorf("failed to update repository for service '%s': %w", serviceName, err)
 				}
 			}
 
-			_, _ = fmt.Fprintf(e.output, "    ✓ Repository ready for %s\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  Repository ready for %s\n", serviceName)
 		}
 
 		// Run pre-task after repository is ready
@@ -432,7 +432,7 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 		}
 
 		if service.Build != nil && service.Build.Required {
-			_, _ = fmt.Fprintf(e.output, "    🔨 Building %s...\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    🔨  Building %s...\n", serviceName)
 			if err := e.performServiceBuild(ctx, service, false, true); err != nil {
 				return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
 			}
@@ -444,25 +444,25 @@ func (e *Engine) orchestrateStart(ctx *ExecutionContext, orch *ast.OrchestrateSt
 
 		// Wait for health check if configured
 		if service.HealthCheck != nil {
-			_, _ = fmt.Fprintf(e.output, "    ⏳ Waiting for %s to become healthy...\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ⏳  Waiting for %s to become healthy...\n", serviceName)
 			if err := e.waitForHealth(service); err != nil {
-				_, _ = fmt.Fprintf(e.output, "    ⚠ Health check failed for %s: %v\n", serviceName, err)
+				_, _ = fmt.Fprintf(e.output, "    ⚠️  Health check failed for %s: %v\n", serviceName, err)
 				// Continue anyway unless circuit breaker is enabled
 			} else {
-				_, _ = fmt.Fprintf(e.output, "    ✓ %s is healthy\n", serviceName)
+				_, _ = fmt.Fprintf(e.output, "    ✓  %s is healthy\n", serviceName)
 			}
 		} else {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s started\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  %s started\n", serviceName)
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ All services started successfully\n")
+	_, _ = fmt.Fprintf(e.output, "✅  All services started successfully\n")
 	return nil
 }
 
 // orchestrateStop stops services in reverse order
 func (e *Engine) orchestrateStop(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🛑 Stopping orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🛑  Stopping orchestration: %s\n", orch.Name)
 
 	// Reverse order for shutdown
 	for i := len(orderedServices) - 1; i >= 0; i-- {
@@ -471,23 +471,23 @@ func (e *Engine) orchestrateStop(ctx *ExecutionContext, orch *ast.OrchestrateSta
 		_, _ = fmt.Fprintf(e.output, "  ▸ Stopping %s...\n", serviceName)
 
 		if err := e.stopService(service); err != nil {
-			_, _ = fmt.Fprintf(e.output, "    ⚠ Failed to stop %s: %v\n", serviceName, err)
+			_, _ = fmt.Fprintf(e.output, "    ⚠️  Failed to stop %s: %v\n", serviceName, err)
 			// Continue stopping other services
 		} else {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s stopped\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  %s stopped\n", serviceName)
 			if err := e.runServiceHook(ctx, service.PostTask, serviceName, "post"); err != nil {
 				return err
 			}
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ All services stopped\n")
+	_, _ = fmt.Fprintf(e.output, "✅  All services stopped\n")
 	return nil
 }
 
 // orchestrateStatus shows status of all services
 func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "📊 Status of orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "📊  Status of orchestration: %s\n", orch.Name)
 
 	// Check DNS resolution for specified domains
 	if err := e.checkDNSResolution(orch); err != nil {
@@ -506,7 +506,7 @@ func (e *Engine) orchestrateStatus(orch *ast.OrchestrateStatement, orderedServic
 
 // orchestrateShowEndpoints displays all service endpoints
 func (e *Engine) orchestrateShowEndpoints(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🌐 Service endpoints for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🌐  Service endpoints for orchestration: %s\n", orch.Name)
 	_, _ = fmt.Fprintf(e.output, "\n")
 
 	var runningWithEndpoints []struct {
@@ -545,7 +545,7 @@ func (e *Engine) orchestrateShowEndpoints(orch *ast.OrchestrateStatement, ordere
 
 	// Display running services with endpoints
 	if len(runningWithEndpoints) > 0 {
-		_, _ = fmt.Fprintf(e.output, "✅ Running services:\n")
+		_, _ = fmt.Fprintf(e.output, "✅  Running services:\n")
 		for _, svc := range runningWithEndpoints {
 			_, _ = fmt.Fprintf(e.output, "   • %-20s %s\n", svc.name+":", svc.endpoint)
 		}
@@ -579,7 +579,7 @@ func (e *Engine) orchestrateShowEndpoints(orch *ast.OrchestrateStatement, ordere
 
 // orchestrateHealth checks health for all services
 func (e *Engine) orchestrateHealth(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🏥 Health check for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🏥  Health check for orchestration: %s\n", orch.Name)
 
 	var unhealthy []string
 
@@ -596,7 +596,7 @@ func (e *Engine) orchestrateHealth(orch *ast.OrchestrateStatement, orderedServic
 			_, _ = fmt.Fprintf(e.output, "    ⚠️  %s is unhealthy: %v\n", serviceName, err)
 			unhealthy = append(unhealthy, fmt.Sprintf("%s (%v)", serviceName, err))
 		} else {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s is healthy\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  %s is healthy\n", serviceName)
 		}
 	}
 
@@ -604,13 +604,13 @@ func (e *Engine) orchestrateHealth(orch *ast.OrchestrateStatement, orderedServic
 		return fmt.Errorf("services unhealthy: %s", strings.Join(unhealthy, ", "))
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ All services healthy\n")
+	_, _ = fmt.Fprintf(e.output, "✅  All services healthy\n")
 	return nil
 }
 
 // orchestrateLogs displays logs for the selected services
 func (e *Engine) orchestrateLogs(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "📝 Logs for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "📝  Logs for orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -631,7 +631,7 @@ func (e *Engine) orchestrateLogs(ctx *ExecutionContext, orch *ast.OrchestrateSta
 
 // orchestrateCloneRepositories reports repository cloning order
 func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "📦 Repository cloning plan for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "📦  Repository cloning plan for orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -659,7 +659,7 @@ func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, or
 
 // orchestrateUpdateRepositories updates repositories for services
 func (e *Engine) orchestrateUpdateRepositories(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, branchFilter string) error {
-	_, _ = fmt.Fprintf(e.output, "🔄 Updating repositories for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🔄  Updating repositories for orchestration: %s\n", orch.Name)
 	if branchFilter != "" {
 		_, _ = fmt.Fprintf(e.output, "  Filter: only updating services on branch '%s'\n", branchFilter)
 	}
@@ -741,19 +741,19 @@ func (e *Engine) orchestrateUpdateRepositories(ctx context.Context, orch *ast.Or
 		}
 
 		// Update the repository
-		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 updating...", serviceName)
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄  updating...", serviceName)
 		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
-			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, " ❌  failed: %v\n", err)
 			errorCount++
 			continue
 		}
 
 		currentBranch, _ := repoManager.GetCurrentBranch(ctx, service.Path)
-		_, _ = fmt.Fprintf(e.output, " ✅ updated (branch: %s)\n", currentBranch)
+		_, _ = fmt.Fprintf(e.output, " ✅  updated (branch: %s)\n", currentBranch)
 		updatedCount++
 	}
 
-	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d updated, %d skipped, %d errors\n", updatedCount, skippedCount, errorCount)
+	_, _ = fmt.Fprintf(e.output, "\n📊  Summary: %d updated, %d skipped, %d errors\n", updatedCount, skippedCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("repository update completed with %d error(s)", errorCount)
@@ -776,9 +776,9 @@ func normalizeBranchName(branch string) string {
 // If branchFilter is provided, only shows repositories on that branch
 func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, branchFilter string) error {
 	if branchFilter != "" {
-		_, _ = fmt.Fprintf(e.output, "🌿 Repositories on branch '%s' for orchestration: %s\n", branchFilter, orch.Name)
+		_, _ = fmt.Fprintf(e.output, "🌿  Repositories on branch '%s' for orchestration: %s\n", branchFilter, orch.Name)
 	} else {
-		_, _ = fmt.Fprintf(e.output, "🌿 Branch status for orchestration: %s\n", orch.Name)
+		_, _ = fmt.Fprintf(e.output, "🌿  Branch status for orchestration: %s\n", orch.Name)
 	}
 
 	// Get working directory
@@ -861,7 +861,7 @@ func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.Orchestr
 	// Display results
 	if len(matchingRepos) > 0 {
 		if branchFilter != "" {
-			_, _ = fmt.Fprintf(e.output, "\n✅ Repositories on branch '%s':\n", branchFilter)
+			_, _ = fmt.Fprintf(e.output, "\n✅  Repositories on branch '%s':\n", branchFilter)
 		} else {
 			_, _ = fmt.Fprintf(e.output, "\n📋 Repository branches:\n")
 		}
@@ -880,17 +880,17 @@ func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.Orchestr
 	}
 
 	if len(errors) > 0 && branchFilter == "" {
-		_, _ = fmt.Fprintf(e.output, "\n❌ Errors:\n")
+		_, _ = fmt.Fprintf(e.output, "\n❌  Errors:\n")
 		for _, errMsg := range errors {
 			_, _ = fmt.Fprintf(e.output, "  • %s\n", errMsg)
 		}
 	}
 
 	if branchFilter != "" {
-		_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d on branch '%s', %d skipped, %d without repo, %d errors\n",
+		_, _ = fmt.Fprintf(e.output, "\n📊  Summary: %d on branch '%s', %d skipped, %d without repo, %d errors\n",
 			len(matchingRepos), branchFilter, len(skipped), len(noRepo), len(errors))
 	} else {
-		_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d repositories, %d without repo, %d errors\n",
+		_, _ = fmt.Fprintf(e.output, "\n📊  Summary: %d repositories, %d without repo, %d errors\n",
 			len(matchingRepos), len(noRepo), len(errors))
 	}
 
@@ -899,7 +899,7 @@ func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.Orchestr
 
 // orchestrateSwitchToDefault switches a specific service (or all if no service specified) to the default branch
 func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, serviceFilter string) error {
-	_, _ = fmt.Fprintf(e.output, "🔄 Switching to default branch for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🔄  Switching to default branch for orchestration: %s\n", orch.Name)
 	if serviceFilter != "" {
 		_, _ = fmt.Fprintf(e.output, "  Filter: only switching service '%s'\n", serviceFilter)
 	}
@@ -979,7 +979,7 @@ func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.Orche
 		normalizedDefault := normalizeBranchName(defaultBranch)
 
 		if normalizedCurrent == normalizedDefault {
-			_, _ = fmt.Fprintf(e.output, "  %s: ✓ already on default branch (%s), skipping\n", serviceName, currentBranch)
+			_, _ = fmt.Fprintf(e.output, "  %s: ✓  already on default branch (%s), skipping\n", serviceName, currentBranch)
 			skippedCount++
 			continue
 		}
@@ -999,9 +999,9 @@ func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.Orche
 		}
 
 		// Switch to default branch
-		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 switching from %s to %s...", serviceName, currentBranch, defaultBranch)
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄  switching from %s to %s...", serviceName, currentBranch, defaultBranch)
 		if err := repoManager.Checkout(ctx, service.Path, defaultBranch); err != nil {
-			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, " ❌  failed: %v\n", err)
 			errorCount++
 			continue
 		}
@@ -1010,12 +1010,12 @@ func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.Orche
 		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
 			_, _ = fmt.Fprintf(e.output, " ⚠️  switched but failed to pull: %v\n", err)
 		} else {
-			_, _ = fmt.Fprintf(e.output, " ✅ switched and updated\n")
+			_, _ = fmt.Fprintf(e.output, " ✅  switched and updated\n")
 		}
 		switchedCount++
 	}
 
-	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
+	_, _ = fmt.Fprintf(e.output, "\n📊  Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("branch switch completed with %d error(s)", errorCount)
@@ -1030,7 +1030,7 @@ func (e *Engine) orchestrateSwitchToDefault(ctx context.Context, orch *ast.Orche
 
 // orchestrateSetAllDefault sets all services to their default branch
 func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "🔄 Setting all repositories to default branch for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🔄  Setting all repositories to default branch for orchestration: %s\n", orch.Name)
 
 	// Get working directory
 	workDir, err := os.Getwd()
@@ -1102,7 +1102,7 @@ func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.Orchest
 		normalizedDefault := normalizeBranchName(defaultBranch)
 
 		if normalizedCurrent == normalizedDefault {
-			_, _ = fmt.Fprintf(e.output, "  %s: ✓ already on default branch (%s), skipping\n", serviceName, currentBranch)
+			_, _ = fmt.Fprintf(e.output, "  %s: ✓  already on default branch (%s), skipping\n", serviceName, currentBranch)
 			skippedCount++
 			continue
 		}
@@ -1122,9 +1122,9 @@ func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.Orchest
 		}
 
 		// Switch to default branch
-		_, _ = fmt.Fprintf(e.output, "  %s: 🔄 switching from %s to %s...", serviceName, currentBranch, defaultBranch)
+		_, _ = fmt.Fprintf(e.output, "  %s: 🔄  switching from %s to %s...", serviceName, currentBranch, defaultBranch)
 		if err := repoManager.Checkout(ctx, service.Path, defaultBranch); err != nil {
-			_, _ = fmt.Fprintf(e.output, " ❌ failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, " ❌  failed: %v\n", err)
 			errorCount++
 			continue
 		}
@@ -1133,12 +1133,12 @@ func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.Orchest
 		if err := repoManager.Update(ctx, repoConfig, service.Path); err != nil {
 			_, _ = fmt.Fprintf(e.output, " ⚠️  switched but failed to pull: %v\n", err)
 		} else {
-			_, _ = fmt.Fprintf(e.output, " ✅ switched and updated\n")
+			_, _ = fmt.Fprintf(e.output, " ✅  switched and updated\n")
 		}
 		switchedCount++
 	}
 
-	_, _ = fmt.Fprintf(e.output, "\n📊 Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
+	_, _ = fmt.Fprintf(e.output, "\n📊  Summary: %d switched, %d skipped, %d errors\n", switchedCount, skippedCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("branch switch completed with %d error(s)", errorCount)
@@ -1149,7 +1149,7 @@ func (e *Engine) orchestrateSetAllDefault(ctx context.Context, orch *ast.Orchest
 
 // orchestrateBuild builds all services
 func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, useCache bool) error {
-	_, _ = fmt.Fprintf(e.output, "🔨 Building orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🔨  Building orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -1159,7 +1159,7 @@ func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateSt
 			return fmt.Errorf("failed to build service '%s': %w", serviceName, err)
 		}
 
-		_, _ = fmt.Fprintf(e.output, "    ✓ %s built\n", serviceName)
+		_, _ = fmt.Fprintf(e.output, "    ✓  %s built\n", serviceName)
 	}
 
 	return nil
@@ -1167,7 +1167,7 @@ func (e *Engine) orchestrateBuild(ctx *ExecutionContext, orch *ast.OrchestrateSt
 
 // orchestratePull pulls images for all services
 func (e *Engine) orchestratePull(orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement) error {
-	_, _ = fmt.Fprintf(e.output, "📥 Pulling images for orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "📥  Pulling images for orchestration: %s\n", orch.Name)
 
 	for _, serviceName := range orderedServices {
 		service := services[serviceName]
@@ -1177,7 +1177,7 @@ func (e *Engine) orchestratePull(orch *ast.OrchestrateStatement, orderedServices
 			return fmt.Errorf("failed to pull service '%s': %w", serviceName, err)
 		}
 
-		_, _ = fmt.Fprintf(e.output, "    ✓ %s pulled\n", serviceName)
+		_, _ = fmt.Fprintf(e.output, "    ✓  %s pulled\n", serviceName)
 	}
 
 	return nil
@@ -1185,7 +1185,7 @@ func (e *Engine) orchestratePull(orch *ast.OrchestrateStatement, orderedServices
 
 // orchestrateRecreate forces recreation of services by taking them down, rebuilding, and starting again
 func (e *Engine) orchestrateRecreate(ctx *ExecutionContext, orch *ast.OrchestrateStatement, orderedServices []string, services map[string]*ast.ServiceStatement, useCache bool) error {
-	_, _ = fmt.Fprintf(e.output, "🔁 Force recreating orchestration: %s\n", orch.Name)
+	_, _ = fmt.Fprintf(e.output, "🔁  Force recreating orchestration: %s\n", orch.Name)
 
 	errDown := e.orchestrateDown(ctx, orch, orderedServices, services)
 	errPost := e.runOrchestrationHook(ctx, orch.PostTask, orch.Name, "post")
@@ -1220,9 +1220,9 @@ func (e *Engine) orchestrateDown(ctx *ExecutionContext, orch *ast.OrchestrateSta
 		_, _ = fmt.Fprintf(e.output, "  ▸ Taking down %s...\n", serviceName)
 
 		if err := e.downService(service); err != nil {
-			_, _ = fmt.Fprintf(e.output, "    ⚠ Failed to take down %s: %v\n", serviceName, err)
+			_, _ = fmt.Fprintf(e.output, "    ⚠️  Failed to take down %s: %v\n", serviceName, err)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "    ✓ %s taken down\n", serviceName)
+			_, _ = fmt.Fprintf(e.output, "    ✓  %s taken down\n", serviceName)
 			if err := e.runServiceHook(ctx, service.PostTask, serviceName, "post"); err != nil {
 				return err
 			}
@@ -1917,7 +1917,7 @@ func (e *Engine) checkAndProvisionNetworks(services map[string]*ast.ServiceState
 					if err != nil {
 						return fmt.Errorf("failed to create network %s: %w", networkName, err)
 					}
-					_, _ = fmt.Fprintf(e.output, "✓ Created network: %s\n", networkName)
+					_, _ = fmt.Fprintf(e.output, "✓  Created network: %s\n", networkName)
 				} else {
 					return fmt.Errorf("required network %s does not exist and autoprovision is disabled", networkName)
 				}
@@ -1925,7 +1925,7 @@ func (e *Engine) checkAndProvisionNetworks(services map[string]*ast.ServiceState
 				_, _ = fmt.Fprintf(e.output, "⚠️  Network %s does not exist (not required)\n", networkName)
 			}
 		} else {
-			_, _ = fmt.Fprintf(e.output, "✓ Network %s exists\n", networkName)
+			_, _ = fmt.Fprintf(e.output, "✓  Network %s exists\n", networkName)
 		}
 	}
 
@@ -1966,9 +1966,9 @@ func (e *Engine) checkDNSResolution(orch *ast.OrchestrateStatement) error {
 
 	// Only show output if there are failures
 	if len(failedDomains) > 0 {
-		_, _ = fmt.Fprintf(e.output, "🔍 DNS resolution check:\n")
+		_, _ = fmt.Fprintf(e.output, "🔍  DNS resolution check:\n")
 		for _, domain := range failedDomains {
-			_, _ = fmt.Fprintf(e.output, "   ❌ %s - not resolvable\n", domain)
+			_, _ = fmt.Fprintf(e.output, "   ❌  %s - not resolvable\n", domain)
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 		return fmt.Errorf("DNS resolution failed for: %s\nThese domains may need to be added to your /etc/hosts file", strings.Join(failedDomains, ", "))

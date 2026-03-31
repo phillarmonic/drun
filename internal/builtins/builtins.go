@@ -316,7 +316,7 @@ func finishProgress(ctx Context, args ...string) (string, error) {
 
 	elapsed := time.Since(progress.StartTime)
 
-	return fmt.Sprintf("✅ %s (completed in %v)", message, elapsed.Round(time.Millisecond)), nil
+	return fmt.Sprintf("✅  %s (completed in %v)", message, elapsed.Round(time.Millisecond)), nil
 }
 
 // startTimer starts a new timer

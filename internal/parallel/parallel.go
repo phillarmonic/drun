@@ -94,7 +94,7 @@ func (pe *ParallelExecutor) executeParallel(
 	}
 
 	if pe.verbose {
-		_, _ = fmt.Fprintf(pe.output, "🔄 Starting parallel execution: %d items, %d workers\n", numItems, workers)
+		_, _ = fmt.Fprintf(pe.output, "🔄  Starting parallel execution: %d items, %d workers\n", numItems, workers)
 	}
 
 	// Create channels for work distribution and result collection
@@ -137,7 +137,7 @@ func (pe *ParallelExecutor) executeParallel(
 
 			if result.Error != nil {
 				if pe.verbose {
-					_, _ = fmt.Fprintf(pe.output, "❌ Worker failed on item %d (%s): %v\n",
+					_, _ = fmt.Fprintf(pe.output, "❌  Worker failed on item %d (%s): %v\n",
 						result.Index+1, result.Item, result.Error)
 				}
 
@@ -146,7 +146,7 @@ func (pe *ParallelExecutor) executeParallel(
 					cancel() // stop all workers
 				}
 			} else if pe.verbose {
-				_, _ = fmt.Fprintf(pe.output, "✅ Worker completed item %d (%s) in %v\n",
+				_, _ = fmt.Fprintf(pe.output, "✅  Worker completed item %d (%s) in %v\n",
 					result.Index+1, result.Item, result.Duration)
 			}
 
@@ -297,7 +297,7 @@ func (pt *ProgressTracker) Update(success bool) {
 	// Print progress every 10% or on completion
 	percentage := (pt.completed * 100) / pt.total
 	if pt.completed == pt.total || pt.completed%max(1, pt.total/10) == 0 {
-		_, _ = fmt.Fprintf(pt.output, "📊 Progress: %d/%d (%d%%) - %d failed\n",
+		_, _ = fmt.Fprintf(pt.output, "📊  Progress: %d/%d (%d%%) - %d failed\n",
 			pt.completed, pt.total, percentage, pt.failed)
 	}
 }

@@ -39,7 +39,7 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 	if e.dryRun {
 		result, err := op.Execute(true) // dry run
 		if err != nil {
-			_, _ = fmt.Fprintf(e.output, "❌ File operation failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, "❌  File operation failed: %v\n", err)
 			return err
 		}
 		_, _ = fmt.Fprintf(e.output, "📁 %s\n", result.Message)
@@ -69,16 +69,16 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 	case "check_exists":
 		// Check if file exists
 		if e.fileExists(target) {
-			_, _ = fmt.Fprintf(e.output, "✅ File exists: %s\n", target)
+			_, _ = fmt.Fprintf(e.output, "✅  File exists: %s\n", target)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "❌ File does not exist: %s\n", target)
+			_, _ = fmt.Fprintf(e.output, "❌  File does not exist: %s\n", target)
 		}
 		return nil
 	case "get_size":
 		// Get file size
 		size, err := e.getFileSize(target)
 		if err != nil {
-			_, _ = fmt.Fprintf(e.output, "❌ Failed to get file size: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, "❌  Failed to get file size: %v\n", err)
 			return err
 		}
 		_, _ = fmt.Fprintf(e.output, "📏 File size: %s (%d bytes)\n", target, size)
@@ -112,26 +112,26 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 	case "backup":
 		_, _ = fmt.Fprintf(e.output, "💾 Backing up: %s → %s\n", source, target)
 	case "replace":
-		_, _ = fmt.Fprintf(e.output, "🔁 Replacing content in: %s\n", target)
+		_, _ = fmt.Fprintf(e.output, "🔁  Replacing content in: %s\n", target)
 	}
 
 	// Execute the file operation
 	result, err := op.Execute(false)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ File operation failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  File operation failed: %v\n", err)
 		return err
 	}
 
 	// Handle capture for read operations
 	if fileStmt.CaptureVar != "" && fileStmt.Action == "read" {
 		ctx.Variables[fileStmt.CaptureVar] = result.Content
-		_, _ = fmt.Fprintf(e.output, "📦 Captured file content in variable '%s' (%d bytes)\n",
+		_, _ = fmt.Fprintf(e.output, "📦  Captured file content in variable '%s' (%d bytes)\n",
 			fileStmt.CaptureVar, len(result.Content))
 	}
 
 	// Show success message
 	if result.Success {
-		_, _ = fmt.Fprintf(e.output, "✅ %s\n", result.Message)
+		_, _ = fmt.Fprintf(e.output, "✅  %s\n", result.Message)
 	} else {
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", result.Message)
 	}
