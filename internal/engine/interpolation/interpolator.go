@@ -247,6 +247,13 @@ func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context
 }
 
 func (i *Interpolator) resolveDrunBraceContent(content, match string, ctx Context, undefinedVars *[]string) string {
+	// Condition expressions join tokens with spaces (e.g. "if not {$node}:" → "not { $node }"), so brace
+	// content can be " $node" instead of "$node". Trim so resolution matches unspaced {$var} forms.
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return match
+	}
+
 	// Try to resolve simple variables first (most common case)
 	if resolved, found := i.resolveSimpleVariableDirectly(content, ctx); found {
 		return resolved

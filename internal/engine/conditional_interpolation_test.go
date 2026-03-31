@@ -239,6 +239,46 @@ task "build":
 	}
 }
 
+// Regression: parseConditionExpression joins tokens with spaces, so "if not {$node}:" becomes
+// "not { $node }". Brace interpolation must trim inner whitespace (see interpolator).
+func TestIfNotBooleanParameterSpacedBrace(t *testing.T) {
+	input := `version: 2.0
+
+task "build":
+  given $node as boolean defaults to "n"
+  if not {$node}:
+    info "normal variant"
+  else:
+    info "node variant"`
+
+	lexer := lexer.NewLexer(input)
+	parser := parser.NewParser(lexer)
+	program := parser.ParseProgram()
+	if len(parser.Errors()) > 0 {
+		t.Fatalf("Parser errors: %v", parser.Errors())
+	}
+
+	var output bytes.Buffer
+	engine := NewEngine(&output)
+
+	err := engine.ExecuteWithParams(program, "build", map[string]string{"node": "n"})
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+	if !strings.Contains(output.String(), "normal variant") {
+		t.Fatalf("expected normal variant branch, got:\n%s", output.String())
+	}
+
+	output.Reset()
+	err = engine.ExecuteWithParams(program, "build", map[string]string{"node": "y"})
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+	if !strings.Contains(output.String(), "node variant") {
+		t.Fatalf("expected node variant branch, got:\n%s", output.String())
+	}
+}
+
 func TestConditionalInterpolationRealWorld(t *testing.T) {
 	input := `version: 2.0
 

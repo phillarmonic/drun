@@ -328,9 +328,17 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 	// Interpolate variables in the condition for other cases
 	interpolatedCondition := e.interpolateVariables(condition, ctx)
+	trimmed := strings.TrimSpace(interpolatedCondition)
+
+	// "if not <expr>:" parses as condition "not <expr>" (no leading "if"). After interpolation
+	// this becomes e.g. "not false" / "not true" — negate the inner truthiness.
+	if strings.HasPrefix(strings.ToLower(trimmed), "not ") {
+		inner := strings.TrimSpace(trimmed[len("not "):])
+		return !conditionStringTruthy(inner)
+	}
 
 	// Handle boolean values directly
-	switch strings.ToLower(strings.TrimSpace(interpolatedCondition)) {
+	switch strings.ToLower(trimmed) {
 	case "true":
 		return true
 	case "false":
@@ -338,5 +346,18 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 	}
 
 	// Default: treat non-empty strings as true
-	return strings.TrimSpace(interpolatedCondition) != ""
+	return trimmed != ""
+}
+
+// conditionStringTruthy matches the final evaluation rules for a fully interpolated fragment.
+func conditionStringTruthy(s string) bool {
+	s = strings.TrimSpace(s)
+	switch strings.ToLower(s) {
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		return s != ""
+	}
 }
