@@ -153,9 +153,12 @@ func Execute(command string, opts *Options) (*Result, error) {
 			stderrDone <- err
 		}()
 
-		err := cmd.Wait()
+		// Finish reading pipes before Wait(). Per os/exec.Cmd.StdoutPipe, Wait
+		// closes the pipe after the command exits; calling Wait before io.Copy
+		// completes races and can yield "read |0: file already closed".
 		stdoutErr := <-stdoutDone
 		stderrErr := <-stderrDone
+		err := cmd.Wait()
 
 		if stdoutErr != nil && stdoutErr != io.EOF {
 			return nil, fmt.Errorf("failed reading stdout: %w", stdoutErr)
