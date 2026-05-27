@@ -1,7 +1,10 @@
 package app
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -87,12 +90,63 @@ Built-in Commands:
 
 	app.setupFlags()
 	app.setupCommands()
+	// Initialize the default help command explicitly so we can hide it.
+	// This hides cobra's built-in 'help' subcommand from completion if possible, though Cobra
+	// may still forcefully include it. We accept 'help' at the top since user tasks
+	// successfully appear before all 'cmd:*' subcommands.
+	app.rootCmd.InitDefaultHelpCmd()
+	for _, c := range app.rootCmd.Commands() {
+		if c.Name() == "help" {
+			c.Hidden = true
+			break
+		}
+	}
 
 	return app
 }
 
 // Execute runs the CLI application
 func (a *App) Execute() error {
+	// Intercept autocomplete to reorder 'help' to the bottom
+	if len(os.Args) > 1 && (os.Args[1] == "__complete" || os.Args[1] == "__completeNoDesc") {
+		var buf bytes.Buffer
+		a.rootCmd.SetOut(&buf)
+
+		err := a.rootCmd.Execute()
+
+		lines := strings.Split(buf.String(), "\n")
+		var helpLine string
+		var otherLines []string
+
+		for _, line := range lines {
+			if strings.HasPrefix(line, "help\t") || line == "help" {
+				helpLine = line
+			} else {
+				otherLines = append(otherLines, line)
+			}
+		}
+
+		if helpLine != "" {
+			insertIdx := len(otherLines)
+			// Find the directive line (e.g., ":4") which must remain at the very end
+			for i := len(otherLines) - 1; i >= 0; i-- {
+				if otherLines[i] != "" && strings.HasPrefix(otherLines[i], ":") {
+					insertIdx = i
+					break
+				}
+			}
+
+			if insertIdx < len(otherLines) {
+				otherLines = append(otherLines[:insertIdx], append([]string{helpLine}, otherLines[insertIdx:]...)...)
+			} else {
+				otherLines = append(otherLines, helpLine)
+			}
+		}
+
+		fmt.Print(strings.Join(otherLines, "\n"))
+		return err
+	}
+
 	return a.rootCmd.Execute()
 }
 
@@ -129,14 +183,23 @@ func (a *App) setupFlags() {
 
 // setupCommands sets up subcommands
 func (a *App) setupCommands() {
-	a.rootCmd.AddCommand(a.createCompletionCommand())
-	a.rootCmd.AddCommand(a.createConvertCommand())
-	a.rootCmd.AddCommand(a.createDumpEnvCommand())
-	a.rootCmd.AddCommand(a.createStatelessCommand())
-	a.rootCmd.AddCommand(a.createLinkCommand())
-	a.rootCmd.AddCommand(a.createUnlinkCommand())
-	a.rootCmd.AddCommand(a.createUnlinkAllCommand())
-	a.rootCmd.AddCommand(a.createSecretsCommand())
+	// All cmd:* subcommands are registered as Hidden so cobra does not prepend them
+	// to the completion list ahead of user-defined tasks. They remain fully functional
+	// when invoked directly; our ValidArgsFunction returns them after user tasks.
+	cmds := []*cobra.Command{
+		a.createCompletionCommand(),
+		a.createConvertCommand(),
+		a.createDumpEnvCommand(),
+		a.createStatelessCommand(),
+		a.createLinkCommand(),
+		a.createUnlinkCommand(),
+		a.createUnlinkAllCommand(),
+		a.createSecretsCommand(),
+	}
+	for _, cmd := range cmds {
+		cmd.Hidden = true
+		a.rootCmd.AddCommand(cmd)
+	}
 }
 
 // run is the main command handler

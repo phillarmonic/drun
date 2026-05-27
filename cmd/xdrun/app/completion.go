@@ -40,9 +40,27 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	tasks := eng.ListTasks(program)
 
 	var completions []string
+
+	// User-defined tasks come first
 	for _, task := range tasks {
 		completions = append(completions, task.Name+"\t[task] "+task.Description)
 	}
 
-	return completions, cobra.ShellCompDirectiveNoFileComp
+	// Built-in cmd:* commands come after user tasks
+	completions = append(completions, builtinCmdCompletions(cmd)...)
+
+	// KeepOrder ensures zsh/fish respect the order we provide (tasks before builtins)
+	return completions, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+}
+
+// builtinCmdCompletions returns the cmd:* subcommand completions in a consistent order.
+// These are appended after user tasks so user-defined names appear first in the list.
+func builtinCmdCompletions(cmd *cobra.Command) []string {
+	var completions []string
+	for _, sub := range cmd.Root().Commands() {
+		if len(sub.Name()) > 4 && sub.Name()[:4] == "cmd:" {
+			completions = append(completions, sub.Name()+"\t"+sub.Short)
+		}
+	}
+	return completions
 }
