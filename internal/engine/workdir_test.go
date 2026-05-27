@@ -87,12 +87,11 @@ func TestUseWorkdirDoesNotLeak(t *testing.T) {
 
 task "setter":
     use workdir "subdir"
-    run "pwd"
+    run "echo setter > setter.txt"
 
 task "checker":
     depends on setter
-    capture from shell "pwd" as $current
-    info "pwd: {$current}"
+    run "echo checker > checker.txt"
 `
 	program := parseForWorkdirTest(t, input)
 
@@ -102,13 +101,14 @@ task "checker":
 		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
 	}
 
-	output := out.String()
-	// The info line should print tmpDir, NOT subDir
-	if strings.Contains(output, "pwd: "+subDir) {
-		t.Errorf("workdir leaked into dependent task! Output:\n%s", output)
+	if _, err := os.Stat(filepath.Join(subDir, "setter.txt")); os.IsNotExist(err) {
+		t.Errorf("setter.txt not found in subdir; setter task failed to use workdir")
 	}
-	if !strings.Contains(output, tmpDir) {
-		t.Errorf("Expected tmpDir %q in output, got:\n%s", tmpDir, output)
+	if _, err := os.Stat(filepath.Join(tmpDir, "checker.txt")); os.IsNotExist(err) {
+		t.Errorf("checker.txt not found in tmpDir; checker task did not run in correct workdir")
+	}
+	if _, err := os.Stat(filepath.Join(subDir, "checker.txt")); err == nil {
+		t.Errorf("checker.txt found in subdir; workdir leaked into dependent task!")
 	}
 }
 
