@@ -176,6 +176,7 @@ const (
 	IPS           // ips
 	COMMAND       // command
 	WORKING       // working
+	WORKDIR       // workdir
 	MISSING       // missing
 	UPDATE        // update
 	RESTART       // restart
@@ -753,6 +754,8 @@ func (t TokenType) String() string {
 		return "COMMAND"
 	case WORKING:
 		return "WORKING"
+	case WORKDIR:
+		return "WORKDIR"
 	case MISSING:
 		return "MISSING"
 	case UPDATE:
@@ -1359,6 +1362,7 @@ var keywords = map[string]TokenType{
 	"ips":           IPS,
 	"command":       COMMAND,
 	"working":       WORKING,
+	"workdir":       WORKDIR,
 	"missing":       MISSING,
 	"update":        UPDATE,
 	"restart":       RESTART,

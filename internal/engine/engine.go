@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -290,13 +291,21 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		}
 	}
 
+	// Capture the process cwd once so that `use workdir` relative paths
+	// always resolve from this baseline regardless of how many times it's called.
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		originalCwd = "" // fallback: will be re-resolved per call
+	}
+
 	// Create execution context with parameters
 	ctx := &ExecutionContext{
-		Parameters:  make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
-		Variables:   make(map[string]string, 16),      // Pre-allocate for typical variable count
-		Project:     projectCtx,
-		CurrentFile: currentFile,
-		Program:     program,
+		Parameters:         make(map[string]*types.Value, 8), // Pre-allocate for typical parameter count
+		Variables:          make(map[string]string, 16),      // Pre-allocate for typical variable count
+		Project:            projectCtx,
+		CurrentFile:        currentFile,
+		Program:            program,
+		OriginalWorkingDir: originalCwd,
 	}
 
 	// Execute drun setup hooks from the execution plan
@@ -322,6 +331,9 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		// Set current task name for globals access
 		ctx.CurrentTask = currentTaskName
 
+		// Save workdir state so changes in this task don't leak to the next
+		savedWorkingDir := ctx.WorkingDir
+
 		// Execute before hooks only for the target task
 		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.BeforeHooks) > 0 {
 			if err := e.executor.ExecuteHooks("before", plan.Hooks.BeforeHooks, ctx, true); err != nil {
@@ -332,9 +344,13 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		// Execute task body directly using domain statements
 		for _, stmt := range taskPlan.Body {
 			if err := e.executeStatement(stmt, ctx); err != nil {
+				ctx.WorkingDir = savedWorkingDir // restore on error too
 				return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
 			}
 		}
+
+		// Restore workdir after task completes
+		ctx.WorkingDir = savedWorkingDir
 
 		// Execute after hooks only for the target task (best-effort)
 		if currentTaskName == taskName && plan.Hooks != nil && len(plan.Hooks.AfterHooks) > 0 {
@@ -818,6 +834,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeSecret(s, ctx)
 	case *statement.Orchestration:
 		return e.executeOrchestration(s, ctx)
+	case *statement.ChangeWorkdir:
+		return e.executeChangeWorkdir(s, ctx)
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}

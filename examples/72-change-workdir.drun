@@ -1,0 +1,32 @@
+version: 2.0
+
+# Example: use workdir
+# Demonstrates how to change the working directory for shell commands within a task.
+# The directory change is scoped to the current task only.
+
+task "show-workdir-basics" means "Demonstrate basic workdir switching":
+    info "Current directory before: {pwd}"
+    run "pwd"
+
+    use workdir "internal"
+    info "Now running inside internal/"
+    run "pwd"
+
+    use workdir "parser"
+    info "Switched to parser/ (relative to original cwd, not internal/)"
+    run "pwd"
+
+task "workdir-with-variable" means "Use a variable to set the working directory":
+    let $subdir = "internal"
+    use workdir "{$subdir}"
+    run "ls -1 | head -5"
+    success "Listed files in {$subdir}"
+
+task "workdir-isolation" means "Prove workdir changes don't leak between tasks":
+    use workdir "internal"
+    run "pwd"
+    info "workdir is set to internal/ within this task"
+
+task "workdir-after-isolation" means "This task runs in original cwd (workdir not leaked)":
+    run "pwd"
+    success "Working directory is back to original - isolation confirmed!"

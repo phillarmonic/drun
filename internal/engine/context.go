@@ -9,13 +9,15 @@ import (
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
-	Parameters       map[string]*types.Value // parameter name -> typed value
-	Variables        map[string]string       // captured variables from shell commands
-	Project          *ProjectContext         // project-level settings and hooks
-	CurrentFile      string                  // path to the current drun file being executed
-	CurrentTask      string                  // name of the currently executing task
-	CurrentNamespace string                  // namespace of currently executing task/template (for transitive resolution)
-	Program          *ast.Program            // the AST program being executed
+	Parameters         map[string]*types.Value // parameter name -> typed value
+	Variables          map[string]string       // captured variables from shell commands
+	Project            *ProjectContext         // project-level settings and hooks
+	CurrentFile        string                  // path to the current drun file being executed
+	CurrentTask        string                  // name of the currently executing task
+	CurrentNamespace   string                  // namespace of currently executing task/template (for transitive resolution)
+	Program            *ast.Program            // the AST program being executed
+	WorkingDir         string                  // override working directory for shell commands (empty = use process cwd)
+	OriginalWorkingDir string                  // the cwd captured at task start; relative paths are resolved from here
 }
 
 // Implement interpolation.Context interface

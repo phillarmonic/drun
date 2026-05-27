@@ -269,6 +269,11 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			ServiceFilters: s.ServiceFilters,
 		}, nil
 
+	case *ast.ChangeWorkdirStatement:
+		return &ChangeWorkdir{
+			Path: s.Path,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown AST statement type: %T", astStmt)
 	}

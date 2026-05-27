@@ -223,6 +223,8 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 	opts.Output = e.output
 	if svcCtx != nil {
 		opts.WorkingDir = svcCtx.Path
+	} else if ctx != nil && ctx.WorkingDir != "" {
+		opts.WorkingDir = ctx.WorkingDir
 	}
 
 	// Show what we're about to execute (verbose mode only)

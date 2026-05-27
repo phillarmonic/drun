@@ -3216,6 +3216,56 @@ task "inspect-service" given $servicename defaults to "some-service":
 
 The runtime resolves the service name (from literals, task parameters, or captured variables), validates that the service exists, and executes the command inside the service directory. If no services are defined, or the service name cannot be resolved, execution fails fast with an explanatory error.
 
+#### Changing Working Directory (`use workdir`)
+
+For tasks that need to run commands in a different directory, `use workdir` provides a clean, readable way to temporarily change the working directory for all subsequent shell commands in the current task.
+
+**Syntax:**
+
+```drun
+use workdir "path"
+```
+
+**Examples:**
+
+```drun
+# Basic: build a frontend project located in a subdirectory
+task "front-dev" means "Builds the dev frontend of the app":
+    use workdir "frontend"
+    run "npm run build:dev"
+
+# With variable interpolation
+task "build-module" means "Build a specific module":
+    given $module defaults to "frontend"
+    use workdir "{$module}"
+    run "npm run build"
+
+# Switch between directories in one task
+task "multi-build" means "Build both packages":
+    use workdir "packages/frontend"
+    run "npm run build"
+    use workdir "packages/backend"
+    run "go build ./..."
+
+# Absolute path
+task "deploy":
+    use workdir "/var/www/app"
+    run "git pull origin main"
+```
+
+**Key Behaviors:**
+
+- **Task-scoped**: The working directory change applies only within the current task. It does not affect called tasks (`call task`), dependent tasks (`depends on`), or any other task.
+- **Relative paths from original cwd**: Relative paths are always resolved from the process's original working directory (the cwd when xdrun was invoked), not chained from a previous `use workdir`. This means:
+  ```drun
+  use workdir "a"  # resolves to <original_cwd>/a
+  use workdir "b"  # resolves to <original_cwd>/b  (NOT <original_cwd>/a/b)
+  ```
+- **Absolute paths**: Absolute paths are used as-is.
+- **Variable interpolation**: Full interpolation support — use `{$var}`, `{env('VAR')}`, etc.
+- **Validation**: The resolved path must exist and be a directory. Non-existent paths fail immediately with a descriptive error.
+- **Dry-run**: In `--dry-run` mode, logs `[DRY RUN] Would set working directory to: <path>` without resolving the path.
+
 #### Variable Interpolation in Multiline Commands
 
 Variables work seamlessly in multiline blocks:

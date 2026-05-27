@@ -255,8 +255,19 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				}
 			}
 		} else if p.curToken.Type == lexer.USE {
-			// Check for USE snippet
-			if p.peekToken.Type == lexer.SNIPPET {
+			// Check for USE snippet or USE workdir
+			if p.peekToken.Type == lexer.WORKDIR {
+				// use workdir "path"
+				p.nextToken() // consume WORKDIR
+				if !p.expectPeek(lexer.STRING) {
+					continue
+				}
+				workdirStmt := &ast.ChangeWorkdirStatement{
+					Token: p.curToken,
+					Path:  p.curToken.Literal,
+				}
+				stmt.Body = append(stmt.Body, workdirStmt)
+			} else if p.peekToken.Type == lexer.SNIPPET {
 				p.nextToken() // consume SNIPPET
 
 				if !p.expectPeek(lexer.STRING) {
@@ -269,7 +280,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				}
 				stmt.Body = append(stmt.Body, useSnippet)
 			} else {
-				p.addError(fmt.Sprintf("expected 'snippet' after 'use', got %s", p.peekToken.Type))
+				p.addError(fmt.Sprintf("expected 'snippet' or 'workdir' after 'use', got %s", p.peekToken.Type))
 			}
 		} else if p.isCallToken(p.curToken.Type) {
 			call := p.parseTaskCallStatement()
@@ -379,8 +390,19 @@ func (p *Parser) parseTaskTemplateStatement() *ast.TaskTemplateStatement {
 
 // parseStatementInTaskBody is a helper that parses statements within a task or template body
 func (p *Parser) parseStatementInTaskBody() ast.Statement {
-	// Check for USE snippet
+	// Check for USE snippet or USE workdir
 	if p.curToken.Type == lexer.USE {
+		if p.peekToken.Type == lexer.WORKDIR {
+			// use workdir "path"
+			p.nextToken() // consume WORKDIR
+			if !p.expectPeek(lexer.STRING) {
+				return nil
+			}
+			return &ast.ChangeWorkdirStatement{
+				Token: p.curToken,
+				Path:  p.curToken.Literal,
+			}
+		}
 		if p.peekToken.Type == lexer.SNIPPET {
 			p.nextToken() // consume SNIPPET
 

@@ -32,6 +32,7 @@ const (
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
 	TypeOrchestration    StatementType = "orchestration"
+	TypeChangeWorkdir    StatementType = "change_workdir"
 )
 
 // Action represents an action statement (info, step, success, etc.)
@@ -269,3 +270,12 @@ type Orchestration struct {
 }
 
 func (o *Orchestration) Type() StatementType { return TypeOrchestration }
+
+// ChangeWorkdir represents a working directory change within a task.
+// Subsequent shell commands in the same task will run in this directory.
+// Relative paths are resolved against the original cwd (not chained).
+type ChangeWorkdir struct {
+	Path string
+}
+
+func (cw *ChangeWorkdir) Type() StatementType { return TypeChangeWorkdir }
