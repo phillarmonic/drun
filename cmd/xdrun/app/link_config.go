@@ -150,7 +150,7 @@ func LinkDirectories(directories []string, taskFile string) error {
 		}
 
 		config.Links[absDir] = targetFile
-		fmt.Printf("🔗 Linked %s ➜ %s\n", absDir, targetFile)
+		fmt.Printf("🔗  Linked %s ➜ %s\n", absDir, targetFile)
 	}
 
 	if err := saveLinkConfig(config); err != nil {
