@@ -310,7 +310,7 @@ func DebugDomain(info DomainDebugInfo) {
 	fmt.Println()
 
 	// Parameter Validator Debug
-	fmt.Println("✅ Parameter Validator:")
+	fmt.Println("✅  Parameter Validator:")
 	fmt.Println("  Status: initialized")
 	fmt.Println("  Validation support:")
 	fmt.Println("    • Type checking (string, number, boolean, list)")

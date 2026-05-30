@@ -39,7 +39,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: 1.25
+        go-version: 1.26
         cache: true
         cache-dependency-path: go.sum
 
@@ -47,9 +47,9 @@ jobs:
       run: go mod download
 
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: latest
+        version: v2.11.4
         args: --timeout=5m
 
   # Test job depends on successful lint
@@ -60,7 +60,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: [1.25]
+        go-version: [1.26]
     
     steps:
     - name: Checkout code
@@ -113,7 +113,7 @@ jobs:
         fi
         
         echo "Building the binary..."
-        go build -o bin/xdrun.exe ./cmd/drun
+        go build -o bin/xdrun.exe ./cmd/xdrun
         if [ $? -ne 0 ]; then
           echo "❌ Build failed!"
           exit 1
@@ -127,7 +127,7 @@ jobs:
         echo "CI tests passed!"
 
     - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.25'
+      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26'
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage/coverage.cov
@@ -150,7 +150,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: 1.25
+        go-version: 1.26
         cache: true
         cache-dependency-path: go.sum
 
@@ -160,14 +160,14 @@ jobs:
     - name: Build binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/drun
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun ./cmd/xdrun
         ./bin/xdrun --version
 
     - name: Build binary (Windows)
       if: runner.os == 'Windows'
       shell: bash
       run: |
-        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun.exe ./cmd/drun
+        go build -ldflags "-X main.version=ci-build -X main.commit=${{ github.sha }} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/xdrun.exe ./cmd/xdrun
         ./bin/xdrun.exe --version
 
     - name: Upload artifacts
@@ -198,7 +198,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: 1.25
+        go-version: 1.26
         cache: true
         cache-dependency-path: go.sum
 
@@ -214,13 +214,13 @@ jobs:
     - name: Build drun binary (Unix)
       if: runner.os != 'Windows'
       run: |
-        go build -o bin/xdrun ./cmd/drun
+        go build -o bin/xdrun ./cmd/xdrun
         ./bin/xdrun --version
 
     - name: Build drun binary (Windows)
       if: runner.os == 'Windows'
       run: |
-        go build -o bin/xdrun.exe ./cmd/drun
+        go build -o bin/xdrun.exe ./cmd/xdrun
         ./bin/xdrun.exe --version
 
     - name: Test parsing of all example files
@@ -342,6 +342,11 @@ jobs:
         run_with_timeout "examples/08-builtin-functions.drun" "system info"
         
         echo "✅ All safe example executions completed successfully!"
+
+    - name: Run regression check script (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: ./scripts/test-regressions.sh
 
     - name: Test Windows-specific parsing edge cases
       if: matrix.os == 'windows-latest'

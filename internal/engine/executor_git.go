@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Git Operations Execution
@@ -12,7 +12,7 @@ import (
 // - Branch management
 
 // executeGit executes Git operations
-func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeGit(gitStmt *statement.Git, ctx *ExecutionContext) error {
 	// Interpolate variables in Git statement
 	operation := gitStmt.Operation
 	resource := gitStmt.Resource
@@ -33,7 +33,7 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 	case "create":
 		switch resource {
 		case "branch":
-			_, _ = fmt.Fprintf(e.output, "🌿 Creating Git branch")
+			_, _ = fmt.Fprintf(e.output, "🌿  Creating Git branch")
 			if name != "" {
 				_, _ = fmt.Fprintf(e.output, ": %s", name)
 			}
@@ -79,7 +79,7 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "clone":
-		_, _ = fmt.Fprintf(e.output, "📥 Cloning Git repository")
+		_, _ = fmt.Fprintf(e.output, "📥  Cloning Git repository")
 		if name != "" {
 			_, _ = fmt.Fprintf(e.output, ": %s", name)
 		}
@@ -93,10 +93,10 @@ func (e *Engine) executeGit(gitStmt *ast.GitStatement, ctx *ExecutionContext) er
 		}
 		_, _ = fmt.Fprintf(e.output, "\n")
 	case "status":
-		_, _ = fmt.Fprintf(e.output, "📊 Checking Git status\n")
+		_, _ = fmt.Fprintf(e.output, "📊  Checking Git status\n")
 	case "show":
 		if resource == "branch" {
-			_, _ = fmt.Fprintf(e.output, "🌿 Showing current Git branch\n")
+			_, _ = fmt.Fprintf(e.output, "🌿  Showing current Git branch\n")
 		} else {
 			_, _ = fmt.Fprintf(e.output, "📖 Showing Git information\n")
 		}

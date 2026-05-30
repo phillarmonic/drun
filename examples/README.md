@@ -37,7 +37,7 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[44-array-literals-showcase.drun](44-array-literals-showcase.drun)** - Comprehensive array literal examples and real-world use cases
 
 ### 📝 String Features
-- **[64-multiline-strings.drun](64-multiline-strings.drun)** - Multi-line strings with line continuation, escaped quotes, and interpolation
+- **[64-multiline-strings.drun](63-multiline-strings.drun)** - Multi-line strings with line continuation, escaped quotes, and interpolation
 
 ## 🚀 Quick Start
 

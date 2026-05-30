@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/lexer"
 )
@@ -20,13 +23,7 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 		p.nextToken()
 		stmt.Operation = "compose"
 		stmt.Resource = "compose"
-
-		// Parse compose command (up, down, build, etc.)
-		if p.peekToken.Type == lexer.UP || p.peekToken.Type == lexer.DOWN || p.peekToken.Type == lexer.BUILD {
-			p.nextToken()
-			stmt.Options["command"] = p.curToken.Literal
-		}
-		return stmt
+		return p.parseDockerComposeStatement(stmt)
 	case lexer.SCALE:
 		// Handle "docker compose scale service "name" to 3"
 		p.nextToken() // consume SCALE
@@ -98,4 +95,82 @@ func (p *Parser) parseDockerStatement() *ast.DockerStatement {
 	}
 
 	return stmt
+}
+
+func (p *Parser) parseDockerComposeStatement(stmt *ast.DockerStatement) *ast.DockerStatement {
+	// Optional: docker compose in service "<name>"
+	if p.peekToken.Type == lexer.IN {
+		p.nextToken() // consume IN
+		if p.peekToken.Type == lexer.SERVICE || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "service") {
+			p.nextToken()
+		} else {
+			p.addError("expected 'service' keyword after 'in'")
+			return nil
+		}
+
+		name, isLiteral, ok := p.parseServiceReference()
+		if !ok {
+			return nil
+		}
+		stmt.ServiceScoped = true
+		stmt.ServiceName = name
+		stmt.ServiceNameIsLiteral = isLiteral
+	}
+
+	raw := p.collectInlineCommand()
+	if raw != "" {
+		stmt.Options["args"] = raw
+		if _, exists := stmt.Options["command"]; !exists {
+			fields := strings.Fields(raw)
+			if len(fields) > 0 {
+				stmt.Options["command"] = fields[0]
+			}
+		}
+	}
+
+	return stmt
+}
+
+func (p *Parser) collectInlineCommand() string {
+	if p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.DEDENT || p.peekToken.Type == lexer.EOF {
+		return ""
+	}
+
+	var builder strings.Builder
+	lastWasMinus := false
+
+collectLoop:
+	for {
+		switch p.peekToken.Type {
+		case lexer.NEWLINE, lexer.DEDENT, lexer.EOF:
+			break collectLoop
+		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
+			p.nextToken()
+			continue
+		default:
+			p.nextToken()
+			tok := p.curToken
+			if tok.Type == lexer.MINUS {
+				if builder.Len() > 0 && !lastWasMinus {
+					builder.WriteByte(' ')
+				}
+				builder.WriteByte('-')
+				lastWasMinus = true
+				continue
+			}
+
+			literal := tok.Literal
+			if tok.Type == lexer.STRING {
+				literal = fmt.Sprintf("\"%s\"", tok.Literal)
+			}
+
+			if builder.Len() > 0 && !lastWasMinus {
+				builder.WriteByte(' ')
+			}
+			builder.WriteString(literal)
+			lastWasMinus = false
+		}
+	}
+
+	return strings.TrimSpace(builder.String())
 }

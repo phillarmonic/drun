@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/shell"
 )
 
@@ -16,15 +16,24 @@ import (
 // - Platform-specific shell configuration
 
 // executeShell executes a shell command statement
-func (e *Engine) executeShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
-	if shellStmt.IsMultiline {
-		return e.executeMultilineShell(shellStmt, ctx)
+func (e *Engine) executeShell(shellStmt *statement.Shell, ctx *ExecutionContext) error {
+	var svcCtx *serviceContextInfo
+	var err error
+	if shellStmt.ServiceScoped {
+		svcCtx, err = e.resolveServiceContext(shellStmt.ServiceName, shellStmt.ServiceNameIsLiteral, ctx)
+		if err != nil {
+			return err
+		}
 	}
-	return e.executeSingleLineShell(shellStmt, ctx)
+
+	if shellStmt.IsMultiline {
+		return e.executeMultilineShell(shellStmt, ctx, svcCtx)
+	}
+	return e.executeSingleLineShell(shellStmt, ctx, svcCtx)
 }
 
 // executeMultilineShell executes multiline shell commands as a single shell session
-func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *ExecutionContext, svcCtx *serviceContextInfo) error {
 	// Interpolate variables in all commands
 	var interpolatedCommands []string
 	for _, cmd := range shellStmt.Commands {
@@ -36,7 +45,11 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 	script := strings.Join(interpolatedCommands, "\n")
 
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands:\n")
+		if svcCtx != nil {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands in service '%s' (%s):\n", svcCtx.Name, svcCtx.Path)
+		} else {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute multiline shell commands:\n")
+		}
 		for i, cmd := range interpolatedCommands {
 			_, _ = fmt.Fprintf(e.output, "[DRY RUN]   %d: %s\n", i+1, cmd)
 		}
@@ -53,18 +66,27 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 	opts.CaptureOutput = true
 	opts.StreamOutput = shellStmt.StreamOutput
 	opts.Output = e.output
+	if svcCtx != nil {
+		opts.WorkingDir = svcCtx.Path
+	} else if ctx != nil && ctx.WorkingDir != "" {
+		opts.WorkingDir = ctx.WorkingDir
+	}
 
 	// Show what we're about to execute (verbose mode only)
 	if e.verbose {
 		switch shellStmt.Action {
 		case "run":
-			_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+			if svcCtx != nil {
+				_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands in service '%s' (%d lines):\n", svcCtx.Name, len(interpolatedCommands))
+			} else {
+				_, _ = fmt.Fprintf(e.output, "🏃 Running multiline commands (%d lines):\n", len(interpolatedCommands))
+			}
 		case "exec":
 			_, _ = fmt.Fprintf(e.output, "⚡ Executing multiline commands (%d lines):\n", len(interpolatedCommands))
 		case "shell":
 			_, _ = fmt.Fprintf(e.output, "🐚 Shell multiline commands (%d lines):\n", len(interpolatedCommands))
 		case "capture":
-			_, _ = fmt.Fprintf(e.output, "📥 Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
+			_, _ = fmt.Fprintf(e.output, "📥  Capturing multiline commands (%d lines):\n", len(interpolatedCommands))
 		}
 
 		// Show each command with line numbers
@@ -76,20 +98,20 @@ func (e *Engine) executeMultilineShell(shellStmt *ast.ShellStatement, ctx *Execu
 	// Execute the script as a single shell session
 	result, err := shell.Execute(script, opts)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ Multiline command failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  Multiline command failed: %v\n", err)
 		return err
 	}
 
 	// Handle capture
 	if shellStmt.CaptureVar != "" && shellStmt.Action == "capture" {
 		ctx.Variables[shellStmt.CaptureVar] = result.Stdout
-		_, _ = fmt.Fprintf(e.output, "📦 Captured output in variable '%s'\n", shellStmt.CaptureVar)
+		_, _ = fmt.Fprintf(e.output, "📦  Captured output in variable '%s'\n", shellStmt.CaptureVar)
 	}
 
 	// Show execution summary
 	if result.Success {
 		if e.verbose {
-			_, _ = fmt.Fprintf(e.output, "✅ Multiline commands completed successfully (exit code: %d, duration: %v)\n",
+			_, _ = fmt.Fprintf(e.output, "✅  Multiline commands completed successfully (exit code: %d, duration: %v)\n",
 				result.ExitCode, result.Duration)
 		}
 	} else {

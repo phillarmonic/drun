@@ -2,15 +2,15 @@
 
 ## Overview
 
-The `engine` package is the execution engine for drun. It has been refactored from a monolithic 5,182-line file into a modular, domain-driven architecture.
+The `engine` package is the execution engine for drun. It uses a **modular, domain-driven architecture** with clear separation of concerns through specialized components: Planner, Executor, and supporting subsystems.
 
-## Refactoring Results
+## Current Architecture
 
-- **Original:** `engine.go` - 5,182 lines (monolithic)
-- **Current:** `engine.go` - 918 lines (orchestration core)
-- **Total Reduction:** 82.3% reduction in main file size
-- **Files Created:** 35 domain-specific files
-- **Total Package Lines:** ~9,200 lines (well-organized)
+- **Core Orchestration:** `engine.go` - Main engine coordinating execution flow
+- **Execution Planning:** `planner/` - Dependency resolution and execution plan generation
+- **Task Execution:** `executor/` - Task and hook execution with domain statements
+- **Configuration:** Options-based dependency injection for testability
+- **Subsystems:** Interpolation, hooks, includes as focused packages
 
 ## Package Structure
 
@@ -32,7 +32,38 @@ The `engine` package is the execution engine for drun. It has been refactored fr
   - `ProjectContext` - Project-level configuration and settings
   - Interface implementations for interpolation and includes packages
 
-### Sub-Packages
+### Component Packages
+
+#### `planner/` (Execution Planning)
+- **Purpose:** Dependency resolution and execution plan generation
+- **Files:**
+  - `planner.go` - Main planner with Plan() method
+  - `planner_test.go` - Planner unit tests
+- **Key Types:**
+  - `ExecutionPlan` - Comprehensive execution plan with all metadata
+  - `TaskPlan` - Individual task with domain statements and parameters
+  - `HookPlan` - Lifecycle hooks (setup, before, after, teardown)
+  - `ProjectContext` - Project-level information for planning
+
+**Benefits:**
+- Single upfront dependency resolution
+- Deterministic execution order
+- No redundant AST scans
+- Rich debugging information
+
+#### `executor/` (Task Execution)
+- **Purpose:** Execute tasks and lifecycle hooks using domain statements
+- **Files:**
+  - `executor.go` - Main executor
+  - `executor_test.go` - Executor unit tests
+- **Key Types:**
+  - `Executor` - Handles task and hook execution
+  - `DomainStatementExecutor` - Interface for statement execution
+- **Features:**
+  - Direct domain statement execution
+  - Lifecycle hook management
+  - Dry-run support
+  - Error handling
 
 #### `interpolation/` (670 lines across 4 files)
 - **Purpose:** Variable and expression interpolation
@@ -102,7 +133,7 @@ Domain-specific statement execution:
     - Tool and command detection
     - Environment detection
 
-### Helper Files (1,885 lines across 7 files)
+### Helper Files (1,652 lines across 7 files)
 
 Supporting functionality organized by domain:
 
@@ -110,10 +141,10 @@ Supporting functionality organized by domain:
    - Command builders for Docker, Git, HTTP, Network operations
    - Shell command construction
 
-2. **`helpers_expressions.go` (354 lines)**
-   - Expression evaluation (binary, function calls)
-   - Builtin operations parsing and application
-   - Variable operation chains
+2. **`helpers_expressions.go` (121 lines)**
+   - Builtin operations parsing (replace, without, trim, etc.)
+   - Variable operation chains for interpolator
+   - Post-interpolation transformations
 
 3. **`helpers_conditions.go` (332 lines)**
    - Condition evaluation logic
@@ -230,35 +261,105 @@ type ProjectContext struct {
 7. **Execute Hooks** → Teardown hooks
 8. **Cleanup** → Resource cleanup
 
-## Benefits of Refactoring
+## Dependency Injection & Configuration
+
+### Options-Based Constructor
+
+The engine supports pluggable infrastructure through `NewEngineWithOptions`:
+
+```go
+// Example: Custom configuration
+engine := NewEngineWithOptions(
+    WithOutput(customWriter),
+    WithTaskRegistry(customRegistry),
+    WithParamValidator(customValidator),
+    WithDepResolver(customResolver),
+    WithCacheManager(customCache),
+    WithVerbose(true),
+    WithDryRun(false),
+)
+```
+
+### Available Options (`options.go`)
+
+- `WithOutput(io.Writer)` - Custom output writer
+- `WithTaskRegistry(*task.Registry)` - Custom task registry
+- `WithParamValidator(*parameter.Validator)` - Custom parameter validator
+- `WithDepResolver(*task.DependencyResolver)` - Custom dependency resolver
+- `WithCacheManager(*cache.Manager)` - Custom cache manager
+- `WithVerbose(bool)` - Enable verbose output
+- `WithDryRun(bool)` - Enable dry-run mode
+- `WithAllowUndefinedVars(bool)` - Allow undefined variables
+
+### Default Configuration
+
+When options are omitted, sensible defaults are applied via `applyDefaults()`:
+- Standard output writer
+- New task registry
+- Default validators and resolvers
+- GitHub, HTTPS, and Drunhub fetchers
+- Standard interpolator
+
+## Architecture Benefits
 
 ### Code Quality
-✅ Reduced complexity (5,182 → 918 lines in core)  
-✅ Improved readability (clear domain boundaries)  
-✅ Better maintainability (focused files)  
-✅ Enhanced testability (isolated domains)  
+✅ **Modular Design** - Clear component boundaries (Planner, Executor, Engine)  
+✅ **Domain-Driven** - Business logic separated from AST  
+✅ **Explicit Planning** - Upfront execution plan eliminates waste  
+✅ **Dependency Injection** - Pluggable infrastructure for testing  
 
 ### Development Experience
-✅ Easier to navigate (logical file organization)  
-✅ Faster to understand (smaller, focused files)  
-✅ Simpler to extend (clear extension points)  
-✅ Reduced merge conflicts (distributed changes)  
+✅ **Easier Navigation** - Logical package organization  
+✅ **Better Testability** - Components tested in isolation  
+✅ **Clear Extension Points** - Add features without breaking changes  
+✅ **Rich Debugging** - Plan visualization and diagnostics  
 
-### Performance
-✅ No performance impact (same logic, better organized)  
-✅ All 58 examples passing  
-✅ All unit tests passing  
-✅ Zero regressions  
+### Performance & Reliability
+✅ **Optimized Execution** - Single AST scan, no redundant work  
+✅ **All Examples Passing** - 60/60 examples verified  
+✅ **All Unit Tests Passing** - Comprehensive test coverage  
+✅ **Zero Regressions** - Backward compatible  
+
+## Debug & Diagnostics
+
+### Execution Plan Visualization
+
+The engine supports comprehensive debugging through execution plan exports:
+
+**Available Formats:**
+- **Graphviz DOT** - For rendering with `dot` command
+- **Mermaid** - For markdown diagrams
+- **JSON** - For programmatic analysis
+
+**CLI Usage:**
+```bash
+# View plan in terminal
+xdrun --debug --debug-domain --debug-plan -f myfile.drun
+
+# Export all formats
+xdrun --debug --debug-domain \
+  --debug-export-graph plan \
+  --debug-export-mermaid plan \
+  --debug-export-json plan \
+  -f myfile.drun
+```
+
+**Plan Information:**
+- Complete execution order
+- Task dependencies
+- Parameter metadata
+- Hook integration points
+- Project and namespace info
 
 ## Future Enhancements
 
 Potential areas for further improvement:
 
-1. **Extract more sub-packages** for complex domains (e.g., detection, actions)
-2. **Interface extraction** for better mocking and testing
-3. **Dependency injection** for cleaner initialization
-4. **Event system** for better observability
-5. **Plugin architecture** for extensibility
+1. **Plan Caching** - Cache execution plans for warm-start performance
+2. **Interactive Debugger** - Step-through execution with breakpoints
+3. **Plan Diff Tool** - Compare execution plans across changes
+4. **Web UI** - Interactive plan visualization dashboard
+5. **Performance Profiling** - Built-in performance metrics
 
 ## Maintenance Guidelines
 
@@ -283,5 +384,7 @@ Potential areas for further improvement:
 
 ---
 
-**Last Updated:** Phase 3 Refactoring - October 2025  
-**Status:** ✅ Complete - All tests passing, zero regressions
+**Last Updated:** October 9, 2025  
+**Status:** ✅ Production - Pure domain-driven architecture  
+**Code Quality:** 249 lines of legacy code removed, all executors use domain types  
+**Test Coverage:** 60/60 examples passing, all unit tests passing

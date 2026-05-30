@@ -959,11 +959,11 @@ requires $environment from ["dev", "staging", "production"] defaults to "dev"
 - Emphasizes importance and criticality
 - Can have defaults for convenience while maintaining validation
 
-#### `given` - Optional Parameters with Defaults
+#### `given` - Optional Parameters (with optional defaults)
 
-**Semantic Intent:** "This parameter is configurable but has a sensible default."
+**Semantic Intent:** "This parameter is configurable and optional."
 
-Parameters declared with `given` **ALWAYS** have a default value and are completely optional.
+Parameters declared with `given` are optional. They _may_ specify a default value but are no longer required to do so. When no default is supplied, the parameter resolves to an empty string unless populated at runtime.
 
 ```
 given <name> defaults to <value> [constraints]
@@ -974,6 +974,7 @@ given $timeout defaults to "5m"
 given $force defaults to "false"
 given $tags defaults to [] as list of strings
 given $features defaults to empty  # equivalent to ""
+given $service_name  # optional without explicit default
 
 # Optional with enum validation (NEW!):
 given $log_level from ["error", "warn", "info", "debug"] defaults to "info"
@@ -986,7 +987,7 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 ```
 
 **Key Characteristics:**
-- Default value is **mandatory**
+- Default value is optional (defaults to empty string when omitted)
 - User can override but doesn't have to
 - Used for configuration, feature flags, optional overrides
 - Can also have validation constraints (enums, types)
@@ -996,7 +997,7 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 | Feature | `requires` | `given` |
 |---------|------------|---------|
 | **Must provide value?** | Yes (unless has default) | No (always optional) |
-| **Default value** | Optional | **Mandatory** |
+| **Default value** | Optional | Optional (defaults to empty string) |
 | **Semantic meaning** | Essential/Critical | Configurable/Optional |
 | **Validation** | Recommended | Optional |
 | **Use case** | Core parameters | Configuration options |
@@ -1512,6 +1513,12 @@ else:
 # Alternative: use 'are not' for better readability
 if docker,"docker-compose",kubectl are not available:
   error "One or more required tools are missing"
+
+# Availability can be chained with a version check
+if "golangci-lint" is available and version >= "2.12":
+  info "golangci-lint is installed and new enough"
+else:
+  fail "golangci-lint >= 2.12 is required"
 
 # File/directory detection
 if file "package.json" exists:
@@ -2333,11 +2340,11 @@ This maintains consistency with other global variable access patterns like `{$gl
 
 ### Loop Variables with Array Literals
 
-Loop variables use the `$variable` syntax for consistency with the scoping system:
+Loop variables use the `$variable` syntax for consistency with the scoping system. For readability in prose-style code, bare identifiers (`for service in [...]`) are also accepted and automatically normalised to `$service` within the loop body:
 
 ```
 # Direct array literal in loops
-for each $platform in ["linux", "darwin", "windows"]:
+for each platform in ["linux", "darwin", "windows"]:
   info "Building for {$platform}"
 
 # Using project-defined arrays
@@ -3203,6 +3210,68 @@ run:
   pwd              # Shows /tmp (working directory persists)
 ```
 
+#### Service-Scoped Shell Commands
+
+When services are declared in the program, shell commands can target a service's working directory without manual `cd` operations:
+
+```drun
+task "inspect-service" given $servicename defaults to "some-service":
+    run in service $servicename "ls -a"
+    run in service $servicename "cat Dockerfile"
+```
+
+The runtime resolves the service name (from literals, task parameters, or captured variables), validates that the service exists, and executes the command inside the service directory. If no services are defined, or the service name cannot be resolved, execution fails fast with an explanatory error.
+
+#### Changing Working Directory (`use workdir`)
+
+For tasks that need to run commands in a different directory, `use workdir` provides a clean, readable way to temporarily change the working directory for all subsequent shell commands in the current task.
+
+**Syntax:**
+
+```drun
+use workdir "path"
+```
+
+**Examples:**
+
+```drun
+# Basic: build a frontend project located in a subdirectory
+task "front-dev" means "Builds the dev frontend of the app":
+    use workdir "frontend"
+    run "npm run build:dev"
+
+# With variable interpolation
+task "build-module" means "Build a specific module":
+    given $module defaults to "frontend"
+    use workdir "{$module}"
+    run "npm run build"
+
+# Switch between directories in one task
+task "multi-build" means "Build both packages":
+    use workdir "packages/frontend"
+    run "npm run build"
+    use workdir "packages/backend"
+    run "go build ./..."
+
+# Absolute path
+task "deploy":
+    use workdir "/var/www/app"
+    run "git pull origin main"
+```
+
+**Key Behaviors:**
+
+- **Task-scoped**: The working directory change applies only within the current task. It does not affect called tasks (`call task`), dependent tasks (`depends on`), or any other task.
+- **Relative paths from original cwd**: Relative paths are always resolved from the process's original working directory (the cwd when xdrun was invoked), not chained from a previous `use workdir`. This means:
+  ```drun
+  use workdir "a"  # resolves to <original_cwd>/a
+  use workdir "b"  # resolves to <original_cwd>/b  (NOT <original_cwd>/a/b)
+  ```
+- **Absolute paths**: Absolute paths are used as-is.
+- **Variable interpolation**: Full interpolation support — use `{$var}`, `{env('VAR')}`, etc.
+- **Validation**: The resolved path must exist and be a directory. Non-existent paths fail immediately with a descriptive error.
+- **Dry-run**: In `--dry-run` mode, logs `[DRY RUN] Would set working directory to: <path>` without resolving the path.
+
 #### Variable Interpolation in Multiline Commands
 
 Variables work seamlessly in multiline blocks:
@@ -3328,6 +3397,16 @@ restart docker compose service "api"
 
 # Scaling
 scale docker compose service "worker" to 3 instances
+
+# Execute commands within a service directory
+docker compose in service "api" exec -it app bash
+```
+
+Service-scoped docker compose commands reuse the registered service paths. The service name can be dynamic—for example, using task parameters:
+
+```drun
+task "open-shell" given $servicename defaults to "some-service":
+    docker compose in service $servicename exec app bash
 ```
 
 ### Kubernetes Actions
@@ -3418,11 +3497,16 @@ move "old-name.txt" to "new-name.txt"
 remove "unwanted-file.txt"
 backup "important-file.txt"
 backup "important-file.txt" as "backup-{now.date}"
+replace in "config/.env":
+    "API_KEY=CHANGE_ME" with "API_KEY={$api_key}"
+    "ENV=dev" with "ENV=production"
 
 # Directory operations
 create directory "new-folder"
 remove directory "old-folder"
 copy directory "src" to "backup/src"
+
+The `replace` action accepts an indented list of `"old" with "new"` clauses, performing multiple replacements within the target file in a single operation.
 ```
 
 #### File Inspection
@@ -4080,6 +4164,269 @@ task "parameter defaults with pipes":
 - **Parameter Defaults**: Use in parameter default values with full pipe support
 - **Variable Assignment**: Assign results to variables for reuse
 - **Expression Context**: Work in any expression context (info messages, conditions, etc.)
+
+---
+
+## Secrets Management
+
+drun v2 provides secure, built-in secrets management for storing and retrieving sensitive data like API keys, passwords, and tokens.
+
+### Features
+
+- **Automatic Project Isolation**: Secrets are automatically namespaced by project name from drun config
+- **Platform Integration**: Uses native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Automatic Fallback**: Seamlessly falls back to AES-256-GCM encrypted file storage when platform keychain is unavailable or has permission issues
+- **Interpolation Support**: Access secrets directly in strings using `{secret('key')}`
+- **Namespace Override**: Optionally specify custom namespaces for shared secrets
+
+### Secret Operations
+
+#### Setting Secrets
+
+```drun
+# Basic usage (automatic project namespace)
+secret set "api_key" to "secret123"
+secret set "db_password" to "super_secure_pass"
+
+# With custom namespace
+secret set "shared_token" to "token456" in namespace "team-shared"
+
+# From environment variable
+secret set "github_token" to ${GITHUB_TOKEN}
+```
+
+#### Retrieving Secrets
+
+```drun
+# In interpolation (recommended)
+info "Connecting with key: {secret('api_key')}"
+run "curl -H 'Authorization: Bearer {secret('api_key')}' https://api.example.com"
+
+# With default value
+info "Webhook: {secret('webhook_url', 'https://default.webhook.com')}"
+
+# From custom namespace
+info "Token: {secret('shared_token', '', 'team-shared')}"
+```
+
+#### Checking Secret Existence
+
+```drun
+# Check if secret exists
+secret exists "api_key"
+
+# With namespace
+secret exists "shared_token" in namespace "team-shared"
+```
+
+#### Listing Secrets
+
+```drun
+# List all secrets in current project namespace
+secret list
+
+# List from custom namespace
+secret list from namespace "team-shared"
+```
+
+#### Deleting Secrets
+
+```drun
+# Delete secret
+secret delete "api_key"
+
+# Delete from custom namespace
+secret delete "shared_token" from namespace "team-shared"
+```
+
+### Complete Example
+
+```drun
+version: 2.0
+
+project "api-deployment" version "1.0":
+
+task "configure":
+  info "Setting up secrets..."
+  secret set "api_key" to prompt "Enter API key:" masked
+  secret set "db_password" to prompt "Enter database password:" masked
+  success "Secrets configured"
+
+task "deploy":
+  depends on "configure"
+  
+  # Check if secrets exist
+  secret exists "api_key"
+  secret exists "db_password"
+  
+  # Use secrets in deployment
+  run """
+    kubectl create secret generic app-secrets \
+      --from-literal=api-key={secret('api_key')} \
+      --from-literal=db-password={secret('db_password')}
+  """
+  
+  success "Deployed with secrets"
+
+task "cleanup":
+  info "Removing secrets..."
+  secret delete "api_key"
+  secret delete "db_password"
+  success "Secrets removed"
+```
+
+### Security Features
+
+- **Per-Project Isolation**: Secrets are automatically scoped to project names, preventing accidental access
+- **Platform Keychains**: Integrates with OS-native secure storage when available
+- **Encrypted Storage**: AES-256-GCM encryption with PBKDF2 key derivation for fallback storage
+- **Memory Safety**: Secure clearing of sensitive data from memory
+- **Input Validation**: Keys, namespaces, and values are validated before storage
+
+### secret() Function
+
+The `secret()` builtin function allows seamless secret access in interpolations:
+
+**Syntax:**
+```
+{secret('key')}                           # Get from current project namespace
+{secret('key', 'default')}                # Get with default value
+{secret('key', '', 'namespace')}          # Get from specific namespace
+```
+
+**Examples:**
+```drun
+# Simple usage
+info "API Key: {secret('api_key')}"
+
+# With default for optional secrets
+run "webhook_url={secret('webhook', 'https://default.com')}"
+
+# From shared namespace
+run "deploy --token {secret('deploy_token', '', 'ci-secrets')}"
+
+# In complex strings
+run "curl -u admin:{secret('password')} https://api.example.com"
+```
+
+### CLI Secret Management
+
+In addition to managing secrets within tasks, drun provides a standalone `cmd:secret` command for managing secrets directly from the command line. This is useful for:
+
+- Setting up secrets before running tasks
+- Managing secrets across multiple projects
+- Inspecting and listing stored secrets
+- Team collaboration via shared namespaces
+
+#### Command Syntax
+
+```bash
+# Add secrets
+xdrun cmd:secret add <key> [value] [flags]
+
+# List secrets
+xdrun cmd:secret list [flags]
+xdrun cmd:secret list-all [flags]
+
+# Remove secrets
+xdrun cmd:secret remove <key> [flags]
+```
+
+#### Namespace Flags
+
+- `--project`, `-p`: Use project scope (auto-detects project name from drun config)
+- `--global`, `-g`: Use global scope (shared across all projects)
+- `--namespace <name>`, `-n <name>`: Use custom namespace
+
+**Automatic Workspace Detection:**
+When you run `cmd:secret` commands without specifying a namespace, drun automatically detects your project name from the current workspace's `.drun/spec.drun` or configured drun file. This provides automatic project isolation without manual namespace management.
+
+#### Examples
+
+**Add Secrets:**
+
+```bash
+# Add to default namespace (auto-detects project if in workspace, prompts for value)
+xdrun cmd:secret add api_key
+
+# Add with masked input (secure)
+xdrun cmd:secret add api_key --masked
+
+# Add to global scope
+xdrun cmd:secret add --global shared_token "team-token-123"
+
+# Add to project scope (auto-detects project name from drun config)
+xdrun cmd:secret add --project db_password "secret-pass"
+
+# Add to custom namespace
+xdrun cmd:secret add --namespace team-alpha team_key "alpha-secret"
+```
+
+**List Secrets:**
+
+```bash
+# List in default namespace (auto-detects project if in workspace)
+xdrun cmd:secret list
+
+# List in global scope
+xdrun cmd:secret list --global
+
+# List in project scope (auto-detects project name)
+xdrun cmd:secret list --project
+
+# List all secrets across all namespaces
+xdrun cmd:secret list-all
+
+# Show secret values (use with caution)
+xdrun cmd:secret list --show-values
+```
+
+**Remove Secrets:**
+
+```bash
+# Remove from default namespace (auto-detects project if in workspace)
+xdrun cmd:secret remove api_key
+
+# Remove from global scope
+xdrun cmd:secret rm --global shared_token  # 'rm' is an alias
+
+# Remove from project scope (auto-detects project name)
+xdrun cmd:secret delete --project db_password  # 'delete' is an alias
+```
+
+#### Using CLI-Managed Secrets in Tasks
+
+Secrets managed via CLI are accessible in tasks using the `secret()` function:
+
+```drun
+version: 2.0
+project "my-app" version "1.0":
+
+task "deploy":
+  # Access project-scoped secret
+  info "Deploying with key: {secret('api_key')}"
+  
+  # Access global secret
+  info "Team token: {secret('shared_token', '', 'global')}"
+  
+  # Access custom namespace secret
+  info "Alpha key: {secret('team_key', '', 'team-alpha')}"
+```
+
+#### Security Notes
+
+1. **Masked Input**: Use `--masked` flag for secure password entry
+2. **Command History**: Avoid passing secrets directly on command line
+3. **Show Values**: Only use `--show-values` in secure environments
+4. **Platform Storage**: Secrets stored in native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+
+### Best Practices
+
+1. **Use Project Namespaces**: Let drun automatically scope secrets to projects
+2. **Set Defaults**: Provide sensible defaults for optional secrets
+3. **Clean Up**: Delete secrets after use in temporary workflows
+4. **Audit Access**: Use `secret list` to review stored secrets
+5. **Avoid Hardcoding**: Never commit secrets to version control
 
 ---
 
@@ -5021,7 +5368,7 @@ drun/
 │       └── engine/   # Execution engine domain
 │           ├── engine.go   # Direct execution engine
 │           └── engine_test.go
-└── cmd/drun/
+└── cmd/xdrun/
     └── main.go       # CLI integration for both v1 and v2
 ```
 
@@ -5376,3 +5723,1152 @@ Error: parameter 'version': value '1.2.3' does not match semver pattern (Basic s
 Error: parameter 'id': value 'not-a-uuid' does not match uuid pattern (UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000))
 ```
 
+
+---
+
+## Microservices Orchestration
+
+drun v2 includes a comprehensive microservices orchestration system for managing multi-service architectures with Docker Compose integration, health monitoring, and visual progress feedback.
+
+### Overview
+
+The orchestration system allows you to:
+
+- Define services with dependencies and health checks
+- Group services into orchestration units
+- Manage service lifecycles with semantic actions
+- Monitor health and status in real-time
+- Handle errors with circuit breaker support
+- Visualize progress with BuildKit-style display
+
+### Service Declaration
+
+Services represent Docker Compose projects that can be orchestrated together.
+
+#### Syntax
+
+```drun
+service "<name>" in "<path>":
+    [depends on ["service1", "service2", ...]]
+    [repository:
+        url "<url>"
+        [branch "<branch>"]
+        [tag "<tag>"]
+        [ssh_key "<path>"]
+        [clone <boolean>]  # defaults to true, can be omitted
+        [update_on_start <boolean>]]
+    [build:
+        required <boolean>
+        [command "<command>"]
+        [makefile "<path>"]
+        [make_target "<target>"]
+        [make_args ["arg1", "arg2", ...]]
+        [makefile_timeout "<duration>"]
+        [retry_on_failure <boolean>]
+        [max_retries <number>]
+        [retry_delay "<duration>"]
+        [fallback_command "<command>"]]
+    [health check:
+        type "<type>"
+        endpoint "<endpoint>"
+        [timeout "<duration>"]
+        [interval "<duration>"]
+        [retries <number>]
+        [condition "<condition>"]]
+```
+
+#### Example
+
+```drun
+service "api" in "./services/api":
+    depends on ["database", "redis"]
+    repository:
+        url "https://github.com/acme/api.git"
+        branch "main"
+        clone true  # default, can be omitted
+        update_on_start false
+    build:
+        required true
+        command "npm install && npm run build"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        interval "2s"
+        retries 5
+        condition "200"
+```
+
+#### Properties
+
+- **name**: Unique identifier for the service
+- **path**: Directory containing docker-compose.yml
+- **depends on**: List of service dependencies (optional)
+- **repository**: Git repository configuration (optional)
+  - **url**: Repository URL (required if repository is specified)
+  - **branch**: Branch to checkout (optional)
+  - **tag**: Tag to checkout (optional, mutually exclusive with branch)
+  - **ssh_key**: Path to SSH key for private repositories (optional)
+  - **clone**: Auto-clone missing repositories (defaults to `true`, can be omitted)
+  - **update_on_start**: Pull latest changes on start (defaults to `false`)
+- **build**: Build configuration (optional)
+  - **required**: Whether the build is mandatory (defaults to `false`)
+  - **command**: Shell command to execute (supports multiline strings)
+  - **allocate_tty**: Allocate a pseudo-TTY for the command (defaults to `false`)
+  - **makefile**: Path to Makefile (alternative to command)
+  - **make_target**: Makefile target to execute
+  - **make_args**: Additional arguments to pass to make
+  - **makefile_timeout**: Maximum time for make command execution
+  - **retry_on_failure**: Retry on build failure (defaults to `false`)
+  - **max_retries**: Maximum number of retry attempts
+  - **retry_delay**: Delay between retries
+  - **fallback_command**: Command to run if make fails
+- **health check**: Health check configuration (optional)
+
+### Build Configuration
+
+The build configuration allows you to specify custom build commands or Makefile targets to execute before starting a service.
+
+#### Simple Build Command
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        command "npm install && npm run build"
+```
+
+#### Multiline Build Commands
+
+**The `command` field supports multiline strings**, allowing complex multi-step build processes:
+
+```drun
+service "backend" in "./backend":
+    build:
+        required true
+        command "echo 'Installing dependencies...'
+npm install
+echo 'Running tests...'
+npm test
+echo 'Building application...'
+npm run build
+echo 'Build complete!'"
+```
+
+#### Line Continuation
+
+Use backslash (`\`) for line continuation to join lines without newlines:
+
+```drun
+service "frontend" in "./frontend":
+    build:
+        required true
+        command "docker build \
+            --tag myapp:latest \
+            --build-arg ENV=production \
+            --build-arg VERSION=1.0.0 \
+            ."
+```
+
+#### Makefile-Based Build
+
+```drun
+service "api" in "./services/api":
+    build:
+        required true
+        makefile "Makefile"
+        make_target "build"
+        make_args ["ENV=production", "VERBOSE=1"]
+        makefile_timeout "10m"
+        retry_on_failure true
+        max_retries 2
+        retry_delay "5s"
+        fallback_command "docker compose build"
+```
+
+#### Build with Variable Interpolation
+
+```drun
+project "myapp" version "1.0":
+    parameter $environment defaults to "development"
+    parameter $version defaults to "1.0.0"
+
+service "api" in "./api":
+    build:
+        required true
+        command "echo 'Building for {$environment}...'
+go mod download
+go test ./...
+go build -ldflags=\"-X main.version={$version}\" -o bin/api
+echo 'Build complete for version {$version}'"
+```
+
+#### Build with TTY Allocation
+
+For commands that require interactive terminal access (like `docker compose exec`):
+
+```drun
+service "gateway" in "./celesta-gateway":
+    compose file "docker-compose.dev.yml"
+    build:
+        required true
+        allocate_tty true
+        command "make build && make init"
+    health check:
+        type "http"
+        endpoint "http://localhost:93/"
+```
+
+**When to use `allocate_tty`:**
+- ✅ When your build uses `docker compose exec` to run commands inside containers
+- ✅ When scripts require a TTY (check for "input device is not a TTY" errors)
+- ✅ When commands need interactive terminal features
+- ❌ Not needed for regular shell commands, docker build, or make
+
+#### Complex Real-World Example
+
+```drun
+service "web-app" in "./webapp":
+    repository:
+        url "git@github.com:acme/webapp.git"
+        branch "main"
+        clone true
+    build:
+        required true
+        command "echo 'Installing frontend dependencies...'
+cd frontend && npm ci
+echo 'Building frontend assets...'
+npm run build
+cd ..
+echo 'Installing backend dependencies...'
+cd backend && go mod download
+echo 'Running backend tests...'
+go test ./...
+echo 'Building backend binary...'
+go build -o ../bin/server
+cd ..
+echo 'Build pipeline complete!'"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+```
+
+**Key Features:**
+- **Multiline Support**: Write complex multi-step commands naturally
+- **Line Continuation**: Use `\` to join long single commands
+- **Variable Interpolation**: Use `{$var}` syntax in build commands
+- **Escaped Quotes**: Use `\"` for quotes within commands
+- **Make Integration**: Alternative Makefile-based builds with fallback
+- **Retry Logic**: Automatic retries with configurable delays
+
+### Health Check Types
+
+#### HTTP Health Check
+
+Checks an HTTP endpoint for successful response:
+
+```drun
+health check:
+    type "http"
+    endpoint "http://localhost:8080/health"
+    timeout "10s"
+    interval "2s"
+    retries 5
+    condition "200"  # Expected HTTP status code
+```
+
+#### TCP Health Check
+
+Checks if a TCP port is accepting connections:
+
+```drun
+health check:
+    type "tcp"
+    endpoint "localhost:5432"
+    timeout "5s"
+    interval "1s"
+    retries 10
+```
+
+#### Docker Health Check
+
+Uses Docker's native health check status:
+
+```drun
+health check:
+    type "docker"
+    container "container-name"
+    timeout "30s"
+    interval "2s"
+```
+
+#### DNS Health Check
+
+Checks if a hostname resolves:
+
+```drun
+health check:
+    type "dns"
+    endpoint "api.example.com"
+    timeout "5s"
+    retries 3
+```
+
+#### Custom Health Check
+
+Runs a custom command:
+
+```drun
+health check:
+    type "custom"
+    command "curl -f http://localhost:8080/ready || exit 1"
+    timeout "5s"
+    interval "2s"
+    retries 5
+```
+
+### Orchestration Groups
+
+Orchestration groups define collections of services with shared lifecycle management.
+
+#### Syntax
+
+```drun
+orchestrate "<name>":
+    services ["service1", "service2", ...]
+    [strategy "<strategy>"]
+    [circuit <boolean>]
+    [health_check_interval "<duration>"]
+```
+
+#### Example
+
+```drun
+orchestrate "full_stack":
+    services ["database", "redis", "api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker true
+    health_check_interval "30s"
+    git_ssh_key "~/.ssh/id_rsa"
+    dns_checks ["api.local", "db.local", "frontend.local"]
+```
+
+#### Properties
+
+- **services**: List of services to orchestrate
+- **strategy**: Startup strategy (sequential, parallel, dependency-based)
+- **circuit_breaker**: Enable circuit breaker behaviour (stops dependent services on failure)
+- **stop_on_failure**: Always stop services when any service fails
+- **health_check_interval**: Background health check cadence once started
+- **startup_timeout** / **shutdown_timeout**: Global orchestration-level timeouts
+- **makefile_order** / **makefile_timeout**: Cross-service build sequencing and timeout
+- **clone_order** / **clone_timeout**: Repository cloning sequencing and timeout
+- **pre_task** / **post_task**: Task hooks executed before start / after stop
+- **git_ssh_key**: Default SSH key path for all Git operations (services can override)
+- **dns_checks**: Array of domains to validate DNS resolution before orchestration actions
+
+#### Startup Strategies
+
+**Sequential**: Start services one by one in declaration order
+
+```drun
+orchestrate "simple":
+    services ["a", "b", "c"]
+    strategy "sequential"
+```
+
+**Dependency-Based** (Recommended): Start based on dependency graph
+
+```drun
+orchestrate "smart":
+    services ["frontend", "api", "database"]
+    strategy "dependency-based"
+```
+
+**Parallel**: Start all services simultaneously
+
+```drun
+orchestrate "workers":
+    services ["worker1", "worker2", "worker3"]
+    strategy "parallel"
+```
+
+#### Git SSH Key Configuration
+
+Orchestrations can specify a default SSH key for all Git repository operations. This key is used as a fallback for any service that doesn't specify its own SSH key.
+
+```drun
+orchestrate "microservices":
+    services ["api", "frontend", "worker"]
+    strategy "dependency-based"
+    git_ssh_key "~/.ssh/id_rsa"
+```
+
+**Behavior:**
+- Services without their own `ssh_key` configuration will use the orchestration's key
+- Services with their own `ssh_key` configuration override the orchestration default
+- Supports path expansion (`~` for home directory)
+- Applied to all Git operations: clone, fetch, pull
+
+#### DNS Resolution Checks
+
+Orchestrations can validate that specific domains resolve before starting services. This is useful for catching missing `/etc/hosts` entries in local development environments.
+
+```drun
+orchestrate "local_stack":
+    services ["database", "api", "frontend"]
+    strategy "dependency-based"
+    dns_checks [
+        "api.local",
+        "db.local",
+        "frontend.local"
+    ]
+```
+
+**Behavior:**
+- DNS checks run before `start`, `up`, `down`, and `status` actions
+- Each domain has a 500ms timeout for fast failure detection
+- Failures are non-blocking warnings (orchestration continues)
+- Silent when all domains resolve (only shows output on failures)
+- Helpful warning message suggests adding entries to `/etc/hosts`
+
+**Example Output (on failure):**
+```
+🔍 DNS resolution check:
+   ❌ api.local - not resolvable
+
+⚠️  DNS resolution failed for: api.local
+These domains may need to be added to your /etc/hosts file
+```
+
+### Orchestration Actions
+
+Use orchestration actions within task bodies to manage services.
+
+#### Syntax
+
+```drun
+orchestrate "<group_name>" <action> [services ["service1", ...]]
+```
+
+#### Available Actions
+
+- `start` - Start services (skip if running and no updates detected)
+- `up` - Bring up services with fresh rebuild and repo updates on default branches
+- `stop` - Stop all services in reverse order
+- `restart` - Stop then start services
+- `recreate` - Force a fresh deployment by running `down → build → start`
+- `status` - Show status of all services
+- `show endpoints` / `endpoints` - List all service endpoints (URLs from health checks)
+- `health` / `health_check` - Re-evaluate service health and report failures
+- `build` - Build service images
+- `pull` - Pull latest images
+- `down` - Stop and remove containers
+- `logs` - Stream logs for the selected services (supports filters)
+- `clone repositories` - Produce the repository cloning plan (dry-run execution)
+- `update repositories` - Update repositories to latest version (optionally filter by branch)
+- `list branches` - List all repositories with their current branch
+- `list branches "branch name"` - Show all repositories checked out on the specified branch
+- `switch branch to default` - Switch a specific service (or all) to its default branch
+- `set all branches to default` - Set all services to their default branch
+
+**Difference between `start` and `up`:**
+
+| Feature | `start` | `up` |
+|---------|---------|------|
+| Skip if healthy | ✅ Yes | ❌ No |
+| Check for updates | ✅ Yes | ✅ Yes |
+| Force repo updates on main/master | ❌ No | ✅ Yes |
+| Force rebuild | ❌ No | ✅ Yes |
+| **Use for** | Quick restarts | Development, fresh deploys |
+
+#### Resume from a Specific Service
+
+You can resume an orchestration from a specific service using the `starting from` modifier. This is useful when an orchestration fails partway through and you've fixed the issue. The system will verify that all dependencies before the specified service are running and healthy before starting from that point.
+
+**Syntax:**
+```drun
+orchestrate "<group_name>" <action> starting from "<service_name>"
+orchestrate "<group_name>" <action> starting from {$variable}
+orchestrate "<group_name>" <action> starting from $variable
+```
+
+**Example:**
+```drun
+task "up" means "Start the stack":
+    given $service defaults to empty
+    
+    when $service is not empty:
+        # Resume from a specific service if provided
+        orchestrate "my_stack" up starting from {$service}
+    otherwise:
+        # Start the full stack
+        orchestrate "my_stack" up
+```
+
+**Behavior:**
+1. Verifies all dependencies before `$service` are running and healthy
+2. If any dependency is not running or healthy, fails with an error
+3. If all dependencies are satisfied, starts from `$service` onwards in dependency order
+
+**Usage:**
+```bash
+# Start full stack
+xdrun up
+
+# Resume from 'api' service (assumes database, cache are already running)
+xdrun up service=api
+```
+
+#### Examples
+
+```drun
+task "start":
+    orchestrate "my_stack" start
+
+task "up":
+    orchestrate "my_stack" up
+
+task "stop":
+    orchestrate "my_stack" stop
+
+task "restart_api":
+    orchestrate "my_stack" restart services ["api"]
+
+task "recreate_api":
+    orchestrate "my_stack" recreate services ["api"] with cache "false"
+
+task "update_repos":
+    # Update all repositories
+    orchestrate "my_stack" update repositories
+
+task "update_main_branch":
+    # Update only repositories on main/master branch
+    orchestrate "my_stack" update repositories with branch "main"
+
+task "status":
+    orchestrate "my_stack" status
+
+task "endpoints":
+    orchestrate "my_stack" show endpoints
+
+task "show_api_logs":
+    orchestrate "my_stack" logs service "api"
+
+task "check_branches":
+    # List all repositories with their current branch
+    orchestrate "my_stack" list branches
+
+task "check_main_branch":
+    # Show all repositories checked out on "main" branch
+    orchestrate "my_stack" list branches "main"
+
+task "switch_service_branch":
+    # Switch a specific service to its default branch
+    orchestrate "my_stack" switch branch to default service "api"
+
+task "switch_all_branches":
+    # Switch all services to their default branch
+    orchestrate "my_stack" set all branches to default
+```
+
+Service filters can be supplied inline (`services ["api"]`, `service "api"`) or via CLI parameters (`xdrun logs service=api`). Filters accept literal strings, variables (`$service`), or interpolated values (`{$service}`) and are validated against the orchestration's service registry.
+
+#### Branch Management Actions
+
+The branch management actions help you keep repositories aligned with their default branches:
+
+**`list branches`** - Lists all repositories with their current branch:
+- Shows all repositories with their current branch name
+- Lists services without repository configuration
+- Provides a summary count
+
+**`list branches "branch name"`** - Shows repositories on a specific branch:
+- Filters to show only repositories checked out on the specified branch
+- Useful for finding which services are on a particular branch
+- Normalizes branch names (main/master are treated as equivalent)
+
+**`switch branch to default`** - Switches repositories to their default branch:
+- If a `service` filter is provided, only switches that service
+- If no filter is provided, switches all services
+- Skips repositories with uncommitted changes (safety feature)
+- Automatically pulls latest changes after switching
+- The default branch is detected from the remote repository
+
+**`set all branches to default`** - Sets all services to their default branch:
+- Same behavior as `switch branch to default` but applies to all services
+- Useful for resetting all repositories to their default state
+
+**Safety Features:**
+- Repositories with uncommitted changes are skipped (you must commit or stash changes first)
+- The default branch is automatically detected from `origin/HEAD` or by checking for `main`/`master` branches
+- After switching, the latest changes are pulled from the default branch
+
+**Variable support in service filters:**
+```drun
+task "restart_service":
+    given $service defaults to empty
+    
+    when $service is not empty:
+        # All three syntaxes work:
+        orchestrate "stack" restart service "api"        # Literal
+        orchestrate "stack" restart service $service     # Variable
+        orchestrate "stack" restart service {$service}   # Interpolation
+```
+
+The `build` and `recreate` actions accept a `with cache "false"` modifier to disable Docker's build cache (`docker compose build --no-cache`) for services that need a completely fresh image.
+
+You can retrieve an orchestration's service list in tasks via the builtin expression `{orchestrate services "stack_name"}` which yields an array literal suitable for loops:
+
+```drun
+let $services be {orchestrate services "celesta-sb-stack"}
+
+for each $service in $services:
+    info "Ensuring {$service} is healthy"
+    orchestrate "celesta-sb-stack" health services [$service]
+```
+
+#### Show Endpoints
+
+The `show endpoints` (alias: `endpoints`) action displays all service endpoints with health check URLs. This is useful for quickly accessing running services or sharing URLs with team members.
+
+```drun
+task "endpoints":
+    orchestrate "my_stack" show endpoints
+```
+
+**Example Output:**
+```
+🌐 Service endpoints for orchestration: my_stack
+
+✅ Running services with endpoints:
+   • api: http://localhost:8080/health
+   • frontend: http://localhost:3000/
+   • admin: http://localhost:9000/admin
+
+✅ Running services (no endpoints):
+   • database
+   • redis
+
+⏹️  Stopped services:
+   • worker
+   • scheduler
+```
+
+**Behavior:**
+- Shows services grouped by status: running with endpoints, running without, stopped
+- Only displays URLs from HTTP health checks
+- Services without health checks appear in "running without endpoints"
+- Services that are not running appear in the stopped section
+
+### Progress Display
+
+The orchestration system features a BuildKit-inspired real-time progress display.
+
+#### Status Indicators
+
+- ⏸️ **Pending** - Waiting to start
+- 🔄 **Starting** - Service is starting
+- ✅ **Healthy** - Started and passed health checks
+- ❌ **Failed** - Failed to start or unhealthy
+- 🛑 **Stopping** - Being stopped
+- ⏹️ **Stopped** - Successfully stopped
+
+#### Example Output
+
+```
+🚀 Starting orchestration: full_stack
+   4 services in dependency order
+
+  ⏸️ database     
+  ⏸️ redis        
+  ⏸️ api          
+  ⏸️ frontend     
+
+  🔄 database     Starting service... [0s]
+  🔄 database     Waiting for health check... [0s]
+  ✅ database     Healthy [2s]
+  🔄 redis        Starting service... [0s]
+  ✅ redis        Healthy [1s]
+  🔄 api          Starting service... [0s]
+  ✅ api          Healthy [3s]
+  🔄 frontend     Starting service... [0s]
+  ✅ frontend     Healthy [2s]
+
+✅ 4/4 services completed successfully
+```
+
+### Circuit Breaker
+
+When circuit breaker is enabled, any failure stops and rolls back all services.
+
+#### Configuration
+
+```drun
+orchestrate "critical":
+    services ["database", "api", "frontend"]
+    circuit_breaker true  # Enable circuit breaker
+```
+
+#### Behavior
+
+```
+🚀 Starting orchestration: critical
+   🔴 Circuit breaker: ENABLED - will stop all on failure
+
+  ✅ database     Healthy [2s]
+  ❌ api          Health check failed [5s]
+
+🔴 Circuit breaker triggered! Rolling back all services...
+
+  🛑 database     Rolling back... [0s]
+  ⏹️ database     Stopped (rollback) [0s]
+
+❌ 1/3 services failed
+Error: circuit breaker: health check failed for 'api', all services stopped
+```
+
+### Resilient Mode
+
+When circuit breaker is disabled, failures are tolerated and the system continues in degraded mode.
+
+#### Configuration
+
+```drun
+orchestrate "resilient":
+    services ["database", "api", "frontend"]
+    circuit false  # Disable circuit breaker
+```
+
+#### Behavior
+
+```
+🚀 Starting orchestration: resilient
+
+  ✅ database     Healthy [2s]
+  ❌ api          Health check failed [5s]
+  🔄 api          ⚠️  Unhealthy: health check failed [5s]
+  ✅ frontend     Healthy [2s]
+
+✅ 2/3 services completed successfully
+```
+
+### Complete Example
+
+```drun
+version: 2.0
+
+project "e-commerce" version "1.0":
+
+# Infrastructure
+service "database" in "./services/db":
+    health check:
+        type "tcp"
+        endpoint "localhost:5432"
+        timeout "10s"
+        retries 10
+
+service "cache" in "./services/redis":
+    health check:
+        type "tcp"
+        endpoint "localhost:6379"
+        timeout "5s"
+        retries 5
+
+# Application
+service "api" in "./services/api":
+    depends on ["database", "cache"]
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "15s"
+        interval "2s"
+        retries 5
+
+service "frontend" in "./services/web":
+    depends on ["api"]
+    health check:
+        type "http"
+        endpoint "http://localhost:3000/"
+        timeout "10s"
+        retries 3
+
+# Orchestration
+orchestrate "platform":
+    services ["database", "cache", "api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker true
+
+# Tasks
+task "start":
+    info "🚀 Starting platform..."
+    orchestrate "platform" start
+    success "Platform ready at http://localhost:3000"
+
+task "stop":
+    info "🛑 Stopping platform..."
+    orchestrate "platform" stop
+
+task "restart":
+    orchestrate "platform" restart
+
+task "status":
+    orchestrate "platform" status
+
+task "rebuild":
+    orchestrate "platform" build
+    orchestrate "platform" restart
+
+task "cleanup":
+    orchestrate "platform" down
+```
+
+### Docker Compose Integration
+
+The orchestration system executes `docker compose` commands directly:
+
+#### Start Service
+
+```bash
+cd /path/to/service
+docker compose up -d
+```
+
+#### Stop Service
+
+```bash
+cd /path/to/service
+docker compose stop
+```
+
+#### Service Status
+
+```bash
+cd /path/to/service
+docker compose ps
+```
+
+#### Down (Remove)
+
+```bash
+cd /path/to/service
+docker compose down
+```
+
+### Dependency Resolution
+
+Services are started in topological order based on dependencies:
+
+#### Example
+
+```drun
+service "database" in "./db":
+service "cache" in "./cache":
+service "api" in "./api":
+    depends on ["database", "cache"]
+service "frontend" in "./web":
+    depends on ["api"]
+```
+
+**Resolution Order:**
+1. `database` and `cache` (parallel - no dependencies)
+2. `api` (after database and cache)
+3. `frontend` (after api)
+
+#### Shutdown Order
+
+Shutdown occurs in reverse topological order:
+1. `frontend`
+2. `api`
+3. `database` and `cache`
+
+### Error Handling
+
+#### Health Check Failures
+
+```
+  ❌ api    Waiting for health check...: health check failed after 5 attempts [10s]
+```
+
+**Common causes:**
+- Service not responding at endpoint
+- Wrong port or URL configuration
+- Service internal error
+- Health check timeout too short
+
+#### Docker Compose Errors
+
+```
+  ❌ service  Starting service...: docker compose failed: exit status 1
+Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is already allocated
+```
+
+**Common causes:**
+- Port conflict with another container
+- Docker Compose file doesn't exist
+- Permission issues
+- Invalid Docker Compose configuration
+
+#### Missing Service Path
+
+```
+  ❌ service  Starting service...: docker compose failed: chdir /path: no such file or directory
+```
+
+**Common causes:**
+- Incorrect path in service declaration
+- Service directory doesn't exist
+- Docker Compose file not in expected location
+
+### Best Practices
+
+1. **Always Use Health Checks**
+
+```drun
+service "api" in "./api":
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        retries 5
+```
+
+2. **Use Dependency-Based Strategy**
+
+```drun
+orchestrate "stack":
+    services [...]
+    strategy "dependency-based"  # Recommended
+```
+
+3. **Enable Circuit Breaker for Critical Systems**
+
+```drun
+orchestrate "production":
+    circuit_breaker true  # Fail fast in production
+```
+
+4. **Group Related Services**
+
+```drun
+orchestrate "infra":
+    services ["database", "cache"]
+
+orchestrate "app":
+    services ["api", "worker"]
+```
+
+5. **Use Meaningful Timeouts**
+
+```drun
+service "database" in "./db":
+    health check:
+        timeout "30s"  # Databases need more time
+        retries 10
+
+service "api" in "./api":
+    health check:
+        timeout "10s"  # APIs start faster
+        retries 5
+```
+
+### Implementation Details
+
+#### Components
+
+1. **AST Nodes**
+   - `ServiceStatement` - Service declarations
+   - `OrchestrateStatement` - Orchestration groups
+   - `OrchestrationActionStatement` - Actions in tasks
+
+2. **Domain Models**
+   - `Service` - Runtime service representation
+   - `OrchestrationGroup` - Group configuration
+   - `HealthCheck` - Health check configuration
+
+3. **Execution Engine**
+   - Dependency resolution (topological sort)
+   - Docker Compose execution
+   - Health check monitoring
+   - Progress display
+
+4. **Health Check System**
+   - HTTP checker
+   - TCP checker
+   - Docker checker
+   - DNS checker
+   - Custom command checker
+
+#### Data Flow
+
+```
+Drunfile
+   ↓
+Parser (service & orchestrate)
+   ↓
+AST Nodes
+   ↓
+Domain Models
+   ↓
+Task Execution
+   ↓
+Orchestration Engine
+   ├→ Dependency Resolution
+   ├→ Docker Compose Commands
+   ├→ Health Monitoring
+   └→ Progress Display
+```
+
+### Implementation Details
+
+The microservices orchestration system includes several sophisticated implementation details and edge case handling:
+
+#### Parser Robustness
+
+**Infinite Loop Prevention**
+The orchestration parser includes comprehensive error handling to prevent infinite loops during parsing:
+
+- String array parsing advances tokens on unexpected types
+- Orchestration body parsing includes proper error recovery
+- Service body parsing provides detailed error messages with graceful degradation
+
+**Compose File Syntax Support**
+The parser supports multiple Docker Compose file specification syntaxes:
+
+- Inline syntax: `compose file "docker-compose.yml"`
+- Block syntax: `compose:` with nested configuration
+- Automatic detection and proper handling of both formats
+
+#### Docker Compose Integration
+
+**Working Directory Management**
+Each service runs Docker Compose commands from its own directory with proper environment setup:
+
+- Service directory resolution with absolute path conversion
+- PWD environment variable setup for `${PWD}` references in compose files
+- Proper working directory context for all Docker operations
+
+**BuildKit Output Streaming**
+Real-time Docker build output is streamed to provide visibility:
+
+- Direct stdout/stderr streaming during build operations
+- Integration with progress display system
+- Build failure handling with circuit breaker integration
+
+#### Circuit Breaker Implementation
+
+**Smart Rollback Logic**
+The circuit breaker uses intelligent dependency-aware rollback:
+
+- Only stops services that were started after the failed service
+- Index-based dependency tracking for efficient rollback
+- Avoids stopping services that don't depend on the failed service
+
+**Multi-Failure Type Handling**
+Circuit breaker is triggered by various failure types:
+
+- Docker Compose build failures
+- Docker Compose startup failures  
+- Health check timeout failures
+- Service dependency resolution failures
+
+#### Progress Display System
+
+**BuildKit-Style Visual Feedback**
+Real-time progress display with comprehensive state tracking:
+
+- Status icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
+- Inline progress updates without output cluttering
+- Build output integration with progress display
+- Final summary with success/failure counts
+
+**Thread-Safe State Management**
+Comprehensive state tracking with concurrency safety:
+
+- Mutex-protected state updates for concurrent access
+- Timing information for performance monitoring
+- Error tracking with detailed error information
+- Clear state transitions throughout service lifecycle
+
+#### Error Handling & Recovery
+
+**Parser Error Recovery**
+Robust error recovery mechanisms:
+
+- Token synchronization on parse errors
+- Detailed error messages with line/column information
+- Graceful degradation when individual statements fail
+
+**Docker Compose Error Handling**
+Comprehensive error handling for Docker operations:
+
+- Proper error capture and reporting for all Docker commands
+- Output capture for both stdout and stderr debugging
+- Configurable timeouts for long-running operations
+- Exit code validation and error propagation
+
+#### Performance Considerations
+
+**Sequential vs Parallel Operations**
+Balanced approach to safety and performance:
+
+- Sequential service startup for proper dependency resolution
+- Parallel health checks after startup completion
+- Concurrent rollback operations for efficiency
+
+**Memory Management**
+Efficient resource usage patterns:
+
+- Streaming output instead of buffering for large builds
+- Proper goroutine cleanup and management
+- Docker resource cleanup on completion
+
+#### Configuration Flexibility
+
+**Service Configuration Options**
+Comprehensive service configuration:
+
+- Multiple health check types (HTTP, TCP, Docker, DNS, Custom)
+- Build configuration with timeout and parallel job settings
+- Complex dependency graphs with topological sorting
+- Environment variable management per service
+
+**Orchestration Strategies**
+Multiple orchestration approaches:
+
+- Dependency-based startup (default)
+- Sequential startup regardless of dependencies
+- Future parallel startup capabilities
+
+#### Testing & Validation
+
+**Comprehensive Test Coverage**
+Extensive testing implementation:
+
+- Unit tests for all parsing scenarios
+- Integration tests with real Docker containers
+- Error case testing for various failure scenarios
+- Circuit breaker behavior validation
+
+**Real-World Validation**
+Production validation with actual projects:
+
+- Celesta project integration and testing
+- Docker Compose file compatibility validation
+- Health check testing with real services
+
+### Future Enhancements
+
+Planned features for future versions:
+
+- Service discovery integration
+- Metrics and monitoring
+- Automatic rollback support
+- Blue/green deployments
+- Dynamic scaling operations
+
+### Related Documentation
+
+- [Orchestration Guide](./docs/ORCHESTRATION.md) - Complete orchestration documentation
+- [Microservices Spec](./spec/microservices-orchestration.md) - Original specification
+- [Examples](./examples/) - Working examples

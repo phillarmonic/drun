@@ -24,10 +24,12 @@ type Expression interface {
 
 // Program represents the root of the AST
 type Program struct {
-	Version   *VersionStatement
-	Project   *ProjectStatement
-	Tasks     []*TaskStatement
-	Templates []*TaskTemplateStatement
+	Version        *VersionStatement
+	Project        *ProjectStatement
+	Tasks          []*TaskStatement
+	Templates      []*TaskTemplateStatement
+	Services       []*ServiceStatement
+	Orchestrations []*OrchestrateStatement
 }
 
 func (p *Program) String() string {
@@ -42,6 +44,14 @@ func (p *Program) String() string {
 	}
 	for _, template := range p.Templates {
 		out.WriteString(template.String())
+		out.WriteString("\n")
+	}
+	for _, service := range p.Services {
+		out.WriteString(service.String())
+		out.WriteString("\n")
+	}
+	for _, orchestration := range p.Orchestrations {
+		out.WriteString(orchestration.String())
 		out.WriteString("\n")
 	}
 	for _, task := range p.Tasks {

@@ -1,0 +1,77 @@
+version: 2.0
+
+project "microservices-dns-health" version "1.0.0":
+    set environment to "production"
+    set api_domain to "api.mycompany.com"
+    set frontend_domain to "app.mycompany.com"
+
+# Service with DNS health check
+service "api" in "./services/api" means "API with custom domain":
+    health check:
+        type "dns"
+        domain "{$api_domain}"
+        timeout "5s"
+        interval "10s"
+        retries 3
+        record_type "A"
+        expected_ip "10.0.1.100"
+    compose:
+        file "docker-compose.prod.yml"
+    environment:
+        # External domain for browser/client access
+        EXTERNAL_URL "https://{$api_domain}"
+        # Internal service name for container communication
+        INTERNAL_URL "http://api:8080"
+
+service "frontend" in "./services/frontend" means "Frontend with domain":
+    depends on ["api"]
+    health check:
+        type "http"
+        endpoint "http://localhost:3000/health"
+        timeout "5s"
+        interval "10s"
+        retries 2
+        condition "200"
+    compose:
+        file "docker-compose.prod.yml"
+    environment:
+        # Use internal service name for API calls from frontend container
+        REACT_APP_API_URL "http://api:8080"
+        # Use external domain for browser API calls
+        REACT_APP_PUBLIC_API_URL "https://{$api_domain}"
+        REACT_APP_FRONTEND_DOMAIN "{$frontend_domain}"
+
+orchestrate "custom_domain_services" means "Services with custom domains":
+    services ["api", "frontend"]
+    strategy "dependency-based"
+    circuit_breaker true
+    stop_on_failure true
+    health_check_interval "30s"
+
+task "start_with_domains" means "Start services with domain validation":
+    info "Checking domain resolution..."
+    set $api_ip to "{dns_resolve '{$api_domain}'}"
+    info "API domain resolves to: {$api_ip}"
+    
+    orchestrate "custom_domain_services" start
+    success "Services started with domain validation!"
+
+task "check_domains" means "Validate all domains":
+    info "Validating domain resolution..."
+    
+    # Check API domain
+    when "{dns_check '{$api_domain}' 'A'}" is "success":
+        success "✅ API domain resolves correctly"
+    otherwise:
+        error "❌ API domain resolution failed"
+        throw "Domain resolution failed for {$api_domain}"
+    
+    # Check frontend domain
+    when "{dns_check '{$frontend_domain}' 'A'}" is "success":
+        success "✅ Frontend domain resolves correctly"
+    otherwise:
+        error "❌ Frontend domain resolution failed"
+        throw "Domain resolution failed for {$frontend_domain}"
+    
+    success "All domains resolve correctly!"
+

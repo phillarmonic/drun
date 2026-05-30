@@ -111,7 +111,7 @@ func (p *Parser) isActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.INFO, lexer.STEP, lexer.WARN, lexer.ERROR, lexer.SUCCESS, lexer.FAIL, lexer.ECHO,
 		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
-		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
+		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK, lexer.REPLACE:
 		return true
 	default:
 		return false
@@ -134,6 +134,61 @@ func (p *Parser) isValidTaskNameToken(tokenType lexer.TokenType) bool {
 	default:
 		return false
 	}
+}
+
+// isTaskNamePartToken checks if a token type can be part of an unquoted task name
+func (p *Parser) isTaskNamePartToken(tok lexer.Token) bool {
+	switch tok.Type {
+	case lexer.IDENT, lexer.NUMBER:
+		return true
+	default:
+		if p.isValidTaskNameToken(tok.Type) {
+			return true
+		}
+	}
+
+	if tok.Literal == "" {
+		return false
+	}
+
+	for i := 0; i < len(tok.Literal); i++ {
+		ch := tok.Literal[i]
+		if ('a' <= ch && ch <= 'z') ||
+			('A' <= ch && ch <= 'Z') ||
+			('0' <= ch && ch <= '9') ||
+			ch == '_' {
+			continue
+		}
+		return false
+	}
+
+	return true
+}
+
+// collectDashedName consumes subsequent "- part" segments and returns the combined name
+func (p *Parser) collectDashedName(initial string) (string, bool) {
+	if p.peekToken.Type != lexer.MINUS {
+		return initial, true
+	}
+
+	var builder strings.Builder
+	builder.WriteString(initial)
+
+	for p.peekToken.Type == lexer.MINUS {
+		p.nextToken() // consume '-'
+
+		if !p.isTaskNamePartToken(p.peekToken) {
+			p.addError("expected identifier after '-' in task name")
+			return "", false
+		}
+
+		builder.WriteString("-")
+
+		p.nextToken() // consume next segment
+		builder.WriteString(p.curToken.Literal)
+	}
+
+	return builder.String(), true
 }
 
 // isKeywordToken checks if a token type is a keyword (can be used as a parameter name)
@@ -190,6 +245,8 @@ func (p *Parser) isTypeToken(tokenType lexer.TokenType) bool {
 func (p *Parser) isFileActionToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
 	case lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK:
+		return true
+	case lexer.REPLACE:
 		return true
 	default:
 		return false
@@ -390,9 +447,17 @@ func (p *Parser) validateVariableName(name string) bool {
 	return true
 }
 
-// expectPeekFileKeyword checks for the "file" keyword (as IDENT)
+// expectPeekFileKeyword checks for the "file" keyword (accepting IDENT or FILE token)
 func (p *Parser) expectPeekFileKeyword() bool {
-	if p.peekToken.Type != lexer.IDENT || p.peekToken.Literal != "file" {
+	switch p.peekToken.Type {
+	case lexer.IDENT:
+		if p.peekToken.Literal != "file" {
+			p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Literal))
+			return false
+		}
+	case lexer.FILE:
+		// Token already represents the keyword; nothing else to validate
+	default:
 		p.addError(fmt.Sprintf("expected 'file', got %s instead", p.peekToken.Type))
 		return false
 	}

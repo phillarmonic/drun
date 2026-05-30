@@ -188,7 +188,10 @@ func TestNewTask(t *testing.T) {
 		Body: []ast.Statement{},
 	}
 
-	task := NewTask(astTask, "testns", "test.drun")
+	task, err := NewTask(astTask, "testns", "test.drun")
+	if err != nil {
+		t.Fatalf("NewTask() error = %v", err)
+	}
 
 	if task.Name != "test-task" {
 		t.Errorf("Name = %v, want test-task", task.Name)

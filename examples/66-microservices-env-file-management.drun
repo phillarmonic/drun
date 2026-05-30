@@ -1,0 +1,66 @@
+version: 2.0
+
+project "microservices-env-management" version "1.0.0":
+    set environment to "development"
+
+# Service with environment file management
+service "api" in "./services/api" means "API with env file management":
+    env_file:
+        required true
+        task "setup_api_env"
+    compose:
+        file "docker-compose.dev.yml"
+    health check:
+        type "http"
+        endpoint "http://localhost:8080/health"
+        timeout "10s"
+        interval "15s"
+        retries 3
+        condition "200"
+
+# Environment setup task
+task "setup_api_env" means "Setup API environment file":
+    info "Setting up API environment file..."
+    
+    # Check if .env exists
+    when file "./services/api/.env" exists:
+        info "API .env file already exists"
+    otherwise:
+        info "Creating .env file from example..."
+        
+        # Copy template
+        when file "./services/api/.env.example" exists:
+            copy "./services/api/.env.example" to "./services/api/.env"
+            
+            # Generate secure password
+            set $db_password to "{generate_password 32}"
+            set $api_key to "{generate_password 64}"
+            
+            # Replace placeholders
+            replace in "./services/api/.env":
+                "DB_PASSWORD=CHANGE_ME" with "DB_PASSWORD={$db_password}"
+                "API_KEY=CHANGE_ME" with "API_KEY={$api_key}"
+                "ENVIRONMENT=CHANGE_ME" with "ENVIRONMENT={$environment}"
+            
+            # Set secure permissions
+            run "chmod 600 ./services/api/.env"
+            
+            success "✅ API environment file created with secure credentials!"
+        otherwise:
+            error "❌ .env.example file not found"
+            throw "Cannot create .env file for API"
+    
+    success "API environment setup completed!"
+
+# Orchestration
+orchestrate "development" means "Development environment":
+    services ["api"]
+    strategy "sequential"
+    circuit_breaker false
+    stop_on_failure false
+
+task "start" means "Start services with env management":
+    info "Starting services..."
+    orchestrate "development" start
+    success "Services started!"
+

@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // executeTry executes try/catch/finally blocks
-func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error {
 	var tryError error
 	var finallyError error
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute try block\n")
 
-		// Execute try body in dry run
+		// Execute try body in dry run (domain statements)
 		for _, stmt := range tryStmt.TryBody {
 			if err := e.executeStatement(stmt, ctx); err != nil {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would catch error: %v\n", err)
@@ -34,8 +34,8 @@ func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) er
 		return nil
 	}
 
-	// Execute try block
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing try block\n")
+	// Execute try block (domain statements)
+	_, _ = fmt.Fprintf(e.output, "🔄  Executing try block\n")
 	for _, stmt := range tryStmt.TryBody {
 		if err := e.executeStatement(stmt, ctx); err != nil {
 			tryError = err
@@ -54,10 +54,10 @@ func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) er
 				// Set error variable if specified
 				if catchClause.ErrorVar != "" {
 					ctx.Variables[catchClause.ErrorVar] = tryError.Error()
-					_, _ = fmt.Fprintf(e.output, "📦 Captured error in variable '%s'\n", catchClause.ErrorVar)
+					_, _ = fmt.Fprintf(e.output, "📦  Captured error in variable '%s'\n", catchClause.ErrorVar)
 				}
 
-				// Execute catch body
+				// Execute catch body (domain statements)
 				for _, stmt := range catchClause.Body {
 					if err := e.executeStatement(stmt, ctx); err != nil {
 						// Error in catch block - this becomes the new error
@@ -72,18 +72,18 @@ func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) er
 		}
 
 		if !handled {
-			_, _ = fmt.Fprintf(e.output, "❌ Unhandled error: %v\n", tryError)
+			_, _ = fmt.Fprintf(e.output, "❌  Unhandled error: %v\n", tryError)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "✅ Error handled successfully\n")
+			_, _ = fmt.Fprintf(e.output, "✅  Error handled successfully\n")
 			tryError = nil // Error was handled
 		}
 	} else {
-		_, _ = fmt.Fprintf(e.output, "✅ Try block completed successfully\n")
+		_, _ = fmt.Fprintf(e.output, "✅  Try block completed successfully\n")
 	}
 
-	// Always execute finally block
+	// Always execute finally block (domain statements)
 	if len(tryStmt.FinallyBody) > 0 {
-		_, _ = fmt.Fprintf(e.output, "🔄 Executing finally block\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Executing finally block\n")
 		for _, stmt := range tryStmt.FinallyBody {
 			if err := e.executeStatement(stmt, ctx); err != nil {
 				finallyError = err
@@ -93,7 +93,7 @@ func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) er
 		}
 
 		if finallyError == nil {
-			_, _ = fmt.Fprintf(e.output, "✅ Finally block completed successfully\n")
+			_, _ = fmt.Fprintf(e.output, "✅  Finally block completed successfully\n")
 		}
 	}
 
@@ -105,7 +105,7 @@ func (e *Engine) executeTry(tryStmt *ast.TryStatement, ctx *ExecutionContext) er
 }
 
 // executeThrow executes throw, rethrow, and ignore statements
-func (e *Engine) executeThrow(throwStmt *ast.ThrowStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeThrow(throwStmt *statement.Throw, ctx *ExecutionContext) error {
 	if e.dryRun {
 		switch throwStmt.Action {
 		case "throw":
@@ -121,10 +121,10 @@ func (e *Engine) executeThrow(throwStmt *ast.ThrowStatement, ctx *ExecutionConte
 	switch throwStmt.Action {
 	case "throw":
 		message := e.interpolateVariables(throwStmt.Message, ctx)
-		_, _ = fmt.Fprintf(e.output, "💥 Throwing error: %s\n", message)
+		_, _ = fmt.Fprintf(e.output, "💥  Throwing error: %s\n", message)
 		return fmt.Errorf("thrown error: %s", message)
 	case "rethrow":
-		_, _ = fmt.Fprintf(e.output, "🔄 Rethrowing current error\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Rethrowing current error\n")
 		// In a real implementation, we'd need to track the current error context
 		return fmt.Errorf("rethrown error")
 	case "ignore":
@@ -136,7 +136,7 @@ func (e *Engine) executeThrow(throwStmt *ast.ThrowStatement, ctx *ExecutionConte
 }
 
 // shouldHandleError checks if a catch clause should handle the given error
-func (e *Engine) shouldHandleError(err error, catchClause ast.CatchClause) bool {
+func (e *Engine) shouldHandleError(err error, catchClause statement.CatchClause) bool {
 	// If no specific error type is specified, catch all errors
 	if catchClause.ErrorType == "" {
 		return true

@@ -10,11 +10,12 @@ import (
 
 // FileOperation represents a file system operation
 type FileOperation struct {
-	Type    string // "create", "copy", "move", "delete", "read", "write", "append"
-	Target  string // target file/directory path
-	Source  string // source path (for copy/move operations)
-	Content string // content (for write/append operations)
-	IsDir   bool   // whether the operation is on a directory
+	Type         string            // "create", "copy", "move", "delete", "read", "write", "append"
+	Target       string            // target file/directory path
+	Source       string            // source path (for copy/move operations)
+	Content      string            // content (for write/append operations)
+	IsDir        bool              // whether the operation is on a directory
+	Replacements map[string]string // replacements for replace operations
 }
 
 // Execute performs the file operation
@@ -46,6 +47,8 @@ func (op *FileOperation) Execute(dryRun bool) (*Result, error) {
 		return op.executeWrite()
 	case "append":
 		return op.executeAppend()
+	case "replace":
+		return op.executeReplace()
 	default:
 		return nil, fmt.Errorf("unknown file operation: %s", op.Type)
 	}
@@ -85,6 +88,8 @@ func (op *FileOperation) getDescription() string {
 		return fmt.Sprintf("content to file '%s'", op.Target)
 	case "append":
 		return fmt.Sprintf("content to file '%s'", op.Target)
+	case "replace":
+		return fmt.Sprintf("values in file '%s'", op.Target)
 	default:
 		return op.Target
 	}
@@ -333,6 +338,54 @@ func (op *FileOperation) executeAppend() (*Result, error) {
 
 	result.Success = true
 	result.Message = fmt.Sprintf("Appended %d bytes to file '%s'", len(op.Content), op.Target)
+	return result, nil
+}
+
+// executeReplace replaces occurrences in a file
+func (op *FileOperation) executeReplace() (*Result, error) {
+	result := &Result{
+		Operation: op.Type,
+		Target:    op.Target,
+	}
+
+	data, err := os.ReadFile(op.Target)
+	if err != nil {
+		result.Message = fmt.Sprintf("Failed to read file '%s': %v", op.Target, err)
+		return result, err
+	}
+
+	original := string(data)
+	updated := original
+	changed := false
+
+	for old, new := range op.Replacements {
+		if old == "" {
+			continue
+		}
+		if strings.Contains(updated, old) {
+			updated = strings.ReplaceAll(updated, old, new)
+			changed = true
+		}
+	}
+
+	if !changed {
+		result.Success = true
+		result.Message = fmt.Sprintf("No replacements applied to '%s'", op.Target)
+		return result, nil
+	}
+
+	perm := os.FileMode(0644)
+	if info, statErr := os.Stat(op.Target); statErr == nil {
+		perm = info.Mode().Perm()
+	}
+
+	if err := os.WriteFile(op.Target, []byte(updated), perm); err != nil {
+		result.Message = fmt.Sprintf("Failed to write file '%s': %v", op.Target, err)
+		return result, err
+	}
+
+	result.Success = true
+	result.Message = fmt.Sprintf("Updated file '%s'", op.Target)
 	return result, nil
 }
 

@@ -8,27 +8,29 @@ import (
 // Domain: Command Builders
 // This file contains helper methods for building shell commands for various operations
 
-// buildDockerCommand builds and optionally executes the Docker command
-func (e *Engine) buildDockerCommand(operation, resource, name string, options map[string]string, dryRun bool) error {
+// assembleDockerCommand builds the Docker command as a string without executing it
+func (e *Engine) assembleDockerCommand(operation, resource, name string, options map[string]string) string {
 	var dockerCmd []string
 	dockerCmd = append(dockerCmd, "docker")
 
-	// Handle Docker Compose separately
 	if operation == "compose" {
 		dockerCmd = append(dockerCmd, "compose")
-		if command, exists := options["command"]; exists {
+		if raw, exists := options["args"]; exists && strings.TrimSpace(raw) != "" {
+			return strings.TrimSpace(strings.Join(dockerCmd, " ") + " " + strings.TrimSpace(raw))
+		}
+		if command, exists := options["command"]; exists && command != "" {
 			dockerCmd = append(dockerCmd, command)
 		}
 	} else if operation == "scale" && resource == "compose" {
-		// Handle "docker compose scale service_name replicas"
 		dockerCmd = append(dockerCmd, "compose", "scale")
 		if name != "" {
-			if replicas, exists := options["replicas"]; exists {
+			if replicas, exists := options["replicas"]; exists && replicas != "" {
 				dockerCmd = append(dockerCmd, fmt.Sprintf("%s=%s", name, replicas))
+			} else {
+				dockerCmd = append(dockerCmd, name)
 			}
 		}
 	} else {
-		// Regular Docker commands
 		dockerCmd = append(dockerCmd, operation)
 		if resource != "" {
 			dockerCmd = append(dockerCmd, resource)
@@ -37,7 +39,6 @@ func (e *Engine) buildDockerCommand(operation, resource, name string, options ma
 			dockerCmd = append(dockerCmd, name)
 		}
 
-		// Add options in a logical order
 		if from, exists := options["from"]; exists {
 			if operation == "build" {
 				dockerCmd = append(dockerCmd, "--file", from)
@@ -58,22 +59,12 @@ func (e *Engine) buildDockerCommand(operation, resource, name string, options ma
 		}
 	}
 
-	if dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute Docker command: %s\n", strings.Join(dockerCmd, " "))
-		return nil
+	command := strings.Join(dockerCmd, " ")
+	if raw, exists := options["args"]; exists && strings.TrimSpace(raw) != "" && operation != "compose" {
+		command = strings.TrimSpace(command + " " + strings.TrimSpace(raw))
 	}
 
-	// Show the actual command being executed
-	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "Command: %s\n", strings.Join(dockerCmd, " "))
-	}
-
-	// For now, we'll simulate the command execution
-	// In a real implementation, you would use exec.Command to run the Docker command
-	// cmd := exec.Command(dockerCmd[0], dockerCmd[1:]...)
-	// return cmd.Run()
-
-	return nil
+	return command
 }
 
 // buildGitCommand builds and displays the git command

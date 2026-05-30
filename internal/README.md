@@ -485,7 +485,7 @@ Looking for Docker support?
 
 ### Understanding Execution Flow
 
-1. Start at `cmd/drun/main.go` - entry point
+1. Start at `cmd/xdrun/main.go` - entry point
 2. Follow to `engine.go` - orchestration
 3. Look at specific executor - action execution
 4. Check helpers - supporting functions

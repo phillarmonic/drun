@@ -129,6 +129,14 @@ func TestDetector_GetToolVersion(t *testing.T) {
 	}
 }
 
+func TestDetector_CompareVersionWithShortSemver(t *testing.T) {
+	detector := NewDetector()
+
+	if !detector.CompareVersion("2.12.2", ">=", "2.12") {
+		t.Errorf("expected 2.12.2 to satisfy >= 2.12")
+	}
+}
+
 func TestDetector_parseVersion(t *testing.T) {
 	detector := NewDetector()
 

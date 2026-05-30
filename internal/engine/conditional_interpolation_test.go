@@ -74,6 +74,19 @@ task "test":
 			params:         map[string]string{"option": "yes"},
 			expectedOutput: []string{"Status: enabled"},
 		},
+		{
+			name: "ternary branch with nested {$var} interpolation (docker tag style)",
+			input: `version: 2.0
+
+task "build":
+  given $node as boolean defaults to "n"
+  given $node-version defaults to "24"
+  info "tag: php8.4{$node ? 'node-{$node-version}' : ''}"`,
+			taskName:       "build",
+			params:         map[string]string{"node": "y"},
+			expectedOutput: []string{"tag: php8.4node-24"},
+			notExpected:    []string{"{$node ?"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -223,6 +236,46 @@ task "build":
 				}
 			}
 		})
+	}
+}
+
+// Regression: parseConditionExpression joins tokens with spaces, so "if not {$node}:" becomes
+// "not { $node }". Brace interpolation must trim inner whitespace (see interpolator).
+func TestIfNotBooleanParameterSpacedBrace(t *testing.T) {
+	input := `version: 2.0
+
+task "build":
+  given $node as boolean defaults to "n"
+  if not {$node}:
+    info "normal variant"
+  else:
+    info "node variant"`
+
+	lexer := lexer.NewLexer(input)
+	parser := parser.NewParser(lexer)
+	program := parser.ParseProgram()
+	if len(parser.Errors()) > 0 {
+		t.Fatalf("Parser errors: %v", parser.Errors())
+	}
+
+	var output bytes.Buffer
+	engine := NewEngine(&output)
+
+	err := engine.ExecuteWithParams(program, "build", map[string]string{"node": "n"})
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+	if !strings.Contains(output.String(), "normal variant") {
+		t.Fatalf("expected normal variant branch, got:\n%s", output.String())
+	}
+
+	output.Reset()
+	err = engine.ExecuteWithParams(program, "build", map[string]string{"node": "y"})
+	if err != nil {
+		t.Fatalf("Execution failed: %v", err)
+	}
+	if !strings.Contains(output.String(), "node variant") {
+		t.Fatalf("expected node variant branch, got:\n%s", output.String())
 	}
 }
 

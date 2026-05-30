@@ -153,59 +153,59 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 			}
 		}
 
-		// Expect: given name defaults to "value"
-		if !p.expectPeek(lexer.DEFAULTS) {
-			return nil
-		}
-		if !p.expectPeek(lexer.TO) {
-			return nil
-		}
-
-		// Parse default value - can be string, number, boolean, empty, or built-in function
-		switch p.peekToken.Type {
-		case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
-			p.nextToken()
-			stmt.DefaultValue = p.curToken.Literal
-			stmt.HasDefault = true
-		case lexer.EMPTY:
-			// Handle "empty" keyword - treat as empty string
-			p.nextToken()
-			stmt.DefaultValue = ""
-			stmt.HasDefault = true
-		case lexer.LBRACE:
-			// Handle "{builtin function}" syntax
-			p.nextToken() // consume LBRACE
-			var funcParts []string
-
-			// Read tokens until RBRACE
-			for p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.EOF {
-				p.nextToken()
-				funcParts = append(funcParts, p.curToken.Literal)
-			}
-
-			if p.peekToken.Type != lexer.RBRACE {
-				p.addError("expected '}' to close builtin function call")
+		// Expect optional "defaults to" clause
+		if p.peekToken.Type == lexer.DEFAULTS {
+			p.nextToken() // consume DEFAULTS
+			if !p.expectPeek(lexer.TO) {
 				return nil
 			}
-			p.nextToken() // consume RBRACE
 
-			// Join the function parts and store as the default value
-			stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
-			stmt.HasDefault = true
-		case lexer.CURRENT:
-			// Handle legacy "current git commit" built-in function (for backward compatibility)
-			p.nextToken() // consume CURRENT
-			if p.peekToken.Type == lexer.GIT {
-				p.nextToken() // consume GIT
-				if p.peekToken.Type == lexer.COMMIT {
-					p.nextToken() // consume COMMIT
-					stmt.DefaultValue = "current git commit"
-					stmt.HasDefault = true
+			// Parse default value - can be string, number, boolean, empty, or built-in function
+			switch p.peekToken.Type {
+			case lexer.STRING, lexer.NUMBER, lexer.BOOLEAN:
+				p.nextToken()
+				stmt.DefaultValue = p.curToken.Literal
+				stmt.HasDefault = true
+			case lexer.EMPTY:
+				// Handle "empty" keyword - treat as empty string
+				p.nextToken()
+				stmt.DefaultValue = ""
+				stmt.HasDefault = true
+			case lexer.LBRACE:
+				// Handle "{builtin function}" syntax
+				p.nextToken() // consume LBRACE
+				var funcParts []string
+
+				// Read tokens until RBRACE
+				for p.peekToken.Type != lexer.RBRACE && p.peekToken.Type != lexer.EOF {
+					p.nextToken()
+					funcParts = append(funcParts, p.curToken.Literal)
 				}
+
+				if p.peekToken.Type != lexer.RBRACE {
+					p.addError("expected '}' to close builtin function call")
+					return nil
+				}
+				p.nextToken() // consume RBRACE
+
+				// Join the function parts and store as the default value
+				stmt.DefaultValue = "{" + strings.Join(funcParts, " ") + "}"
+				stmt.HasDefault = true
+			case lexer.CURRENT:
+				// Handle legacy "current git commit" built-in function (for backward compatibility)
+				p.nextToken() // consume CURRENT
+				if p.peekToken.Type == lexer.GIT {
+					p.nextToken() // consume GIT
+					if p.peekToken.Type == lexer.COMMIT {
+						p.nextToken() // consume COMMIT
+						stmt.DefaultValue = "current git commit"
+						stmt.HasDefault = true
+					}
+				}
+			default:
+				p.addError(fmt.Sprintf("expected default value (string, number, boolean, empty, or built-in function), got %s", p.peekToken.Type))
+				return nil
 			}
-		default:
-			p.addError(fmt.Sprintf("expected default value (string, number, boolean, empty, or built-in function), got %s", p.peekToken.Type))
-			return nil
 		}
 
 		// Check for constraints after default value (legacy syntax): given name defaults to "value" from ["list"]

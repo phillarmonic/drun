@@ -184,6 +184,79 @@ task "node_version_check":
 	}
 }
 
+func TestParser_IfToolAvailableWithVersionConstraint(t *testing.T) {
+	input := `version: 2.0
+
+task "lint_check":
+  if "golangci-lint" is available and version >= "2.12":
+    info "GolangCI Lint is new enough"
+  else:
+    warn "GolangCI Lint missing or too old"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	task := program.Tasks[0]
+	detectionStmt, ok := task.Body[0].(*ast.DetectionStatement)
+	if !ok {
+		t.Fatalf("first statement should be DetectionStatement. got=%T", task.Body[0])
+	}
+
+	if detectionStmt.Type != "if_available" {
+		t.Errorf("detection type not 'if_available'. got=%q", detectionStmt.Type)
+	}
+
+	if detectionStmt.Target != "golangci-lint" {
+		t.Errorf("detection target not 'golangci-lint'. got=%q", detectionStmt.Target)
+	}
+
+	if detectionStmt.Condition != "available" {
+		t.Errorf("detection condition not 'available'. got=%q", detectionStmt.Condition)
+	}
+
+	if detectionStmt.VersionOp != ">=" {
+		t.Errorf("version operator not '>='. got=%q", detectionStmt.VersionOp)
+	}
+
+	if detectionStmt.VersionValue != "2.12" {
+		t.Errorf("version value not '2.12'. got=%q", detectionStmt.VersionValue)
+	}
+}
+
+func TestParser_DetectQuotedToolVersion(t *testing.T) {
+	input := `version: 2.0
+
+task "lint_version":
+  detect "golangci-lint" version`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	task := program.Tasks[0]
+	detectionStmt, ok := task.Body[0].(*ast.DetectionStatement)
+	if !ok {
+		t.Fatalf("first statement should be DetectionStatement. got=%T", task.Body[0])
+	}
+
+	if detectionStmt.Type != "detect" {
+		t.Errorf("detection type not 'detect'. got=%q", detectionStmt.Type)
+	}
+
+	if detectionStmt.Target != "golangci-lint" {
+		t.Errorf("detection target not 'golangci-lint'. got=%q", detectionStmt.Target)
+	}
+
+	if detectionStmt.Condition != "version" {
+		t.Errorf("detection condition not 'version'. got=%q", detectionStmt.Condition)
+	}
+}
+
 func TestParser_WhenEnvironment(t *testing.T) {
 	input := `version: 2.0
 

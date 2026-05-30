@@ -62,6 +62,7 @@ const (
 	TAG       // tag
 	REMOVE    // remove
 	START     // start
+	STARTING  // starting
 	STOP      // stop
 	UP        // up
 	DOWN      // down
@@ -148,6 +149,81 @@ const (
 	BE         // be
 	EXPECT     // expect
 
+	// Orchestration keywords
+	ORCHESTRATE   // orchestrate
+	SERVICES      // services
+	STRATEGY      // strategy
+	SEQUENTIAL    // sequential
+	CIRCUIT       // circuit
+	BREAKER       // breaker
+	FAILURE       // failure
+	THRESHOLD     // threshold
+	RECOVERY      // recovery
+	INTERVAL      // interval
+	RETRIES       // retries
+	NETWORKS      // networks
+	EXTERNAL      // external
+	REQUIRED      // required
+	AUTOPROVISION // autoprovision
+	DRIVER        // driver
+	CONDITION     // condition
+	DNS           // dns
+	TCP           // tcp
+	DOMAIN        // domain
+	RECORD        // record
+	EXPECTED      // expected
+	IP            // ip
+	IPS           // ips
+	COMMAND       // command
+	WORKING       // working
+	WORKDIR       // workdir
+	MISSING       // missing
+	UPDATE        // update
+	RESTART       // restart
+	FORCE         // force
+	RECREATE      // recreate
+	DEPS          // deps
+	NO            // no
+	NEVER         // never
+	ALWAYS        // always
+	MAKEFILE      // makefile
+	TARGET        // target
+	ARGS          // args
+	PRE           // pre
+	JOBS          // jobs
+	VERBOSE       // verbose
+	ALLOCATE_TTY  // allocate_tty
+	SSH           // ssh
+	KEY           // key
+	FALLBACK      // fallback
+	DELAY         // delay
+	FILE          // file
+	PATH          // path
+	STARTUP       // startup
+	SHUTDOWN      // shutdown
+	DISCOVERY     // discovery
+	METRICS       // metrics
+	ENABLED       // enabled
+	LABELS        // labels
+	UNAVAILABLE   // unavailable
+	MAX           // max
+	MIN           // min
+	CONSUL        // consul
+	ETCD          // etcd
+	KUBERNETES    // kubernetes
+	SERVER        // server
+	SEARCH        // search
+	DOMAINS       // domains
+	TTL           // ttl
+	CACHE         // cache
+	MEMORY        // memory
+	CPU           // cpu
+	LIMIT         // limit
+	POLICY        // policy
+	ORPHANS       // orphans
+	PERIOD        // period
+	ENV_FILE      // env_file (using underscore to distinguish from ENV)
+
 	// Smart Detection keywords
 	DETECT      // detect
 	AVAILABLE   // available
@@ -213,10 +289,14 @@ const (
 	FORMAT   // format
 
 	// Variable Operations keywords
-	LET       // let
-	CONCAT    // concat
-	SPLIT     // split
-	REPLACE   // replace
+	LET     // let
+	CONCAT  // concat
+	SPLIT   // split
+	REPLACE // replace
+
+	// Secret Management keywords
+	SECRET    // secret
+	NAMESPACE // namespace
 	TRIM      // trim
 	UPPERCASE // uppercase
 	LOWERCASE // lowercase
@@ -462,6 +542,8 @@ func (t TokenType) String() string {
 		return "REMOVE"
 	case START:
 		return "START"
+	case STARTING:
+		return "STARTING"
 	case STOP:
 		return "STOP"
 	case UP:
@@ -620,6 +702,152 @@ func (t TokenType) String() string {
 		return "BE"
 	case EXPECT:
 		return "EXPECT"
+	case ORCHESTRATE:
+		return "ORCHESTRATE"
+	case SERVICES:
+		return "SERVICES"
+	case STRATEGY:
+		return "STRATEGY"
+	case SEQUENTIAL:
+		return "SEQUENTIAL"
+	case CIRCUIT:
+		return "CIRCUIT"
+	case BREAKER:
+		return "BREAKER"
+	case FAILURE:
+		return "FAILURE"
+	case THRESHOLD:
+		return "THRESHOLD"
+	case RECOVERY:
+		return "RECOVERY"
+	case INTERVAL:
+		return "INTERVAL"
+	case RETRIES:
+		return "RETRIES"
+	case NETWORKS:
+		return "NETWORKS"
+	case EXTERNAL:
+		return "EXTERNAL"
+	case REQUIRED:
+		return "REQUIRED"
+	case AUTOPROVISION:
+		return "AUTOPROVISION"
+	case DRIVER:
+		return "DRIVER"
+	case CONDITION:
+		return "CONDITION"
+	case DNS:
+		return "DNS"
+	case TCP:
+		return "TCP"
+	case DOMAIN:
+		return "DOMAIN"
+	case RECORD:
+		return "RECORD"
+	case EXPECTED:
+		return "EXPECTED"
+	case IP:
+		return "IP"
+	case IPS:
+		return "IPS"
+	case COMMAND:
+		return "COMMAND"
+	case WORKING:
+		return "WORKING"
+	case WORKDIR:
+		return "WORKDIR"
+	case MISSING:
+		return "MISSING"
+	case UPDATE:
+		return "UPDATE"
+	case RESTART:
+		return "RESTART"
+	case FORCE:
+		return "FORCE"
+	case RECREATE:
+		return "RECREATE"
+	case DEPS:
+		return "DEPS"
+	case NO:
+		return "NO"
+	case NEVER:
+		return "NEVER"
+	case ALWAYS:
+		return "ALWAYS"
+	case MAKEFILE:
+		return "MAKEFILE"
+	case TARGET:
+		return "TARGET"
+	case ARGS:
+		return "ARGS"
+	case PRE:
+		return "PRE"
+	case JOBS:
+		return "JOBS"
+	case VERBOSE:
+		return "VERBOSE"
+	case ALLOCATE_TTY:
+		return "ALLOCATE_TTY"
+	case SSH:
+		return "SSH"
+	case KEY:
+		return "KEY"
+	case FALLBACK:
+		return "FALLBACK"
+	case DELAY:
+		return "DELAY"
+	case FILE:
+		return "FILE"
+	case PATH:
+		return "PATH"
+	case STARTUP:
+		return "STARTUP"
+	case SHUTDOWN:
+		return "SHUTDOWN"
+	case DISCOVERY:
+		return "DISCOVERY"
+	case METRICS:
+		return "METRICS"
+	case ENABLED:
+		return "ENABLED"
+	case LABELS:
+		return "LABELS"
+	case UNAVAILABLE:
+		return "UNAVAILABLE"
+	case MAX:
+		return "MAX"
+	case MIN:
+		return "MIN"
+	case CONSUL:
+		return "CONSUL"
+	case ETCD:
+		return "ETCD"
+	case KUBERNETES:
+		return "KUBERNETES"
+	case SERVER:
+		return "SERVER"
+	case SEARCH:
+		return "SEARCH"
+	case DOMAINS:
+		return "DOMAINS"
+	case TTL:
+		return "TTL"
+	case CACHE:
+		return "CACHE"
+	case MEMORY:
+		return "MEMORY"
+	case CPU:
+		return "CPU"
+	case LIMIT:
+		return "LIMIT"
+	case POLICY:
+		return "POLICY"
+	case ORPHANS:
+		return "ORPHANS"
+	case PERIOD:
+		return "PERIOD"
+	case ENV_FILE:
+		return "ENV_FILE"
 	case DETECT:
 		return "DETECT"
 	case AVAILABLE:
@@ -742,6 +970,10 @@ func (t TokenType) String() string {
 		return "FORMAT"
 	case LET:
 		return "LET"
+	case SECRET:
+		return "SECRET"
+	case NAMESPACE:
+		return "NAMESPACE"
 	case CONCAT:
 		return "CONCAT"
 	case SPLIT:
@@ -985,282 +1217,358 @@ func (t Token) String() string {
 
 // Keywords maps string literals to their token types
 var keywords = map[string]TokenType{
-	"version":     VERSION,
-	"task":        TASK,
-	"means":       MEANS,
-	"project":     PROJECT,
-	"set":         SET,
-	"include":     INCLUDE,
-	"before":      BEFORE,
-	"after":       AFTER,
-	"any":         ANY,
-	"drun":        DRUN,
-	"setup":       SETUP,
-	"teardown":    TEARDOWN,
-	"depends":     DEPENDS,
-	"on":          ON,
-	"then":        THEN,
-	"and":         AND,
-	"or":          OR,
-	"call":        CALL,
-	"parameter":   PARAMETER,
-	"snippet":     SNIPPET,
-	"template":    TEMPLATE,
-	"mixin":       MIXIN,
-	"uses":        USES,
-	"includes":    INCLUDES,
-	"use":         USE,
-	"snippets":    SNIPPETS,
-	"templates":   TEMPLATES,
-	"tasks":       TASKS,
-	"drunhub":     DRUNHUB,
-	"docker":      DOCKER,
-	"image":       IMAGE,
-	"container":   CONTAINER,
-	"compose":     COMPOSE,
-	"build":       BUILD,
-	"push":        PUSH,
-	"pull":        PULL,
-	"tag":         TAG,
-	"remove":      REMOVE,
-	"start":       START,
-	"stop":        STOP,
-	"up":          UP,
-	"down":        DOWN,
-	"scale":       SCALE,
-	"port":        PORT,
-	"registry":    REGISTRY,
-	"git":         GIT,
-	"clone":       CLONE,
-	"init":        INIT,
-	"branch":      BRANCH,
-	"switch":      SWITCH,
-	"merge":       MERGE,
-	"add":         ADD,
-	"commit":      COMMIT,
-	"fetch":       FETCH,
-	"status":      STATUS,
-	"log":         LOG,
-	"show":        SHOW,
-	"repository":  REPOSITORY,
-	"remote":      REMOTE,
-	"changes":     CHANGES,
-	"message":     MESSAGE,
-	"files":       FILES,
-	"current":     CURRENT,
-	"all":         ALL,
-	"with":        WITH,
-	"into":        INTO,
-	"checkout":    CHECKOUT,
-	"http":        HTTP,
-	"https":       HTTPS,
-	"get":         GET,
-	"post":        POST,
-	"put":         PUT,
-	"patch":       PATCH,
-	"head":        HEAD,
-	"options":     OPTIONS,
-	"request":     REQUEST,
-	"response":    RESPONSE,
-	"body":        BODY,
-	"headers":     HEADERS,
-	"header":      HEADER,
-	"url":         URL,
-	"endpoint":    ENDPOINT,
-	"api":         API,
-	"json":        JSON,
-	"xml":         XML,
-	"form":        FORM,
-	"data":        DATA,
-	"timeout":     TIMEOUT,
-	"retry":       RETRY,
-	"follow":      FOLLOW,
-	"redirects":   REDIRECTS,
-	"verify":      VERIFY,
-	"ssl":         SSL,
-	"auth":        AUTH,
-	"bearer":      BEARER,
-	"basic":       BASIC,
-	"token":       TOKEN,
-	"user":        USER,
-	"password":    PASSWORD,
-	"content":     CONTENT,
-	"type":        TYPE,
-	"accept":      ACCEPT,
-	"send":        SEND,
-	"receive":     RECEIVE,
-	"download":    DOWNLOAD,
-	"upload":      UPLOAD,
-	"health":      HEALTH,
-	"service":     SERVICE,
-	"wait":        WAIT,
-	"ready":       READY,
-	"open":        OPEN,
-	"ping":        PING,
-	"host":        HOST,
-	"connection":  CONNECTION,
-	"test":        TEST,
-	"at":          AT,
-	"be":          BE,
-	"expect":      EXPECT,
-	"detect":      DETECT,
-	"available":   AVAILABLE,
-	"not":         NOT,
-	"installed":   INSTALLED,
-	"tool":        TOOL,
-	"framework":   FRAMEWORK,
-	"environment": ENVIRONMENT,
-	"node":        NODE,
-	"npm":         NPM,
-	"yarn":        YARN,
-	"pnpm":        PNPM,
-	"bun":         BUN,
-	"python":      PYTHON,
-	"pip":         PIP,
-	"go":          GO,
-	"golang":      GOLANG,
-	"cargo":       CARGO,
-	"java":        JAVA,
-	"maven":       MAVEN,
-	"gradle":      GRADLE,
-	"ruby":        RUBY,
-	"gem":         GEM,
-	"php":         PHP,
-	"composer":    COMPOSER,
-	"rust":        RUST,
-	"make":        MAKE,
-	"kubectl":     KUBECTL,
-	"helm":        HELM,
-	"terraform":   TERRAFORM,
-	"aws":         AWS,
-	"gcp":         GCP,
-	"azure":       AZURE,
-	"ci":          CI,
-	"local":       LOCAL,
-	"production":  PRODUCTION,
-	"staging":     STAGING,
-	"development": DEVELOPMENT,
-	"react":       REACT,
-	"vue":         VUE,
-	"angular":     ANGULAR,
-	"django":      DJANGO,
-	"rails":       RAILS,
-	"express":     EXPRESS,
-	"spring":      SPRING,
-	"laravel":     LARAVEL,
-	"range":       RANGE,
-	"where":       WHERE,
-	"break":       BREAK,
-	"continue":    CONTINUE,
-	"contains":    CONTAINS,
-	"starts":      STARTS,
-	"ends":        ENDS,
-	"matches":     MATCHES,
-	"matching":    MATCHING,
-	"line":        LINE,
-	"match":       MATCH,
-	"pattern":     PATTERN,
-	"between":     BETWEEN,
-	"email":       EMAIL,
-	"format":      FORMAT,
-	"let":         LET,
-	"concat":      CONCAT,
-	"split":       SPLIT,
-	"replace":     REPLACE,
-	"trim":        TRIM,
-	"uppercase":   UPPERCASE,
-	"lowercase":   LOWERCASE,
-	"prepend":     PREPEND,
-	"join":        JOIN,
-	"slice":       SLICE,
-	"length":      LENGTH,
-	"keys":        KEYS,
-	"values":      VALUES,
-	"transform":   TRANSFORM,
-	"subtract":    SUBTRACT,
-	"multiply":    MULTIPLY,
-	"divide":      DIVIDE,
-	"modulo":      MODULO,
-	"property":    PROPERTY,
-	"without":     WITHOUT,
-	"filtered":    FILTERED,
-	"sorted":      SORTED,
-	"reversed":    REVERSED,
-	"unique":      UNIQUE,
-	"first":       FIRST,
-	"last":        LAST,
-	"basename":    BASENAME,
-	"dirname":     DIRNAME,
-	"extension":   EXTENSION,
-	"prefix":      PREFIX,
-	"suffix":      SUFFIX,
-	">=":          GTE,
-	">":           GT,
-	"<=":          LTE,
-	"<":           LT,
-	"==":          EQ,
-	"!=":          NE,
-	"info":        INFO,
-	"step":        STEP,
-	"warn":        WARN,
-	"error":       ERROR,
-	"success":     SUCCESS,
-	"fail":        FAIL,
-	"echo":        ECHO,
-	"requires":    REQUIRES,
-	"given":       GIVEN,
-	"accepts":     ACCEPTS,
-	"defaults":    DEFAULTS,
-	"to":          TO,
-	"from":        FROM,
-	"as":          AS,
-	"list":        LIST,
-	"of":          OF,
-	"when":        WHEN,
-	"if":          IF,
-	"else":        ELSE,
-	"otherwise":   OTHERWISE,
-	"for":         FOR,
-	"each":        EACH,
-	"in":          IN,
-	"parallel":    PARALLEL,
-	"is":          IS,
-	"are":         ARE,
-	"exists":      EXISTS,
-	"empty":       EMPTY,
-	"run":         RUN,
-	"exec":        EXEC,
-	"shell":       SHELL,
-	"capture":     CAPTURE,
-	"output":      OUTPUT,
-	"config":      CONFIG,
-	"string":      STRING_TYPE,
-	"number":      NUMBER_TYPE,
-	"boolean":     BOOLEAN_TYPE,
-	"create":      CREATE,
-	"copy":        COPY,
-	"move":        MOVE,
-	"delete":      DELETE,
-	"read":        READ,
-	"write":       WRITE,
-	"append":      APPEND,
-	"dir":         DIR,
-	"backup":      BACKUP,
-	"check":       CHECK,
-	"size":        SIZE,
-	"directory":   DIRECTORY,
-	"allow":       ALLOW,
-	"permissions": PERMISSIONS,
-	"extract":     EXTRACT,
-	"archive":     ARCHIVE,
-	"try":         TRY,
-	"catch":       CATCH,
-	"finally":     FINALLY,
-	"throw":       THROW,
-	"rethrow":     RETHROW,
-	"ignore":      IGNORE,
-	"true":        BOOLEAN,
-	"false":       BOOLEAN,
+	"version":       VERSION,
+	"task":          TASK,
+	"means":         MEANS,
+	"project":       PROJECT,
+	"set":           SET,
+	"include":       INCLUDE,
+	"before":        BEFORE,
+	"after":         AFTER,
+	"any":           ANY,
+	"drun":          DRUN,
+	"setup":         SETUP,
+	"teardown":      TEARDOWN,
+	"depends":       DEPENDS,
+	"on":            ON,
+	"then":          THEN,
+	"and":           AND,
+	"or":            OR,
+	"call":          CALL,
+	"parameter":     PARAMETER,
+	"snippet":       SNIPPET,
+	"template":      TEMPLATE,
+	"mixin":         MIXIN,
+	"uses":          USES,
+	"includes":      INCLUDES,
+	"use":           USE,
+	"snippets":      SNIPPETS,
+	"templates":     TEMPLATES,
+	"tasks":         TASKS,
+	"drunhub":       DRUNHUB,
+	"docker":        DOCKER,
+	"image":         IMAGE,
+	"container":     CONTAINER,
+	"compose":       COMPOSE,
+	"build":         BUILD,
+	"push":          PUSH,
+	"pull":          PULL,
+	"tag":           TAG,
+	"remove":        REMOVE,
+	"start":         START,
+	"starting":      STARTING,
+	"stop":          STOP,
+	"up":            UP,
+	"down":          DOWN,
+	"scale":         SCALE,
+	"port":          PORT,
+	"registry":      REGISTRY,
+	"git":           GIT,
+	"clone":         CLONE,
+	"init":          INIT,
+	"branch":        BRANCH,
+	"switch":        SWITCH,
+	"merge":         MERGE,
+	"add":           ADD,
+	"commit":        COMMIT,
+	"fetch":         FETCH,
+	"status":        STATUS,
+	"log":           LOG,
+	"show":          SHOW,
+	"repository":    REPOSITORY,
+	"remote":        REMOTE,
+	"changes":       CHANGES,
+	"message":       MESSAGE,
+	"files":         FILES,
+	"current":       CURRENT,
+	"all":           ALL,
+	"with":          WITH,
+	"into":          INTO,
+	"checkout":      CHECKOUT,
+	"http":          HTTP,
+	"https":         HTTPS,
+	"get":           GET,
+	"post":          POST,
+	"put":           PUT,
+	"patch":         PATCH,
+	"head":          HEAD,
+	"options":       OPTIONS,
+	"request":       REQUEST,
+	"response":      RESPONSE,
+	"body":          BODY,
+	"headers":       HEADERS,
+	"header":        HEADER,
+	"url":           URL,
+	"endpoint":      ENDPOINT,
+	"api":           API,
+	"json":          JSON,
+	"xml":           XML,
+	"form":          FORM,
+	"data":          DATA,
+	"timeout":       TIMEOUT,
+	"retry":         RETRY,
+	"follow":        FOLLOW,
+	"redirects":     REDIRECTS,
+	"verify":        VERIFY,
+	"ssl":           SSL,
+	"auth":          AUTH,
+	"bearer":        BEARER,
+	"basic":         BASIC,
+	"token":         TOKEN,
+	"user":          USER,
+	"password":      PASSWORD,
+	"content":       CONTENT,
+	"type":          TYPE,
+	"accept":        ACCEPT,
+	"send":          SEND,
+	"receive":       RECEIVE,
+	"download":      DOWNLOAD,
+	"upload":        UPLOAD,
+	"health":        HEALTH,
+	"service":       SERVICE,
+	"wait":          WAIT,
+	"ready":         READY,
+	"open":          OPEN,
+	"ping":          PING,
+	"host":          HOST,
+	"connection":    CONNECTION,
+	"test":          TEST,
+	"at":            AT,
+	"be":            BE,
+	"expect":        EXPECT,
+	"orchestrate":   ORCHESTRATE,
+	"services":      SERVICES,
+	"strategy":      STRATEGY,
+	"sequential":    SEQUENTIAL,
+	"circuit":       CIRCUIT,
+	"breaker":       BREAKER,
+	"failure":       FAILURE,
+	"threshold":     THRESHOLD,
+	"recovery":      RECOVERY,
+	"interval":      INTERVAL,
+	"retries":       RETRIES,
+	"networks":      NETWORKS,
+	"external":      EXTERNAL,
+	"required":      REQUIRED,
+	"autoprovision": AUTOPROVISION,
+	"driver":        DRIVER,
+	"condition":     CONDITION,
+	"dns":           DNS,
+	"tcp":           TCP,
+	"domain":        DOMAIN,
+	"record":        RECORD,
+	"expected":      EXPECTED,
+	"ip":            IP,
+	"ips":           IPS,
+	"command":       COMMAND,
+	"working":       WORKING,
+	"workdir":       WORKDIR,
+	"missing":       MISSING,
+	"update":        UPDATE,
+	"restart":       RESTART,
+	"force":         FORCE,
+	"recreate":      RECREATE,
+	"deps":          DEPS,
+	"no":            NO,
+	"never":         NEVER,
+	"always":        ALWAYS,
+	"makefile":      MAKEFILE,
+	"target":        TARGET,
+	"args":          ARGS,
+	"pre":           PRE,
+	"jobs":          JOBS,
+	"verbose":       VERBOSE,
+	"allocate_tty":  ALLOCATE_TTY,
+	"ssh":           SSH,
+	"key":           KEY,
+	"fallback":      FALLBACK,
+	"delay":         DELAY,
+	"file":          FILE,
+	"path":          PATH,
+	"startup":       STARTUP,
+	"shutdown":      SHUTDOWN,
+	"discovery":     DISCOVERY,
+	"metrics":       METRICS,
+	"enabled":       ENABLED,
+	"labels":        LABELS,
+	"unavailable":   UNAVAILABLE,
+	"max":           MAX,
+	"min":           MIN,
+	"consul":        CONSUL,
+	"etcd":          ETCD,
+	"kubernetes":    KUBERNETES,
+	"server":        SERVER,
+	"search":        SEARCH,
+	"domains":       DOMAINS,
+	"ttl":           TTL,
+	"cache":         CACHE,
+	"memory":        MEMORY,
+	"cpu":           CPU,
+	"limit":         LIMIT,
+	"policy":        POLICY,
+	"orphans":       ORPHANS,
+	"period":        PERIOD,
+	"env_file":      ENV_FILE,
+	"detect":        DETECT,
+	"available":     AVAILABLE,
+	"not":           NOT,
+	"installed":     INSTALLED,
+	"tool":          TOOL,
+	"framework":     FRAMEWORK,
+	"environment":   ENVIRONMENT,
+	"node":          NODE,
+	"npm":           NPM,
+	"yarn":          YARN,
+	"pnpm":          PNPM,
+	"bun":           BUN,
+	"python":        PYTHON,
+	"pip":           PIP,
+	"go":            GO,
+	"golang":        GOLANG,
+	"cargo":         CARGO,
+	"java":          JAVA,
+	"maven":         MAVEN,
+	"gradle":        GRADLE,
+	"ruby":          RUBY,
+	"gem":           GEM,
+	"php":           PHP,
+	"composer":      COMPOSER,
+	"rust":          RUST,
+	"make":          MAKE,
+	"kubectl":       KUBECTL,
+	"helm":          HELM,
+	"terraform":     TERRAFORM,
+	"aws":           AWS,
+	"gcp":           GCP,
+	"azure":         AZURE,
+	"ci":            CI,
+	"local":         LOCAL,
+	"production":    PRODUCTION,
+	"staging":       STAGING,
+	"development":   DEVELOPMENT,
+	"react":         REACT,
+	"vue":           VUE,
+	"angular":       ANGULAR,
+	"django":        DJANGO,
+	"rails":         RAILS,
+	"express":       EXPRESS,
+	"spring":        SPRING,
+	"laravel":       LARAVEL,
+	"range":         RANGE,
+	"where":         WHERE,
+	"break":         BREAK,
+	"continue":      CONTINUE,
+	"contains":      CONTAINS,
+	"starts":        STARTS,
+	"ends":          ENDS,
+	"matches":       MATCHES,
+	"matching":      MATCHING,
+	"line":          LINE,
+	"match":         MATCH,
+	"pattern":       PATTERN,
+	"between":       BETWEEN,
+	"email":         EMAIL,
+	"format":        FORMAT,
+	"let":           LET,
+	"secret":        SECRET,
+	"namespace":     NAMESPACE,
+	"concat":        CONCAT,
+	"split":         SPLIT,
+	"replace":       REPLACE,
+	"trim":          TRIM,
+	"uppercase":     UPPERCASE,
+	"lowercase":     LOWERCASE,
+	"prepend":       PREPEND,
+	"join":          JOIN,
+	"slice":         SLICE,
+	"length":        LENGTH,
+	"keys":          KEYS,
+	"values":        VALUES,
+	"transform":     TRANSFORM,
+	"subtract":      SUBTRACT,
+	"multiply":      MULTIPLY,
+	"divide":        DIVIDE,
+	"modulo":        MODULO,
+	"property":      PROPERTY,
+	"without":       WITHOUT,
+	"filtered":      FILTERED,
+	"sorted":        SORTED,
+	"reversed":      REVERSED,
+	"unique":        UNIQUE,
+	"first":         FIRST,
+	"last":          LAST,
+	"basename":      BASENAME,
+	"dirname":       DIRNAME,
+	"extension":     EXTENSION,
+	"prefix":        PREFIX,
+	"suffix":        SUFFIX,
+	">=":            GTE,
+	">":             GT,
+	"<=":            LTE,
+	"<":             LT,
+	"==":            EQ,
+	"!=":            NE,
+	"info":          INFO,
+	"step":          STEP,
+	"warn":          WARN,
+	"error":         ERROR,
+	"success":       SUCCESS,
+	"fail":          FAIL,
+	"echo":          ECHO,
+	"requires":      REQUIRES,
+	"given":         GIVEN,
+	"accepts":       ACCEPTS,
+	"defaults":      DEFAULTS,
+	"to":            TO,
+	"from":          FROM,
+	"as":            AS,
+	"list":          LIST,
+	"of":            OF,
+	"when":          WHEN,
+	"if":            IF,
+	"else":          ELSE,
+	"otherwise":     OTHERWISE,
+	"for":           FOR,
+	"each":          EACH,
+	"in":            IN,
+	"parallel":      PARALLEL,
+	"is":            IS,
+	"are":           ARE,
+	"exists":        EXISTS,
+	"empty":         EMPTY,
+	"run":           RUN,
+	"exec":          EXEC,
+	"shell":         SHELL,
+	"capture":       CAPTURE,
+	"output":        OUTPUT,
+	"config":        CONFIG,
+	"string":        STRING_TYPE,
+	"number":        NUMBER_TYPE,
+	"boolean":       BOOLEAN_TYPE,
+	"create":        CREATE,
+	"copy":          COPY,
+	"move":          MOVE,
+	"delete":        DELETE,
+	"read":          READ,
+	"write":         WRITE,
+	"append":        APPEND,
+	"dir":           DIR,
+	"backup":        BACKUP,
+	"check":         CHECK,
+	"size":          SIZE,
+	"directory":     DIRECTORY,
+	"allow":         ALLOW,
+	"permissions":   PERMISSIONS,
+	"extract":       EXTRACT,
+	"archive":       ARCHIVE,
+	"try":           TRY,
+	"catch":         CATCH,
+	"finally":       FINALLY,
+	"throw":         THROW,
+	"rethrow":       RETHROW,
+	"ignore":        IGNORE,
+	"true":          BOOLEAN,
+	"false":         BOOLEAN,
 }
 
 // LookupIdent checks if an identifier is a keyword

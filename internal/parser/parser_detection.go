@@ -67,7 +67,7 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 				p.nextToken() // consume TYPE
 				stmt.Condition = "type"
 			}
-		} else if p.isToolToken(p.peekToken.Type) {
+		} else if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
@@ -107,29 +107,20 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 				case lexer.AVAILABLE:
 					p.nextToken() // consume AVAILABLE
 					stmt.Condition = "available"
+					p.parseOptionalAvailabilityVersion(stmt)
 				case lexer.NOT:
 					p.nextToken() // consume NOT
 					if p.peekToken.Type == lexer.AVAILABLE {
 						p.nextToken() // consume AVAILABLE
 						stmt.Condition = "not_available"
+						p.parseOptionalAvailabilityVersion(stmt)
 					}
 				}
 			case lexer.VERSION:
 				p.nextToken() // consume VERSION
 				stmt.Type = "if_version"
 
-				// Parse comparison operator
-				if p.peekToken.Type == lexer.GTE || p.peekToken.Type == lexer.GT ||
-					p.peekToken.Type == lexer.LTE || p.peekToken.Type == lexer.LT ||
-					p.peekToken.Type == lexer.EQ || p.peekToken.Type == lexer.NE {
-					p.nextToken()
-					stmt.Condition = p.curToken.Literal
-
-					if p.peekToken.Type == lexer.STRING {
-						p.nextToken()
-						stmt.Value = p.curToken.Literal
-					}
-				}
+				p.parseVersionComparison(stmt)
 			}
 		}
 
@@ -169,6 +160,51 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 	}
 
 	return stmt
+}
+
+func (p *Parser) parseOptionalAvailabilityVersion(stmt *ast.DetectionStatement) {
+	if p.peekToken.Type != lexer.AND {
+		return
+	}
+
+	p.nextToken() // consume AND
+	if p.peekToken.Type != lexer.VERSION {
+		p.errors = append(p.errors, fmt.Sprintf("expected 'version' after 'and', got %s", p.peekToken.Type))
+		return
+	}
+
+	p.nextToken() // consume VERSION
+	if !p.parseVersionComparison(stmt) {
+		p.errors = append(p.errors, "expected version comparison after 'version'")
+	}
+}
+
+func (p *Parser) parseVersionComparison(stmt *ast.DetectionStatement) bool {
+	if p.peekToken.Type != lexer.GTE && p.peekToken.Type != lexer.GT &&
+		p.peekToken.Type != lexer.LTE && p.peekToken.Type != lexer.LT &&
+		p.peekToken.Type != lexer.EQ && p.peekToken.Type != lexer.NE {
+		return false
+	}
+
+	p.nextToken()
+	operator := p.curToken.Literal
+
+	if p.peekToken.Type != lexer.STRING && p.peekToken.Type != lexer.NUMBER {
+		return false
+	}
+
+	p.nextToken()
+	value := p.curToken.Literal
+
+	if stmt.Type == "if_available" {
+		stmt.VersionOp = operator
+		stmt.VersionValue = value
+	} else {
+		stmt.Condition = operator
+		stmt.Value = value
+	}
+
+	return true
 }
 
 // isToolToken checks if a token represents a tool name

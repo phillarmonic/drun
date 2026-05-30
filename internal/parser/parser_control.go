@@ -110,8 +110,8 @@ func (p *Parser) parseForStatement() *ast.LoopStatement {
 	switch p.peekToken.Type {
 	case lexer.EACH:
 		return p.parseForEachStatement(stmt)
-	case lexer.VARIABLE:
-		// This could be "for $i in range" or "for $variable in iterable"
+	case lexer.VARIABLE, lexer.IDENT, lexer.SERVICE:
+		// This could be "for $i in range" or "for variable in iterable"
 		return p.parseForVariableStatement(stmt)
 	default:
 		p.addError(fmt.Sprintf("unexpected token after for: %s (variables must start with $)", p.peekToken.Type))
@@ -231,14 +231,16 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 
 // parseForVariableStatement parses "for $variable in range" or "for $variable in iterable"
 func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopStatement {
-	// Accept only VARIABLE tokens (must have $ prefix)
+	// Accept variables with or without $ prefix (allow keywords used as identifiers)
 	switch p.peekToken.Type {
 	case lexer.VARIABLE:
 		p.nextToken()
 		stmt.Variable = p.curToken.Literal
 	default:
-		p.addError(fmt.Sprintf("expected variable (with $ prefix), got %s instead", p.peekToken.Type))
-		return nil
+		if !p.expectPeekIdentifierLike() {
+			return nil
+		}
+		stmt.Variable = "$" + p.curToken.Literal
 	}
 
 	if !p.expectPeek(lexer.IN) {
@@ -442,6 +444,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if detection != nil {
 				body = append(body, detection)
 			}
+		} else if p.curToken.Type == lexer.ORCHESTRATE {
+			orchestrate := p.parseOrchestrationActionStatement()
+			if orchestrate != nil {
+				body = append(body, orchestrate)
+			}
 		} else if p.isThrowActionToken(p.curToken.Type) {
 			throw := p.parseThrowStatement()
 			if throw != nil {
@@ -451,7 +458,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			// Special handling for RUN token - check context
 			if p.curToken.Type == lexer.RUN {
 				// Look ahead to determine if this is shell or docker command
-				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
+				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON || p.peekToken.Type == lexer.IN {
 					// This is "run 'command'" or "run:" - shell command
 					shell := p.parseShellStatement()
 					if shell != nil {

@@ -152,10 +152,22 @@ func (p *Parser) parseFunctionCall() ast.Expression {
 }
 
 // parseArrayLiteral parses array literals like ["item1", "item2", "item3"]
+// Supports both single-line and multiline arrays:
+//
+//	["item1", "item2"]
+//	[
+//	    "item1",
+//	    "item2"
+//	]
 func (p *Parser) parseArrayLiteral() ast.Expression {
 	array := &ast.ArrayLiteral{
 		Token:    p.curToken, // LBRACKET
 		Elements: []ast.Expression{},
+	}
+
+	// Skip optional whitespace after opening bracket
+	for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.INDENT {
+		p.nextToken()
 	}
 
 	// Handle empty array []
@@ -166,13 +178,50 @@ func (p *Parser) parseArrayLiteral() ast.Expression {
 
 	// Parse first element
 	p.nextToken()
+
+	// Skip whitespace before first element
+	for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
+		p.nextToken()
+	}
+
 	array.Elements = append(array.Elements, p.parseExpression())
 
 	// Parse remaining elements separated by commas
-	for p.peekToken.Type == lexer.COMMA {
-		p.nextToken() // consume comma
-		p.nextToken() // move to next element
-		array.Elements = append(array.Elements, p.parseExpression())
+	for p.peekToken.Type == lexer.COMMA || p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.INDENT || p.peekToken.Type == lexer.DEDENT {
+		// Skip whitespace
+		for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.INDENT || p.peekToken.Type == lexer.DEDENT {
+			p.nextToken()
+		}
+
+		if p.peekToken.Type == lexer.COMMA {
+			p.nextToken() // consume comma
+
+			// Skip whitespace after comma
+			for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.INDENT || p.peekToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
+
+			// Check if we hit the closing bracket (trailing comma case)
+			if p.peekToken.Type == lexer.RBRACKET {
+				break
+			}
+
+			p.nextToken() // move to next element
+
+			// Skip whitespace before element
+			for p.curToken.Type == lexer.NEWLINE || p.curToken.Type == lexer.INDENT || p.curToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
+
+			array.Elements = append(array.Elements, p.parseExpression())
+		} else {
+			break
+		}
+	}
+
+	// Skip whitespace before closing bracket
+	for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.INDENT || p.peekToken.Type == lexer.DEDENT {
+		p.nextToken()
 	}
 
 	if !p.expectPeek(lexer.RBRACKET) {

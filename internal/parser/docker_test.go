@@ -217,6 +217,42 @@ task "tag":
 	}
 }
 
+func TestParser_DockerComposeInService(t *testing.T) {
+	input := `version: 2.0
+
+task "compose":
+  docker compose in service "api" exec -it app bash
+`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	task := program.Tasks[0]
+	dockerStmt, ok := task.Body[0].(*ast.DockerStatement)
+	if !ok {
+		t.Fatalf("expected DockerStatement, got %T", task.Body[0])
+	}
+
+	if !dockerStmt.ServiceScoped {
+		t.Fatalf("expected service-scoped docker compose statement")
+	}
+
+	if dockerStmt.ServiceName != "api" {
+		t.Errorf("expected service name 'api', got %s", dockerStmt.ServiceName)
+	}
+
+	if dockerStmt.Options["command"] != "exec" {
+		t.Errorf("expected command 'exec', got %s", dockerStmt.Options["command"])
+	}
+
+	if dockerStmt.Options["args"] != "exec -it app bash" {
+		t.Errorf("expected args 'exec -it app bash', got %s", dockerStmt.Options["args"])
+	}
+}
+
 func TestParser_DockerMultipleOperations(t *testing.T) {
 	input := `version: 2.0
 

@@ -117,6 +117,7 @@ dist/
 *.backup
 drun-cli
 xdrun
+!cmd/xdrun
 
 spec
 dist

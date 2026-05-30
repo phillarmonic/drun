@@ -15,6 +15,25 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 		Action: p.curToken.Literal,
 	}
 
+	// Optional service scoping for run commands
+	if stmt.Action == "run" && p.peekToken.Type == lexer.IN {
+		p.nextToken() // consume IN
+		if p.peekToken.Type == lexer.SERVICE || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "service") {
+			p.nextToken() // consume SERVICE keyword
+		} else {
+			p.addError("expected 'service' keyword after 'in'")
+			return nil
+		}
+
+		name, isLiteral, ok := p.parseServiceReference()
+		if !ok {
+			return nil
+		}
+		stmt.ServiceScoped = true
+		stmt.ServiceName = name
+		stmt.ServiceNameIsLiteral = isLiteral
+	}
+
 	// Check if this is multiline syntax (action followed by colon or capture with "as")
 	if p.peekToken.Type == lexer.COLON {
 		return p.parseMultilineShellStatement(stmt)
@@ -146,7 +165,7 @@ func (p *Parser) readCommandTokens() []string {
 
 		// Add the current token to the line
 		if p.curToken.Type == lexer.STRING {
-			currentLine.WriteString(fmt.Sprintf("\"%s\"", p.curToken.Literal))
+			fmt.Fprintf(&currentLine, "\"%s\"", p.curToken.Literal)
 		} else {
 			currentLine.WriteString(p.curToken.Literal)
 		}
@@ -177,4 +196,19 @@ func (p *Parser) readCommandTokens() []string {
 	}
 
 	return filteredCommands
+}
+
+// parseServiceReference parses a service name reference, allowing literals or variables
+func (p *Parser) parseServiceReference() (string, bool, bool) {
+	switch p.peekToken.Type {
+	case lexer.STRING:
+		p.nextToken()
+		return p.curToken.Literal, true, true
+	case lexer.VARIABLE, lexer.IDENT:
+		p.nextToken()
+		return p.curToken.Literal, false, true
+	default:
+		p.addError("expected service name (string or variable)")
+		return "", false, false
+	}
 }

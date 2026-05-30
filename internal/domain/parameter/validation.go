@@ -61,11 +61,10 @@ func (v *Validator) validateDataType(param *Parameter, value *types.Value) error
 
 	case "boolean":
 		if value.Type != types.BooleanType {
-			val := strings.ToLower(value.String())
-			if val != "true" && val != "false" && val != "yes" && val != "no" {
+			if _, err := types.NewValue(types.BooleanType, value.String()); err != nil {
 				return &ValidationError{
 					Parameter: param.Name,
-					Message:   "must be a boolean (true/false, yes/no)",
+					Message:   "must be a valid boolean value",
 					Value:     value.String(),
 				}
 			}

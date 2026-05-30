@@ -72,12 +72,12 @@ func (is *IncludeStatement) projectSettingNode() {}
 func (is *IncludeStatement) String() string {
 	var out strings.Builder
 	if len(is.Selectors) > 0 {
-		out.WriteString(fmt.Sprintf("include %s from %s", strings.Join(is.Selectors, ", "), is.Path))
+		fmt.Fprintf(&out, "include %s from %s", strings.Join(is.Selectors, ", "), is.Path)
 	} else {
-		out.WriteString(fmt.Sprintf("include %s", is.Path))
+		fmt.Fprintf(&out, "include %s", is.Path)
 	}
 	if is.Namespace != "" {
-		out.WriteString(fmt.Sprintf(" as %s", is.Namespace))
+		fmt.Fprintf(&out, " as %s", is.Namespace)
 	}
 	return out.String()
 }
@@ -94,18 +94,18 @@ func (scs *ShellConfigStatement) String() string {
 	var out strings.Builder
 	out.WriteString("shell config:")
 	for platform, config := range scs.Platforms {
-		out.WriteString(fmt.Sprintf("\n  %s:", platform))
-		out.WriteString(fmt.Sprintf("\n    executable: \"%s\"", config.Executable))
+		fmt.Fprintf(&out, "\n  %s:", platform)
+		fmt.Fprintf(&out, "\n    executable: \"%s\"", config.Executable)
 		if len(config.Args) > 0 {
 			out.WriteString("\n    args:")
 			for _, arg := range config.Args {
-				out.WriteString(fmt.Sprintf("\n      - \"%s\"", arg))
+				fmt.Fprintf(&out, "\n      - \"%s\"", arg)
 			}
 		}
 		if len(config.Environment) > 0 {
 			out.WriteString("\n    environment:")
 			for key, value := range config.Environment {
-				out.WriteString(fmt.Sprintf("\n      %s: \"%s\"", key, value))
+				fmt.Fprintf(&out, "\n      %s: \"%s\"", key, value)
 			}
 		}
 	}

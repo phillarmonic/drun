@@ -124,7 +124,7 @@ func (i *Interpolator) resolveVariableOrValue(expr string, ctx Context) string {
 // isTruthy checks if a value should be considered true
 func (i *Interpolator) isTruthy(value string) bool {
 	value = strings.ToLower(strings.TrimSpace(value))
-	return value == "true" || value == "yes" || value == "1" || value == "on"
+	return value == "true" || value == "yes" || value == "y" || value == "1" || value == "on"
 }
 
 // unquoteString removes single or double quotes from a string if present

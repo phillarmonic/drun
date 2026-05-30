@@ -15,7 +15,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 		// Provide helpful error message for unquoted task names
 		p.addErrorWithHelpAtPeek(
 			fmt.Sprintf("expected task name as quoted string, got %s instead", p.peekToken.Type),
-			"Task names must be quoted. Use: task \""+p.peekToken.Literal+"\" instead of: task "+p.peekToken.Literal,
+			"Task names must be quoted on definition. Use: task \""+p.peekToken.Literal+"\" instead of: task "+p.peekToken.Literal,
 		)
 		return nil
 	}
@@ -131,7 +131,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			// Special handling for RUN token - check context
 			if p.curToken.Type == lexer.RUN {
 				// Look ahead to determine if this is shell or docker command
-				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON {
+				if p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.COLON || p.peekToken.Type == lexer.IN {
 					// This is "run 'command'" or "run:" - shell command
 					shell := p.parseShellStatement()
 					if shell != nil {
@@ -159,7 +159,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					if git != nil {
 						stmt.Body = append(stmt.Body, git)
 					}
-				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "file") {
+				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || p.peekToken.Type == lexer.FILE || (p.peekToken.Type == lexer.IDENT && (p.peekToken.Literal == "file" || p.peekToken.Literal == "dir" || p.peekToken.Literal == "directory")) {
 					file := p.parseFileStatement()
 					if file != nil {
 						stmt.Body = append(stmt.Body, file)
@@ -192,6 +192,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			variable := p.parseVariableStatement()
 			if variable != nil {
 				stmt.Body = append(stmt.Body, variable)
+			}
+		} else if p.curToken.Type == lexer.SECRET {
+			secret := p.parseSecretStatement()
+			if secret != nil {
+				stmt.Body = append(stmt.Body, secret)
 			}
 		} else if p.isActionToken(p.curToken.Type) {
 			if p.isShellActionToken(p.curToken.Type) {
@@ -250,8 +255,19 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				}
 			}
 		} else if p.curToken.Type == lexer.USE {
-			// Check for USE snippet
-			if p.peekToken.Type == lexer.SNIPPET {
+			// Check for USE snippet or USE workdir
+			if p.peekToken.Type == lexer.WORKDIR {
+				// use workdir "path"
+				p.nextToken() // consume WORKDIR
+				if !p.expectPeek(lexer.STRING) {
+					continue
+				}
+				workdirStmt := &ast.ChangeWorkdirStatement{
+					Token: p.curToken,
+					Path:  p.curToken.Literal,
+				}
+				stmt.Body = append(stmt.Body, workdirStmt)
+			} else if p.peekToken.Type == lexer.SNIPPET {
 				p.nextToken() // consume SNIPPET
 
 				if !p.expectPeek(lexer.STRING) {
@@ -264,12 +280,18 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				}
 				stmt.Body = append(stmt.Body, useSnippet)
 			} else {
-				p.addError(fmt.Sprintf("expected 'snippet' after 'use', got %s", p.peekToken.Type))
+				p.addError(fmt.Sprintf("expected 'snippet' or 'workdir' after 'use', got %s", p.peekToken.Type))
 			}
 		} else if p.isCallToken(p.curToken.Type) {
 			call := p.parseTaskCallStatement()
 			if call != nil {
 				stmt.Body = append(stmt.Body, call)
+			}
+		} else if p.curToken.Type == lexer.ORCHESTRATE {
+			// Parse orchestration action (e.g., orchestrate "group" start)
+			orchAction := p.parseOrchestrationActionStatement()
+			if orchAction != nil {
+				stmt.Body = append(stmt.Body, orchAction)
 			}
 		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
 			// Skip comments in task body
@@ -368,8 +390,19 @@ func (p *Parser) parseTaskTemplateStatement() *ast.TaskTemplateStatement {
 
 // parseStatementInTaskBody is a helper that parses statements within a task or template body
 func (p *Parser) parseStatementInTaskBody() ast.Statement {
-	// Check for USE snippet
+	// Check for USE snippet or USE workdir
 	if p.curToken.Type == lexer.USE {
+		if p.peekToken.Type == lexer.WORKDIR {
+			// use workdir "path"
+			p.nextToken() // consume WORKDIR
+			if !p.expectPeek(lexer.STRING) {
+				return nil
+			}
+			return &ast.ChangeWorkdirStatement{
+				Token: p.curToken,
+				Path:  p.curToken.Literal,
+			}
+		}
 		if p.peekToken.Type == lexer.SNIPPET {
 			p.nextToken() // consume SNIPPET
 
@@ -396,8 +429,12 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		return p.parseTaskCallStatement()
 	case lexer.SET, lexer.LET:
 		return p.parseVariableStatement()
+	case lexer.SECRET:
+		return p.parseSecretStatement()
 	case lexer.TRY:
 		return p.parseErrorHandlingStatement()
+	case lexer.ORCHESTRATE:
+		return p.parseOrchestrationActionStatement()
 	}
 
 	// Delegate to existing statement parsing logic
@@ -438,8 +475,15 @@ func (p *Parser) parseDependencyStatement() *ast.DependencyGroup {
 			return nil
 		}
 
+		name := p.curToken.Literal
+		if combined, ok := p.collectDashedName(name); ok {
+			name = combined
+		} else {
+			return nil
+		}
+
 		dep := ast.DependencyItem{
-			Name:     p.curToken.Literal,
+			Name:     name,
 			Parallel: false, // default
 		}
 

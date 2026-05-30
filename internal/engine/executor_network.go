@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // Domain: Network Operations Execution
@@ -13,7 +14,7 @@ import (
 // - File downloads (HTTP/HTTPS)
 
 // executeNetwork executes network operations (health checks, port testing, ping)
-func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionContext) error {
 	// Interpolate variables in network statement
 	target := e.interpolateVariables(networkStmt.Target, ctx)
 	port := e.interpolateVariables(networkStmt.Port, ctx)
@@ -32,9 +33,9 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 	// Show what we're about to do with appropriate emoji
 	switch networkStmt.Action {
 	case "health_check":
-		_, _ = fmt.Fprintf(e.output, "🏥 Health check: %s\n", target)
+		_, _ = fmt.Fprintf(e.output, "🏥  Health check: %s\n", target)
 	case "wait_for_service":
-		_, _ = fmt.Fprintf(e.output, "⏳ Waiting for service: %s\n", target)
+		_, _ = fmt.Fprintf(e.output, "⏳  Waiting for service: %s\n", target)
 	case "port_check":
 		if port != "" {
 			_, _ = fmt.Fprintf(e.output, "🔌 Port check: %s:%s\n", target, port)
@@ -44,7 +45,7 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 	case "ping":
 		_, _ = fmt.Fprintf(e.output, "🏓 Ping: %s\n", target)
 	default:
-		_, _ = fmt.Fprintf(e.output, "🌐 Network operation: %s on %s\n", networkStmt.Action, target)
+		_, _ = fmt.Fprintf(e.output, "🌐  Network operation: %s on %s\n", networkStmt.Action, target)
 	}
 
 	// Build and execute the actual network command
@@ -52,7 +53,7 @@ func (e *Engine) executeNetwork(networkStmt *ast.NetworkStatement, ctx *Executio
 }
 
 // executeDownload executes file download operations using native Go HTTP client
-func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *ExecutionContext) error {
 	// Interpolate variables in download statement
 	url := e.interpolateVariables(downloadStmt.URL, ctx)
 	path := e.interpolateVariables(downloadStmt.Path, ctx)
@@ -78,7 +79,7 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 	// Check if file exists and handle overwrite
 	if !downloadStmt.AllowOverwrite && e.fileExists(path) {
 		errMsg := fmt.Sprintf("file already exists: %s (use 'allow overwrite' to replace)", path)
-		_, _ = fmt.Fprintf(e.output, "❌ %s\n", errMsg)
+		_, _ = fmt.Fprintf(e.output, "❌  %s\n", errMsg)
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -107,22 +108,22 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 	// Perform the download with progress tracking
 	err := e.downloadFileWithProgress(url, path, headers, auth, options)
 	if err != nil {
-		_, _ = fmt.Fprintf(e.output, "❌ Download failed: %v\n", err)
+		_, _ = fmt.Fprintf(e.output, "❌  Download failed: %v\n", err)
 		return fmt.Errorf("download failed: %w", err)
 	}
 
 	// Extract archive if requested
 	if downloadStmt.ExtractTo != "" {
 		extractTo := e.interpolateVariables(downloadStmt.ExtractTo, ctx)
-		_, _ = fmt.Fprintf(e.output, "📦 Extracting archive to: %s\n", extractTo)
+		_, _ = fmt.Fprintf(e.output, "📦  Extracting archive to: %s\n", extractTo)
 
 		err = e.extractArchive(path, extractTo)
 		if err != nil {
-			_, _ = fmt.Fprintf(e.output, "❌ Extraction failed: %v\n", err)
+			_, _ = fmt.Fprintf(e.output, "❌  Extraction failed: %v\n", err)
 			return fmt.Errorf("extraction failed: %w", err)
 		}
 
-		_, _ = fmt.Fprintf(e.output, "✅ Extraction completed\n")
+		_, _ = fmt.Fprintf(e.output, "✅  Extraction completed\n")
 
 		// Remove archive if requested
 		if downloadStmt.RemoveArchive {
@@ -131,13 +132,21 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 			if err != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to remove archive: %v\n", err)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "✅ Archive removed\n")
+				_, _ = fmt.Fprintf(e.output, "✅  Archive removed\n")
 			}
 		}
 	} else {
 		// Apply file permissions if specified (only for non-extracted files)
 		if len(downloadStmt.AllowPermissions) > 0 {
-			err = e.applyFilePermissions(path, downloadStmt.AllowPermissions)
+			// Convert domain PermissionSpec to ast.PermissionSpec
+			var astPerms []ast.PermissionSpec
+			for _, perm := range downloadStmt.AllowPermissions {
+				astPerms = append(astPerms, ast.PermissionSpec{
+					Permissions: perm.Permissions,
+					Targets:     perm.Targets,
+				})
+			}
+			err = e.applyFilePermissions(path, astPerms)
 			if err != nil {
 				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
 				// Don't fail the download, just warn
@@ -145,6 +154,6 @@ func (e *Engine) executeDownload(downloadStmt *ast.DownloadStatement, ctx *Execu
 		}
 	}
 
-	_, _ = fmt.Fprintf(e.output, "✅ Downloaded successfully to: %s\n", path)
+	_, _ = fmt.Fprintf(e.output, "✅  Downloaded successfully to: %s\n", path)
 	return nil
 }

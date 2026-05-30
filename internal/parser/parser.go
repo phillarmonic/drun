@@ -78,7 +78,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.skipComments()
 	}
 
-	// Parse task and template statements
+	// Parse task, template, service, and orchestration statements
 	for p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
 		case lexer.TEMPLATE:
@@ -94,6 +94,22 @@ func (p *Parser) ParseProgram() *ast.Program {
 			} else {
 				p.addError(fmt.Sprintf("unexpected token after template: %s", p.peekToken.Type))
 				p.nextToken()
+			}
+		case lexer.SERVICE:
+			service := p.parseServiceStatement()
+			if service != nil {
+				program.Services = append(program.Services, service)
+			} else {
+				// Error recovery: skip to next statement or EOF
+				p.synchronize()
+			}
+		case lexer.ORCHESTRATE:
+			orchestration := p.parseOrchestrateStatement()
+			if orchestration != nil {
+				program.Orchestrations = append(program.Orchestrations, orchestration)
+			} else {
+				// Error recovery: skip to next statement or EOF
+				p.synchronize()
 			}
 		case lexer.TASK:
 			task := p.parseTaskStatement()

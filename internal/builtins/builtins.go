@@ -11,8 +11,22 @@ import (
 	"time"
 )
 
-// BuiltinFunction represents a built-in function
-type BuiltinFunction func(args ...string) (string, error)
+// Context provides access to execution context for builtins
+type Context interface {
+	GetProjectName() string
+	GetSecretsManager() SecretsManager
+	IsDryRun() bool
+}
+
+// SecretsManager provides access to secrets
+type SecretsManager interface {
+	Get(namespace, key string) (string, error)
+	Set(namespace, key, value string) error
+	Exists(namespace, key string) (bool, error)
+}
+
+// BuiltinFunction represents a built-in function with optional context
+type BuiltinFunction func(ctx Context, args ...string) (string, error)
 
 // ProgressState holds the state of a progress indicator
 type ProgressState struct {
@@ -55,10 +69,14 @@ var Registry = map[string]BuiltinFunction{
 	"stop timer":            stopTimer,
 	"show elapsed time":     showElapsedTime,
 	"docker compose status": checkDockerComposeStatus,
+	"secret":                getSecret,
+	"dns_resolve":           getDNSResolve,
+	"dns_check":             getDNSCheck,
+	"dns_validate":          getDNSValidate,
 }
 
 // getCurrentGitCommit returns the current git commit hash
-func getCurrentGitCommit(args ...string) (string, error) {
+func getCurrentGitCommit(ctx Context, args ...string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
@@ -78,7 +96,7 @@ func getCurrentGitCommit(args ...string) (string, error) {
 }
 
 // getCurrentGitBranch returns the current git branch name
-func getCurrentGitBranch(args ...string) (string, error) {
+func getCurrentGitBranch(ctx Context, args ...string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
@@ -90,7 +108,7 @@ func getCurrentGitBranch(args ...string) (string, error) {
 }
 
 // formatCurrentTime formats the current time
-func formatCurrentTime(args ...string) (string, error) {
+func formatCurrentTime(ctx Context, args ...string) (string, error) {
 	now := time.Now()
 
 	// Default format if no args
@@ -103,7 +121,7 @@ func formatCurrentTime(args ...string) (string, error) {
 }
 
 // checkFileExists checks if a file exists
-func checkFileExists(args ...string) (string, error) {
+func checkFileExists(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "false", fmt.Errorf("file path required")
 	}
@@ -119,7 +137,7 @@ func checkFileExists(args ...string) (string, error) {
 }
 
 // checkDirExists checks if a directory exists
-func checkDirExists(args ...string) (string, error) {
+func checkDirExists(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "false", fmt.Errorf("directory path required")
 	}
@@ -140,7 +158,7 @@ func checkDirExists(args ...string) (string, error) {
 }
 
 // getEnvironmentVariable gets an environment variable
-func getEnvironmentVariable(args ...string) (string, error) {
+func getEnvironmentVariable(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("environment variable name required")
 	}
@@ -157,7 +175,7 @@ func getEnvironmentVariable(args ...string) (string, error) {
 }
 
 // getCurrentDirectory returns the current working directory
-func getCurrentDirectory(args ...string) (string, error) {
+func getCurrentDirectory(ctx Context, args ...string) (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current directory: %w", err)
@@ -172,7 +190,7 @@ func getCurrentDirectory(args ...string) (string, error) {
 }
 
 // getHostname returns the system hostname
-func getHostname(args ...string) (string, error) {
+func getHostname(ctx Context, args ...string) (string, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return "", fmt.Errorf("failed to get hostname: %w", err)
@@ -181,14 +199,19 @@ func getHostname(args ...string) (string, error) {
 	return hostname, nil
 }
 
-// CallBuiltin calls a built-in function by name
-func CallBuiltin(name string, args ...string) (string, error) {
+// CallBuiltin calls a built-in function by name with optional context
+func CallBuiltin(name string, ctx Context, args ...string) (string, error) {
 	fn, exists := Registry[name]
 	if !exists {
 		return "", fmt.Errorf("unknown built-in function: %s", name)
 	}
 
-	return fn(args...)
+	return fn(ctx, args...)
+}
+
+// CallBuiltinLegacy calls a built-in function without context (for backward compatibility)
+func CallBuiltinLegacy(name string, args ...string) (string, error) {
+	return CallBuiltin(name, nil, args...)
 }
 
 // IsBuiltin checks if a function name is a built-in
@@ -197,8 +220,67 @@ func IsBuiltin(name string) bool {
 	return exists
 }
 
+func getDNSResolve(ctx Context, args ...string) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("dns_resolve requires 1 argument (domain)")
+	}
+
+	resolver, ok := ctx.(interface {
+		DNSResolve(string) (string, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_resolve requires DNS resolution support")
+	}
+
+	return resolver.DNSResolve(args[0])
+}
+
+func getDNSCheck(ctx Context, args ...string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("dns_check requires 2 arguments (domain, record_type)")
+	}
+
+	checker, ok := ctx.(interface {
+		DNSCheck(string, string) (bool, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_check requires DNS validation support")
+	}
+
+	valid, err := checker.DNSCheck(args[0], args[1])
+	if err != nil {
+		return "", err
+	}
+	if valid {
+		return "success", nil
+	}
+	return "failed", nil
+}
+
+func getDNSValidate(ctx Context, args ...string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("dns_validate requires 2 arguments (domain, expected_ip)")
+	}
+
+	validator, ok := ctx.(interface {
+		DNSValidate(string, string) (bool, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_validate requires DNS validation support")
+	}
+
+	valid, err := validator.DNSValidate(args[0], args[1])
+	if err != nil {
+		return "", err
+	}
+	if valid {
+		return "valid", nil
+	}
+	return "invalid", nil
+}
+
 // startProgress starts a new progress indicator
-func startProgress(args ...string) (string, error) {
+func startProgress(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("progress message required")
 	}
@@ -224,7 +306,7 @@ func startProgress(args ...string) (string, error) {
 }
 
 // updateProgress updates an existing progress indicator
-func updateProgress(args ...string) (string, error) {
+func updateProgress(ctx Context, args ...string) (string, error) {
 	if len(args) < 2 {
 		return "", fmt.Errorf("percentage and message required")
 	}
@@ -267,7 +349,7 @@ func updateProgress(args ...string) (string, error) {
 }
 
 // finishProgress completes a progress indicator
-func finishProgress(args ...string) (string, error) {
+func finishProgress(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("completion message required")
 	}
@@ -296,11 +378,11 @@ func finishProgress(args ...string) (string, error) {
 
 	elapsed := time.Since(progress.StartTime)
 
-	return fmt.Sprintf("✅ %s (completed in %v)", message, elapsed.Round(time.Millisecond)), nil
+	return fmt.Sprintf("✅  %s (completed in %v)", message, elapsed.Round(time.Millisecond)), nil
 }
 
 // startTimer starts a new timer
-func startTimer(args ...string) (string, error) {
+func startTimer(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("timer name required")
 	}
@@ -326,7 +408,7 @@ func startTimer(args ...string) (string, error) {
 }
 
 // stopTimer stops a running timer
-func stopTimer(args ...string) (string, error) {
+func stopTimer(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("timer name required")
 	}
@@ -355,7 +437,7 @@ func stopTimer(args ...string) (string, error) {
 }
 
 // showElapsedTime shows the elapsed time for a timer
-func showElapsedTime(args ...string) (string, error) {
+func showElapsedTime(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("timer name required")
 	}
@@ -406,7 +488,7 @@ func createProgressBar(percentage int) string {
 }
 
 // checkDockerComposeStatus checks if a Docker Compose project is in a usable state
-func checkDockerComposeStatus(args ...string) (string, error) {
+func checkDockerComposeStatus(ctx Context, args ...string) (string, error) {
 	// Determine project name/path - default to current directory
 	projectPath := "."
 	if len(args) > 0 {
@@ -416,7 +498,7 @@ func checkDockerComposeStatus(args ...string) (string, error) {
 	// Detect which Docker Compose command to use (prioritize "docker compose")
 	composeCmd, err := detectDockerComposeCommand()
 	if err != nil {
-		return "unavailable", fmt.Errorf("docker compose not available: %w", err)
+		return "unavailable", nil
 	}
 
 	// Get container status for the project

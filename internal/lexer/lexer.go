@@ -389,10 +389,20 @@ func (l *Lexer) readMultilineComment() string {
 // readIdentifier reads an identifier or keyword
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || l.ch == '-' {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+
+	// Get the identifier
+	ident := l.input[position:l.position]
+
+	// Trim trailing dashes to avoid conflicts with binary operations (e.g., task-name- could be confused)
+	for len(ident) > 0 && ident[len(ident)-1] == '-' {
+		ident = ident[:len(ident)-1]
+		l.position-- // Move back one position to re-read the dash as a separate token
+	}
+
+	return ident
 }
 
 // readVariable reads a variable starting with $
@@ -400,18 +410,27 @@ func (l *Lexer) readVariable() string {
 	position := l.position
 	l.readChar() // consume the '$'
 
-	// Variable name must start with letter or underscore (not digit)
+	// Variable name must start with letter or underscore (not digit or dash)
 	if !isLetter(l.ch) && l.ch != '_' {
 		// Invalid variable name - but still return the $ for error reporting
 		return "$"
 	}
 
-	// Read the rest of the variable name (letters, digits, underscores, dots for namespacing)
-	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || l.ch == '.' {
+	// Read the rest of the variable name (letters, digits, underscores, hyphens, dots for namespacing)
+	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || l.ch == '-' || l.ch == '.' {
 		l.readChar()
 	}
 
-	return l.input[position:l.position]
+	// Get the variable name
+	varName := l.input[position:l.position]
+
+	// Trim trailing dashes to avoid conflicts with binary operations (e.g., $var- could be confused with $var - something)
+	for len(varName) > 1 && varName[len(varName)-1] == '-' {
+		varName = varName[:len(varName)-1]
+		l.position-- // Move back one position to re-read the dash as a separate token
+	}
+
+	return varName
 }
 
 // readNumber reads a number (integer or float)

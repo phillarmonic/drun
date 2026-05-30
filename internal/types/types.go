@@ -179,9 +179,9 @@ func parseBoolean(s string) (bool, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 
 	switch s {
-	case "true", "yes", "1", "on", "enabled":
+	case "true", "yes", "y", "1", "on", "enabled":
 		return true, nil
-	case "false", "no", "0", "off", "disabled", "":
+	case "false", "no", "n", "0", "off", "disabled", "":
 		return false, nil
 	default:
 		return false, fmt.Errorf("invalid boolean: %s", s)

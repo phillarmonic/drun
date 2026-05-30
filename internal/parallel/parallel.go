@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 )
 
 // ExecutionResult represents the result of a parallel execution
@@ -46,8 +46,8 @@ func NewParallelExecutor(maxWorkers int, failFast bool, output io.Writer, dryRun
 func (pe *ParallelExecutor) ExecuteLoop(
 	items []string,
 	variable string,
-	body []ast.Statement,
-	executor func([]ast.Statement, map[string]string) error,
+	body []statement.Statement,
+	executor func([]statement.Statement, map[string]string) error,
 ) ([]ExecutionResult, error) {
 	if pe.dryRun {
 		return pe.executeDryRun(items, variable, body)
@@ -57,7 +57,7 @@ func (pe *ParallelExecutor) ExecuteLoop(
 }
 
 // executeDryRun simulates parallel execution in dry run mode
-func (pe *ParallelExecutor) executeDryRun(items []string, variable string, body []ast.Statement) ([]ExecutionResult, error) {
+func (pe *ParallelExecutor) executeDryRun(items []string, variable string, body []statement.Statement) ([]ExecutionResult, error) {
 	_, _ = fmt.Fprintf(pe.output, "[DRY RUN] Would execute %d items in parallel (max workers: %d)\n",
 		len(items), pe.maxWorkers)
 
@@ -79,8 +79,8 @@ func (pe *ParallelExecutor) executeDryRun(items []string, variable string, body 
 func (pe *ParallelExecutor) executeParallel(
 	items []string,
 	variable string,
-	body []ast.Statement,
-	executor func([]ast.Statement, map[string]string) error,
+	body []statement.Statement,
+	executor func([]statement.Statement, map[string]string) error,
 ) ([]ExecutionResult, error) {
 	numItems := len(items)
 	if numItems == 0 {
@@ -94,7 +94,7 @@ func (pe *ParallelExecutor) executeParallel(
 	}
 
 	if pe.verbose {
-		_, _ = fmt.Fprintf(pe.output, "🔄 Starting parallel execution: %d items, %d workers\n", numItems, workers)
+		_, _ = fmt.Fprintf(pe.output, "🔄  Starting parallel execution: %d items, %d workers\n", numItems, workers)
 	}
 
 	// Create channels for work distribution and result collection
@@ -137,7 +137,7 @@ func (pe *ParallelExecutor) executeParallel(
 
 			if result.Error != nil {
 				if pe.verbose {
-					_, _ = fmt.Fprintf(pe.output, "❌ Worker failed on item %d (%s): %v\n",
+					_, _ = fmt.Fprintf(pe.output, "❌  Worker failed on item %d (%s): %v\n",
 						result.Index+1, result.Item, result.Error)
 				}
 
@@ -146,7 +146,7 @@ func (pe *ParallelExecutor) executeParallel(
 					cancel() // stop all workers
 				}
 			} else if pe.verbose {
-				_, _ = fmt.Fprintf(pe.output, "✅ Worker completed item %d (%s) in %v\n",
+				_, _ = fmt.Fprintf(pe.output, "✅  Worker completed item %d (%s) in %v\n",
 					result.Index+1, result.Item, result.Duration)
 			}
 
@@ -212,8 +212,8 @@ func (pe *ParallelExecutor) worker(
 	workChan <-chan workItem,
 	resultChan chan<- ExecutionResult,
 	variable string,
-	body []ast.Statement,
-	executor func([]ast.Statement, map[string]string) error,
+	body []statement.Statement,
+	executor func([]statement.Statement, map[string]string) error,
 	wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
@@ -245,8 +245,8 @@ func (pe *ParallelExecutor) executeWorkItem(
 	workerID int,
 	work workItem,
 	variable string,
-	body []ast.Statement,
-	executor func([]ast.Statement, map[string]string) error,
+	body []statement.Statement,
+	executor func([]statement.Statement, map[string]string) error,
 ) ExecutionResult {
 	start := time.Now()
 
@@ -297,7 +297,7 @@ func (pt *ProgressTracker) Update(success bool) {
 	// Print progress every 10% or on completion
 	percentage := (pt.completed * 100) / pt.total
 	if pt.completed == pt.total || pt.completed%max(1, pt.total/10) == 0 {
-		_, _ = fmt.Fprintf(pt.output, "📊 Progress: %d/%d (%d%%) - %d failed\n",
+		_, _ = fmt.Fprintf(pt.output, "📊  Progress: %d/%d (%d%%) - %d failed\n",
 			pt.completed, pt.total, percentage, pt.failed)
 	}
 }

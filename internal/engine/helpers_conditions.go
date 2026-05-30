@@ -14,9 +14,12 @@ import (
 
 // checkConditionForUndefinedVars checks if a condition contains undefined variables
 func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
+	condition = stripBraceInterpolations(condition)
+
 	// For conditions, we only need to check simple variable references like "$var is value"
 	// Complex expressions in conditions are handled by the condition evaluation itself
-	re := regexp.MustCompile(`\$\w+`)
+	// Match variables with alphanumeric, underscore, hyphen, and dot characters
+	re := regexp.MustCompile(`\$[\w.-]+`)
 	matches := re.FindAllString(condition, -1)
 
 	var undefinedVars []string
@@ -46,6 +49,30 @@ func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *Execution
 	}
 
 	return nil
+}
+
+func stripBraceInterpolations(s string) string {
+	var b strings.Builder
+	depth := 0
+
+	for _, r := range s {
+		switch r {
+		case '{':
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			} else {
+				b.WriteRune(r)
+			}
+		default:
+			if depth == 0 {
+				b.WriteRune(r)
+			}
+		}
+	}
+
+	return b.String()
 }
 
 // evaluateEnvCondition evaluates environment variable conditionals
@@ -223,6 +250,8 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			if right == "empty" {
 				right = ""
 			}
+			leftInterpolated := strings.Trim(e.interpolateVariables(left, ctx), "\"'")
+			rightInterpolated := strings.Trim(e.interpolateVariables(right, ctx), "\"'")
 
 			// Strip $ prefix if present
 			paramName := left
@@ -232,21 +261,21 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
-				return value.AsString() != right
+				return value.AsString() != rightInterpolated
 			}
 
 			// Try to get the value from variables (let statements)
 			if value, exists := ctx.Variables[paramName]; exists {
-				return value != right
+				return value != rightInterpolated
 			}
 
 			// Also try with the $ prefix (variables stored with $ prefix)
 			if value, exists := ctx.Variables["$"+paramName]; exists {
-				return value != right
+				return value != rightInterpolated
 			}
 
 			// If not found in parameters or variables, compare as strings
-			return left != right
+			return leftInterpolated != rightInterpolated
 		}
 	}
 
@@ -298,6 +327,8 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			if right == "empty" {
 				right = ""
 			}
+			leftInterpolated := strings.Trim(e.interpolateVariables(left, ctx), "\"'")
+			rightInterpolated := strings.Trim(e.interpolateVariables(right, ctx), "\"'")
 
 			// Strip $ prefix if present
 			paramName := left
@@ -307,29 +338,37 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
-				return value.AsString() == right
+				return value.AsString() == rightInterpolated
 			}
 
 			// Try to get the value from variables (let statements)
 			if value, exists := ctx.Variables[paramName]; exists {
-				return value == right
+				return value == rightInterpolated
 			}
 
 			// Also try with the $ prefix (variables stored with $ prefix)
 			if value, exists := ctx.Variables["$"+paramName]; exists {
-				return value == right
+				return value == rightInterpolated
 			}
 
 			// If not found in parameters or variables, compare as strings
-			return left == right
+			return leftInterpolated == rightInterpolated
 		}
 	}
 
 	// Interpolate variables in the condition for other cases
 	interpolatedCondition := e.interpolateVariables(condition, ctx)
+	trimmed := strings.TrimSpace(interpolatedCondition)
+
+	// "if not <expr>:" parses as condition "not <expr>" (no leading "if"). After interpolation
+	// this becomes e.g. "not false" / "not true" — negate the inner truthiness.
+	if strings.HasPrefix(strings.ToLower(trimmed), "not ") {
+		inner := strings.TrimSpace(trimmed[len("not "):])
+		return !conditionStringTruthy(inner)
+	}
 
 	// Handle boolean values directly
-	switch strings.ToLower(strings.TrimSpace(interpolatedCondition)) {
+	switch strings.ToLower(trimmed) {
 	case "true":
 		return true
 	case "false":
@@ -337,5 +376,18 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 	}
 
 	// Default: treat non-empty strings as true
-	return strings.TrimSpace(interpolatedCondition) != ""
+	return trimmed != ""
+}
+
+// conditionStringTruthy matches the final evaluation rules for a fully interpolated fragment.
+func conditionStringTruthy(s string) bool {
+	s = strings.TrimSpace(s)
+	switch strings.ToLower(s) {
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		return s != ""
+	}
 }

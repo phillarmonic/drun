@@ -27,8 +27,8 @@ func (e *ParseError) FormatError() string {
 	var result strings.Builder
 
 	// Write the main error message with file:line:column
-	result.WriteString(fmt.Sprintf("\033[31mError\033[0m: %s\n", e.Message))
-	result.WriteString(fmt.Sprintf("  \033[36m--> %s:%d:%d\033[0m\n", e.Filename, e.Token.Line, e.Token.Column))
+	fmt.Fprintf(&result, "\033[31mError\033[0m: %s\n", e.Message)
+	fmt.Fprintf(&result, "  \033[36m--> %s:%d:%d\033[0m\n", e.Filename, e.Token.Line, e.Token.Column)
 
 	// Get the source line
 	lines := strings.Split(e.Source, "\n")
@@ -37,13 +37,13 @@ func (e *ParseError) FormatError() string {
 		lineNumStr := fmt.Sprintf("%d", e.Token.Line)
 
 		// Show the line with line number
-		result.WriteString(fmt.Sprintf("   \033[34m%s\033[0m | %s\n", lineNumStr, sourceLine))
+		fmt.Fprintf(&result, "   \033[34m%s\033[0m | %s\n", lineNumStr, sourceLine)
 
 		// Show the caret pointing to the error position
 		// Calculate visual column position accounting for tab expansion
 		visualColumn := e.calculateVisualColumn(sourceLine, e.Token.Column)
 		spaces := strings.Repeat(" ", len(lineNumStr)) + " | " + strings.Repeat(" ", visualColumn-1)
-		result.WriteString(fmt.Sprintf("   %s\033[31m^\033[0m\n", spaces))
+		fmt.Fprintf(&result, "   %s\033[31m^\033[0m\n", spaces)
 
 		// Add helpful suggestions for common errors
 		// Use custom help text if provided, otherwise use auto-generated suggestion
@@ -52,7 +52,7 @@ func (e *ParseError) FormatError() string {
 			suggestion = e.getSuggestion()
 		}
 		if suggestion != "" {
-			result.WriteString(fmt.Sprintf("   \033[33mHelp:\033[0m %s\n", suggestion))
+			fmt.Fprintf(&result, "   \033[33mHelp:\033[0m %s\n", suggestion)
 		}
 	}
 
@@ -142,9 +142,9 @@ func (el *ParseErrorList) FormatErrors() string {
 	if len(el.Errors) == 1 {
 		result.WriteString("Parse error:\n\n")
 	} else if len(el.Errors) <= maxErrors {
-		result.WriteString(fmt.Sprintf("Parse errors (%d):\n\n", len(el.Errors)))
+		fmt.Fprintf(&result, "Parse errors (%d):\n\n", len(el.Errors))
 	} else {
-		result.WriteString(fmt.Sprintf("Parse errors (showing first %d of %d):\n\n", maxErrors, len(el.Errors)))
+		fmt.Fprintf(&result, "Parse errors (showing first %d of %d):\n\n", maxErrors, len(el.Errors))
 	}
 
 	// Format each error
@@ -157,7 +157,7 @@ func (el *ParseErrorList) FormatErrors() string {
 
 	// Show helpful hint if there were more errors
 	if len(el.Errors) > maxErrors {
-		result.WriteString(fmt.Sprintf("\n\033[33mNote:\033[0m %d additional errors not shown. Fix the above errors first.\n", len(el.Errors)-maxErrors))
+		fmt.Fprintf(&result, "\n\033[33mNote:\033[0m %d additional errors not shown. Fix the above errors first.\n", len(el.Errors)-maxErrors)
 	}
 
 	return result.String()

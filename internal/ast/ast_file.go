@@ -8,13 +8,14 @@ import (
 
 // FileStatement represents file system operations
 type FileStatement struct {
-	Token      lexer.Token
-	Action     string
-	Target     string
-	Source     string
-	Content    string
-	IsDir      bool
-	CaptureVar string
+	Token        lexer.Token
+	Action       string
+	Target       string
+	Source       string
+	Content      string
+	IsDir        bool
+	CaptureVar   string
+	Replacements map[string]string
 }
 
 func (fs *FileStatement) statementNode() {}
@@ -43,6 +44,8 @@ func (fs *FileStatement) String() string {
 		return fmt.Sprintf("write \"%s\" to file \"%s\"", fs.Content, fs.Target)
 	case "append":
 		return fmt.Sprintf("append \"%s\" to file \"%s\"", fs.Content, fs.Target)
+	case "replace":
+		return fmt.Sprintf("replace values in \"%s\"", fs.Target)
 	default:
 		return fmt.Sprintf("%s \"%s\"", fs.Action, fs.Target)
 	}

@@ -27,10 +27,14 @@ echo -e "${BLUE}🧪 Testing all drun examples for regressions...${NC}"
 echo "=================================================="
 
 # Build fresh binary
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 echo -e "${BLUE}📦 Building fresh drun binary...${NC}"
-cd /Users/andy/repos/phillarmonic/drun
-go build -o xdrun ./cmd/drun
-echo -e "${GREEN}✅ Build completed${NC}"
+cd "${REPO_ROOT}"
+mkdir -p bin
+go build -o bin/xdrun ./cmd/xdrun
+echo -e "${GREEN}✅ Build completed: bin/xdrun${NC}"
 echo
 
 # Function to test a single file
@@ -41,7 +45,7 @@ test_file() {
     echo -e "${BLUE}🔍 Testing: ${filename}${NC}"
     
     # First, try to list tasks to see if file parses
-    if ! ./xdrun -f "$file" -l > /dev/null 2>&1; then
+    if ! ./bin/xdrun -f "$file" -l > /dev/null 2>&1; then
         echo -e "${RED}❌ FAILED: ${filename} - Parse error${NC}"
         FAILED_FILES+=("$filename (parse error)")
         ((FAILED_TESTS++))
@@ -51,7 +55,7 @@ test_file() {
     # Get the first task from the file (handle multi-word task names)
     # Task list format: "  task_name           description"
     # We need to extract everything before the description (2+ spaces separator)
-    local first_task=$(./xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed -E 's/  +.*//' | xargs)
+    local first_task=$(./bin/xdrun -f "$file" -l 2>/dev/null | grep -E "^  " | head -1 | sed 's/^  //' | sed -E 's/  +.*//' | xargs)
     
     if [ -z "$first_task" ]; then
         echo -e "${YELLOW}⚠️  SKIPPED: ${filename} - No tasks found${NC}"
@@ -69,7 +73,7 @@ test_file() {
     for task_name in "${task_names[@]}"; do
         if [ -n "$task_name" ]; then
             # Try to run the task in dry-run mode
-            if ./xdrun -f "$file" "$task_name" --dry-run > /dev/null 2>&1; then
+            if ./bin/xdrun -f "$file" "$task_name" --dry-run > /dev/null 2>&1; then
                 echo -e "${GREEN}✅ PASSED: ${filename} (task: ${task_name})${NC}"
                 PASSED_FILES+=("$filename")
                 ((PASSED_TESTS++))
@@ -87,7 +91,7 @@ test_file() {
                 )
                 
                 for params in "${param_attempts[@]}"; do
-                    if ./xdrun -f "$file" "$task_name" $params --dry-run > /dev/null 2>&1; then
+                    if ./bin/xdrun -f "$file" "$task_name" $params --dry-run > /dev/null 2>&1; then
                         echo -e "${GREEN}✅ PASSED: ${filename} (task: ${task_name} with params: ${params})${NC}"
                         PASSED_FILES+=("$filename")
                         ((PASSED_TESTS++))

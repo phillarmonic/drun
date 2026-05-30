@@ -68,12 +68,14 @@ task "hello":
 - **Project Declarations**: Define global project settings, includes, and lifecycle hooks
 - **Dependency System**: Automatic task dependency resolution with parallel execution
 - **Task Calling**: Call tasks from within other tasks with parameter passing (`call task "name" with param="value"`)
+- **Microservices Orchestration**: Full-featured orchestration system for managing multi-service architectures with BuildKit-style progress display, health checks, dependency resolution, and circuit breaker support ([→ Learn more](./docs/ORCHESTRATION.md))
 - **HTTP Actions**: Built-in HTTP requests with authentication and response handling
 - **Docker Integration**: Semantic Docker commands (`build docker image`, `run container`)
 - **Kubernetes Support**: Native kubectl operations with intelligent resource management (soon)
 - **Error Handling**: Comprehensive `try/catch/finally` with custom error types
 - **Parallel Execution**: True parallel loops with concurrency control and progress tracking
 - **Progress & Timing**: Built-in progress indicators and timer functions for long-running operations
+- **Secrets Management**: Secure storage for API keys, passwords, and tokens with platform-native keychain integration and CLI management (`cmd:secret`)
 - **Smart Detection**: Auto-detect tools, frameworks, and environments intelligently
 - **DRY Tool Detection**: Detect tool variants and capture working ones (`detect available "docker compose" or "docker-compose" as $compose_cmd`)
 - **File Operations**: Built-in file system operations with path interpolation
@@ -125,6 +127,60 @@ drun includes powerful built-in functions for common operations:
 - `{start timer('name')}` - Start a named timer
 - `{stop timer('name')}` - Stop a timer and show elapsed time
 - `{show elapsed time('name')}` - Show current elapsed time for a timer
+
+#### **Secrets Management** 🔐 *New*
+
+- `{secret('key')}` - Get secret from current project namespace
+- `{secret('key', 'default')}` - Get secret with default value if not found
+- `{secret('key', '', 'namespace')}` - Get secret from specific namespace (use 'global' for global scope)
+
+**Features:**
+- **Platform Integration**: Uses native keychains (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **Encrypted Fallback**: AES-256-GCM encrypted storage when platform keychain unavailable
+- **Automatic Isolation**: Secrets automatically scoped to project names
+- **Namespace Support**: Project, global, and custom namespaces for organizing secrets
+- **CLI Management**: Standalone `cmd:secret` command for managing secrets outside of tasks
+
+**Example:**
+
+```drun
+version: 2.0
+project "api-deployment" version "1.0":
+
+task "setup":
+  secret set "api_key" to "secret_key_12345"
+  secret set "db_password" to "super_secure_pass"
+  
+  # Use global namespace for shared secrets
+  secret set "shared_token" to "team_token_789" in namespace "global"
+
+task "deploy":
+  # Use secrets in interpolation
+  info "Connecting with key: {secret('api_key')}"
+  run "curl -H 'Authorization: Bearer {secret('api_key')}' https://api.example.com"
+  
+  # With default value for optional secrets
+  run "webhook_url={secret('webhook', 'https://default.com')}"
+  
+  # Access global namespace secret
+  info "Team token: {secret('shared_token', '', 'global')}"
+
+task "cleanup":
+  secret delete "api_key"
+  secret delete "db_password"
+```
+
+**Secret Operations in Tasks:**
+- `secret set "key" to "value"` - Store a secret in project namespace
+- `secret set "key" to "value" in namespace "name"` - Store in custom namespace
+- `secret get "key"` - Retrieve a secret (or use `{secret('key')}` in interpolation)
+- `secret exists "key"` - Check if a secret exists
+- `secret list` - List all secrets in current project namespace
+- `secret list from namespace "name"` - List secrets in specific namespace
+- `secret delete "key"` - Remove a secret from project namespace
+- `secret delete "key" from namespace "name"` - Remove from custom namespace
+
+**See also:** [Secret Management CLI](#secret-management-cli) for managing secrets from the command line
 
 #### **Usage Examples**
 
@@ -658,6 +714,10 @@ task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
   # Detect which Docker Buildx variant is available and capture it
   detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 
+  # Version-gated tool checks also work with quoted tool names
+  if "golangci-lint" is available and version >= "2.12":
+    info "golangci-lint is ready"
+
   info " Detected tools:"
   info "   Compose: {$compose_cmd}"
   info "  🔨 Buildx: {$buildx_cmd}"
@@ -903,6 +963,7 @@ Built-in commands use the `cmd:` prefix to avoid collisions with user-defined ta
 
 - `cmd:completion [bash|zsh|fish|powershell]`: Generate shell completion scripts
 - `cmd:from makefile`: Convert Makefile to drun format
+- `cmd:secret`: Manage secrets (add, remove, list) - see [Secret Management CLI](#secret-management-cli)
 
 ### Management Commands
 
@@ -1211,6 +1272,175 @@ task "build" means "Build the application":
 
 Learn more in [`examples/makefile-conversion/README.md`](examples/makefile-conversion/README.md)
 
+## Secret Management CLI
+
+Manage secrets directly from the command line with the `cmd:secret` command. This is useful for:
+
+- Setting up secrets before running tasks
+- Managing secrets across multiple projects
+- Listing and inspecting stored secrets
+- Sharing secrets between team members via different namespaces
+
+### Secret Scopes
+
+Secrets can be stored in different scopes (namespaces):
+
+- **Default namespace**: General-purpose secrets (`--namespace` not specified)
+- **Project scope**: Secrets specific to a project (uses current directory name as namespace via `--project`)
+- **Global scope**: Secrets shared across all projects (via `--global`)
+- **Custom namespace**: Any custom namespace you define (via `--namespace <name>`)
+
+### Commands
+
+#### Add Secrets
+
+```bash
+# Add to default namespace (auto-detects project if in drun workspace, prompts for value)
+xdrun cmd:secret add api_key
+
+# Add with value directly (visible in command history - use with caution)
+xdrun cmd:secret add api_key "my-secret-key"
+
+# Add with masked input (secure)
+xdrun cmd:secret add api_key --masked
+
+# Add to global scope (shared across all projects)
+xdrun cmd:secret add --global shared_token "team-token-123"
+
+# Add to project scope (auto-detects project name from drun config)
+xdrun cmd:secret add --project db_password "secret-pass"
+
+# Add to custom namespace
+xdrun cmd:secret add --namespace team-alpha team_key "alpha-secret"
+```
+
+**Automatic Workspace Detection:**
+When you run `cmd:secret` commands without specifying a namespace, drun automatically detects your project name from the current workspace's `.drun/spec.drun` or configured drun file. This means:
+- If you're in a project directory with a drun config, secrets are automatically scoped to that project
+- No need to manually specify `--project` or remember to use the correct namespace
+- A message will inform you when auto-detection occurs
+
+#### List Secrets
+
+```bash
+# List secrets in default namespace (auto-detects project if in workspace)
+xdrun cmd:secret list
+
+# List secrets in global scope
+xdrun cmd:secret list --global
+
+# List secrets in project scope (auto-detects project name)
+xdrun cmd:secret list --project
+
+# List secrets in custom namespace
+xdrun cmd:secret list --namespace team-alpha
+
+# List all secrets across all namespaces
+xdrun cmd:secret list-all
+
+# Show secret values (use with caution!)
+xdrun cmd:secret list --show-values
+xdrun cmd:secret list-all --show-values
+```
+
+#### Remove Secrets
+
+```bash
+# Remove from default namespace (auto-detects project if in workspace)
+xdrun cmd:secret remove api_key
+
+# Remove from global scope
+xdrun cmd:secret remove --global shared_token
+
+# Remove from project scope (auto-detects project name)
+xdrun cmd:secret rm --project db_password  # 'rm' is an alias
+
+# Remove from custom namespace
+xdrun cmd:secret delete --namespace team-alpha team_key  # 'delete' is an alias
+```
+
+### Using CLI-Managed Secrets in Tasks
+
+Secrets managed via CLI are accessible in your drun tasks using the `secret()` function:
+
+```drun
+version: 2.0
+project "my-app" version "1.0":
+
+task "deploy":
+  # Access project-scoped secret (automatically uses project name)
+  info "Deploying with key: {secret('api_key')}"
+  
+  # Access global secret
+  info "Team token: {secret('shared_token', '', 'global')}"
+  
+  # Access custom namespace secret
+  info "Team alpha key: {secret('team_key', '', 'team-alpha')}"
+  
+  # With default value
+  run "curl -u admin:{secret('admin_password', 'default-pass')} https://api.example.com"
+```
+
+### Complete Workflow Example
+
+```bash
+# Step 1: Set up secrets for your project
+cd /path/to/myproject
+xdrun cmd:secret add --project api_key --masked
+xdrun cmd:secret add --project db_password --masked
+xdrun cmd:secret add --global shared_token "team-token-123"
+
+# Step 2: Verify secrets are stored
+xdrun cmd:secret list --project
+# Output:
+# Secrets in namespace 'myproject':
+#   - api_key
+#   - db_password
+
+xdrun cmd:secret list --global
+# Output:
+# Secrets in namespace 'global':
+#   - shared_token
+
+# Step 3: Use secrets in your tasks
+xdrun deploy  # Secrets are automatically available
+
+# Step 4: Clean up when done
+xdrun cmd:secret remove --project api_key
+xdrun cmd:secret remove --project db_password
+```
+
+### Security Best Practices
+
+1. **Use Masked Input**: Always use `--masked` flag when entering sensitive values interactively
+2. **Avoid Command History**: Don't pass secret values directly on command line (they appear in shell history)
+3. **Use Namespaces**: Organize secrets by scope (global, project, team) for better management
+4. **Regular Cleanup**: Remove secrets when they're no longer needed
+5. **Show Values Carefully**: Only use `--show-values` in secure, private environments
+6. **Platform Keychain**: Secrets are stored in your system's native keychain when available
+
+### Platform-Specific Storage
+
+- **macOS**: Keychain Access (`com.phillarmonic.drun` service)
+- **Windows**: Credential Manager (`drun:` prefix)
+- **Linux**: Secret Service API (GNOME Keyring, KWallet) with index file (`~/.drun/secrets-index.json`)
+- **Fallback**: AES-256-GCM encrypted file (`~/.drun/secrets.enc`) when native keychain is unavailable or inaccessible
+
+**Automatic Fallback:**
+If the platform keychain is unavailable or returns permission errors, drun automatically falls back to encrypted file storage. You'll see a message like "Using encrypted file storage" when this occurs. The fallback provides the same security guarantees with AES-256-GCM encryption.
+
+### Help and Documentation
+
+```bash
+# Main help
+xdrun cmd:secret --help
+
+# Subcommand help
+xdrun cmd:secret add --help
+xdrun cmd:secret list --help
+xdrun cmd:secret remove --help
+```
+
 ## Self-Update & Backup Management
 
 drun includes built-in self-update functionality with intelligent backup management.
@@ -1283,6 +1513,8 @@ Explore comprehensive examples in the `examples/` directory:
 - **`examples/26-smart-detection.drun`** - Smart tool and environment detection
 - **`examples/38-progress-and-timers.drun`** - Progress indicators and timing operations
 - **`examples/46-task-calling.drun`** - Task calling and modular task design
+- **`examples/62-secrets-interpolation.drun`** 🔐 - Secrets management with the `secret()` function
+- **`examples/71-cli-secret-management.drun`** 🔐 - CLI secret management across different scopes (project, global, custom)
 
 ### Quick Examples
 
@@ -1305,6 +1537,14 @@ xdrun -f examples/26-smart-detection.drun "detect project"
 # Try task calling and modular design
 xdrun -f examples/46-task-calling.drun "quick-test"
 
+# Try secrets management (in-task)
+xdrun -f examples/62-secrets-interpolation.drun setup
+xdrun -f examples/62-secrets-interpolation.drun use_secrets_in_interpolation
+
+# Try CLI secret management (command-line)
+xdrun -f examples/71-cli-secret-management.drun demo-cli-secrets
+xdrun -f examples/71-cli-secret-management.drun security-best-practices
+
 # See comprehensive features
 xdrun -f examples/07-final-showcase.drun showcase project_name=MyApp
 ```
@@ -1318,8 +1558,8 @@ drun is **production-ready** with enterprise-grade features:
 ### Implemented Features
 
 - **Core Functionality**: .drun semantic language, parameters, variables, control flow
-- **Advanced Features**: Remote includes, matrix execution, secrets management, task calling
-- **Developer Experience**: 15+ template functions, intelligent caching, rich errors
+- **Advanced Features**: Remote includes, matrix execution, **secrets management with CLI** 🔐, task calling
+- **Developer Experience**: 20+ template functions, intelligent caching, rich errors
 - **Performance**: Microsecond-level operations, high test coverage (71-83%)
 - **Quality**: Zero linting issues, comprehensive test suite
 
@@ -1359,7 +1599,7 @@ git clone https://github.com/phillarmonic/drun.git
 cd drun
 
 # Build drun
-go build -o bin/xdrun ./cmd/drun
+go build -o bin/xdrun ./cmd/xdrun
 
 # Or use the build script for all platforms
 ./scripts/build.sh

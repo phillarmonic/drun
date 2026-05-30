@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/parallel"
 	"github.com/phillarmonic/drun/internal/types"
 )
@@ -27,7 +27,7 @@ type ContinueError struct {
 }
 
 // executeBreak executes break statements
-func (e *Engine) executeBreak(breakStmt *ast.BreakStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeBreak(breakStmt *statement.Break, ctx *ExecutionContext) error {
 	condition := e.interpolateVariables(breakStmt.Condition, ctx)
 
 	if e.dryRun {
@@ -42,19 +42,19 @@ func (e *Engine) executeBreak(breakStmt *ast.BreakStatement, ctx *ExecutionConte
 	if condition != "" {
 		// Evaluate the condition
 		if e.evaluateSimpleCondition(condition, ctx) {
-			_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop (condition: %s)\n", condition)
+			_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop (condition: %s)\n", condition)
 			return BreakError{Condition: condition}
 		}
 		// Condition not met, don't break
 		return nil
 	} else {
-		_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop\n")
 		return BreakError{Condition: condition}
 	}
 }
 
 // executeContinue executes continue statements
-func (e *Engine) executeContinue(continueStmt *ast.ContinueStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeContinue(continueStmt *statement.Continue, ctx *ExecutionContext) error {
 	condition := e.interpolateVariables(continueStmt.Condition, ctx)
 
 	if e.dryRun {
@@ -69,13 +69,13 @@ func (e *Engine) executeContinue(continueStmt *ast.ContinueStatement, ctx *Execu
 	if condition != "" {
 		// Evaluate the condition
 		if e.evaluateSimpleCondition(condition, ctx) {
-			_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop (condition: %s)\n", condition)
+			_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop (condition: %s)\n", condition)
 			return ContinueError{Condition: condition}
 		}
 		// Condition not met, don't continue
 		return nil
 	} else {
-		_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop\n")
+		_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop\n")
 		return ContinueError{Condition: condition}
 	}
 }
@@ -88,17 +88,17 @@ func (e *Engine) evaluateSimpleCondition(condition string, ctx *ExecutionContext
 	return true
 }
 
-func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeConditional(stmt *statement.Conditional, ctx *ExecutionContext) error {
 	// In strict mode, check for undefined variables in the condition
 	// This checks both bare $var references and {var} interpolations
 	if e.interpolator.IsStrictMode() {
 		// Check for undefined variables in {var} interpolations
 		if _, err := e.interpolateVariablesWithError(stmt.Condition, ctx); err != nil {
-			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+			return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
 		}
 		// Check for undefined bare $var references (e.g., "when $var is value")
 		if err := e.checkConditionForUndefinedVars(stmt.Condition, ctx); err != nil {
-			return fmt.Errorf("in %s condition: %w", stmt.Type, err)
+			return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
 		}
 	}
 
@@ -106,14 +106,14 @@ func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *Executi
 	conditionResult := e.evaluateCondition(stmt.Condition, ctx)
 
 	if conditionResult {
-		// Execute the main body
+		// Execute the main body (domain statements)
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, ctx); err != nil {
 				return err
 			}
 		}
 	} else if len(stmt.ElseBody) > 0 {
-		// Execute the else body if condition is false
+		// Execute the else body if condition is false (domain statements)
 		for _, elseStmt := range stmt.ElseBody {
 			if err := e.executeStatement(elseStmt, ctx); err != nil {
 				return err
@@ -125,9 +125,9 @@ func (e *Engine) executeConditional(stmt *ast.ConditionalStatement, ctx *Executi
 }
 
 // executeLoop executes loop statements (for each)
-func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
-	// If Type is not set, default to "each"
-	loopType := stmt.Type
+func (e *Engine) executeLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
+	// If LoopType is not set, default to "each"
+	loopType := stmt.LoopType
 	if loopType == "" {
 		loopType = "each"
 	}
@@ -145,9 +145,9 @@ func (e *Engine) executeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) err
 }
 
 // executeSequentialLoop executes loop items sequentially
-func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
+func (e *Engine) executeSequentialLoop(stmt *statement.Loop, items []string, ctx *ExecutionContext) error {
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "🔄 Executing %d items sequentially\n", len(items))
+		_, _ = fmt.Fprintf(e.output, "🔄  Executing %d items sequentially\n", len(items))
 	}
 
 	for i, item := range items {
@@ -158,19 +158,19 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 		// Create a new context with the loop variable
 		loopCtx := e.createLoopContext(ctx, stmt.Variable, item)
 
-		// Execute the loop body
+		// Execute the loop body (domain statements)
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
 				// Check for break/continue control flow
 				if breakErr, ok := err.(BreakError); ok {
 					if e.verbose {
-						_, _ = fmt.Fprintf(e.output, "🔄 Breaking loop: %s\n", breakErr.Error())
+						_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop: %s\n", breakErr.Error())
 					}
 					return nil // Break out of the entire loop
 				}
 				if continueErr, ok := err.(ContinueError); ok {
 					if e.verbose {
-						_, _ = fmt.Fprintf(e.output, "🔄 Continuing loop: %s\n", continueErr.Error())
+						_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop: %s\n", continueErr.Error())
 					}
 					break // Break out of the body execution, continue to next item
 				}
@@ -180,13 +180,13 @@ func (e *Engine) executeSequentialLoop(stmt *ast.LoopStatement, items []string, 
 	}
 
 	if e.verbose {
-		_, _ = fmt.Fprintf(e.output, "✅ Sequential loop completed: %d items processed\n", len(items))
+		_, _ = fmt.Fprintf(e.output, "✅  Sequential loop completed: %d items processed\n", len(items))
 	}
 	return nil
 }
 
 // executeParallelLoop executes loop items in parallel
-func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ctx *ExecutionContext) error {
+func (e *Engine) executeParallelLoop(stmt *statement.Loop, items []string, ctx *ExecutionContext) error {
 	// Determine parallel execution settings
 	maxWorkers := stmt.MaxWorkers
 	if maxWorkers <= 0 {
@@ -198,8 +198,8 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 	// Create parallel executor
 	executor := parallel.NewParallelExecutor(maxWorkers, failFast, e.output, e.dryRun, e.verbose)
 
-	// Define the execution function for each item
-	executeItem := func(body []ast.Statement, variables map[string]string) error {
+	// Define the execution function for each item (domain statements)
+	executeItem := func(body []statement.Statement, variables map[string]string) error {
 		// Create a new context for this parallel execution
 		loopCtx := &ExecutionContext{
 			Parameters: make(map[string]*types.Value, len(ctx.Parameters)+len(variables)), // Pre-allocate for parent + new variables
@@ -224,7 +224,7 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 			}
 		}
 
-		// Execute the loop body
+		// Execute the loop body (domain statements)
 		for _, bodyStmt := range body {
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
 				return err
@@ -258,7 +258,7 @@ func (e *Engine) executeParallelLoop(stmt *ast.LoopStatement, items []string, ct
 }
 
 // executeRangeLoop executes range loops
-func (e *Engine) executeRangeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
 	start := e.interpolateVariables(stmt.RangeStart, ctx)
 	end := e.interpolateVariables(stmt.RangeEnd, ctx)
 	step := "1"
@@ -283,7 +283,7 @@ func (e *Engine) executeRangeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(e.output, "🔄 Executing range loop from %s to %s step %s (%d items)\n", start, end, step, len(items))
+	_, _ = fmt.Fprintf(e.output, "🔄  Executing range loop from %s to %s step %s (%d items)\n", start, end, step, len(items))
 
 	// Apply filter if present
 	if stmt.Filter != nil {
@@ -298,7 +298,7 @@ func (e *Engine) executeRangeLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 }
 
 // executeLineLoop executes line-by-line file processing loops
-func (e *Engine) executeLineLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeLineLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
 	filename := e.interpolateVariables(stmt.Iterable, ctx)
 
 	if e.dryRun {
@@ -325,7 +325,7 @@ func (e *Engine) executeLineLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 }
 
 // executeMatchLoop executes pattern matching loops
-func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeMatchLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
 	pattern := e.interpolateVariables(stmt.Iterable, ctx)
 
 	if e.dryRun {
@@ -337,7 +337,7 @@ func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 	// For now, we'll simulate with some sample matches
 	matches := []string{"match1", "match2"}
 
-	_, _ = fmt.Fprintf(e.output, "🔍 Finding matches for pattern: %s (%d matches)\n", pattern, len(matches))
+	_, _ = fmt.Fprintf(e.output, "🔍  Finding matches for pattern: %s (%d matches)\n", pattern, len(matches))
 
 	// Apply filter if present
 	if stmt.Filter != nil {
@@ -352,7 +352,7 @@ func (e *Engine) executeMatchLoop(stmt *ast.LoopStatement, ctx *ExecutionContext
 }
 
 // executeEachLoop executes traditional each loops
-func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext) error {
+func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
 	// Resolve the iterable (could be a parameter, variable, array literal, etc.)
 	var items []string
 
@@ -486,7 +486,7 @@ func (e *Engine) executeEachLoop(stmt *ast.LoopStatement, ctx *ExecutionContext)
 }
 
 // applyFilter applies filter conditions to a list of items
-func (e *Engine) applyFilter(items []string, filter *ast.FilterExpression, ctx *ExecutionContext) []string {
+func (e *Engine) applyFilter(items []string, filter *statement.Filter, ctx *ExecutionContext) []string {
 	var filtered []string
 
 	filterValue := e.interpolateVariables(filter.Value, ctx)
@@ -519,7 +519,7 @@ func (e *Engine) applyFilter(items []string, filter *ast.FilterExpression, ctx *
 	}
 
 	if len(filtered) != len(items) {
-		_, _ = fmt.Fprintf(e.output, "🔍 Filter applied: %d items match condition '%s %s %s'\n",
+		_, _ = fmt.Fprintf(e.output, "🔍  Filter applied: %d items match condition '%s %s %s'\n",
 			len(filtered), filter.Variable, filter.Operator, filterValue)
 	}
 

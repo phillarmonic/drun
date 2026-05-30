@@ -103,14 +103,14 @@ func (l *Loader) Load() (*LoadResult, error) {
 		if l.debugMode {
 			if info.Exists {
 				if info.Loaded {
-					_, _ = fmt.Fprintf(l.output, "✅ [ENV DEBUG] Loaded: %s (%d variables)\n", info.Path, len(info.Vars))
+					_, _ = fmt.Fprintf(l.output, "✅  [ENV DEBUG] Loaded: %s (%d variables)\n", info.Path, len(info.Vars))
 					for key, value := range info.Vars {
 						// Mask sensitive values in debug output
 						maskedValue := maskSensitiveValue(key, value)
 						_, _ = fmt.Fprintf(l.output, "   %s=%s\n", key, maskedValue)
 					}
 				} else {
-					_, _ = fmt.Fprintf(l.output, "❌ [ENV DEBUG] Failed to load: %s (error: %v)\n", info.Path, info.Error)
+					_, _ = fmt.Fprintf(l.output, "❌  [ENV DEBUG] Failed to load: %s (error: %v)\n", info.Path, info.Error)
 				}
 			} else {
 				_, _ = fmt.Fprintf(l.output, "⏭️  [ENV DEBUG] Skipped (not found): %s\n", info.Path)
