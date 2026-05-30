@@ -31,7 +31,13 @@ task "hello" means "Say hello":
   info "Hello from drun"
 ```
 
-Run it:
+Or run this command to initialize a Drun spec file in the current directory (a folder named .drun will be created). The drun demo file also includes a task named hello.
+
+```bash
+xdrun --init
+```
+
+Then run it:
 
 ```bash
 xdrun hello
