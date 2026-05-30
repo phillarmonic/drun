@@ -541,21 +541,12 @@ func TestCheckDockerComposeStatus(t *testing.T) {
 	// Test with current directory (should work even if no compose project exists)
 	result, err := checkDockerComposeStatus(nil)
 
-	// The function should not error even if docker compose is not available
-	// It should return "unavailable" in that case
 	if err != nil {
-		// Check if it's the expected "unavailable" case
-		if !strings.Contains(err.Error(), "docker compose not available") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if result != "unavailable" {
-			t.Errorf("Expected 'unavailable' when docker compose not available, got %s", result)
-		}
-		return
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// If docker compose is available, we should get a valid status
-	validStatuses := []string{"down", "usable", "unusable", "partial", "error"}
+	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
 	found := false
 	for _, status := range validStatuses {
 		if result == status {
@@ -574,16 +565,15 @@ func TestCheckDockerComposeStatusWithPath(t *testing.T) {
 	result, err := checkDockerComposeStatus(nil, "/non/existent/directory")
 
 	if err != nil {
-		// Should get an error about the directory not existing or docker compose not available
-		if !strings.Contains(err.Error(), "docker compose not available") &&
-			!strings.Contains(err.Error(), "failed to change to project directory") {
+		// Should only error when compose is available and the directory change fails.
+		if !strings.Contains(err.Error(), "failed to change to project directory") {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		return
 	}
 
 	// If no error, should be a valid status
-	validStatuses := []string{"down", "usable", "unusable", "partial", "error"}
+	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
 	found := false
 	for _, status := range validStatuses {
 		if result == status {
@@ -609,15 +599,7 @@ func TestDockerComposeStatusInterpolation(t *testing.T) {
 	// Test calling it directly
 	result, err := CallBuiltin("docker compose status", nil)
 	if err != nil {
-		// Should get a result even if docker compose is not available
-		if !strings.Contains(err.Error(), "docker compose not available") {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		// If error, result should be "unavailable"
-		if result != "unavailable" {
-			t.Errorf("Expected 'unavailable' when docker compose not available, got %s", result)
-		}
-		return
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// If no error, should be a valid status

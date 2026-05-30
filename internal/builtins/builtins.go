@@ -498,7 +498,7 @@ func checkDockerComposeStatus(ctx Context, args ...string) (string, error) {
 	// Detect which Docker Compose command to use (prioritize "docker compose")
 	composeCmd, err := detectDockerComposeCommand()
 	if err != nil {
-		return "unavailable", fmt.Errorf("docker compose not available: %w", err)
+		return "unavailable", nil
 	}
 
 	// Get container status for the project
