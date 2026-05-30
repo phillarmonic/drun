@@ -7,6 +7,7 @@ import (
 
 	"github.com/phillarmonic/drun/internal/lexer"
 	"github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/internal/types"
 )
 
 func TestEngine_StrictVariableChecking(t *testing.T) {
@@ -304,6 +305,55 @@ task "test":
 				}
 			}
 		})
+	}
+}
+
+func TestEngine_StrictVariablesAllowsBuiltinInWhenCondition(t *testing.T) {
+	input := `version: 2.0
+
+project "dns-test" version "1.0.0":
+	set api_domain to "api.example.com"
+
+task "test":
+	when "{dns_check '{$api_domain}' 'A'}" is "success":
+		info "dns ok"
+	otherwise:
+		info "dns failed"`
+
+	var output bytes.Buffer
+	engine := NewEngine(&output)
+	engine.SetDryRun(true)
+	engine.SetAllowUndefinedVars(false)
+
+	lexer := lexer.NewLexer(input)
+	parser := parser.NewParser(lexer)
+	program := parser.ParseProgram()
+
+	if len(parser.Errors()) > 0 {
+		t.Fatalf("Parser errors: %v", parser.Errors())
+	}
+
+	ctx := &ExecutionContext{
+		Parameters: make(map[string]*types.Value),
+		Variables:  make(map[string]string),
+		Project: &ProjectContext{
+			Name:     "dns-test",
+			Version:  "1.0.0",
+			Settings: map[string]string{"api_domain": "api.example.com"},
+		},
+	}
+	if result, err := engine.interpolateVariablesWithError("{dns_check '{$api_domain}' 'A'}", ctx); err != nil {
+		t.Fatalf("interpolation failed before execution: result=%q err=%v", result, err)
+	} else if result != "success" {
+		t.Fatalf("expected interpolation result %q, got %q", "success", result)
+	}
+
+	if err := engine.Execute(program, "test"); err != nil {
+		t.Fatalf("expected builtin condition to resolve in strict mode, got error: %v", err)
+	}
+
+	if got := output.String(); !strings.Contains(got, "dns ok") {
+		t.Fatalf("expected true branch output, got: %s", got)
 	}
 }
 

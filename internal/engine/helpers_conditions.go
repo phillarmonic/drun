@@ -14,6 +14,8 @@ import (
 
 // checkConditionForUndefinedVars checks if a condition contains undefined variables
 func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
+	condition = stripBraceInterpolations(condition)
+
 	// For conditions, we only need to check simple variable references like "$var is value"
 	// Complex expressions in conditions are handled by the condition evaluation itself
 	// Match variables with alphanumeric, underscore, hyphen, and dot characters
@@ -47,6 +49,30 @@ func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *Execution
 	}
 
 	return nil
+}
+
+func stripBraceInterpolations(s string) string {
+	var b strings.Builder
+	depth := 0
+
+	for _, r := range s {
+		switch r {
+		case '{':
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			} else {
+				b.WriteRune(r)
+			}
+		default:
+			if depth == 0 {
+				b.WriteRune(r)
+			}
+		}
+	}
+
+	return b.String()
 }
 
 // evaluateEnvCondition evaluates environment variable conditionals
@@ -224,6 +250,8 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			if right == "empty" {
 				right = ""
 			}
+			leftInterpolated := strings.Trim(e.interpolateVariables(left, ctx), "\"'")
+			rightInterpolated := strings.Trim(e.interpolateVariables(right, ctx), "\"'")
 
 			// Strip $ prefix if present
 			paramName := left
@@ -233,21 +261,21 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
-				return value.AsString() != right
+				return value.AsString() != rightInterpolated
 			}
 
 			// Try to get the value from variables (let statements)
 			if value, exists := ctx.Variables[paramName]; exists {
-				return value != right
+				return value != rightInterpolated
 			}
 
 			// Also try with the $ prefix (variables stored with $ prefix)
 			if value, exists := ctx.Variables["$"+paramName]; exists {
-				return value != right
+				return value != rightInterpolated
 			}
 
 			// If not found in parameters or variables, compare as strings
-			return left != right
+			return leftInterpolated != rightInterpolated
 		}
 	}
 
@@ -299,6 +327,8 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			if right == "empty" {
 				right = ""
 			}
+			leftInterpolated := strings.Trim(e.interpolateVariables(left, ctx), "\"'")
+			rightInterpolated := strings.Trim(e.interpolateVariables(right, ctx), "\"'")
 
 			// Strip $ prefix if present
 			paramName := left
@@ -308,21 +338,21 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 			// Try to get the value of the left side from parameters first
 			if value, exists := ctx.Parameters[paramName]; exists {
-				return value.AsString() == right
+				return value.AsString() == rightInterpolated
 			}
 
 			// Try to get the value from variables (let statements)
 			if value, exists := ctx.Variables[paramName]; exists {
-				return value == right
+				return value == rightInterpolated
 			}
 
 			// Also try with the $ prefix (variables stored with $ prefix)
 			if value, exists := ctx.Variables["$"+paramName]; exists {
-				return value == right
+				return value == rightInterpolated
 			}
 
 			// If not found in parameters or variables, compare as strings
-			return left == right
+			return leftInterpolated == rightInterpolated
 		}
 	}
 

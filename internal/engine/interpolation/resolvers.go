@@ -196,6 +196,31 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 		}
 	}
 
+	// 5b. Check for builtin calls with space-separated quoted arguments.
+	// Pattern: "dns_check 'example.com' 'A'"
+	if quoteIdx := strings.IndexAny(expr, `'"`); quoteIdx > 0 {
+		funcName := strings.TrimSpace(expr[:quoteIdx])
+		argsStr := strings.TrimSpace(expr[quoteIdx:])
+		args := i.parseQuotedArguments(argsStr)
+
+		if builtins.IsBuiltin(funcName) && len(args) > 0 {
+			if i.resolveBuiltin != nil {
+				if result, err := i.resolveBuiltin(funcName, args, ctx); err == nil {
+					return result
+				} else {
+					i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+					return ""
+				}
+			}
+			if result, err := builtins.CallBuiltinLegacy(funcName, args...); err == nil {
+				return result
+			} else {
+				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				return ""
+			}
+		}
+	}
+
 	// 6. Check for function calls with parameter arguments
 	// Pattern: "function(param)" where param is a parameter name
 	if matches := i.paramArgRegex.FindStringSubmatch(expr); len(matches) == 3 {

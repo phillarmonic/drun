@@ -343,6 +343,11 @@ jobs:
         
         echo "✅ All safe example executions completed successfully!"
 
+    - name: Run regression check script (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: ./scripts/test-regressions.sh
+
     - name: Test Windows-specific parsing edge cases
       if: matrix.os == 'windows-latest'
       shell: bash

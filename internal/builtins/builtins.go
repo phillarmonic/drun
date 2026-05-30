@@ -70,6 +70,9 @@ var Registry = map[string]BuiltinFunction{
 	"show elapsed time":     showElapsedTime,
 	"docker compose status": checkDockerComposeStatus,
 	"secret":                getSecret,
+	"dns_resolve":           getDNSResolve,
+	"dns_check":             getDNSCheck,
+	"dns_validate":          getDNSValidate,
 }
 
 // getCurrentGitCommit returns the current git commit hash
@@ -215,6 +218,65 @@ func CallBuiltinLegacy(name string, args ...string) (string, error) {
 func IsBuiltin(name string) bool {
 	_, exists := Registry[name]
 	return exists
+}
+
+func getDNSResolve(ctx Context, args ...string) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("dns_resolve requires 1 argument (domain)")
+	}
+
+	resolver, ok := ctx.(interface {
+		DNSResolve(string) (string, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_resolve requires DNS resolution support")
+	}
+
+	return resolver.DNSResolve(args[0])
+}
+
+func getDNSCheck(ctx Context, args ...string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("dns_check requires 2 arguments (domain, record_type)")
+	}
+
+	checker, ok := ctx.(interface {
+		DNSCheck(string, string) (bool, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_check requires DNS validation support")
+	}
+
+	valid, err := checker.DNSCheck(args[0], args[1])
+	if err != nil {
+		return "", err
+	}
+	if valid {
+		return "success", nil
+	}
+	return "failed", nil
+}
+
+func getDNSValidate(ctx Context, args ...string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("dns_validate requires 2 arguments (domain, expected_ip)")
+	}
+
+	validator, ok := ctx.(interface {
+		DNSValidate(string, string) (bool, error)
+	})
+	if !ok {
+		return "", fmt.Errorf("dns_validate requires DNS validation support")
+	}
+
+	valid, err := validator.DNSValidate(args[0], args[1])
+	if err != nil {
+		return "", err
+	}
+	if valid {
+		return "valid", nil
+	}
+	return "invalid", nil
 }
 
 // startProgress starts a new progress indicator
