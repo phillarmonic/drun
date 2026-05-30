@@ -425,7 +425,7 @@ echo 'Monorepo build complete!'"
 For commands that require interactive terminal access (like `docker compose exec`):
 
 ```drun
-service "gateway" in "./celesta-gateway":
+service "gateway" in "./gateway":
     compose file "docker-compose.dev.yml"
     build:
         required true
@@ -570,11 +570,11 @@ Commands fail fast if no services are defined or the requested service cannot be
 Need to fan out across several services? Capture the stack definition into a variable and iterate:
 
 ```drun
-let $services be {orchestrate services "celesta-sb-stack"}
+let $services be {orchestrate services "sb-stack"}
 
 for each $service in $services:
     info "Checking {$service}"
-    orchestrate "celesta-sb-stack" status services [$service]
+    orchestrate "stack" status services [$service]
 ```
 
 The `{orchestrate services "…"}` builtin returns an array literal, so it plugs straight into `for each` loops or other list-aware features.
@@ -1389,7 +1389,6 @@ The implementation includes extensive testing:
 
 The system has been validated with real projects:
 
-- **Celesta Project**: Production validation with complex microservices
 - **Docker Compose Integration**: Real Docker Compose file compatibility
 - **Health Check Validation**: Actual HTTP/TCP health check testing
 

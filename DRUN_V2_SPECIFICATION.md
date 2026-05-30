@@ -5908,7 +5908,7 @@ echo 'Build complete for version {$version}'"
 For commands that require interactive terminal access (like `docker compose exec`):
 
 ```drun
-service "gateway" in "./celesta-gateway":
+service "gateway" in "./gateway":
     compose file "docker-compose.dev.yml"
     build:
         required true
@@ -6321,11 +6321,11 @@ The `build` and `recreate` actions accept a `with cache "false"` modifier to dis
 You can retrieve an orchestration's service list in tasks via the builtin expression `{orchestrate services "stack_name"}` which yields an array literal suitable for loops:
 
 ```drun
-let $services be {orchestrate services "celesta-sb-stack"}
+let $services be {orchestrate services "stack"}
 
 for each $service in $services:
     info "Ensuring {$service} is healthy"
-    orchestrate "celesta-sb-stack" health services [$service]
+    orchestrate "stack" health services [$service]
 ```
 
 #### Show Endpoints
@@ -6853,7 +6853,8 @@ Extensive testing implementation:
 **Real-World Validation**
 Production validation with actual projects:
 
-- Celesta project integration and testing
+- POG programming language
+- Eating our own dogfood at Phillarmonic
 - Docker Compose file compatibility validation
 - Health check testing with real services
 
