@@ -9,7 +9,6 @@ Welcome to the drun developer documentation! This guide will help you understand
 1. **Understand the architecture** → Read [ARCHITECTURE.md](./ARCHITECTURE.md)
 2. **Navigate the code** → Read [internal/README.md](./internal/README.md)
 3. **Learn the language** → Read [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
-4. **See what's planned** → Read [ROADMAP.md](./ROADMAP.md)
 
 ---
 
@@ -28,14 +27,8 @@ Welcome to the drun developer documentation! This guide will help you understand
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
 | **[DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)** | Complete language specification | Understanding drun syntax |
-| **[DRUN_LLM_USAGE_MANUAL.md](./DRUN_LLM_USAGE_MANUAL.md)** | How to write drun code | Creating drun files |
 | **[examples/](./examples/)** | 62 working examples | Learning by example |
 
-### Project Planning
-
-| Document | Purpose | When to Read |
-|----------|---------|--------------|
-| **[ROADMAP.md](./ROADMAP.md)** | Feature roadmap | Planning contributions |
 
 ### Package Documentation
 
@@ -68,28 +61,13 @@ graph LR
 3. Pick a package and explore its files
 4. Run examples in [examples/](./examples/)
 
-### I want to add a new feature
-
-```mermaid
-graph LR
-    A[Start] --> B[Check ROADMAP.md]
-    B --> C[Read ARCHITECTURE.md]
-    C --> D[Find extension point]
-    D --> E[Write code]
-    E --> F[Add tests]
-    F --> G[Update docs]
-    
-    style A fill:#e1f5ff
-    style G fill:#e1ffe1
-```
 
 **Steps:**
-1. Check [ROADMAP.md](./ROADMAP.md) - Is it already planned?
-2. Read [ARCHITECTURE.md](./ARCHITECTURE.md) - Where does it fit?
-3. Read [internal/README.md](./internal/README.md) - Find the right package
-4. Follow the "Adding New Actions" guide in [ARCHITECTURE.md](./ARCHITECTURE.md#adding-new-actions)
-5. Add tests in the appropriate `*_test.go` file
-6. Update documentation
+1. Read [ARCHITECTURE.md](./ARCHITECTURE.md) - Where does it fit?
+2. Read [internal/README.md](./internal/README.md) - Find the right package
+3. Follow the "Adding New Actions" guide in [ARCHITECTURE.md](./ARCHITECTURE.md#adding-new-actions)
+4. Add tests in the appropriate `*_test.go` file
+5. Update documentation
 
 ### I want to fix a bug
 
@@ -749,7 +727,6 @@ Create:
 
 #### 7. Update Documentation
 
-- Add to [ROADMAP.md](./ROADMAP.md)
 - Add example to `examples/`
 - Update [ARCHITECTURE.md](./ARCHITECTURE.md) if needed
 
@@ -941,14 +918,12 @@ Check interpolation logic in:
 1. Read [ARCHITECTURE.md](./ARCHITECTURE.md)
 2. Read [internal/README.md](./internal/README.md)
 3. Run the examples: `cd examples && xdrun -l`
-4. Pick a feature from [ROADMAP.md](./ROADMAP.md)
-5. Open a PR!
+4. Open a PR!
 
 ### For Maintainers
 
-1. Review [ROADMAP.md](./ROADMAP.md) for planned features
-2. Continue feature development
-3. Maintain code quality standards
+1. Continue feature development
+2. Maintain code quality standards
 
 ---
 
@@ -962,7 +937,6 @@ Need to understand...                    → Read...
 How the system works                    → ARCHITECTURE.md
 How to navigate the code                → internal/README.md
 The drun language                       → DRUN_V2_SPECIFICATION.md
-What's planned                          → ROADMAP.md
 How to contribute                       → CONTRIBUTING.md
 ```
 
@@ -971,7 +945,6 @@ How to contribute                       → CONTRIBUTING.md
 - [Architecture Overview](./ARCHITECTURE.md)
 - [Package Guide](./internal/README.md)
 - [Language Spec](./DRUN_V2_SPECIFICATION.md)
-- [Roadmap](./ROADMAP.md)
 - [Examples](./examples/)
 
 ---
@@ -979,12 +952,12 @@ How to contribute                       → CONTRIBUTING.md
 ## Summary
 
 **drun is now:**
-- ✅ Well-organized (100+ focused files, modular architecture)
-- ✅ Well-documented (15+ guides with architecture details)
-- ✅ Well-tested (all tests passing, 60 examples verified)
-- ✅ Well-architected (domain-driven, explicit planning, DI)
-- ✅ Well-equipped (debug diagnostics, plan visualization)
-- ✅ Ready for contributions
+- Well-organized (100+ focused files, modular architecture)
+- Well-documented (15+ guides with architecture details)
+- Well-tested (all tests passing, 60 examples verified)
+- Well-architected (domain-driven, explicit planning, DI)
+- Well-equipped (debug diagnostics, plan visualization)
+- Ready for contributions
 
 **Start with:**
 1. [ARCHITECTURE.md](./ARCHITECTURE.md) for the big picture
@@ -996,5 +969,5 @@ Happy coding!
 
 ---
 
-*Last Updated: October 9, 2025*  
-*Version: 2.1.1 - Pure Domain-Driven Architecture*
+*Last Updated: May 30, 2026*  
+*Version: 2.15.0 - Refactor of the whole internal system*

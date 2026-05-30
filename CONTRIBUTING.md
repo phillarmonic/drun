@@ -501,7 +501,6 @@ When adding user-facing features:
 1. Update [README.md](./README.md)
 2. Update [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
 3. Add examples to [examples/](./examples/)
-4. Update [ROADMAP.md](./ROADMAP.md) status
 
 ### Developer Documentation
 

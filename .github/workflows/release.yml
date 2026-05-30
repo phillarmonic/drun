@@ -11,9 +11,7 @@ on:
       - 'docs/**'
       - 'examples/**/*.md'
       - 'LICENSE'
-      - 'ROADMAP.md'
       - 'TEMPLATE_FUNCTIONS.md'
-      - 'spec.md'
 
 # Cancel previous runs when new commits are pushed
 concurrency:

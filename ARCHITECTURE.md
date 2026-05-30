@@ -1074,7 +1074,6 @@ secret delete "key"
 - [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md) - Language specification
 - [internal/domain/README.md](./internal/domain/README.md) - Domain layer documentation
 - [internal/engine/README.md](./internal/engine/README.md) - Engine architecture
-- [ROADMAP.md](./ROADMAP.md) - Feature roadmap
 
 ---
 
