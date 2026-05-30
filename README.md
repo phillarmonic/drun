@@ -1840,13 +1840,13 @@ xdrun --no-drun-cache -f myfile.drun deploy
 **Benefits:**
 
 - **DRY Principle**: Eliminate duplication across tasks
-- ** Maintainable**: Update logic in one place
-- ** Type-Safe**: Full validation on all parameters
-- ** Readable**: Clear, semantic names for reusable components
-- ** Flexible**: Mix and match project parameters, snippets, and templates
+- **Maintainable**: Update logic in one place
+- **Type-Safe**: Full validation on all parameters
+- **Readable**: Clear, semantic names for reusable components
+- **Flexible**: Mix and match project parameters, snippets, and templates
 - **Cross-Project Sharing**: Share workflows across multiple projects with includes
 - **Namespace Safety**: Dot notation prevents naming collisions
-- ** Community Workflows**: Leverage shared workflows from GitHub
+- **Community Workflows**: Leverage shared workflows from GitHub
 
 **See it in action:**
 
