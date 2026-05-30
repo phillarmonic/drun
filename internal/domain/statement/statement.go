@@ -247,6 +247,8 @@ type Detection struct {
 	Alternatives  []string
 	Condition     string
 	Value         string
+	VersionOp     string
+	VersionValue  string
 	CaptureVar    string
 	Body          []Statement
 	ElseBody      []Statement

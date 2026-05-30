@@ -222,6 +222,8 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Alternatives:  s.Alternatives,
 			Condition:     s.Condition,
 			Value:         s.Value,
+			VersionOp:     s.VersionOp,
+			VersionValue:  s.VersionValue,
 			CaptureVar:    s.CaptureVar,
 			Body:          body,
 			ElseBody:      elseBody,

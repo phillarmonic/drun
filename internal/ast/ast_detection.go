@@ -14,6 +14,8 @@ type DetectionStatement struct {
 	Alternatives []string
 	Condition    string
 	Value        string
+	VersionOp    string
+	VersionValue string
 	CaptureVar   string
 	Body         []Statement
 	ElseBody     []Statement
@@ -46,6 +48,9 @@ func (ds *DetectionStatement) String() string {
 			out.WriteString("if " + strings.Join(tools, ",") + " is available")
 		} else {
 			out.WriteString("if " + ds.Target + " is available")
+		}
+		if ds.VersionOp != "" {
+			out.WriteString(" and version " + ds.VersionOp + " " + ds.VersionValue)
 		}
 	case "when_environment":
 		out.WriteString("when in " + ds.Target + " environment")

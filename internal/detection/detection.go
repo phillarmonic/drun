@@ -112,6 +112,8 @@ func (d *Detector) GetToolVersion(tool string) string {
 		}
 	case "go", "golang":
 		version = d.getCommandVersion("go", "version", `go version go(\d+\.\d+\.\d+)`)
+	case "golangci-lint":
+		version = d.getCommandVersion("golangci-lint", "version", `version (\d+\.\d+(?:\.\d+)?)`)
 	case "java":
 		version = d.getCommandVersion("java", "-version", `version "(\d+\.\d+\.\d+)`)
 	case "ruby":
@@ -126,6 +128,8 @@ func (d *Detector) GetToolVersion(tool string) string {
 		version = d.getCommandVersion("helm", "version", `Version:"v(\d+\.\d+\.\d+)"`)
 	case "terraform":
 		version = d.getCommandVersion("terraform", "version", `Terraform v(\d+\.\d+\.\d+)`)
+	default:
+		version = d.getGenericToolVersion(tool)
 	}
 
 	d.cache[cacheKey] = version
@@ -294,6 +298,22 @@ func (d *Detector) getCommandVersionWithArgs(command string, args []string, patt
 		return matches[1]
 	}
 	return ""
+}
+
+func (d *Detector) getGenericToolVersion(tool string) string {
+	parts := strings.Fields(tool)
+	if len(parts) == 0 {
+		return ""
+	}
+
+	command := parts[0]
+
+	version := d.getCommandVersionWithArgs(command, append(parts[1:], "version"), `v?(\d+\.\d+(?:\.\d+)*)`)
+	if version != "" {
+		return version
+	}
+
+	return d.getCommandVersionWithArgs(command, append(parts[1:], "--version"), `v?(\d+\.\d+(?:\.\d+)*)`)
 }
 
 func (d *Detector) isCIEnvironment() bool {

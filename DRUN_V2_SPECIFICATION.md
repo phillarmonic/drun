@@ -1514,6 +1514,12 @@ else:
 if docker,"docker-compose",kubectl are not available:
   error "One or more required tools are missing"
 
+# Availability can be chained with a version check
+if "golangci-lint" is available and version >= "2.12":
+  info "golangci-lint is installed and new enough"
+else:
+  fail "golangci-lint >= 2.12 is required"
+
 # File/directory detection
 if file "package.json" exists:
   install npm dependencies

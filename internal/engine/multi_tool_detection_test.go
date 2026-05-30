@@ -76,6 +76,18 @@ task "test":
 			expectInOutput: "At least one tool is missing",
 			expectError:    false,
 		},
+		{
+			name: "quoted tool available with version constraint",
+			script: `version: 2.0
+
+task "test":
+  if "go" is available and version >= "1.0":
+    info "Go is available and version is sufficient"
+  else:
+    error "Should not reach here"`,
+			expectInOutput: "Go is available and version is sufficient",
+			expectError:    false,
+		},
 	}
 
 	for _, tt := range tests {

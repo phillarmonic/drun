@@ -714,6 +714,10 @@ task "setup-docker-tools" means "Setup Docker toolchain with DRY detection":
   # Detect which Docker Buildx variant is available and capture it
   detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 
+  # Version-gated tool checks also work with quoted tool names
+  if "golangci-lint" is available and version >= "2.12":
+    info "golangci-lint is ready"
+
   info " Detected tools:"
   info "   Compose: {$compose_cmd}"
   info "  🔨 Buildx: {$buildx_cmd}"

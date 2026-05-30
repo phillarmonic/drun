@@ -91,6 +91,13 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 		}
 	}
 
+	if conditionMet && stmt.VersionOp != "" {
+		currentVersion := detector.GetToolVersion(stmt.Target)
+		targetVersion := e.interpolateVariables(stmt.VersionValue, ctx)
+		conditionMet = currentVersion != "" && detector.CompareVersion(currentVersion, stmt.VersionOp, targetVersion)
+		conditionText = fmt.Sprintf("%s and %s version %s %s", conditionText, stmt.Target, stmt.VersionOp, targetVersion)
+	}
+
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would check if %s: %t\n", conditionText, conditionMet)
 		if conditionMet {
