@@ -117,7 +117,7 @@ jobs:
     - name: Install UPX (Linux/Windows)
       if: matrix.runner == 'ubuntu-latest'
       run: |
-        UPX_VERSION=5.0.2
+        UPX_VERSION=5.1.1
         echo "Installing UPX version $UPX_VERSION"
         
         # Download UPX for Linux
