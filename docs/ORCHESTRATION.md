@@ -6,18 +6,18 @@ Drun provides a comprehensive microservices orchestration system that manages th
 
 ## Features at a Glance
 
-- ✅ **Service Declarations**: Define services with paths, dependencies, and health checks
-- ✅ **Orchestration Groups**: Group services with lifecycle management strategies
-- ✅ **BuildKit-Style Progress**: Real-time visual feedback during operations
-- ✅ **Health Monitoring**: HTTP, TCP, Docker, DNS, and custom health checks
-- ✅ **Dependency Resolution**: Topological sort ensures correct startup/shutdown order
-- ✅ **Smart Circuit Breaker**: Only stops dependent services on failure (not all services)
-- ✅ **Docker Compose Integration**: Direct `docker compose` command execution
-- ✅ **Automatic Building**: Build containers before starting with real-time output
-- ✅ **PWD Environment**: Correct working directory for Docker Compose files
-- ✅ **Graceful Shutdown**: Services stopped in reverse dependency order
-- ✅ **Error Handling**: Detailed error messages with rollback support
-- ✅ **BuildKit Output Streaming**: Real-time Docker build progress visibility
+- **Service Declarations**: Define services with paths, dependencies, and health checks
+- **Orchestration Groups**: Group services with lifecycle management strategies
+- **BuildKit-Style Progress**: Real-time visual feedback during operations
+- **Health Monitoring**: HTTP, TCP, Docker, DNS, and custom health checks
+- **Dependency Resolution**: Topological sort ensures correct startup/shutdown order
+- **Smart Circuit Breaker**: Only stops dependent services on failure (not all services)
+- **Docker Compose Integration**: Direct `docker compose` command execution
+- **Automatic Building**: Build containers before starting with real-time output
+- **PWD Environment**: Correct working directory for Docker Compose files
+- **Graceful Shutdown**: Services stopped in reverse dependency order
+- **Error Handling**: Detailed error messages with rollback support
+- **BuildKit Output Streaming**: Real-time Docker build progress visibility
 
 ## Quick Start
 
@@ -115,18 +115,18 @@ drun down
 ### Difference Between `start` and `up`
 
 #### `orchestrate "stack" start`
-- ✅ Checks if services are healthy
-- ✅ Checks for repository updates (but doesn't force update)
-- ✅ Only rebuilds if `build: required true` is set
-- ✅ Skips services that are already running with no updates
+- Checks if services are healthy
+- Checks for repository updates (but doesn't force update)
+- Only rebuilds if `build: required true` is set
+- Skips services that are already running with no updates
 - 🎯 **Use for**: Quick starts when nothing has changed
 
 #### `orchestrate "stack" up`
-- ✅ Updates all repositories on default branches (main/master)
-- ✅ Forces rebuild of all services (even without `build: required`)
-- ✅ Recreates containers with latest code
-- ✅ Never skips services
-- 🎯 **Use for**: Development workflow, pulling latest changes, ensuring fresh build
+- Updates all repositories on default branches (main/master)
+- Forces rebuild of all services (even without `build: required`)
+- Recreates containers with latest code
+- Never skips services
+- **Use for**: Development workflow, pulling latest changes, ensuring fresh build
 
 ## Service Declaration
 
@@ -458,13 +458,13 @@ When `required` is `true`, the engine honours the full configuration:
 - **fallback_command**: Command to run if make fails
 
 **Key Features:**
-- ✅ **Multiline Support**: Write complex multi-step commands naturally
-- ✅ **Line Continuation**: Use `\` to join long single commands  
-- ✅ **Variable Interpolation**: Use `{$var}` syntax in build commands
-- ✅ **Escaped Quotes**: Use `\"` for quotes within commands
-- ✅ **TTY Allocation**: Enable for commands requiring terminal access
-- ✅ **Make Integration**: Alternative Makefile-based builds with fallback
-- ✅ **Retry Logic**: Automatic retries with configurable delays
+- **Multiline Support**: Write complex multi-step commands naturally
+- **Line Continuation**: Use `\` to join long single commands  
+- **Variable Interpolation**: Use `{$var}` syntax in build commands
+- **Escaped Quotes**: Use `\"` for quotes within commands
+- **TTY Allocation**: Enable for commands requiring terminal access
+- **Make Integration**: Alternative Makefile-based builds with fallback
+- **Retry Logic**: Automatic retries with configurable delays
 
 ## Environment File Management
 
@@ -1171,11 +1171,6 @@ Orchestration Engine
 
 Planned features for future releases:
 
-- [ ] **Pre/Post Tasks**: Run tasks before/after service lifecycle events
-- [ ] **Environment File Management**: Automatic .env file setup
-- [ ] **Makefile Integration**: Execute Makefiles during build
-- [ ] **Repository Management**: Auto-clone Git repositories
-- [ ] **Service Discovery**: DNS and service mesh integration
 - [ ] **Monitoring Integration**: Metrics collection and reporting
 - [ ] **Rollback Support**: Automatic rollback on deployment failure
 - [ ] **Blue/Green Deployments**: Zero-downtime deployments
