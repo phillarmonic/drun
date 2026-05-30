@@ -1472,13 +1472,13 @@ Backups are automatically created during updates and stored in user-writable loc
 
 ```bash
 # List and clean up old backups (interactive)
-drun cleanup-backups
+xdrun cleanup-backups
 
 # Keep only the 3 most recent backups
-drun cleanup-backups --keep=3
+xdrun cleanup-backups --keep=3
 
 # Remove all backup files
-drun cleanup-backups --all
+xdrun cleanup-backups --all
 ```
 
 The cleanup command provides:
