@@ -3145,7 +3145,7 @@ drun v2 supports both single-line and multiline shell command execution with con
 ```
 # Execute and stream output
 run "echo 'Hello World'"
-run "go run ./cmd/pog" attached
+run "command" attached
 exec "date +%Y-%m-%d"
 shell "pwd"
 
@@ -3204,7 +3204,7 @@ run "echo hello"  # Executes: /bin/sh -c "echo hello"
 
 **Attached single-line `run` commands**: Stay connected to the current terminal for interactive programs
 ```
-run "go run ./cmd/pog" attached
+run "command" attached
 run in service $servicename "npm run dev" attached
 ```
 

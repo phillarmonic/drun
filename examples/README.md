@@ -262,7 +262,7 @@ depends on lint, test, scan        # Parallel dependencies
 let name be "value"                 # Immutable binding
 set counter to 0                    # Mutable variable
 capture from shell "command" as $variable       # Capture command output
-run "go run ./cmd/pog" attached     # Keep stdin attached for REPL-like commands
+run "command" attached     # Keep stdin attached for REPL-like commands
 
 # Conditional assignment
 let config be:

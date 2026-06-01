@@ -85,7 +85,7 @@ Use `attached` when a `run` command must stay connected to your terminal, such a
 
 ```drun
 task "repl":
-  run "go run ./cmd/pog" attached
+  run "go run command" attached
 ```
 
 Plain `run "command"` remains non-interactive and is still the default for ordinary automation steps.
