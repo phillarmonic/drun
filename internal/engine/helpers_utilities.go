@@ -218,8 +218,9 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 
 	// Configure shell options based on the action type and platform configuration
 	opts := e.getPlatformShellConfig(ctx)
-	opts.CaptureOutput = true
-	opts.StreamOutput = shellStmt.StreamOutput
+	opts.Attached = shellStmt.Attached
+	opts.CaptureOutput = !shellStmt.Attached
+	opts.StreamOutput = shellStmt.StreamOutput || shellStmt.Attached
 	opts.Output = e.output
 	if svcCtx != nil {
 		opts.WorkingDir = svcCtx.Path
@@ -232,9 +233,9 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 		switch shellStmt.Action {
 		case "run":
 			if svcCtx != nil {
-				_, _ = fmt.Fprintf(e.output, "🏃 Running in service '%s': %s\n", svcCtx.Name, interpolatedCommand)
+				_, _ = fmt.Fprintf(e.output, "🏃 Running in service '%s'%s: %s\n", svcCtx.Name, attachedLabel(shellStmt.Attached), interpolatedCommand)
 			} else {
-				_, _ = fmt.Fprintf(e.output, "🏃 Running: %s\n", interpolatedCommand)
+				_, _ = fmt.Fprintf(e.output, "🏃 Running%s: %s\n", attachedLabel(shellStmt.Attached), interpolatedCommand)
 			}
 		case "exec":
 			_, _ = fmt.Fprintf(e.output, "⚡ Executing: %s\n", interpolatedCommand)
@@ -270,4 +271,11 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 	}
 
 	return nil
+}
+
+func attachedLabel(attached bool) string {
+	if attached {
+		return " attached"
+	}
+	return ""
 }

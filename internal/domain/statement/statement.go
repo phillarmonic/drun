@@ -51,6 +51,7 @@ type Shell struct {
 	Command              string
 	Commands             []string
 	CaptureVar           string
+	Attached             bool
 	StreamOutput         bool
 	IsMultiline          bool
 	ServiceScoped        bool

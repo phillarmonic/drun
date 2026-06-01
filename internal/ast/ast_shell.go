@@ -13,6 +13,7 @@ type ShellStatement struct {
 	Command              string
 	Commands             []string
 	CaptureVar           string
+	Attached             bool
 	StreamOutput         bool
 	IsMultiline          bool
 	ServiceScoped        bool
@@ -55,6 +56,9 @@ func (ss *ShellStatement) String() string {
 
 	if ss.CaptureVar != "" {
 		return fmt.Sprintf("%s \"%s\" as %s", prefix, ss.Command, ss.CaptureVar)
+	}
+	if ss.Attached {
+		return fmt.Sprintf("%s \"%s\" attached", prefix, ss.Command)
 	}
 	return fmt.Sprintf("%s \"%s\"", prefix, ss.Command)
 }

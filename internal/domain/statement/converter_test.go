@@ -43,6 +43,7 @@ func TestFromAST_Shell(t *testing.T) {
 		Action:     "run",
 		Command:    "echo hello",
 		CaptureVar: "output",
+		Attached:   true,
 	}
 
 	domainStmt, err := FromAST(astShell)
@@ -63,6 +64,9 @@ func TestFromAST_Shell(t *testing.T) {
 	}
 	if shell.CaptureVar != "output" {
 		t.Errorf("CaptureVar = %v, want output", shell.CaptureVar)
+	}
+	if !shell.Attached {
+		t.Error("Attached should be true")
 	}
 }
 
