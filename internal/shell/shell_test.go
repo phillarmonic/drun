@@ -2,6 +2,7 @@ package shell
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"runtime"
 	"strings"
@@ -246,6 +247,38 @@ func TestDefaultOptions(t *testing.T) {
 
 	if opts.StreamOutput {
 		t.Errorf("Expected StreamOutput to be false by default")
+	}
+
+	if opts.Attached {
+		t.Errorf("Expected Attached to be false by default")
+	}
+}
+
+func TestBuildCommand_AttachedUsesTTYOnUnix(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Attached = true
+
+	cmd := buildCommand(context.Background(), "echo test", opts)
+
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		if !strings.HasSuffix(cmd.Path, "/script") && cmd.Path != "script" {
+			t.Fatalf("Expected attached mode to use script, got %q", cmd.Path)
+		}
+		return
+	}
+
+	if cmd.Path != opts.Shell {
+		t.Fatalf("Expected fallback shell %q, got %q", opts.Shell, cmd.Path)
+	}
+}
+
+func TestBuildCommand_DefaultUsesShell(t *testing.T) {
+	opts := DefaultOptions()
+
+	cmd := buildCommand(context.Background(), "echo test", opts)
+
+	if cmd.Path != opts.Shell {
+		t.Fatalf("Expected shell %q, got %q", opts.Shell, cmd.Path)
 	}
 }
 

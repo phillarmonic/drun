@@ -88,7 +88,7 @@ Action statements and task calls:
 
 #### `parser_shell.go` - 175 lines
 Shell command execution:
-- **Shell statements** (`run "command"`)
+- **Shell statements** (`run "command"`, `run "command" attached`)
 - **Multiline shell commands**
 - **Command capture** (`capture $var from command`)
 
@@ -195,4 +195,3 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 - Consider extracting common patterns into shared helpers
 - Add inline documentation for complex parsing logic
 - Create parser benchmarks for performance testing
-

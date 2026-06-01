@@ -34,6 +34,7 @@ type Options struct {
 	Output        io.Writer         // Where to stream output (if StreamOutput is true)
 	Shell         string            // Shell to use (default: /bin/sh)
 	IgnoreErrors  bool              // Whether to ignore non-zero exit codes
+	Attached      bool              // Whether to keep stdin attached and allocate a TTY when possible
 }
 
 // DefaultOptions returns sensible default options
@@ -58,6 +59,7 @@ func DefaultOptions() *Options {
 		Output:        os.Stdout,
 		Shell:         defaultShell,
 		IgnoreErrors:  false,
+		Attached:      false,
 	}
 }
 
@@ -81,11 +83,15 @@ func Execute(command string, opts *Options) (*Result, error) {
 	}
 
 	// Create the command
-	cmd := exec.CommandContext(ctx, opts.Shell, "-c", command)
+	cmd := buildCommand(ctx, command, opts)
 
 	// Explicitly set stdin to nil to prevent commands from hanging waiting for input
-	// This is important for non-interactive command execution
-	cmd.Stdin = nil
+	// This is important for non-interactive command execution.
+	if opts.Attached {
+		cmd.Stdin = os.Stdin
+	} else {
+		cmd.Stdin = nil
+	}
 
 	// Set working directory
 	if opts.WorkingDir != "" {
@@ -196,6 +202,25 @@ func Execute(command string, opts *Options) (*Result, error) {
 	}
 
 	return result, nil
+}
+
+func buildCommand(ctx context.Context, command string, opts *Options) *exec.Cmd {
+	if opts.Attached {
+		return createTTYCommand(ctx, command, opts.Shell)
+	}
+
+	return exec.CommandContext(ctx, opts.Shell, "-c", command)
+}
+
+func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.CommandContext(ctx, "script", "-q", "/dev/null", shellPath, "-c", command)
+	case "linux":
+		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", fmt.Sprintf("%s -c %q", shellPath, command), "/dev/null")
+	default:
+		return exec.CommandContext(ctx, shellPath, "-c", command)
+	}
 }
 
 // ExecuteSimple runs a command with default options and returns just the output

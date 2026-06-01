@@ -102,12 +102,14 @@ func TestParser_ShellStatementTypes(t *testing.T) {
 		expectedAction string
 		expectedCmd    string
 		expectedVar    string
+		attached       bool
 		streamOutput   bool
 	}{
-		{`run "echo hello"`, "run", "echo hello", "", true},
-		{`exec "date"`, "exec", "date", "", true},
-		{`shell "pwd"`, "shell", "pwd", "", true},
-		{`capture from shell "whoami" as $user`, "capture", "whoami", "user", false},
+		{`run "echo hello"`, "run", "echo hello", "", false, true},
+		{`run "echo hello" attached`, "run", "echo hello", "", true, true},
+		{`exec "date"`, "exec", "date", "", false, true},
+		{`shell "pwd"`, "shell", "pwd", "", false, true},
+		{`capture from shell "whoami" as $user`, "capture", "whoami", "user", false, false},
 	}
 
 	for _, test := range tests {
@@ -170,6 +172,9 @@ task "test":
 			if shellStmt.StreamOutput != test.streamOutput {
 				t.Errorf("Expected stream output %v, got %v", test.streamOutput, shellStmt.StreamOutput)
 			}
+			if shellStmt.Attached != test.attached {
+				t.Errorf("Expected attached %v, got %v", test.attached, shellStmt.Attached)
+			}
 		}
 	}
 }
@@ -214,6 +219,9 @@ task "svc":
 	if !shellStmt.ServiceNameIsLiteral {
 		t.Errorf("expected literal service name")
 	}
+	if shellStmt.Attached {
+		t.Errorf("expected non-attached run statement")
+	}
 }
 
 func TestParser_RunInServiceWithVariable(t *testing.T) {
@@ -247,5 +255,47 @@ task "svc":
 
 	if shellStmt.ServiceNameIsLiteral {
 		t.Errorf("expected non-literal service name")
+	}
+}
+
+func TestParser_RunInServiceAttached(t *testing.T) {
+	input := `version: 2.0
+
+task "svc":
+  run in service "api" "npm run dev" attached
+`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		t.Fatalf("Parser errors: %v", p.Errors())
+	}
+
+	task := program.Tasks[0]
+	shellStmt, ok := task.Body[0].(*ast.ShellStatement)
+	if !ok {
+		t.Fatalf("expected ShellStatement, got %T", task.Body[0])
+	}
+
+	if !shellStmt.Attached {
+		t.Fatalf("expected attached run statement")
+	}
+}
+
+func TestParser_AttachedRejectedForExec(t *testing.T) {
+	input := `version: 2.0
+
+task "svc":
+  exec "date" attached
+`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	_ = p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Fatalf("expected parser error for exec attached")
 	}
 }

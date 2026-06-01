@@ -3145,6 +3145,7 @@ drun v2 supports both single-line and multiline shell command execution with con
 ```
 # Execute and stream output
 run "echo 'Hello World'"
+run "go run ./cmd/pog" attached
 exec "date +%Y-%m-%d"
 shell "pwd"
 
@@ -3201,6 +3202,14 @@ exec:
 run "echo hello"  # Executes: /bin/sh -c "echo hello"
 ```
 
+**Attached single-line `run` commands**: Stay connected to the current terminal for interactive programs
+```
+run "go run ./cmd/pog" attached
+run in service $servicename "npm run dev" attached
+```
+
+Use `attached` only with single-line `run` statements when the command needs stdin or terminal behavior. Plain `run` remains non-interactive by default.
+
 **Multiline commands**: Execute as a single shell session
 ```
 run:
@@ -3218,6 +3227,7 @@ When services are declared in the program, shell commands can target a service's
 task "inspect-service" given $servicename defaults to "some-service":
     run in service $servicename "ls -a"
     run in service $servicename "cat Dockerfile"
+    run in service $servicename "npm run dev" attached
 ```
 
 The runtime resolves the service name (from literals, task parameters, or captured variables), validates that the service exists, and executes the command inside the service directory. If no services are defined, or the service name cannot be resolved, execution fails fast with an explanatory error.

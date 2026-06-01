@@ -23,6 +23,7 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Command:              s.Command,
 			Commands:             s.Commands,
 			CaptureVar:           s.CaptureVar,
+			Attached:             s.Attached,
 			StreamOutput:         s.StreamOutput,
 			IsMultiline:          s.IsMultiline,
 			ServiceScoped:        s.ServiceScoped,

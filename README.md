@@ -75,8 +75,20 @@ xdrun deploy environment=production version=v1.2.3
 - `key=value` task parameters with CLI flags kept separate.
 - Built-in validation, defaults, and control flow.
 - Dry-run support for inspecting execution.
+- Optional `run ... attached` mode for REPL-style commands that need stdin and a terminal.
 - Reusable task files and examples for common workflows.
 - Orchestration support for multi-service projects.
+
+## Interactive Commands
+
+Use `attached` when a `run` command must stay connected to your terminal, such as REPLs or tools that prompt for input:
+
+```drun
+task "repl":
+  run "go run ./cmd/pog" attached
+```
+
+Plain `run "command"` remains non-interactive and is still the default for ordinary automation steps.
 
 ## Learn More
 

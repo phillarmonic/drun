@@ -60,6 +60,14 @@ func (p *Parser) parseShellStatement() *ast.ShellStatement {
 	p.nextToken() // consume STRING
 
 	stmt.Command = p.curToken.Literal
+	if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "attached" {
+		if stmt.Action != "run" {
+			p.addError("attached modifier is only supported for run statements")
+			return nil
+		}
+		p.nextToken() // consume attached
+		stmt.Attached = true
+	}
 
 	// Set streaming behavior based on action type
 	switch stmt.Action {
