@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -267,7 +268,7 @@ func TestBuildCommand_AttachedUsesTTYOnUnix(t *testing.T) {
 		return
 	}
 
-	if cmd.Path != opts.Shell {
+	if filepath.Base(cmd.Path) != filepath.Base(opts.Shell) {
 		t.Fatalf("Expected fallback shell %q, got %q", opts.Shell, cmd.Path)
 	}
 }
@@ -277,7 +278,7 @@ func TestBuildCommand_DefaultUsesShell(t *testing.T) {
 
 	cmd := buildCommand(context.Background(), "echo test", opts)
 
-	if cmd.Path != opts.Shell {
+	if filepath.Base(cmd.Path) != filepath.Base(opts.Shell) {
 		t.Fatalf("Expected shell %q, got %q", opts.Shell, cmd.Path)
 	}
 }
