@@ -4448,7 +4448,7 @@ task "deploy":
 
 ### Tool Detection
 
-#### Tool Requirements (requires tools:) ⭐ *New*
+#### Tool Requirements (requires tools:) *New*
 
 The most robust way to ensure required dependencies are available is using the declarative `requires tools:` block. This can be used at the project level (checked before any tasks run) or at the task level (checked before the task runs).
 
