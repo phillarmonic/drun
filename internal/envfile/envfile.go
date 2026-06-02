@@ -66,6 +66,7 @@ func (m *Manager) Ensure(ctx context.Context, config *orchestration.EnvFileConfi
 func (m *Manager) Read(filePath string) (map[string]string, error) {
 	fullPath := filepath.Join(m.workDir, filePath)
 
+	// #nosec G304 -- env files are intentionally resolved relative to the configured workDir.
 	file, err := os.Open(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open env file: %w", err)
@@ -113,10 +114,11 @@ func (m *Manager) Write(filePath string, env map[string]string) error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
+	// #nosec G304 -- env files are intentionally created relative to the configured workDir.
 	file, err := os.Create(fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to create env file: %w", err)
@@ -191,6 +193,7 @@ func (m *Manager) Contains(filePath, varName string) (bool, error) {
 
 // CopyFile copies a file from source to destination
 func (m *Manager) CopyFile(source, destination string) error {
+	// #nosec G304 -- source is selected by the caller for explicit env-file management.
 	srcFile, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
@@ -199,6 +202,7 @@ func (m *Manager) CopyFile(source, destination string) error {
 		_ = srcFile.Close()
 	}()
 
+	// #nosec G304 -- destination is selected by the caller for explicit env-file management.
 	dstFile, err := os.Create(destination)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
@@ -285,6 +289,7 @@ func (m *Manager) Interpolate(filePath string, variables map[string]string) erro
 	fullPath := filepath.Join(m.workDir, filePath)
 
 	// Read file content
+	// #nosec G304 -- env files are intentionally resolved relative to the configured workDir.
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to read env file: %w", err)
@@ -302,7 +307,9 @@ func (m *Manager) Interpolate(filePath string, variables map[string]string) erro
 	}
 
 	// Write interpolated content
-	if err := os.WriteFile(fullPath, []byte(result), 0644); err != nil {
+	cleanPath := filepath.Clean(fullPath)
+	// #nosec G703 -- env files are intentionally written under the configured workDir.
+	if err := os.WriteFile(cleanPath, []byte(result), 0600); err != nil {
 		return fmt.Errorf("failed to write interpolated file: %w", err)
 	}
 

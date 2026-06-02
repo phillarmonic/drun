@@ -125,6 +125,7 @@ project_setting = "set" identifier "to" expression
                 | "include" string_literal
                 | "before" "any" "task" ":" statement_block
                 | "after" "any" "task" ":" statement_block
+                | "requires" "tools" ":" { tool_requirement }
                 | shell_config ;
 
 (* Task definition *)
@@ -138,11 +139,14 @@ task_property = parameter_declaration
               | variable_declaration ;
 
 (* Parameters *)
-parameter_declaration = "requires" parameter_spec
+parameter_declaration = "requires" "tools" ":" { tool_requirement }
+                      | "requires" parameter_spec
                       | "given" parameter_spec
                       | "accepts" parameter_spec ;
 
 parameter_spec = identifier [ parameter_constraint ] [ parameter_default ] ;
+
+tool_requirement = tool_name { comparison_operator ( string_literal | number ) } ;
 
 parameter_constraint = "from" array_literal
                      | "matching" "pattern" string_literal
@@ -4444,7 +4448,35 @@ task "deploy":
 
 ### Tool Detection
 
-The language automatically detects available tools and uses appropriate commands:
+#### Tool Requirements (requires tools:) ⭐ *New*
+
+The most robust way to ensure required dependencies are available is using the declarative `requires tools:` block. This can be used at the project level (checked before any tasks run) or at the task level (checked before the task runs).
+
+```drun
+# Project-level tool requirements
+project "myapp":
+  requires tools:
+    go >= "1.21"
+    golangci-lint >= "1.50" <= "1.55"
+    docker
+
+# Task-level tool requirements
+task "security":
+  requires tools:
+    gosec >= "2.27"
+  info "Running gosec"
+  run "gosec ./..."
+```
+
+**Key Features:**
+- **Fail-Fast**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error.
+- **Multiple Bounds**: Supports chaining comparison operators (`>=`, `<=`, `>`, `<`) on the same line to define a range.
+- **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the tool must be installed, without version checking.
+- **Unquoted Versions**: Supports both quoted (`"1.21"`) and unquoted (`1.21`) version numbers.
+
+#### Dynamic Detection
+
+The language also automatically detects available tools and uses appropriate commands when you prefer not to use strict requirements:
 
 ```
 # Automatically uses "docker compose" or "docker-compose"

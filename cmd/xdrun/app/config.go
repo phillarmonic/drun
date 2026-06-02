@@ -89,6 +89,7 @@ func getWorkspaceDefaultFile() string {
 	}
 
 	// Read and parse workspace configuration
+	// #nosec G304 -- workspace config is intentionally loaded from a fixed repository path.
 	data, err := os.ReadFile(workspaceConfigPath)
 	if err != nil {
 		return ""
@@ -112,7 +113,7 @@ func saveWorkspaceConfig(config WorkspaceConfig) error {
 	workspaceConfigPath := ".drun/.drun_workspace.yml"
 
 	// Create .drun directory if it doesn't exist
-	if err := os.MkdirAll(".drun", 0755); err != nil {
+	if err := os.MkdirAll(".drun", 0750); err != nil {
 		return fmt.Errorf("failed to create .drun directory: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func InitializeConfig(filename string, saveAsDefault bool) error {
 	if targetDir != "." && targetDir != "" {
 		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 			// Create the directory
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
+			if err := os.MkdirAll(targetDir, 0750); err != nil {
 				return fmt.Errorf("failed to create directory '%s': %w", targetDir, err)
 			}
 			fmt.Printf("📁 Created directory: %s\n", targetDir)

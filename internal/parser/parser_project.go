@@ -103,6 +103,24 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
+			case lexer.REQUIRES:
+				// Check for "requires tools:" block
+				if p.peekToken.Type == lexer.TOOLS {
+					requiresTools := p.parseRequiresToolsStatement()
+					if requiresTools != nil {
+						stmt.Settings = append(stmt.Settings, requiresTools)
+					} else {
+						// If parsing failed, advance to avoid infinite loop
+						p.nextToken()
+					}
+					// Advance past DEDENT for project parser to continue
+					if p.curToken.Type == lexer.DEDENT {
+						p.nextToken()
+					}
+				} else {
+					p.addError(fmt.Sprintf("unexpected 'requires' in project body (did you mean 'requires tools:'?), got requires %s", p.peekToken.Type))
+					p.nextToken()
+				}
 			case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 				p.nextToken() // Skip comments
 			case lexer.NEWLINE:

@@ -125,6 +125,7 @@ func (m *MemoryMonitor) dumpDiagnostics(mem runtime.MemStats) {
 
 	// Create dump file
 	filename := fmt.Sprintf("drun-crash-dump-%s.json", time.Now().Format("20060102-150405"))
+	// #nosec G304 -- crash dumps intentionally write to timestamped files in the current working directory.
 	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create dump file: %v\n", err)
@@ -142,6 +143,7 @@ func (m *MemoryMonitor) dumpDiagnostics(mem runtime.MemStats) {
 
 	// Also create a simple text summary
 	summaryFile := fmt.Sprintf("drun-crash-summary-%s.txt", time.Now().Format("20060102-150405"))
+	// #nosec G304 -- crash summaries intentionally write to timestamped files in the current working directory.
 	f, err := os.Create(summaryFile)
 	if err == nil {
 		defer func() { _ = f.Close() }()

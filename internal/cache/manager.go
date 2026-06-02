@@ -47,7 +47,7 @@ func NewManager(expiration time.Duration, disabled bool) (*Manager, error) {
 
 	// Create ~/.drun directory
 	drunDir := filepath.Join(homeDir, ".drun")
-	if err := os.MkdirAll(drunDir, 0755); err != nil {
+	if err := os.MkdirAll(drunDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create .drun directory: %w", err)
 	}
 

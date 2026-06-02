@@ -211,7 +211,7 @@ func (p *Parser) isKeywordToken(tokenType lexer.TokenType) bool {
 		lexer.RUN, lexer.EXEC, lexer.SHELL, lexer.CAPTURE,
 		lexer.CREATE, lexer.COPY, lexer.MOVE, lexer.DELETE, lexer.READ, lexer.WRITE, lexer.APPEND, lexer.BACKUP, lexer.CHECK,
 		lexer.DOCKER, lexer.GIT, lexer.HTTP, lexer.HTTPS, lexer.GET, lexer.POST, lexer.PUT, lexer.PATCH, lexer.HEAD, lexer.OPTIONS,
-		lexer.DETECT, lexer.GIVEN, lexer.REQUIRES, lexer.DEFAULTS, lexer.BREAK, lexer.CONTINUE,
+		lexer.DETECT, lexer.GIVEN, lexer.REQUIRES, lexer.DEFAULTS, lexer.BREAK, lexer.CONTINUE, lexer.TOOLS,
 		lexer.USE, lexer.SNIPPET, lexer.TEMPLATE, lexer.PARAMETER, lexer.MIXIN, lexer.USES, lexer.INCLUDES:
 		// Structural keywords, action keywords, and statement-starting keywords
 		return false

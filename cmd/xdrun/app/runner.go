@@ -36,6 +36,7 @@ func ExecuteTask(
 	}
 
 	// Read the drun file
+	// #nosec G304 -- task execution intentionally reads the discovered drun task file.
 	content, err := os.ReadFile(actualConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read drun file '%s': %w", actualConfigFile, err)

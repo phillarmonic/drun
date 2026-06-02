@@ -209,16 +209,20 @@ func buildCommand(ctx context.Context, command string, opts *Options) *exec.Cmd 
 		return createTTYCommand(ctx, command, opts.Shell)
 	}
 
+	// #nosec G204 -- task execution intentionally invokes the configured shell with a user-authored command.
 	return exec.CommandContext(ctx, opts.Shell, "-c", command)
 }
 
 func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd {
 	switch runtime.GOOS {
 	case "darwin":
+		// #nosec G204 -- interactive task execution intentionally invokes the selected shell command in a TTY.
 		return exec.CommandContext(ctx, "script", "-q", "/dev/null", shellPath, "-c", command)
 	case "linux":
+		// #nosec G204 -- interactive task execution intentionally invokes the selected shell command in a TTY.
 		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", fmt.Sprintf("%s -c %q", shellPath, command), "/dev/null")
 	default:
+		// #nosec G204 -- interactive task execution intentionally invokes the selected shell command in a TTY.
 		return exec.CommandContext(ctx, shellPath, "-c", command)
 	}
 }

@@ -143,6 +143,7 @@ func (l *Loader) loadFile(filepath string, envMap map[string]string) EnvFileInfo
 	info.Exists = true
 
 	// Open and read the file
+	// #nosec G304 -- environment loading intentionally opens the discovered env file path.
 	file, err := os.Open(filepath)
 	if err != nil {
 		info.Error = err

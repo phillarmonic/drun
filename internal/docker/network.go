@@ -18,6 +18,7 @@ func NewNetworkManager() *NetworkManager {
 
 // CheckNetworkExists checks if a Docker network exists
 func (nm *NetworkManager) CheckNetworkExists(ctx context.Context, networkName string) (bool, error) {
+	// #nosec G204 -- docker network inspection intentionally uses the requested network name.
 	cmd := exec.CommandContext(ctx, "docker", "network", "ls", "--format", "{{.Name}}", "--filter", fmt.Sprintf("name=^%s$", networkName))
 	output, err := cmd.Output()
 	if err != nil {
@@ -42,6 +43,7 @@ func (nm *NetworkManager) CreateNetwork(ctx context.Context, networkName, driver
 
 	args = append(args, networkName)
 
+	// #nosec G204 -- docker network creation intentionally uses the requested driver and options.
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -53,6 +55,7 @@ func (nm *NetworkManager) CreateNetwork(ctx context.Context, networkName, driver
 
 // RemoveNetwork removes a Docker network
 func (nm *NetworkManager) RemoveNetwork(ctx context.Context, networkName string) error {
+	// #nosec G204 -- docker network removal intentionally uses the requested network name.
 	cmd := exec.CommandContext(ctx, "docker", "network", "rm", networkName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -64,6 +67,7 @@ func (nm *NetworkManager) RemoveNetwork(ctx context.Context, networkName string)
 
 // GetNetworkInfo gets information about a Docker network
 func (nm *NetworkManager) GetNetworkInfo(ctx context.Context, networkName string) (map[string]string, error) {
+	// #nosec G204 -- docker network inspection intentionally uses the requested network name.
 	cmd := exec.CommandContext(ctx, "docker", "network", "inspect", networkName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -102,4 +106,3 @@ func (nm *NetworkManager) WaitForNetwork(ctx context.Context, networkName string
 		}
 	}
 }
-

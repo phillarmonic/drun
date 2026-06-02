@@ -108,6 +108,7 @@ func (c *Checker) checkTCP(ctx context.Context, config *orchestration.HealthChec
 // checkDocker performs a Docker container health check
 func (c *Checker) checkDocker(ctx context.Context, config *orchestration.HealthCheck) error {
 	// Use docker inspect to check container health
+	// #nosec G204 -- docker health checks intentionally inspect the configured container.
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Health.Status}}", config.Container)
 	output, err := cmd.Output()
 	if err != nil {
@@ -217,6 +218,7 @@ func (c *Checker) checkCustom(ctx context.Context, config *orchestration.HealthC
 	}
 
 	// Create command
+	// #nosec G204 -- custom health checks intentionally execute the configured command.
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 
 	// Set working directory if specified

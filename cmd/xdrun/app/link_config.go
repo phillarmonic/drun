@@ -37,6 +37,7 @@ func loadLinkConfig() (*LinkConfig, error) {
 		}, nil
 	}
 
+	// #nosec G304 -- link config is intentionally loaded from the user's home config path.
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read link config: %w", err)
@@ -61,7 +62,7 @@ func saveLinkConfig(config *LinkConfig) error {
 	}
 
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create link config directory: %w", err)
 	}
 

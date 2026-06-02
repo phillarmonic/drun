@@ -66,6 +66,7 @@ func (e *Executor) Execute(ctx context.Context, config *orchestration.BuildConfi
 	args = append(args, config.MakeArgs...)
 
 	// Create command
+	// #nosec G204 -- build execution intentionally invokes make with user-selected targets and flags.
 	cmd := exec.CommandContext(ctx, "make", args...)
 	cmd.Dir = fullPath
 	cmd.Env = os.Environ()
@@ -75,6 +76,7 @@ func (e *Executor) Execute(ctx context.Context, config *orchestration.BuildConfi
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, config.MakefileTimeout)
 		defer cancel()
+		// #nosec G204 -- build execution intentionally invokes make with user-selected targets and flags.
 		cmd = exec.CommandContext(ctx, "make", args...)
 		cmd.Dir = fullPath
 		cmd.Env = os.Environ()
@@ -162,6 +164,7 @@ func (e *Executor) executeCommand(ctx context.Context, cmdStr, workDir string) e
 		return fmt.Errorf("empty command")
 	}
 
+	// #nosec G204 -- pre/post/fallback commands are explicitly configured build commands.
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
@@ -184,6 +187,7 @@ func (e *Executor) ListTargets(ctx context.Context, makefilePath string) ([]stri
 	}
 
 	// Use make -qp to list targets
+	// #nosec G204 -- make target discovery intentionally inspects the selected Makefile path.
 	cmd := exec.CommandContext(ctx, "make", "-qp", "-f", fullPath)
 	cmd.Dir = filepath.Dir(fullPath)
 
@@ -250,6 +254,7 @@ func (e *Executor) DryRun(ctx context.Context, config *orchestration.BuildConfig
 	args = append(args, config.MakeArgs...)
 
 	// Create command
+	// #nosec G204 -- dry-run intentionally invokes make with user-selected targets and flags.
 	cmd := exec.CommandContext(ctx, "make", args...)
 	cmd.Dir = fullPath
 	cmd.Env = os.Environ()
@@ -273,6 +278,7 @@ func (e *Executor) Validate(ctx context.Context, makefilePath string) error {
 	}
 
 	// Try to parse the Makefile using make --dry-run
+	// #nosec G204 -- validation intentionally invokes make against the selected Makefile path.
 	cmd := exec.CommandContext(ctx, "make", "-f", fullPath, "--dry-run")
 	cmd.Dir = filepath.Dir(fullPath)
 

@@ -40,6 +40,7 @@ func (oc *OrchestrationCoordinator) StartOrchestration(ctx context.Context, exec
 	}
 
 	// Create context with timeout
+	originalCtx := ctx
 	if orchestr.StartupTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, orchestr.StartupTimeout)
@@ -63,7 +64,7 @@ func (oc *OrchestrationCoordinator) StartOrchestration(ctx context.Context, exec
 
 		// Stop all services if stop_on_failure is enabled
 		if orchestr.StopOnFailure {
-			if stopErr := oc.StopOrchestration(context.Background(), execCtx, orchestrationName); stopErr != nil {
+			if stopErr := oc.StopOrchestration(context.WithoutCancel(ctx), execCtx, orchestrationName); stopErr != nil {
 				fmt.Printf("Error stopping orchestration %s: %v\n", orchestrationName, stopErr)
 			}
 		}
@@ -73,7 +74,7 @@ func (oc *OrchestrationCoordinator) StartOrchestration(ctx context.Context, exec
 
 	// Start health monitoring if configured
 	if orchestr.HealthCheckInterval > 0 {
-		go oc.monitorOrchestrationHealth(ctx, execCtx, orchestr)
+		go oc.monitorOrchestrationHealth(originalCtx, execCtx, orchestr)
 	}
 
 	orchestr.MarkHealthy()
@@ -307,14 +308,14 @@ func (oc *OrchestrationCoordinator) monitorOrchestrationHealth(ctx context.Conte
 
 					if orchestr.StopOnFailure {
 						// Stop all services
-						if stopErr := oc.StopOrchestration(context.Background(), execCtx, orchestr.Name); stopErr != nil {
+						if stopErr := oc.StopOrchestration(context.WithoutCancel(ctx), execCtx, orchestr.Name); stopErr != nil {
 							fmt.Printf("Error stopping orchestration %s: %v\n", orchestr.Name, stopErr)
 						}
 					}
 
 					// Attempt recovery if configured
 					if orchestr.ShouldRecover() {
-						go oc.attemptRecovery(context.Background(), execCtx, orchestr)
+						go oc.attemptRecovery(context.WithoutCancel(ctx), execCtx, orchestr)
 					}
 
 					return

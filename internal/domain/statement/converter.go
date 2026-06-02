@@ -272,6 +272,25 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			ServiceFilters: s.ServiceFilters,
 		}, nil
 
+	case *ast.RequiresToolsStatement:
+		var tools []ToolRequirement
+		for _, astTool := range s.Tools {
+			var constraints []VersionConstraint
+			for _, astConstraint := range astTool.Constraints {
+				constraints = append(constraints, VersionConstraint{
+					Operator: astConstraint.Operator,
+					Version:  astConstraint.Version,
+				})
+			}
+			tools = append(tools, ToolRequirement{
+				Name:        astTool.Name,
+				Constraints: constraints,
+			})
+		}
+		return &RequiresTools{
+			Tools: tools,
+		}, nil
+
 	case *ast.ChangeWorkdirStatement:
 		return &ChangeWorkdir{
 			Path: s.Path,

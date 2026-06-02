@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/phillarmonic/drun/internal/ast"
 	"github.com/phillarmonic/drun/internal/debug"
@@ -173,7 +174,9 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 			if opts.ExportGraphviz != "" {
 				dot := debug.ExportExecutionPlanGraphviz(planInfo)
 				filename := fmt.Sprintf("%s-%s.dot", opts.ExportGraphviz, fullName)
-				if err := os.WriteFile(filename, []byte(dot), 0644); err != nil {
+				cleanFilename := filepath.Clean(filename)
+				// #nosec G703 -- debug exports intentionally write to the user-selected output path.
+				if err := os.WriteFile(cleanFilename, []byte(dot), 0600); err != nil {
 					fmt.Printf("    ❌  Failed to write Graphviz file: %v\n", err)
 				} else {
 					fmt.Printf("    ✅  Graphviz exported to: %s\n", filename)
@@ -184,7 +187,9 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 			if opts.ExportMermaid != "" {
 				mermaid := debug.ExportExecutionPlanMermaid(planInfo)
 				filename := fmt.Sprintf("%s-%s.mmd", opts.ExportMermaid, fullName)
-				if err := os.WriteFile(filename, []byte(mermaid), 0644); err != nil {
+				cleanFilename := filepath.Clean(filename)
+				// #nosec G703 -- debug exports intentionally write to the user-selected output path.
+				if err := os.WriteFile(cleanFilename, []byte(mermaid), 0600); err != nil {
 					fmt.Printf("    ❌  Failed to write Mermaid file: %v\n", err)
 				} else {
 					fmt.Printf("    ✅  Mermaid exported to: %s\n", filename)
@@ -197,7 +202,9 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 					fmt.Printf("    ❌  Failed to export JSON: %v\n", err)
 				} else {
 					filename := fmt.Sprintf("%s-%s.json", opts.ExportJSON, fullName)
-					if err := os.WriteFile(filename, []byte(jsonStr), 0644); err != nil {
+					cleanFilename := filepath.Clean(filename)
+					// #nosec G703 -- debug exports intentionally write to the user-selected output path.
+					if err := os.WriteFile(cleanFilename, []byte(jsonStr), 0600); err != nil {
 						fmt.Printf("    ❌  Failed to write JSON file: %v\n", err)
 					} else {
 						fmt.Printf("    ✅  JSON exported to: %s\n", filename)
