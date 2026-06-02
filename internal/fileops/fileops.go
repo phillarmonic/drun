@@ -348,6 +348,7 @@ func (op *FileOperation) executeReplace() (*Result, error) {
 		Target:    op.Target,
 	}
 
+	// #nosec G304 -- file operations intentionally act on caller-provided paths.
 	data, err := os.ReadFile(op.Target)
 	if err != nil {
 		result.Message = fmt.Sprintf("Failed to read file '%s': %v", op.Target, err)
@@ -379,7 +380,9 @@ func (op *FileOperation) executeReplace() (*Result, error) {
 		perm = info.Mode().Perm()
 	}
 
-	if err := os.WriteFile(op.Target, []byte(updated), perm); err != nil {
+	cleanTarget := filepath.Clean(op.Target)
+	// #nosec G703 -- replace operations intentionally write back to the caller-provided path.
+	if err := os.WriteFile(cleanTarget, []byte(updated), perm); err != nil {
 		result.Message = fmt.Sprintf("Failed to write file '%s': %v", op.Target, err)
 		return result, err
 	}
@@ -402,12 +405,14 @@ func copyFile(src, dst string) error {
 		}
 	}
 
+	// #nosec G304 -- copy source is explicitly provided by the caller.
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = srcFile.Close() }()
 
+	// #nosec G304 -- copy destination is explicitly provided by the caller.
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -592,6 +597,7 @@ func GetFileSize(path string) (int64, error) {
 
 // GetFileLines returns the number of lines in a file
 func GetFileLines(path string) (int, error) {
+	// #nosec G304 -- helper intentionally reads the requested file path.
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err

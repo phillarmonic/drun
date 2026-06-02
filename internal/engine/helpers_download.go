@@ -76,12 +76,13 @@ func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, o
 
 	// Create parent directories if they don't exist
 	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return fmt.Errorf("failed to create parent directory: %w", err)
 		}
 	}
 
 	// Create output file
+	// #nosec G304 -- downloads intentionally write to the caller-selected destination path.
 	out, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -233,12 +234,13 @@ func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpe
 // extractArchive extracts an archive file to the specified directory using the archives library
 func (e *Engine) extractArchive(archivePath, extractTo string) error {
 	// Create extract directory if it doesn't exist
-	err := os.MkdirAll(extractTo, 0755)
+	err := os.MkdirAll(extractTo, 0750)
 	if err != nil {
 		return fmt.Errorf("failed to create extract directory: %w", err)
 	}
 
 	// Open the archive file
+	// #nosec G304 -- archive extraction intentionally opens the caller-selected archive path.
 	archiveFile, err := os.Open(archivePath)
 	if err != nil {
 		return fmt.Errorf("failed to open archive: %w", err)
@@ -272,7 +274,7 @@ func (e *Engine) extractArchive(archivePath, extractTo string) error {
 		}
 
 		// Create parent directories
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0750); err != nil {
 			return fmt.Errorf("failed to create parent directory: %w", err)
 		}
 
@@ -284,6 +286,7 @@ func (e *Engine) extractArchive(archivePath, extractTo string) error {
 		defer func() { _ = rc.Close() }()
 
 		// Create the output file
+		// #nosec G304 -- archive extraction intentionally writes entries beneath the chosen output path.
 		outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
@@ -329,6 +332,7 @@ func (e *Engine) decompressFile(decompressor archives.Decompressor, reader io.Re
 	outputPath := filepath.Join(extractTo, baseName)
 
 	// Create output file
+	// #nosec G304 -- decompression intentionally writes beneath the chosen output path.
 	outFile, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)

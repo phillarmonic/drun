@@ -407,6 +407,7 @@ func detectWorkspaceNamespace() string {
 	}
 
 	// Read the file
+	// #nosec G304 -- secret inspection intentionally reads the discovered drun task file.
 	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return ""

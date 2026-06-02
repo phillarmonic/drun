@@ -26,6 +26,7 @@ type Makefile struct {
 
 // ParseMakefile parses a Makefile and returns a structured representation
 func ParseMakefile(filepath string) (*Makefile, error) {
+	// #nosec G304 -- conversion intentionally opens the Makefile path provided by the caller.
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Makefile: %w", err)

@@ -143,6 +143,7 @@ func (m *Manager) Update(ctx context.Context, config *orchestration.Repository, 
 func (m *Manager) Checkout(ctx context.Context, targetPath, ref string) error {
 	fullPath := m.resolvePath(targetPath)
 
+	// #nosec G204 -- repository operations intentionally invoke git with the requested ref.
 	cmd := exec.CommandContext(ctx, "git", "checkout", ref)
 	cmd.Dir = fullPath
 
@@ -343,6 +344,7 @@ func (m *Manager) HasRemoteUpdates(ctx context.Context, config *orchestration.Re
 
 	// Check if local branch is behind remote
 	// git rev-list HEAD..origin/<branch> --count
+	// #nosec G204 -- repository status checks intentionally compare the selected branch against origin.
 	revListCmd := exec.CommandContext(ctx, "git", "rev-list", fmt.Sprintf("HEAD..origin/%s", branch), "--count")
 	revListCmd.Dir = fullPath
 

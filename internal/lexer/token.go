@@ -230,6 +230,7 @@ const (
 	NOT         // not
 	INSTALLED   // installed
 	TOOL        // tool
+	TOOLS       // tools
 	FRAMEWORK   // framework
 	ENVIRONMENT // environment
 	NODE        // node
@@ -858,6 +859,8 @@ func (t TokenType) String() string {
 		return "INSTALLED"
 	case TOOL:
 		return "TOOL"
+	case TOOLS:
+		return "TOOLS"
 	case FRAMEWORK:
 		return "FRAMEWORK"
 	case ENVIRONMENT:
@@ -1414,6 +1417,7 @@ var keywords = map[string]TokenType{
 	"not":           NOT,
 	"installed":     INSTALLED,
 	"tool":          TOOL,
+	"tools":         TOOLS,
 	"framework":     FRAMEWORK,
 	"environment":   ENVIRONMENT,
 	"node":          NODE,

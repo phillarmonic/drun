@@ -252,6 +252,11 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		return fmt.Errorf("creating project context: %w", err)
 	}
 
+	// Check project-level tool requirements before planning/execution starts
+	if err := e.checkProjectToolRequirements(projectCtx); err != nil {
+		return err // Execution fails immediately if project tools are missing
+	}
+
 	// Build planner context from project
 	var plannerCtx *planner.ProjectContext
 	if projectCtx != nil && projectCtx.HookManager != nil {
@@ -721,6 +726,21 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		case *ast.IncludeStatement:
 			// Process include statement
 			e.includesResolver.ProcessInclude(ctx, s, currentFile)
+		case *ast.RequiresToolsStatement:
+			// Store project-level tool requirements for startup validation
+			for _, astTool := range s.Tools {
+				var constraints []statement.VersionConstraint
+				for _, c := range astTool.Constraints {
+					constraints = append(constraints, statement.VersionConstraint{
+						Operator: c.Operator,
+						Version:  c.Version,
+					})
+				}
+				ctx.RequiredTools = append(ctx.RequiredTools, statement.ToolRequirement{
+					Name:        astTool.Name,
+					Constraints: constraints,
+				})
+			}
 		}
 	}
 
@@ -836,6 +856,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeOrchestration(s, ctx)
 	case *statement.ChangeWorkdir:
 		return e.executeChangeWorkdir(s, ctx)
+	case *statement.RequiresTools:
+		return e.executeRequiresTools(s, ctx)
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}

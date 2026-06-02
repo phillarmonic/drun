@@ -81,6 +81,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 	ctx.GetIncludedFiles()[includePath] = true
 
 	// Load and parse the included file
+	// #nosec G304 -- include resolution intentionally reads the resolved include file path.
 	content, err := os.ReadFile(includePath)
 	if err != nil {
 		if r.verbose {

@@ -437,6 +437,7 @@ func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, wor
 	if allocateTTY {
 		cmd = oe.createTTYCommand(ctx, cmdStr)
 	} else {
+		// #nosec G204 -- orchestration shell hooks intentionally execute user-authored commands.
 		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 	}
 
@@ -471,9 +472,11 @@ func (oe *OrchestrationExecutor) createTTYCommand(ctx context.Context, cmdStr st
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: script -q /dev/null sh -c "command"
+		// #nosec G204 -- orchestration TTY hooks intentionally execute user-authored commands.
 		return exec.CommandContext(ctx, "script", "-q", "/dev/null", "sh", "-c", cmdStr)
 	default:
 		// Linux and others: script -q -e -c "command" /dev/null
+		// #nosec G204 -- orchestration TTY hooks intentionally execute user-authored commands.
 		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", cmdStr, "/dev/null")
 	}
 }

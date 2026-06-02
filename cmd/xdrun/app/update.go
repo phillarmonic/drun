@@ -83,6 +83,7 @@ func HandleSelfUpdate(versionStr string) error {
 
 	// Display the actual version from the updated binary
 	fmt.Println("\nVerifying updated binary:")
+	// #nosec G204 -- self-update verifies the exact executable path that was just installed.
 	cmd := exec.Command(currentExe, "--version")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -148,7 +149,7 @@ func createBackup(currentExe, versionStr string) (string, error) {
 	}
 
 	backupDir := filepath.Join(homeDir, ".drun")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -167,7 +168,8 @@ func createBackup(currentExe, versionStr string) (string, error) {
 	}
 
 	// Make backup executable
-	if err := os.Chmod(backupPath, 0755); err != nil {
+	// #nosec G302 -- backups must remain executable for rollback verification by the current user.
+	if err := os.Chmod(backupPath, 0700); err != nil {
 		return "", fmt.Errorf("failed to make backup executable: %w", err)
 	}
 
@@ -242,12 +244,14 @@ func downloadAndInstall(version, targetPath string) error {
 	}
 
 	// Make temp file executable
-	if err := os.Chmod(tempFile.Name(), 0755); err != nil {
+	// #nosec G302 -- the downloaded binary must be executable for local verification by the current user.
+	if err := os.Chmod(tempFile.Name(), 0700); err != nil {
 		return fmt.Errorf("failed to make binary executable: %w", err)
 	}
 
 	// Verify the binary works
 	fmt.Println("🔍  Verifying downloaded binary...")
+	// #nosec G204 -- self-update verifies the exact downloaded executable before installation.
 	cmd := exec.Command(tempFile.Name(), "--version")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("downloaded binary failed verification: %w", err)
@@ -275,6 +279,7 @@ func installBinary(sourcePath, targetPath string) error {
 	switch runtime.GOOS {
 	case "darwin", "linux":
 		// Use sudo on Unix-like systems
+		// #nosec G204 -- installation intentionally copies the verified binary to the requested target path.
 		cmd := exec.Command("sudo", "cp", sourcePath, targetPath)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -293,6 +298,7 @@ func installBinary(sourcePath, targetPath string) error {
 
 // copyFile copies a file from source to destination
 func copyFile(src, dst string) error {
+	// #nosec G304 -- updater copies from an explicitly selected source path.
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
@@ -303,6 +309,7 @@ func copyFile(src, dst string) error {
 		}
 	}()
 
+	// #nosec G304 -- updater copies to an explicitly selected destination path.
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err

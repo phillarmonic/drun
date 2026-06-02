@@ -38,6 +38,7 @@ func HandleDebugMode(
 		}
 
 		// Read the drun file
+		// #nosec G304 -- debug mode intentionally reads the discovered drun task file.
 		data, err := os.ReadFile(actualConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read drun file '%s': %w", actualConfigFile, err)

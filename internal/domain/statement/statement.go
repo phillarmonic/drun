@@ -33,6 +33,7 @@ const (
 	TypeSecret           StatementType = "secret"
 	TypeOrchestration    StatementType = "orchestration"
 	TypeChangeWorkdir    StatementType = "change_workdir"
+	TypeRequiresTools    StatementType = "requires_tools"
 )
 
 // Action represents an action statement (info, step, success, etc.)
@@ -282,3 +283,23 @@ type ChangeWorkdir struct {
 }
 
 func (cw *ChangeWorkdir) Type() StatementType { return TypeChangeWorkdir }
+
+// VersionConstraint represents a single version constraint (e.g., >= "2.27")
+type VersionConstraint struct {
+	Operator string // ">=", ">", "<=", "<"
+	Version  string // "2.27", "3.0", etc.
+}
+
+// ToolRequirement represents a tool requirement with optional version constraints
+type ToolRequirement struct {
+	Name        string              // tool name (e.g., "gosec", "golangci-lint")
+	Constraints []VersionConstraint // zero or more version constraints
+}
+
+// RequiresTools represents a "requires tools:" block that validates tool
+// availability and version constraints before execution proceeds.
+type RequiresTools struct {
+	Tools []ToolRequirement
+}
+
+func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }

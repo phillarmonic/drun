@@ -100,7 +100,7 @@ func convertMakefile(inputFile, outputFile string) error {
 
 	// Write output file
 	fmt.Printf("💾 Writing to: %s\n", output)
-	err = os.WriteFile(output, []byte(drunContent), 0644)
+	err = os.WriteFile(output, []byte(drunContent), 0600)
 	if err != nil {
 		return fmt.Errorf("error writing output file: %w", err)
 	}

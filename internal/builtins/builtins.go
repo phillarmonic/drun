@@ -547,6 +547,7 @@ func getComposeProjectStatus(composeCmd []string, projectPath string) (string, e
 
 	// Run "docker compose ps" to get container status
 	psCmd := append(composeCmd, "ps", "--format", "table")
+	// #nosec G204 -- compose status intentionally runs the detected docker compose command.
 	cmd := exec.Command(psCmd[0], psCmd[1:]...)
 	output, err := cmd.Output()
 	if err != nil {

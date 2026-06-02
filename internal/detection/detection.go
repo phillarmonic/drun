@@ -271,6 +271,7 @@ func (d *Detector) isCommandAvailable(command string) bool {
 }
 
 func (d *Detector) getCommandVersion(command, flag, pattern string) string {
+	// #nosec G204 -- tool detection intentionally executes known tool version flags.
 	cmd := exec.Command(command, flag)
 	output, err := cmd.Output()
 	if err != nil {
@@ -286,6 +287,7 @@ func (d *Detector) getCommandVersion(command, flag, pattern string) string {
 }
 
 func (d *Detector) getCommandVersionWithArgs(command string, args []string, pattern string) string {
+	// #nosec G204 -- tool detection intentionally executes known tool version commands.
 	cmd := exec.Command(command, args...)
 	output, err := cmd.Output()
 	if err != nil {

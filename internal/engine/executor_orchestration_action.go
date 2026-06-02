@@ -1656,6 +1656,7 @@ func (e *Engine) runMakeCommand(buildCfg *ast.BuildConfig, workDir string) error
 		}
 	}
 
+	// #nosec G204 -- service builds intentionally invoke make with configured targets and flags.
 	cmd := exec.CommandContext(runCtx, "make", args...)
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
@@ -1693,6 +1694,7 @@ func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool, allo
 	if allocateTTY {
 		cmd = e.createTTYCommand(cmdStr)
 	} else {
+		// #nosec G204 -- orchestration action hooks intentionally execute user-authored commands.
 		cmd = exec.CommandContext(context.Background(), "sh", "-c", cmdStr)
 	}
 
@@ -1727,9 +1729,11 @@ func (e *Engine) createTTYCommand(cmdStr string) *exec.Cmd {
 	switch runtime.GOOS {
 	case "darwin":
 		// macOS: script -q /dev/null sh -c "command"
+		// #nosec G204 -- orchestration action TTY hooks intentionally execute user-authored commands.
 		return exec.CommandContext(context.Background(), "script", "-q", "/dev/null", "sh", "-c", cmdStr)
 	default:
 		// Linux and others: script -q -e -c "command" /dev/null
+		// #nosec G204 -- orchestration action TTY hooks intentionally execute user-authored commands.
 		return exec.CommandContext(context.Background(), "script", "-q", "-e", "-c", cmdStr, "/dev/null")
 	}
 }

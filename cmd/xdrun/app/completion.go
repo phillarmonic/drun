@@ -25,6 +25,7 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
+	// #nosec G304 -- completion intentionally parses the discovered drun task file.
 	content, err := os.ReadFile(actualConfigFile)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp

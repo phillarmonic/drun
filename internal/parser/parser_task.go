@@ -103,9 +103,17 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				stmt.Dependencies = append(stmt.Dependencies, *dep)
 			}
 		} else if p.isParameterToken(p.curToken.Type) {
-			param := p.parseParameterStatement()
-			if param != nil {
-				stmt.Parameters = append(stmt.Parameters, *param)
+			// Check for "requires tools:" block (not a parameter declaration)
+			if p.curToken.Type == lexer.REQUIRES && p.peekToken.Type == lexer.TOOLS {
+				requiresTools := p.parseRequiresToolsStatement()
+				if requiresTools != nil {
+					stmt.Body = append(stmt.Body, requiresTools)
+				}
+			} else {
+				param := p.parseParameterStatement()
+				if param != nil {
+					stmt.Parameters = append(stmt.Parameters, *param)
+				}
 			}
 		} else if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
 			detection := p.parseDetectionStatement()

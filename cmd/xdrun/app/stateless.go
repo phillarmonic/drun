@@ -43,6 +43,7 @@ func loadStatelessConfig() (*StatelessConfig, error) {
 		}, nil
 	}
 
+	// #nosec G304 -- stateless config is intentionally loaded from the user's home config path.
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read stateless config: %w", err)
@@ -69,7 +70,7 @@ func saveStatelessConfig(config *StatelessConfig) error {
 
 	// Create directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -161,7 +162,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 	// Create template if requested
 	if createTemplate {
 		configDir := filepath.Dir(configLocation)
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, 0750); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/internal/domain/statement"
 	"github.com/phillarmonic/drun/internal/engine/hooks"
 	"github.com/phillarmonic/drun/internal/engine/interpolation"
 	"github.com/phillarmonic/drun/internal/types"
@@ -71,6 +72,7 @@ type ProjectContext struct {
 	IncludedSettings  map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
 	IncludedParams    map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
 	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
+	RequiredTools     []statement.ToolRequirement               // project-level required tools
 }
 
 // Implement interpolation.ProjectContext interface
