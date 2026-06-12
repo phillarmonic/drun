@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
 )
 
 // HookPlan represents hooks to execute at various lifecycle points

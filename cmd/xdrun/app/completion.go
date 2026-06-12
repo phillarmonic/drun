@@ -3,7 +3,7 @@ package app
 import (
 	"os"
 
-	"github.com/phillarmonic/drun/internal/engine"
+	"github.com/phillarmonic/drun/v2/internal/engine"
 	"github.com/spf13/cobra"
 )
 

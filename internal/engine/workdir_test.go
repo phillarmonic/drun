@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/lexer"
-	parserPkg "github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
+	parserPkg "github.com/phillarmonic/drun/v2/internal/parser"
 )
 
 // parseForWorkdirTest is a helper to parse a drun string in engine tests.

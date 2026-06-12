@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/engine/planner"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/engine/planner"
 )
 
 // SecretReference represents a reference to a secret found in the AST

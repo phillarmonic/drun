@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
-	"github.com/phillarmonic/drun/internal/envfile"
-	"github.com/phillarmonic/drun/internal/healthcheck"
-	"github.com/phillarmonic/drun/internal/makeexec"
-	"github.com/phillarmonic/drun/internal/repository"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/envfile"
+	"github.com/phillarmonic/drun/v2/internal/healthcheck"
+	"github.com/phillarmonic/drun/v2/internal/makeexec"
+	"github.com/phillarmonic/drun/v2/internal/repository"
 )
 
 // OrchestrationExecutor handles orchestration execution

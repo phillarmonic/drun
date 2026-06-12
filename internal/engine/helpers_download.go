@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/mholt/archives"
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 // Domain: Download and Archive Helpers

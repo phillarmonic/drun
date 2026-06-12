@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Domain: Network Operations Execution

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // Interpolator handles string interpolation for variables and expressions

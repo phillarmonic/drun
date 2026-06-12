@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
-	"github.com/phillarmonic/drun/internal/parser"
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 func TestEngine_LoopVariableScoping(t *testing.T) {

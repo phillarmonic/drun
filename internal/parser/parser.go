@@ -3,9 +3,9 @@ package parser
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/errors"
-	lexer "github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/errors"
+	lexer "github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // Parser parses drun v2 source code into an AST

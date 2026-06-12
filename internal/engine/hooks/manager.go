@@ -1,7 +1,7 @@
 package hooks
 
 import (
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Manager manages lifecycle hooks for drun execution

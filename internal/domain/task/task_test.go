@@ -3,7 +3,7 @@ package task
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestTask_Validate(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/secrets"
+	"github.com/phillarmonic/drun/v2/internal/secrets"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

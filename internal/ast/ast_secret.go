@@ -3,7 +3,7 @@ package ast
 import (
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // SecretStatement represents secret operations (set, get, delete, exists, list)

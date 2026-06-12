@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/debug"
-	"github.com/phillarmonic/drun/internal/domain/parameter"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/domain/task"
-	"github.com/phillarmonic/drun/internal/engine/planner"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/debug"
+	"github.com/phillarmonic/drun/v2/internal/domain/parameter"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/engine/planner"
 )
 
 // Domain: Domain Layer Debugging

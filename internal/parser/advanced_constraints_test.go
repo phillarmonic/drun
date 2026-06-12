@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 func TestParser_AdvancedParameterConstraints(t *testing.T) {

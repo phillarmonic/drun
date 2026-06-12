@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // TestParser_WindowsNewlineAfterColon tests the specific issue that was failing on Windows

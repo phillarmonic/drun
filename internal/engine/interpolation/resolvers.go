@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/builtins"
+	"github.com/phillarmonic/drun/v2/internal/builtins"
 )
 
 // resolveSimpleVariableDirectly handles simple variable resolution with proper empty string support

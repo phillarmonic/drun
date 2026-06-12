@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/make2drun"
+	"github.com/phillarmonic/drun/v2/internal/make2drun"
 	"github.com/spf13/cobra"
 )
 

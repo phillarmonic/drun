@@ -1,11 +1,11 @@
 package engine
 
 import (
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/engine/hooks"
-	"github.com/phillarmonic/drun/internal/engine/interpolation"
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/engine/hooks"
+	"github.com/phillarmonic/drun/v2/internal/engine/interpolation"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // ExecutionContext holds parameter values and other runtime context

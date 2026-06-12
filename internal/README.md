@@ -54,7 +54,7 @@ This directory contains the internal implementation of the drun execution engine
 
 **Usage:**
 ```go
-import "github.com/phillarmonic/drun/internal/ast"
+import "github.com/phillarmonic/drun/v2/internal/ast"
 
 stmt := &ast.ShellStatement{
     Command: "echo hello",
@@ -89,7 +89,7 @@ stmt := &ast.ShellStatement{
 
 **Usage:**
 ```go
-import "github.com/phillarmonic/drun/internal/parser"
+import "github.com/phillarmonic/drun/v2/internal/parser"
 
 p := parser.New(lexer)
 program, err := p.ParseProgram()
@@ -251,7 +251,7 @@ Domain-specific helper functions:
 
 **Usage:**
 ```go
-import "github.com/phillarmonic/drun/internal/engine"
+import "github.com/phillarmonic/drun/v2/internal/engine"
 
 eng := engine.NewEngine(os.Stdout)
 eng.LoadProject(program)
@@ -293,7 +293,7 @@ Engine (orchestrator)
 
 **Usage:**
 ```go
-import "github.com/phillarmonic/drun/internal/lexer"
+import "github.com/phillarmonic/drun/v2/internal/lexer"
 
 l := lexer.New(source)
 token := l.NextToken()
@@ -308,7 +308,7 @@ token := l.NextToken()
 Functions like `now()`, `env()`, string operations.
 
 ```go
-import "github.com/phillarmonic/drun/internal/builtins"
+import "github.com/phillarmonic/drun/v2/internal/builtins"
 
 result, err := builtins.Apply("uppercase", "hello")
 ```
@@ -318,7 +318,7 @@ result, err := builtins.Apply("uppercase", "hello")
 Cross-platform shell command execution.
 
 ```go
-import "github.com/phillarmonic/drun/internal/shell"
+import "github.com/phillarmonic/drun/v2/internal/shell"
 
 result, err := shell.Execute("echo hello", opts)
 ```
@@ -328,7 +328,7 @@ result, err := shell.Execute("echo hello", opts)
 Detects installed tools and versions.
 
 ```go
-import "github.com/phillarmonic/drun/internal/detection"
+import "github.com/phillarmonic/drun/v2/internal/detection"
 
 available := detection.IsToolAvailable("docker")
 version, _ := detection.GetToolVersion("node")
@@ -339,7 +339,7 @@ version, _ := detection.GetToolVersion("node")
 Fetches files from remote sources (HTTP, GitHub).
 
 ```go
-import "github.com/phillarmonic/drun/internal/remote"
+import "github.com/phillarmonic/drun/v2/internal/remote"
 
 content, err := remote.FetchContent("https://...")
 ```
@@ -349,7 +349,7 @@ content, err := remote.FetchContent("https://...")
 Caches downloaded files and parsed content.
 
 ```go
-import "github.com/phillarmonic/drun/internal/cache"
+import "github.com/phillarmonic/drun/v2/internal/cache"
 
 manager := cache.NewManager()
 manager.Set("key", data)
@@ -360,7 +360,7 @@ manager.Set("key", data)
 Defines custom error types with context.
 
 ```go
-import "github.com/phillarmonic/drun/internal/errors"
+import "github.com/phillarmonic/drun/v2/internal/errors"
 
 err := errors.NewExecutionError("failed", ctx)
 ```
@@ -370,7 +370,7 @@ err := errors.NewExecutionError("failed", ctx)
 Common type definitions and utilities.
 
 ```go
-import "github.com/phillarmonic/drun/internal/types"
+import "github.com/phillarmonic/drun/v2/internal/types"
 
 value := types.StringValue("hello")
 ```

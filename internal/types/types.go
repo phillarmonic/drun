@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/patterns"
+	"github.com/phillarmonic/drun/v2/internal/patterns"
 )
 
 // ParameterType represents the type of a parameter

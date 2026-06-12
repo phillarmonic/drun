@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Domain: Secret Operations Execution

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/errors"
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/errors"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 func (p *Parser) parseStringList() []string {

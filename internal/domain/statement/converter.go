@@ -3,7 +3,7 @@ package statement
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 // FromAST converts an AST statement to a domain statement

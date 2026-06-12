@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestFindDefaultTaskPrefersDefaultOverEarlierStart(t *testing.T) {

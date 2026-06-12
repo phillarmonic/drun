@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/shell"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/shell"
 )
 
 // Domain: Utility Helpers

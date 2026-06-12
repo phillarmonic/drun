@@ -6,10 +6,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/domain/task"
-	"github.com/phillarmonic/drun/internal/engine/hooks"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/engine/hooks"
 )
 
 // MockStatementExecutor implements DomainStatementExecutor for testing

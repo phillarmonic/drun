@@ -3,8 +3,8 @@ package project
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Project represents a domain project entity

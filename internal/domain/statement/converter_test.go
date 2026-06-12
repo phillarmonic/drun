@@ -3,7 +3,7 @@ package statement
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestFromAST_Action(t *testing.T) {

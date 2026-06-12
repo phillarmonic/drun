@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	lexer "github.com/phillarmonic/drun/internal/lexer"
-	"github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	lexer "github.com/phillarmonic/drun/v2/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/parser"
 )
 
 // TokenDebugInfo represents a token with additional debug information

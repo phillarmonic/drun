@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // parseGitStatement parses Git operations

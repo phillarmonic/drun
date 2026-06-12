@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // BenchmarkVariableInterpolation benchmarks the optimized variable interpolation

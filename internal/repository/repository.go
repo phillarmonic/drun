@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
 )
 
 // Manager manages Git repository operations

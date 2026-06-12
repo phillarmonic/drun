@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/cache"
-	"github.com/phillarmonic/drun/internal/remote"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/cache"
+	"github.com/phillarmonic/drun/v2/internal/remote"
 )
 
 // Resolver handles file inclusion, both local and remote

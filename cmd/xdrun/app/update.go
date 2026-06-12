@@ -202,7 +202,7 @@ func downloadAndInstall(version, targetPath string) error {
 		binaryName += ".exe"
 	}
 
-	downloadURL := fmt.Sprintf("https://github.com/phillarmonic/drun/releases/download/%s/%s", version, binaryName)
+	downloadURL := fmt.Sprintf("https://github.com/phillarmonic/drun/v2/releases/download/%s/%s", version, binaryName)
 
 	fmt.Printf("📥  Downloading %s...\n", binaryName)
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // executeTry executes try/catch/finally blocks

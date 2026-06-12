@@ -3,8 +3,8 @@ package parser
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // parseFileStatement parses file operation statements (create, copy, move, delete, read, write, append)

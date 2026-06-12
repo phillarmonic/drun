@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestMemoryMonitorBasic(t *testing.T) {

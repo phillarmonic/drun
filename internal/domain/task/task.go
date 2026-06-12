@@ -3,8 +3,8 @@ package task
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Task represents a domain task entity

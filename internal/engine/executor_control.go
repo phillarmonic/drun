@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/parallel"
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/parallel"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // Domain: Control Flow Execution

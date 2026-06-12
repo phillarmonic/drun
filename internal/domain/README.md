@@ -57,7 +57,7 @@ The domain layer is ready for integration with the engine. Currently, it exists 
 ### Example: Task Registry
 
 ```go
-import "github.com/phillarmonic/drun/internal/domain/task"
+import "github.com/phillarmonic/drun/v2/internal/domain/task"
 
 // Create registry
 registry := task.NewRegistry()
@@ -76,7 +76,7 @@ allTasks := registry.List()
 ### Example: Parameter Validation
 
 ```go
-import "github.com/phillarmonic/drun/internal/domain/parameter"
+import "github.com/phillarmonic/drun/v2/internal/domain/parameter"
 
 // Create validator
 validator := parameter.NewValidator()

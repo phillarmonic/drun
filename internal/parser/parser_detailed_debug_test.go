@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 func TestParser_DetailedDebug(t *testing.T) {

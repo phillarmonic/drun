@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/patterns"
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/patterns"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // Validator validates parameters

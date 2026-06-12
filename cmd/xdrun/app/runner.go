@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/engine"
-	"github.com/phillarmonic/drun/internal/errors"
-	"github.com/phillarmonic/drun/internal/secrets"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/engine"
+	"github.com/phillarmonic/drun/v2/internal/errors"
+	"github.com/phillarmonic/drun/v2/internal/secrets"
 )
 
 // Domain: Task Execution

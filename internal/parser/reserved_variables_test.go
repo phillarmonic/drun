@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // TestParser_ReservedVariableName_Let tests that reserved variable names are rejected in let statements

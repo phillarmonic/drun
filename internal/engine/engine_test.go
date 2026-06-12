@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
 )
 
 func TestNewEngineWithOptions(t *testing.T) {

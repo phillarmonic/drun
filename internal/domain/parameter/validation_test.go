@@ -3,7 +3,7 @@ package parameter
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/types"
+	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // Helper function to create Value for tests

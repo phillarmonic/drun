@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
 )
 
 // Checker performs health checks on services

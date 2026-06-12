@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
-	"github.com/phillarmonic/drun/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/parser"
 )
 
 func TestDrunLifecycleHooks(t *testing.T) {

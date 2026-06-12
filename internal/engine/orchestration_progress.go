@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
-	"github.com/phillarmonic/drun/internal/repository"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/repository"
 )
 
 // ServiceProgress tracks the progress of a service operation

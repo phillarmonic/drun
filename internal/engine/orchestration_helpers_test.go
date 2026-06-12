@@ -4,7 +4,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestResolveOrchestrateServicesBuiltin(t *testing.T) {

@@ -3,8 +3,8 @@ package planner
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
 )
 
 func TestPlanner_Plan(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/phillarmonic/drun/internal/cache"
-	"github.com/phillarmonic/drun/internal/domain/parameter"
-	"github.com/phillarmonic/drun/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/cache"
+	"github.com/phillarmonic/drun/v2/internal/domain/parameter"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
 )
 
 // EngineOptions configures the engine with optional dependencies

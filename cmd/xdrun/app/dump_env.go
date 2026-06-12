@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/envloader"
+	"github.com/phillarmonic/drun/v2/internal/envloader"
 	"github.com/spf13/cobra"
 )
 

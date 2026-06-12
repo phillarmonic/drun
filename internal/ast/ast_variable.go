@@ -3,7 +3,7 @@ package ast
 import (
 	"strings"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // VariableStatement represents variable operations (let, set, transform)

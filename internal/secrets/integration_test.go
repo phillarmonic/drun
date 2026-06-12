@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/engine"
-	"github.com/phillarmonic/drun/internal/secrets"
+	"github.com/phillarmonic/drun/v2/internal/engine"
+	"github.com/phillarmonic/drun/v2/internal/secrets"
 )
 
 // TestIntegration_SecretStatements tests the full flow from parsing to execution

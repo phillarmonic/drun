@@ -1,4 +1,4 @@
-module github.com/phillarmonic/drun
+module github.com/phillarmonic/drun/v2
 
 go 1.26
 

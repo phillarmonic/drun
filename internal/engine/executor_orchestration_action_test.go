@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 func TestResolveCacheOption(t *testing.T) {

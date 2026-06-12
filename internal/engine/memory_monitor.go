@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/ast"
 )
 
 const (

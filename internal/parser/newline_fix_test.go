@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // TestParser_NewlineHandling tests that the parser correctly handles NEWLINE tokens
@@ -50,7 +50,7 @@ task "hello":
 		{
 			name: "clipboarder_style",
 			input: `# Clipboarder - Cross-platform clipboard library development automation
-# Built with drun v2 - https://github.com/phillarmonic/drun
+# Built with drun v2 - https://github.com/phillarmonic/drun/v2
 version: 2.0
 
 project "clipboarder" version "1.0":

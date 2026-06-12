@@ -18,6 +18,18 @@ Install a specific version:
 curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v2.10.0
 ```
 
+Install with Go:
+
+```bash
+go install github.com/phillarmonic/drun/v2/cmd/xdrun@latest
+```
+
+Install a specific tagged version with Go:
+
+```bash
+go install github.com/phillarmonic/drun/v2/cmd/xdrun@v2.17.0
+```
+
 The installer detects platform and architecture, installs `xdrun`, and attempts to make it available on your `PATH`.
 
 ## Quick Start

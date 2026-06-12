@@ -389,7 +389,7 @@ Create `internal/parser/parser_slack.go`:
 ```go
 package parser
 
-import "github.com/phillarmonic/drun/internal/ast"
+import "github.com/phillarmonic/drun/v2/internal/ast"
 
 func (p *Parser) parseSlackStatement() (*ast.SlackStatement, error) {
     stmt := &ast.SlackStatement{}
@@ -423,7 +423,7 @@ Create `internal/engine/executor_slack.go`:
 ```go
 package engine
 
-import "github.com/phillarmonic/drun/internal/domain/statement"
+import "github.com/phillarmonic/drun/v2/internal/domain/statement"
 
 func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) error {
     // Interpolate variables

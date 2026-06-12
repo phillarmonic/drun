@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
 )
 
 // OrchestrationCoordinator coordinates orchestration of multiple services

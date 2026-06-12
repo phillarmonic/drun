@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/builtins"
+	"github.com/phillarmonic/drun/v2/internal/builtins"
 )
 
 // BuiltinContext implements builtins.Context interface for the engine

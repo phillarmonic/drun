@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/docker"
-	"github.com/phillarmonic/drun/internal/domain/orchestration"
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/repository"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/docker"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/repository"
 )
 
 // executeOrchestration executes orchestration action statements from task bodies

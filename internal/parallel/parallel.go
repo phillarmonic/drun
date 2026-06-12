@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // ExecutionResult represents the result of a parallel execution

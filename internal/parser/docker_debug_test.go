@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	lexer "github.com/phillarmonic/drun/internal/lexer"
+	lexer "github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 func TestParser_DockerRunDebugTokens(t *testing.T) {

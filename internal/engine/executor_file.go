@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
-	"github.com/phillarmonic/drun/internal/fileops"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/fileops"
 )
 
 // Domain: File Operations Execution

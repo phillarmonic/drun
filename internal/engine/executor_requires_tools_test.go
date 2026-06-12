@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/detection"
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/detection"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 func TestEngine_checkToolRequirements(t *testing.T) {

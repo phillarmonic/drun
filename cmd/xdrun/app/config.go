@@ -274,7 +274,7 @@ func SetWorkspaceDefault(filename string) error {
 func generateStarterConfig() string {
 	return `# drun (do-run) CLI is a fast, semantic task runner with 
 # its own powerful automation language. Effortless tasks, serious speed.
-# Learn more at https://github.com/phillarmonic/drun
+# Learn more at https://github.com/phillarmonic/drun/v2
 
 version: 2.0
 

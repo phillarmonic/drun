@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 // Domain: Git Operations Execution

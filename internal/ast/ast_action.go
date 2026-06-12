@@ -3,7 +3,7 @@ package ast
 import (
 	"fmt"
 
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // ActionStatement represents an action call (info, step, success, etc.)

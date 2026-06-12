@@ -3,8 +3,8 @@ package parser
 import (
 	"testing"
 
-	"github.com/phillarmonic/drun/internal/ast"
-	"github.com/phillarmonic/drun/internal/lexer"
+	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 func TestParser_DownloadBasic(t *testing.T) {
@@ -410,4 +410,3 @@ task "download_multiple":
 		t.Errorf("third download should allow overwrite. got=%v", stmt3.AllowOverwrite)
 	}
 }
-
