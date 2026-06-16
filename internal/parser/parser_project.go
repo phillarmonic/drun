@@ -48,7 +48,15 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 		return nil
 	}
 
-	// Parse project settings (optional)
+	// Parse project settings (optional).
+	// A project declaration may be immediately followed by the next top-level
+	// statement, so only require an indented block when one is actually present.
+	// Comments and blank lines between the declaration and the next significant
+	// token should not force an INDENT requirement.
+	for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.COMMENT || p.peekToken.Type == lexer.MULTILINE_COMMENT {
+		p.nextToken()
+	}
+
 	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 		p.nextToken() // move to first token inside the block
@@ -135,8 +143,12 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			p.nextToken() // consume DEDENT
 		}
 	} else {
-		// No INDENT found, advance to next token for proper parsing flow
-		p.nextToken()
+		switch p.peekToken.Type {
+		case lexer.TASK, lexer.TEMPLATE, lexer.SERVICE, lexer.ORCHESTRATE, lexer.EOF:
+			p.nextToken() // advance to the next top-level statement
+		default:
+			p.peekError(lexer.INDENT)
+		}
 	}
 
 	return stmt

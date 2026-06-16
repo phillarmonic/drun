@@ -2,6 +2,7 @@ package detection
 
 import (
 	"os"
+	"runtime"
 	"testing"
 )
 
@@ -163,6 +164,21 @@ func TestDetector_parseVersion(t *testing.T) {
 				t.Errorf("parseVersion(%q)[%d] = %d, expected %d", test.version, i, v, test.expected[i])
 			}
 		}
+	}
+}
+
+func TestDetector_GetToolVersionParsesShortGoSemver(t *testing.T) {
+	detector := NewDetector()
+	command := "sh"
+	args := []string{"-c", "printf 'go version go1.26 linux/amd64\\n'"}
+	if runtime.GOOS == "windows" {
+		command = "cmd"
+		args = []string{"/c", "echo", "go version go1.26 windows/amd64"}
+	}
+
+	version := detector.getCommandVersionWithArgs(command, args, `go version go(\d+\.\d+(?:\.\d+)?)`)
+	if version != "1.26" {
+		t.Fatalf("expected short Go semver to parse, got %q", version)
 	}
 }
 

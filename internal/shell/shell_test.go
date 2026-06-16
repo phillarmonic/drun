@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+func usesPowerShell(shellPath string) bool {
+	shellPath = strings.ToLower(filepath.Base(shellPath))
+	return shellPath == "powershell.exe" || shellPath == "pwsh.exe"
+}
+
 func TestExecuteSimple(t *testing.T) {
 	// Test simple command execution
 	output, err := ExecuteSimple("echo 'Hello, World!'")
@@ -77,7 +82,7 @@ func TestExecute_WithEnvironment(t *testing.T) {
 	}
 
 	var cmd string
-	if runtime.GOOS == "windows" {
+	if usesPowerShell(opts.Shell) {
 		cmd = "echo $env:TEST_VAR"
 	} else {
 		cmd = "echo $TEST_VAR"
@@ -99,16 +104,20 @@ func TestExecute_WithWorkingDir(t *testing.T) {
 
 	var expectedDir, cmd string
 	if runtime.GOOS == "windows" {
-		// Use a directory that exists on Windows
+		// Use a directory that exists on Windows regardless of the selected shell.
 		expectedDir = os.Getenv("TEMP")
 		if expectedDir == "" {
 			expectedDir = "C:\\Windows\\Temp"
 		}
 		opts.WorkingDir = expectedDir
-		cmd = "Get-Location | Select-Object -ExpandProperty Path"
 	} else {
 		expectedDir = "/tmp"
 		opts.WorkingDir = expectedDir
+	}
+
+	if usesPowerShell(opts.Shell) {
+		cmd = "Get-Location | Select-Object -ExpandProperty Path"
+	} else {
 		cmd = "pwd"
 	}
 
@@ -120,7 +129,12 @@ func TestExecute_WithWorkingDir(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// On Windows, check if we're in a temp directory (path normalization can vary)
 		actualPath := strings.TrimSpace(result.Stdout)
-		if !strings.Contains(strings.ToLower(actualPath), "temp") {
+		lowerPath := strings.ToLower(actualPath)
+		if usesPowerShell(opts.Shell) {
+			if !strings.Contains(lowerPath, "temp") {
+				t.Errorf("Expected output to contain 'temp' directory, got %q", actualPath)
+			}
+		} else if lowerPath != "/tmp" && !strings.Contains(lowerPath, "temp") {
 			t.Errorf("Expected output to contain 'temp' directory, got %q", actualPath)
 		}
 	} else {
@@ -225,17 +239,29 @@ func TestExecute_StderrCapture(t *testing.T) {
 func TestDefaultOptions(t *testing.T) {
 	opts := DefaultOptions()
 
-	// Check that we get a platform-appropriate shell
-	expectedShells := []string{"/bin/zsh", "/bin/bash", "/bin/sh", "powershell.exe"}
-	validShell := false
-	for _, shell := range expectedShells {
-		if opts.Shell == shell {
-			validShell = true
-			break
+	// Check that we get a platform-appropriate shell.
+	switch runtime.GOOS {
+	case "darwin":
+		if opts.Shell != "/bin/zsh" {
+			t.Errorf("Expected /bin/zsh on darwin, got %q", opts.Shell)
 		}
-	}
-	if !validShell {
-		t.Errorf("Expected platform-appropriate shell (one of %v), got %q", expectedShells, opts.Shell)
+	case "linux":
+		if opts.Shell != "/bin/bash" {
+			t.Errorf("Expected /bin/bash on linux, got %q", opts.Shell)
+		}
+	case "windows":
+		gitBash := detectGitBash()
+		if gitBash != "" {
+			if opts.Shell != gitBash {
+				t.Errorf("Expected Git Bash %q on windows, got %q", gitBash, opts.Shell)
+			}
+		} else if opts.Shell != "powershell.exe" {
+			t.Errorf("Expected powershell.exe fallback on windows, got %q", opts.Shell)
+		}
+	default:
+		if opts.Shell != "/bin/sh" {
+			t.Errorf("Expected /bin/sh fallback, got %q", opts.Shell)
+		}
 	}
 
 	if opts.Timeout != 0 {
@@ -295,7 +321,7 @@ func TestExecute_ImmediateErrorWithStderr(t *testing.T) {
 
 	// Simulate a command that writes to stderr and exits immediately (like docker compose exec with invalid user)
 	var cmd string
-	if runtime.GOOS == "windows" {
+	if usesPowerShell(opts.Shell) {
 		cmd = "Write-Error 'Error response from daemon: unable to find user'; exit 1"
 	} else {
 		cmd = "echo 'Error response from daemon: unable to find user' >&2; exit 1"

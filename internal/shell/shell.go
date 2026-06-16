@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -39,17 +40,6 @@ type Options struct {
 
 // DefaultOptions returns sensible default options
 func DefaultOptions() *Options {
-	// Use platform-appropriate shell defaults
-	defaultShell := "/bin/sh"
-	switch runtime.GOOS {
-	case "darwin":
-		defaultShell = "/bin/zsh"
-	case "linux":
-		defaultShell = "/bin/bash"
-	case "windows":
-		defaultShell = "powershell.exe"
-	}
-
 	return &Options{
 		WorkingDir:    "",
 		Environment:   make(map[string]string, 8), // Pre-allocate for typical env var count
@@ -57,10 +47,50 @@ func DefaultOptions() *Options {
 		CaptureOutput: true,
 		StreamOutput:  false,
 		Output:        os.Stdout,
-		Shell:         defaultShell,
+		Shell:         defaultShell(),
 		IgnoreErrors:  false,
 		Attached:      false,
 	}
+}
+
+func defaultShell() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "/bin/zsh"
+	case "linux":
+		return "/bin/bash"
+	case "windows":
+		if gitBash := detectGitBash(); gitBash != "" {
+			return gitBash
+		}
+		return "powershell.exe"
+	default:
+		return "/bin/sh"
+	}
+}
+
+func detectGitBash() string {
+	if bashPath, err := exec.LookPath("bash.exe"); err == nil {
+		return bashPath
+	}
+
+	candidates := []string{
+		filepath.Join(`C:\Program Files`, "Git", "bin", "bash.exe"),
+		filepath.Join(`C:\Program Files`, "Git", "usr", "bin", "bash.exe"),
+		filepath.Join(`C:\Program Files (x86)`, "Git", "bin", "bash.exe"),
+		filepath.Join(`C:\Program Files (x86)`, "Git", "usr", "bin", "bash.exe"),
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 // Execute runs a shell command with the given options
