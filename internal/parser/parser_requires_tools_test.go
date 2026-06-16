@@ -114,3 +114,39 @@ task "security":
 		t.Errorf("tool constraint wrong: %s %s", tool1.Constraints[0].Operator, tool1.Constraints[0].Version)
 	}
 }
+
+func TestParser_RequiresTools_ProjectLevel_CRLF(t *testing.T) {
+	input := "# comment\r\n" +
+		"version: 2.0\r\n" +
+		"project \"POG\" version \"1.0\":\r\n" +
+		"\trequires tools:\r\n" +
+		"\t\tgo >= 1.26\r\n" +
+		"\t\tgolangci-lint >= 2.12\r\n" +
+		"\t\tgosec\r\n" +
+		"\r\n" +
+		"task \"default\":\r\n" +
+		"\tinfo \"ok\"\r\n"
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if program.Project == nil {
+		t.Fatal("expected project statement to be parsed")
+	}
+
+	if len(program.Project.Settings) != 1 {
+		t.Fatalf("expected 1 project setting, got %d", len(program.Project.Settings))
+	}
+
+	stmt, ok := program.Project.Settings[0].(*ast.RequiresToolsStatement)
+	if !ok {
+		t.Fatalf("expected RequiresToolsStatement, got %T", program.Project.Settings[0])
+	}
+
+	if len(stmt.Tools) != 3 {
+		t.Fatalf("expected 3 tools, got %d", len(stmt.Tools))
+	}
+}

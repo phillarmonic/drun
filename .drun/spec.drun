@@ -7,7 +7,7 @@ project "Drun" version "2.0":
 	requires tools:
 		go >= 1.26
 		golangci-lint >= 2.12
-		gosec >= 2.27
+		gosec
 
 task "default" means "Welcome to drun v2":
 	echo "Drun CI file"

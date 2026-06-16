@@ -49,8 +49,8 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 	}
 
 	// Parse project settings (optional)
-	if p.peekToken.Type == lexer.INDENT {
-		p.nextToken() // consume INDENT
+	// Like task/shell blocks, allow one or more newlines before the indented body.
+	if p.expectPeekSkipNewlines(lexer.INDENT) {
 		p.nextToken() // move to first token inside the block
 
 		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
@@ -135,7 +135,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			p.nextToken() // consume DEDENT
 		}
 	} else {
-		// No INDENT found, advance to next token for proper parsing flow
+		// No indented project body found, advance to keep parsing top-level statements.
 		p.nextToken()
 	}
 
