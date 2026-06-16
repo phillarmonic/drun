@@ -275,3 +275,48 @@ task "hello":
 		t.Errorf("task.Name not 'hello'. got=%q", program.Tasks[0].Name)
 	}
 }
+
+func TestParser_EmptyProjectWithCommentsBeforeTask(t *testing.T) {
+	input := `version: 2.0
+
+project "commented-project" version "1.0":
+
+# This comment should not force a project body
+# Another comment before the first task
+task "hello":
+  info "Hello after comments"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	if program == nil {
+		t.Fatalf("ParseProgram() returned nil")
+	}
+
+	if program.Project == nil {
+		t.Fatalf("program.Project is nil")
+	}
+
+	if program.Project.Name != "commented-project" {
+		t.Errorf("project.Name not 'commented-project'. got=%q", program.Project.Name)
+	}
+
+	if program.Project.Version != "1.0" {
+		t.Errorf("project.Version not '1.0'. got=%q", program.Project.Version)
+	}
+
+	if len(program.Project.Settings) != 0 {
+		t.Fatalf("project should have 0 settings. got=%d", len(program.Project.Settings))
+	}
+
+	if len(program.Tasks) != 1 {
+		t.Fatalf("program should have 1 task. got=%d", len(program.Tasks))
+	}
+
+	if program.Tasks[0].Name != "hello" {
+		t.Errorf("task.Name not 'hello'. got=%q", program.Tasks[0].Name)
+	}
+}

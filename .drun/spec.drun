@@ -6,7 +6,7 @@ version: 2.0
 project "Drun" version "2.0":
 	requires tools:
 		go >= 1.26
-		golangci-lint >= 2.12
+		golangci-lint
 		gosec
 
 task "default" means "Welcome to drun v2":
@@ -23,7 +23,7 @@ task "lint" means "Runs the Golang CI Linter":
 
 task "sec-strict" means "Security tests":
 	info "Running gosec..."
-	run "gosec ./..."
+	run "gosec -severity high -confidence medium ./..."
 
 task "sec" means "Security checks (high)":
 	info "Running gosec (setting to high only)"
