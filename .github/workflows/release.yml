@@ -112,30 +112,31 @@ jobs:
     - name: Install dependencies
       run: go mod download
 
-    - name: Install UPX (Linux/Windows)
-      if: matrix.runner == 'ubuntu-latest'
+    - name: Install UPX (Homebrew)
+      if: matrix.runner == 'ubuntu-latest' || matrix.runner == 'macos-latest'
       run: |
-        UPX_VERSION=5.1.1
-        echo "Installing UPX version $UPX_VERSION"
-        
-        # Download UPX for Linux
-        curl -L https://github.com/upx/upx/releases/download/v$UPX_VERSION/upx-$UPX_VERSION-amd64_linux.tar.xz -o upx.tar.xz
-        tar -xf upx.tar.xz
-        sudo mv upx-$UPX_VERSION-amd64_linux/upx /usr/local/bin/
-        rm -rf upx.tar.xz upx-$UPX_VERSION-amd64_linux
-        upx --version
-      shell: bash
+        set -euo pipefail
 
-    - name: Install UPX (macOS)
-      if: matrix.runner == 'macos-latest'
-      run: |
-        # UPX doesn't provide official macOS binaries, try installing via Homebrew
-        if command -v brew &> /dev/null; then
-          echo "Installing UPX via Homebrew..."
-          brew install upx || echo "⚠️  UPX installation via Homebrew failed, compression will be skipped"
-        else
-          echo "⚠️  Homebrew not available, UPX compression will be skipped for macOS"
+        if ! command -v brew >/dev/null 2>&1; then
+          echo "Installing Homebrew..."
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
         fi
+
+        echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+        eval "$(brew shellenv)"
+
+        # Remove unrelated third-party taps that trigger trust warnings on hosted runners.
+        brew untap aws/tap 2>/dev/null || true
+        brew untap azure/bicep 2>/dev/null || true
+
+        brew update
+        brew install upx
+
+        echo "Installed UPX via Homebrew:"
+        upx --version
       shell: bash
 
     - name: Set binary name
@@ -214,15 +215,10 @@ jobs:
             fi
           fi
         elif [ "${{ matrix.goos }}" = "darwin" ]; then
-          # macOS binaries - UPX may not be available or may have issues
-          if command -v upx &> /dev/null; then
-            if upx --best "$BINARY_PATH" 2>/dev/null; then
-              echo "✅ macOS binary compressed successfully"
-            else
-              echo "⚠️  UPX compression failed for macOS binary (this is normal)"
-            fi
+          if upx --best "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ macOS binary compressed successfully"
           else
-            echo "ℹ️  UPX not available for macOS, skipping compression"
+            echo "⚠️  UPX compression failed for macOS binary"
           fi
         else
           # Linux binaries - use --best compression (should always work)
@@ -251,15 +247,10 @@ jobs:
           # Windows ARM64 - UPX compression was skipped
           echo "ℹ️  Windows ARM64 binary not compressed with UPX (platform not supported)"
         elif [ "${{ matrix.goos }}" = "darwin" ]; then
-          # For macOS, only verify if UPX is available and compression succeeded
-          if command -v upx &> /dev/null; then
-            if upx -t "$BINARY_PATH" 2>/dev/null; then
-              echo "✅ macOS binary successfully compressed with UPX"
-            else
-              echo "ℹ️  macOS binary not compressed with UPX (this is normal)"
-            fi
+          if upx -t "$BINARY_PATH" 2>/dev/null; then
+            echo "✅ macOS binary successfully compressed with UPX"
           else
-            echo "ℹ️  UPX not available for macOS, verification skipped"
+            echo "ℹ️  macOS binary not compressed with UPX"
           fi
         else
           # For Linux and Windows x64, verify UPX compression
@@ -306,13 +297,13 @@ jobs:
 
     - name: Upload build artifacts (on failure)
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: build-logs-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/${{ matrix.goos }}-${{ matrix.goarch }}
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: xdrun-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/${{ matrix.goos }}-${{ matrix.goarch }}/${{ steps.binary.outputs.name }}
@@ -324,7 +315,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     - name: Download build artifacts
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v8
       with:
         pattern: xdrun-*
         path: release-assets

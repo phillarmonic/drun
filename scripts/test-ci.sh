@@ -30,16 +30,7 @@ mkdir -p coverage
 # Run race tests with timeout (10 minutes max)
 echo "⏱️  Running race condition tests with 10-minute timeout..."
 
-# Determine the appropriate timeout command based on OS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS - use gtimeout from coreutils
-    TIMEOUT_CMD="gtimeout"
-else
-    # Linux and other Unix systems - use timeout
-    TIMEOUT_CMD="timeout"
-fi
-
-if $TIMEOUT_CMD 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
+if ./scripts/with-timeout.sh 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
     echo "✅ Race condition tests completed successfully"
 else
     exit_code=$?
