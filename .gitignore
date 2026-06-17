@@ -68,8 +68,20 @@ Temporary Items
 .apdisk
 
 # IDEs
-.idea
+.codex
 .vscode
+.idea
+.cursor
+.antigravity
+.kiro
+.vs
+.settings
+nbproject
+.zed
+Windsurf
+.helix
+.nova
+.fleet
 
 # Build artifacts
 bin/
@@ -121,3 +133,6 @@ xdrun
 
 spec
 dist
+
+graphify-out
+AGENTS.md

@@ -77,7 +77,7 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 	}
 
 	// Check if file exists and handle overwrite
-	if !downloadStmt.AllowOverwrite && e.fileExists(path) {
+	if !downloadStmt.AllowOverwrite && e.fileExists(path, ctx) {
 		errMsg := fmt.Sprintf("file already exists: %s (use 'allow overwrite' to replace)", path)
 		_, _ = fmt.Fprintf(e.output, "❌  %s\n", errMsg)
 		return fmt.Errorf("%s", errMsg)

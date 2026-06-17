@@ -2,6 +2,7 @@ package engine
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -9,15 +10,42 @@ import (
 // Domain: Filesystem Helpers
 // This file contains helper methods for filesystem operations
 
+func (e *Engine) resolveFilesystemPath(path string, ctx *ExecutionContext) string {
+	if path == "" {
+		return path
+	}
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+
+	base := ""
+	if ctx != nil {
+		if ctx.WorkingDir != "" {
+			base = ctx.WorkingDir
+		} else if ctx.OriginalWorkingDir != "" {
+			base = ctx.OriginalWorkingDir
+		}
+	}
+	if base == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			base = cwd
+		}
+	}
+	if base == "" {
+		return filepath.Clean(path)
+	}
+	return filepath.Clean(filepath.Join(base, path))
+}
+
 // fileExists checks if a file exists
-func (e *Engine) fileExists(path string) bool {
-	info, err := os.Stat(path)
+func (e *Engine) fileExists(path string, ctx *ExecutionContext) bool {
+	info, err := os.Stat(e.resolveFilesystemPath(path, ctx))
 	return err == nil && !info.IsDir()
 }
 
 // getFileSize returns the size of a file in bytes
-func (e *Engine) getFileSize(path string) (int64, error) {
-	info, err := os.Stat(path)
+func (e *Engine) getFileSize(path string, ctx *ExecutionContext) (int64, error) {
+	info, err := os.Stat(e.resolveFilesystemPath(path, ctx))
 	if err != nil {
 		return 0, err
 	}
@@ -25,14 +53,14 @@ func (e *Engine) getFileSize(path string) (int64, error) {
 }
 
 // dirExists checks if a directory exists
-func (e *Engine) dirExists(path string) bool {
-	info, err := os.Stat(path)
+func (e *Engine) dirExists(path string, ctx *ExecutionContext) bool {
+	info, err := os.Stat(e.resolveFilesystemPath(path, ctx))
 	return err == nil && info.IsDir()
 }
 
 // isDirEmpty checks if a directory is empty
-func (e *Engine) isDirEmpty(path string) (bool, error) {
-	entries, err := os.ReadDir(path)
+func (e *Engine) isDirEmpty(path string, ctx *ExecutionContext) (bool, error) {
+	entries, err := os.ReadDir(e.resolveFilesystemPath(path, ctx))
 	if err != nil {
 		return false, err
 	}

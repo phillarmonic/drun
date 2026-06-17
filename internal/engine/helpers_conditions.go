@@ -167,6 +167,10 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 		return e.evaluateEnvCondition(strings.TrimPrefix(condition, "env "), ctx)
 	}
 
+	if result, handled := e.evaluateFilesystemExistsCondition(condition, ctx); handled {
+		return result
+	}
+
 	// Handle "folder/directory is not empty" pattern
 	if strings.Contains(condition, " is not empty") {
 		parts := strings.SplitN(condition, " is not empty", 2)
@@ -191,11 +195,11 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 				folderPath = e.interpolateVariables(folderPath, ctx)
 
 				// Check if directory exists and is not empty
-				if !e.dirExists(folderPath) {
+				if !e.dirExists(folderPath, ctx) {
 					return false // Directory doesn't exist, treat as empty
 				}
 
-				isEmpty, err := e.isDirEmpty(folderPath)
+				isEmpty, err := e.isDirEmpty(folderPath, ctx)
 				if err != nil {
 					return false // Error checking, treat as empty
 				}
@@ -303,11 +307,11 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 				folderPath = e.interpolateVariables(folderPath, ctx)
 
 				// Check if directory exists and is empty
-				if !e.dirExists(folderPath) {
+				if !e.dirExists(folderPath, ctx) {
 					return true // Directory doesn't exist, treat as empty
 				}
 
-				isEmpty, err := e.isDirEmpty(folderPath)
+				isEmpty, err := e.isDirEmpty(folderPath, ctx)
 				if err != nil {
 					return true // Error checking, treat as empty
 				}
@@ -377,6 +381,48 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 
 	// Default: treat non-empty strings as true
 	return trimmed != ""
+}
+
+func (e *Engine) evaluateFilesystemExistsCondition(condition string, ctx *ExecutionContext) (bool, bool) {
+	condition = strings.TrimSpace(condition)
+
+	type subject struct {
+		prefix string
+		isDir  bool
+	}
+
+	subjects := []subject{
+		{prefix: "file ", isDir: false},
+		{prefix: "folder ", isDir: true},
+		{prefix: "directory ", isDir: true},
+		{prefix: "dir ", isDir: true},
+	}
+
+	for _, subject := range subjects {
+		if !strings.HasPrefix(condition, subject.prefix) {
+			continue
+		}
+
+		remainder := strings.TrimSpace(strings.TrimPrefix(condition, subject.prefix))
+		switch {
+		case strings.HasSuffix(remainder, " not exists"):
+			path := strings.TrimSpace(strings.TrimSuffix(remainder, " not exists"))
+			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")
+			if subject.isDir {
+				return !e.dirExists(path, ctx), true
+			}
+			return !e.fileExists(path, ctx), true
+		case strings.HasSuffix(remainder, " exists"):
+			path := strings.TrimSpace(strings.TrimSuffix(remainder, " exists"))
+			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")
+			if subject.isDir {
+				return e.dirExists(path, ctx), true
+			}
+			return e.fileExists(path, ctx), true
+		}
+	}
+
+	return false, false
 }
 
 // conditionStringTruthy matches the final evaluation rules for a fully interpolated fragment.

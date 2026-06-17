@@ -18,7 +18,7 @@ func TestIsDirEmpty(t *testing.T) {
 	}
 
 	engine := NewEngine(os.Stdout)
-	isEmpty, err := engine.isDirEmpty(emptyDir)
+	isEmpty, err := engine.isDirEmpty(emptyDir, nil)
 	if err != nil {
 		t.Fatalf("Error checking if directory is empty: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestIsDirEmpty(t *testing.T) {
 		t.Logf("  - %s (IsDir: %v)", entry.Name(), entry.IsDir())
 	}
 
-	isEmpty, err = engine.isDirEmpty(nonEmptyDir)
+	isEmpty, err = engine.isDirEmpty(nonEmptyDir, nil)
 	if err != nil {
 		t.Fatalf("Error checking if directory is empty: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestIsDirEmpty(t *testing.T) {
 		t.Fatalf("Failed to create hidden file: %v", err)
 	}
 
-	isEmpty, err = engine.isDirEmpty(hiddenDir)
+	isEmpty, err = engine.isDirEmpty(hiddenDir, nil)
 	if err != nil {
 		t.Fatalf("Error checking if directory with hidden file is empty: %v", err)
 	}

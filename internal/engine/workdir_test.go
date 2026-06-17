@@ -252,3 +252,101 @@ task "build":
 		t.Errorf("Expected dry-run output to mention 'frontend', got:\n%s", output)
 	}
 }
+
+func TestFileConditionsRespectWorkdir(t *testing.T) {
+	tmpDir := t.TempDir()
+	frontendDir := filepath.Join(tmpDir, "frontend")
+	if err := os.Mkdir(frontendDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(frontendDir, ".npmrc"), []byte("registry=private"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	input := `version: 2.0
+
+task "check":
+    use workdir "frontend"
+    if file ".npmrc" exists:
+        run "echo exists"
+    else:
+        run "echo missing"
+
+task "negated":
+    use workdir "frontend"
+    if file ".npmrc" not exists:
+        run "echo missing"
+    else:
+        run "echo exists"
+`
+	program := parseForWorkdirTest(t, input)
+
+	var out bytes.Buffer
+	eng := NewEngine(&out)
+	if err := eng.Execute(program, "check"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected positive file check to use workdir and find .npmrc, got:\n%s", out.String())
+	}
+
+	out.Reset()
+	if err := eng.Execute(program, "negated"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected negated file check to use workdir and skip missing branch, got:\n%s", out.String())
+	}
+}
+
+func TestFileConditionsWithoutWorkdirUseOriginalCwd(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".npmrc"), []byte("registry=private"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	input := `version: 2.0
+
+task "plain":
+    if file ".npmrc" exists:
+        run "echo exists"
+    else:
+        run "echo missing"
+
+task "plain-negated":
+    if file ".npmrc" not exists:
+        run "echo missing"
+    else:
+        run "echo exists"
+`
+	program := parseForWorkdirTest(t, input)
+
+	var out bytes.Buffer
+	eng := NewEngine(&out)
+	if err := eng.Execute(program, "plain"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected file check to find .npmrc in original cwd, got:\n%s", out.String())
+	}
+
+	out.Reset()
+	if err := eng.Execute(program, "plain-negated"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected negated file check to skip missing branch in original cwd, got:\n%s", out.String())
+	}
+}
