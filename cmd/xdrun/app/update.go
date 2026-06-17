@@ -82,7 +82,7 @@ func HandleSelfUpdate(versionStr string) error {
 	}
 
 	fmt.Printf("🎉  Successfully updated to version %s!\n", latestVersion)
-	fmt.Printf("💾 Backup available at: %s\n", backupPath)
+	fmt.Printf("💾  Backup available at: %s\n", backupPath)
 
 	// Display the actual version from the updated binary
 	fmt.Println("\nVerifying updated binary:")
