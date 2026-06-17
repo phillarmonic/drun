@@ -72,12 +72,6 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Install coreutils on macOS (for timeout command)
-      if: runner.os == 'macOS'
-      run: |
-        echo "Installing coreutils for gtimeout command..."
-        brew install coreutils
-
     - name: Run tests (Unix)
       if: runner.os != 'Windows'
       run: ./scripts/test-ci.sh
@@ -94,7 +88,7 @@ jobs:
         
         # Run race tests with timeout (10 minutes max)
         echo "⏱️  Running race condition tests with 10-minute timeout..."
-        if timeout 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
+        if ./scripts/with-timeout.sh 600 go test -race -cover -coverprofile=coverage/coverage.out ./internal/...; then
           echo "✅ Race condition tests completed successfully"
         else
           exit_code=$?
@@ -167,7 +161,7 @@ jobs:
         ./bin/xdrun.exe --version
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: xdrun-${{ runner.os }}
         path: bin/xdrun*
@@ -201,12 +195,6 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Install coreutils on macOS (for timeout command)
-      if: runner.os == 'macOS'
-      run: |
-        echo "Installing coreutils for gtimeout command..."
-        brew install coreutils
-
     - name: Build drun binary (Unix)
       if: runner.os != 'Windows'
       run: |
@@ -227,13 +215,8 @@ jobs:
         # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           DRUN_BIN="./bin/xdrun.exe"
-          TIMEOUT_CMD="timeout 60"
-        elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          DRUN_BIN="./bin/xdrun"
-          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
           DRUN_BIN="./bin/xdrun"
-          TIMEOUT_CMD="timeout 60"
         fi
         
         # Test that all example files can be parsed without errors
@@ -244,7 +227,7 @@ jobs:
             echo -n "📄 Testing parsing: $file ... "
             
             # Use timeout to prevent infinite loops (60 seconds)
-            if $TIMEOUT_CMD $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/parse_error.log; then
+            if ./scripts/with-timeout.sh 60 "$DRUN_BIN" --list --file "$file" >/dev/null 2>/tmp/parse_error.log; then
               echo "✅ SUCCESS"
             else
               exit_code=$?
@@ -280,13 +263,8 @@ jobs:
         # Set binary name and timeout command based on OS
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           DRUN_BIN="./bin/xdrun.exe"
-          TIMEOUT_CMD="timeout 60"
-        elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          DRUN_BIN="./bin/xdrun"
-          TIMEOUT_CMD="gtimeout 60"  # coreutils installed in previous step
         else
           DRUN_BIN="./bin/xdrun"
-          TIMEOUT_CMD="timeout 60"
         fi
         
         # Helper function to run with timeout and error handling
@@ -299,7 +277,7 @@ jobs:
           echo -n "📄 Testing: $file -> $task ... "
           
           # Execute with timeout
-          if $TIMEOUT_CMD $DRUN_BIN "$task" --file "$file" $args >/dev/null 2>/tmp/exec_error.log; then
+          if ./scripts/with-timeout.sh 60 "$DRUN_BIN" "$task" --file "$file" $args >/dev/null 2>/tmp/exec_error.log; then
             echo "✅ SUCCESS"
           else
             exit_code=$?
@@ -365,7 +343,7 @@ jobs:
           
           if [[ -z "$task" ]]; then
             # Just list tasks
-            if timeout 60 $DRUN_BIN --list --file "$file" >/dev/null 2>/tmp/win_error.log; then
+            if ./scripts/with-timeout.sh 60 "$DRUN_BIN" --list --file "$file" >/dev/null 2>/tmp/win_error.log; then
               echo "✅ SUCCESS"
             else
               exit_code=$?
@@ -386,7 +364,7 @@ jobs:
             fi
           else
             # Execute specific task
-            if timeout 60 $DRUN_BIN "$task" --file "$file" >/dev/null 2>/tmp/win_error.log; then
+            if ./scripts/with-timeout.sh 60 "$DRUN_BIN" "$task" --file "$file" >/dev/null 2>/tmp/win_error.log; then
               echo "✅ SUCCESS"
             else
               exit_code=$?
