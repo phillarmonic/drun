@@ -65,11 +65,32 @@ jobs:
     - name: Run tests
       run: ./scripts/test-ci.sh
 
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: 1.26
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run semantic fuzzing
+      run: ./scripts/fuzz-examples.sh 50
+
   # Build job for cross-platform binaries
   build:
     name: Build
     runs-on: ${{ matrix.runner }}
-    needs: [lint, test]
+    needs: [lint, test, fuzz]
     strategy:
       matrix:
         include:
