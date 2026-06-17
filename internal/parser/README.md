@@ -84,7 +84,7 @@ Expression parsing:
 #### `parser_action.go` - 105 lines
 Action statements and task calls:
 - **Action statements** (`info`, `step`, `success`, `warning`, `error`)
-- **Task call statements** (`call task-name`)
+- **Task call statements** (`call task-name`, `call task "name" with iterations=100`)
 
 #### `parser_shell.go` - 175 lines
 Shell command execution:

@@ -228,10 +228,26 @@ func Execute(command string, opts *Options) (*Result, error) {
 
 	// Check if we should treat this as an error
 	if !result.Success && !opts.IgnoreErrors {
-		return result, fmt.Errorf("command failed with exit code %d: %s", result.ExitCode, result.Stderr)
+		return result, fmt.Errorf("command failed with exit code %d%s", result.ExitCode, formatFailureOutput(result))
 	}
 
 	return result, nil
+}
+
+func formatFailureOutput(result *Result) string {
+	stdout := strings.TrimSpace(result.Stdout)
+	stderr := strings.TrimSpace(result.Stderr)
+
+	switch {
+	case stdout != "" && stderr != "":
+		return fmt.Sprintf(" (stdout: %s; stderr: %s)", stdout, stderr)
+	case stderr != "":
+		return fmt.Sprintf(": %s", stderr)
+	case stdout != "":
+		return fmt.Sprintf(": %s", stdout)
+	default:
+		return ""
+	}
 }
 
 func buildCommand(ctx context.Context, command string, opts *Options) *exec.Cmd {

@@ -87,6 +87,7 @@ xdrun deploy environment=production version=v1.2.3
 - `key=value` task parameters with CLI flags kept separate.
 - Built-in validation, defaults, and control flow.
 - Dry-run support for inspecting execution.
+- Task modes, including CI buffering and one-run overrides via `--task-mode`.
 - Optional `run ... attached` mode for REPL-style commands that need stdin and a terminal.
 - Reusable task files and examples for common workflows.
 - Orchestration support for multi-service projects.

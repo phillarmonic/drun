@@ -10,6 +10,7 @@ import (
 // Task represents a domain task entity
 type Task struct {
 	Name         string
+	Mode         string
 	Description  string
 	Parameters   []Parameter
 	Dependencies []Dependency
@@ -28,6 +29,7 @@ func NewTask(stmt *ast.TaskStatement, namespace, source string) (*Task, error) {
 
 	task := &Task{
 		Name:        stmt.Name,
+		Mode:        stmt.Mode,
 		Description: stmt.Description,
 		Namespace:   namespace,
 		Source:      source,
@@ -92,6 +94,13 @@ func (t *Task) Validate() error {
 		return &TaskError{
 			Task:    t.Name,
 			Message: "task name cannot be empty",
+		}
+	}
+
+	if t.Mode != "" && t.Mode != "ci" {
+		return &TaskError{
+			Task:    t.Name,
+			Message: fmt.Sprintf("unsupported task mode %q", t.Mode),
 		}
 	}
 

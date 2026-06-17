@@ -34,6 +34,9 @@ type EngineOptions struct {
 	// Verbose mode
 	Verbose bool
 
+	// Runtime task mode override for the invocation
+	TaskModeOverride string
+
 	// Secrets manager
 	SecretsManager SecretsManager
 }
@@ -80,6 +83,13 @@ func WithDryRun(dryRun bool) Option {
 func WithVerbose(verbose bool) Option {
 	return func(o *EngineOptions) {
 		o.Verbose = verbose
+	}
+}
+
+// WithTaskModeOverride sets a runtime task mode override for this invocation.
+func WithTaskModeOverride(mode string) Option {
+	return func(o *EngineOptions) {
+		o.TaskModeOverride = mode
 	}
 }
 

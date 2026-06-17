@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -172,7 +173,7 @@ func loadWorkspaceConfig() (*WorkspaceConfig, error) {
 }
 
 // initializeConfig creates a new drun configuration file
-func InitializeConfig(filename string, saveAsDefault bool) error {
+func InitializeConfig(filename string, saveAsDefault bool, minimal bool) error {
 	// Determine the target filename
 	targetFile := ".drun/spec.drun"
 	if filename != "" {
@@ -197,7 +198,7 @@ func InitializeConfig(filename string, saveAsDefault bool) error {
 	}
 
 	// Generate starter configuration
-	config := generateStarterConfig()
+	config := generateStarterConfig(minimal)
 
 	// Write the file
 	if err := os.WriteFile(targetFile, []byte(config), 0600); err != nil {
@@ -271,50 +272,31 @@ func SetWorkspaceDefault(filename string) error {
 }
 
 // generateStarterConfig creates a starter drun v2 configuration
-func generateStarterConfig() string {
-	return `# drun (do-run) CLI is a fast, semantic task runner with 
+func generateStarterConfig(minimal bool) string {
+	projectName := inferProjectNameFromWorkingDir()
+
+	if minimal {
+		return `# drun (do-run) CLI is a fast, semantic task runner with 
 # its own powerful automation language. Effortless tasks, serious speed.
-# Learn more at https://github.com/phillarmonic/drun/v2
+# Learn more at https://github.com/phillarmonic/drun
 
 version: 2.0
 
-project "my-app" version "1.0":
-	/* Cross-platform shell configuration with sensible defaults
-	 These are all default values, you can remove them if you don't intend to change it. */
-
-	shell config:
-		darwin:
-			executable: "/bin/zsh"
-			args:
-				- "-l"
-				- "-i"
-			environment:
-				TERM: "xterm-256color"
-				SHELL_SESSION_HISTORY: "0"
-		
-		linux:
-			executable: "/bin/bash"
-			args:
-				- "--login"
-				- "--interactive"
-			environment:
-				TERM: "xterm-256color"
-				HISTCONTROL: "ignoredups"
-		
-		windows:
-			executable: "powershell.exe"
-			args:
-				- "-NoProfile"
-				- "-ExecutionPolicy"
-				- "Bypass"
-			environment:
-				PSModulePath: ""
-
-task "default" means "Welcome to drun v2":
-	echo "Starting up..."
+project "` + projectName + `" version "1.0":
+task "default" means "Welcome":
 	info "Welcome to drun v2! 🚀"
-	step "This is your starter task file"
-	success "Ready to build amazing automation!"
+`
+	}
+
+	return `# drun (do-run) CLI is a fast, semantic task runner with 
+# its own powerful automation language. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+
+version: 2.0
+
+project "` + projectName + `" version "1.0":
+task "default" means "Welcome":
+	info "Welcome to drun v2! 🚀"
 
 task "hello" means "Say hello":
 	info "Hello from the semantic task runner!"
@@ -336,4 +318,18 @@ task "deploy" means "Deploy application":
 	info "Add your deployment commands here"
 	success "Deployment to {$environment} completed!"
 `
+}
+
+func inferProjectNameFromWorkingDir() string {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return "my-app"
+	}
+
+	projectName := strings.TrimSpace(filepath.Base(filepath.Clean(workingDir)))
+	if projectName == "" || projectName == "." || projectName == string(filepath.Separator) {
+		return "my-app"
+	}
+
+	return projectName
 }

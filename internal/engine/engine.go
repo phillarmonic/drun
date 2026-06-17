@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/builtins"
@@ -38,10 +39,11 @@ type SecretsManager interface {
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output       io.Writer
-	dryRun       bool
-	verbose      bool
-	interpolator *interpolation.Interpolator
+	output           io.Writer
+	dryRun           bool
+	verbose          bool
+	taskModeOverride string
+	interpolator     *interpolation.Interpolator
 
 	// Domain layer services
 	taskRegistry   *task.Registry
@@ -91,13 +93,14 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	interp := interpolation.NewInterpolator()
 
 	e := &Engine{
-		output:         options.Output,
-		dryRun:         options.DryRun,
-		verbose:        options.Verbose,
-		interpolator:   interp,
-		githubFetcher:  githubFetcher,
-		httpsFetcher:   httpsFetcher,
-		drunhubFetcher: drunhubFetcher,
+		output:           options.Output,
+		dryRun:           options.DryRun,
+		verbose:          options.Verbose,
+		taskModeOverride: options.TaskModeOverride,
+		interpolator:     interp,
+		githubFetcher:    githubFetcher,
+		httpsFetcher:     httpsFetcher,
+		drunhubFetcher:   drunhubFetcher,
 
 		// Domain services
 		taskRegistry:   options.TaskRegistry,
@@ -335,6 +338,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 		// Set current task name for globals access
 		ctx.CurrentTask = currentTaskName
+		ctx.CurrentTaskMode = resolvedTaskMode(taskPlan.Mode, plan.Tasks[plan.TargetTask].Mode, e.taskModeOverride)
 
 		// Save workdir state so changes in this task don't leak to the next
 		savedWorkingDir := ctx.WorkingDir
@@ -749,6 +753,12 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 
 // executeTask executes a single task with the given context (AST version for templates)
 func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
+	prevTaskMode := ctx.CurrentTaskMode
+	ctx.CurrentTaskMode = resolvedTaskMode(task.Mode, prevTaskMode, e.taskModeOverride)
+	defer func() {
+		ctx.CurrentTaskMode = prevTaskMode
+	}()
+
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would execute task: %s\n", task.Name)
 		if task.Description != "" {
@@ -886,12 +896,22 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 			_, _ = fmt.Fprintln(e.output)
 		}
 
-		// Print the box
-		boxWidth := len(interpolatedMessage) + 4
-		topLine := "┌" + strings.Repeat("─", boxWidth-2) + "┐"
-		middleLine := "│ " + interpolatedMessage + " │"
-		bottomLine := "└" + strings.Repeat("─", boxWidth-2) + "┘"
-		_, _ = fmt.Fprintf(e.output, "%s\n%s\n%s\n", topLine, middleLine, bottomLine)
+		// Render each line within a box sized to the longest visible line.
+		lines := strings.Split(interpolatedMessage, "\n")
+		maxWidth := 0
+		for _, line := range lines {
+			if width := utf8.RuneCountInString(line); width > maxWidth {
+				maxWidth = width
+			}
+		}
+
+		horizontal := strings.Repeat("─", maxWidth+2)
+		_, _ = fmt.Fprintf(e.output, "┌%s┐\n", horizontal)
+		for _, line := range lines {
+			padding := maxWidth - utf8.RuneCountInString(line)
+			_, _ = fmt.Fprintf(e.output, "│ %s%s │\n", line, strings.Repeat(" ", padding))
+		}
+		_, _ = fmt.Fprintf(e.output, "└%s┘\n", horizontal)
 
 		// Optional line break after
 		if action.LineBreakAfter {
@@ -990,6 +1010,7 @@ func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionCon
 		Project:          ctx.Project,
 		CurrentFile:      ctx.CurrentFile,
 		CurrentTask:      callStmt.TaskName,
+		CurrentTaskMode:  resolvedTaskMode(targetTask.Mode, ctx.CurrentTaskMode, e.taskModeOverride),
 		CurrentNamespace: taskNamespace, // Set namespace for transitive resolution
 		Program:          ctx.Program,
 	}

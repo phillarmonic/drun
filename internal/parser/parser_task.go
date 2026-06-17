@@ -23,6 +23,15 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 
 	stmt.Name = p.curToken.Literal
 
+	// Check for optional task mode clause
+	if p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "mode" {
+		p.nextToken() // consume mode
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Mode = p.curToken.Literal
+	}
+
 	// Check for optional "means" clause
 	if p.peekToken.Type == lexer.MEANS {
 		p.nextToken() // consume lexer.MEANS

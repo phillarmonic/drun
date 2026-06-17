@@ -74,6 +74,60 @@ func TestExecute_Failure(t *testing.T) {
 	}
 }
 
+func TestExecute_FailureIncludesStdoutWhenStderrEmpty(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+
+	var cmd string
+	if usesPowerShell(opts.Shell) {
+		cmd = "Write-Output 'gosec finding details'; exit 1"
+	} else {
+		cmd = "echo 'gosec finding details'; exit 1"
+	}
+
+	result, err := Execute(cmd, opts)
+	if err == nil {
+		t.Fatal("Expected Execute to return an error")
+	}
+
+	if result == nil {
+		t.Fatal("Expected Execute to return a result")
+	}
+
+	if !strings.Contains(err.Error(), "gosec finding details") {
+		t.Fatalf("Expected error to include stdout details, got %q", err.Error())
+	}
+}
+
+func TestExecute_FailureIncludesBothStdoutAndStderr(t *testing.T) {
+	opts := DefaultOptions()
+	opts.CaptureOutput = true
+
+	var cmd string
+	if usesPowerShell(opts.Shell) {
+		cmd = "Write-Output 'finding summary'; [Console]::Error.WriteLine('stack trace'); exit 1"
+	} else {
+		cmd = "echo 'finding summary'; echo 'stack trace' >&2; exit 1"
+	}
+
+	result, err := Execute(cmd, opts)
+	if err == nil {
+		t.Fatal("Expected Execute to return an error")
+	}
+
+	if result == nil {
+		t.Fatal("Expected Execute to return a result")
+	}
+
+	errText := err.Error()
+	if !strings.Contains(errText, "stdout: finding summary") {
+		t.Fatalf("Expected error to label stdout details, got %q", errText)
+	}
+	if !strings.Contains(errText, "stderr: stack trace") {
+		t.Fatalf("Expected error to label stderr details, got %q", errText)
+	}
+}
+
 func TestExecute_WithEnvironment(t *testing.T) {
 	opts := DefaultOptions()
 	opts.CaptureOutput = true

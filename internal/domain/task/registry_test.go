@@ -1,6 +1,7 @@
 package task
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,19 @@ func TestRegistry_Register(t *testing.T) {
 	err = registry.Register(task1)
 	if err == nil {
 		t.Error("Register() should fail for duplicate task")
+	}
+}
+
+func TestRegistry_RegisterRejectsUnsupportedTaskMode(t *testing.T) {
+	registry := NewRegistry()
+
+	err := registry.Register(&Task{Name: "bad", Mode: "unknown"})
+	if err == nil {
+		t.Fatal("expected unsupported task mode to fail registration")
+	}
+
+	if !strings.Contains(err.Error(), `unsupported task mode "unknown"`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

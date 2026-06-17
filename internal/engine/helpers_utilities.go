@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -221,6 +222,9 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 	opts.Attached = shellStmt.Attached
 	opts.CaptureOutput = !shellStmt.Attached
 	opts.StreamOutput = shellStmt.StreamOutput || shellStmt.Attached
+	if shouldBufferShellOutput(ctx, shellStmt) {
+		opts.StreamOutput = false
+	}
 	opts.Output = e.output
 	if svcCtx != nil {
 		opts.WorkingDir = svcCtx.Path
@@ -249,6 +253,9 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 	// Execute the command
 	result, err := shell.Execute(interpolatedCommand, opts)
 	if err != nil {
+		if shouldBufferShellOutput(ctx, shellStmt) {
+			writeBufferedShellFailure(e.output, result)
+		}
 		_, _ = fmt.Fprintf(e.output, "❌  Command failed: %v\n", err)
 		return err
 	}
@@ -278,4 +285,44 @@ func attachedLabel(attached bool) string {
 		return " attached"
 	}
 	return ""
+}
+
+func shouldBufferShellOutput(ctx *ExecutionContext, shellStmt *statement.Shell) bool {
+	if ctx == nil || shellStmt == nil {
+		return false
+	}
+	if shellStmt.Attached || shellStmt.Action == "capture" {
+		return false
+	}
+	return strings.EqualFold(ctx.CurrentTaskMode, "ci")
+}
+
+func resolvedTaskMode(taskMode, inheritedMode, override string) string {
+	if override != "" {
+		return override
+	}
+	if taskMode != "" {
+		return taskMode
+	}
+	return inheritedMode
+}
+
+func writeBufferedShellFailure(output io.Writer, result *shell.Result) {
+	if output == nil || result == nil {
+		return
+	}
+
+	stdout := strings.TrimSpace(result.Stdout)
+	stderr := strings.TrimSpace(result.Stderr)
+
+	if stdout == "" && stderr == "" {
+		return
+	}
+
+	if stdout != "" {
+		_, _ = fmt.Fprintf(output, "stdout:\n%s\n", stdout)
+	}
+	if stderr != "" {
+		_, _ = fmt.Fprintf(output, "stderr:\n%s\n", stderr)
+	}
 }

@@ -20,10 +20,16 @@ func ExecuteTask(
 	listTasks bool,
 	dryRun bool,
 	verbose bool,
+	taskModeOverride string,
 	allowUndefinedVars bool,
 	noDrunCache bool,
 	args []string,
 ) error {
+	taskModeOverride, err := normalizeRuntimeTaskMode(taskModeOverride)
+	if err != nil {
+		return err
+	}
+
 	// Determine the config file to use
 	actualConfigFile, err := FindConfigFile(configFile)
 	if err != nil {
@@ -73,6 +79,7 @@ func ExecuteTask(
 		engine.WithOutput(os.Stdout),
 		engine.WithDryRun(dryRun),
 		engine.WithVerbose(verbose),
+		engine.WithTaskModeOverride(taskModeOverride),
 		engine.WithSecretsManager(secretsMgr),
 	)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)

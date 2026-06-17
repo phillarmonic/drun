@@ -129,7 +129,7 @@ project_setting = "set" identifier "to" expression
                 | shell_config ;
 
 (* Task definition *)
-task_definition = "task" string_literal [ "means" string_literal ] ":"
+task_definition = "task" string_literal [ "mode" string_literal ] [ "means" string_literal ] ":"
                  { task_property }
                  statement_block ;
 
@@ -214,7 +214,7 @@ task_call_statement = "call" "task" string_literal [ "with" parameter_list ] ;
 
 parameter_list = parameter_assignment { parameter_assignment } ;
 
-parameter_assignment = identifier "=" string_literal ;
+parameter_assignment = identifier "=" ( string_literal | number ) ;
 
 (* Conditions *)
 condition = logical_expression ;
@@ -869,7 +869,15 @@ call task "my-special-task"
 ```
 call task "task_name" with param1="value1" param2="value2"
 call task task_name with param1="value1" param2="value2"  # Unquoted task name
+call task fuzz with iterations=100                         # Numeric literals are allowed bare
 ```
+
+Task call parameter values currently support:
+
+- Quoted strings: `name="Alice"`
+- Bare numbers: `iterations=100`, `replicas=3`
+
+Bare numeric literals are passed through as string values to the called task, which keeps task-call syntax aligned with normal drun parameter handling while avoiding unnecessary quotes for numeric inputs.
 
 #### Examples
 
@@ -898,13 +906,14 @@ task "full-pipeline":
   call task "run-tests" with test_type="unit"
   call task "run-tests" with test_type="integration"
   call task "build-application" with target="production"
+  call task fuzz with iterations=100
   
   success "Full pipeline completed successfully!"
 ```
 
 #### Key Features
 
-- **Parameter Passing**: Pass parameters to called tasks using `with param="value"` syntax
+- **Parameter Passing**: Pass parameters to called tasks using `with param="value"` or `with param=123` syntax
 - **Variable Sharing**: Variables set in called tasks are available in the calling task
 - **Error Handling**: If a called task fails, the calling task fails with an appropriate error message
 - **Execution Flow**: Called tasks execute completely before returning control to the calling task
@@ -3158,6 +3167,38 @@ capture from shell "git rev-parse --short HEAD" as $commit_hash
 capture from shell "whoami" as $username
 ```
 
+#### Task Modes
+
+Tasks can opt into execution modes directly in the declaration:
+
+```drun
+task "ci" mode "ci" means "Run noisy checks quietly":
+  step "Lint"
+  run "golangci-lint run ./..."
+  step "Security"
+  run "gosec ./..."
+```
+
+Currently supported modes:
+
+- `normal` is the standard execution behavior. This is the implicit default when a task does not declare a mode. Shell command output streams normally as commands run.
+- `ci` buffers shell command output for the task and only prints the buffered stdout/stderr if a command fails. Action statements like `step`, `info`, and `success` still print normally.
+
+`ci` is the only mode currently declared inside task definitions. Use the normal default behavior by omitting the `mode` clause entirely.
+
+**Runtime Override**
+
+`xdrun` can override the execution mode for a single invocation:
+
+```bash
+xdrun ci --task-mode=normal
+xdrun build --task-mode=ci
+```
+
+- `--task-mode=normal` forces normal streaming behavior even when the task declaration uses `mode "ci"`.
+- `--task-mode=ci` applies CI-style buffering for the invoked task and any called tasks during that run.
+- Supported runtime override values are `normal` and `ci`.
+
 #### Multiline Commands (Block Syntax)
 
 For complex shell operations, use the block syntax with natural indentation:
@@ -3896,6 +3937,18 @@ success "Deployment completed successfully"
   ┌────────────────────────────────┐
   │ Starting deployment process    │
   └────────────────────────────────┘
+  ```
+  Multiline strings are supported and each line is rendered inside the same box:
+  ```
+  step "Executing semantic fuzz tests against example-based inputs
+  Iterations: 50"
+  ```
+  Produces:
+  ```
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Executing semantic fuzz tests against example-based inputs │
+  │ Iterations: 50                                             │
+  └─────────────────────────────────────────────────────────────┘
   ```
 - `info` - Displays with ℹ️ emoji prefix: `ℹ️  Configuration loaded successfully`
 - `warn` - Displays with ⚠️ emoji prefix: `⚠️  Using default configuration`
@@ -5686,6 +5739,15 @@ func (ic *IncrementalCompiler) CompileChanged(changes []Change) error {
 ---
 
 This specification provides a comprehensive foundation for implementing drun v2's semantic language. The design prioritizes readability and maintainability while leveraging the existing drun infrastructure for performance and compatibility.
+
+### Implementation And Validation Contract
+
+When drun adds or changes language behavior, contributors should treat the following as part of the feature:
+
+- Update this specification in the same change whenever syntax, semantics, or normative examples change.
+- Add focused parser, domain, and engine tests that cover the new behavior, not just manual verification.
+- Update `.drun/spec.drun` when the feature affects repository-local workflows so the project continues to exercise its own language.
+- Finish validation with `xdrun ci`, which is the project-level end-to-end check for the current local workflow.
 
 
 ## Pattern Macro System

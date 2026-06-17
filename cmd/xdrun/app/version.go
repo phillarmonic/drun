@@ -32,7 +32,7 @@ func ShowVersion(version, commit, date string) error {
 	fmt.Println("xDrun (eXecute drun) CLI")
 	fmt.Println()
 	fmt.Println("Effortless tasks, serious speed.")
-	fmt.Println("By Phillarmonic Software <https://github.com/phillarmonic/drun/v2>")
+	fmt.Println("By Phillarmonic Software <https://github.com/phillarmonic/drun>")
 	fmt.Println("")
 	fmt.Printf("Version %s\n", version)
 	if commit != "unknown" {

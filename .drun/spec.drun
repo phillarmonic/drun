@@ -14,27 +14,28 @@ task "default" means "Welcome to drun v2":
 	info "Welcome to drun v2! 🚀"
 
 task "test" means "Runs unit tests":
-	info "Running PHPUnit (just kidding)"
+	info "Running PHPUnit"
 	run "go test ./..."
 
 task "lint" means "Runs the Golang CI Linter":
-	info "Running PHPCS (just kidding)"
+	info "Running PHPCS"
 	run "golangci-lint run ./..."
 
-task "sec-strict" means "Security tests":
-	info "Running gosec..."
+task "sec" means "Security checks (high)":
+	info "Running gosec"
 	run "gosec -severity high -confidence medium ./..."
 
-task "sec" means "Security checks (high)":
-	info "Running gosec (setting to high only)"
-	run "gosec -severity high ./..."
+task "fuzz" means "Runs the fuzzers":
+	given $iterations defaults to 50
+	step "Executing semantic fuzz tests against example-based inputs\nIterations: {$iterations}"
+	run "./scripts/fuzz-examples.sh {$iterations}"
 
 task "install" means "Install xdrun with build info":
 	info "Installing xdrun with embedded build date/time..."
 	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
 	success "xdrun installed to $GOPATH/bin"
 
-task "ci" means "Runs the whole CI pipeline":
+task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
 	step "Linter"
 	call task lint
@@ -44,3 +45,6 @@ task "ci" means "Runs the whole CI pipeline":
 	run "./scripts/test-regressions.sh"
 	step "Security checks"
 	call task sec
+	info "Semantic fuzzing"
+	call task fuzz with iterations=50
+	success "CI executed successfully end-to-end"
