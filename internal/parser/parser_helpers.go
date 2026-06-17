@@ -284,6 +284,29 @@ func (p *Parser) expectPeek(t lexer.TokenType) bool {
 	}
 }
 
+// expectPeekOneOf checks the peek token against several allowed types and advances if one matches.
+func (p *Parser) expectPeekOneOf(types ...lexer.TokenType) bool {
+	for _, t := range types {
+		if p.peekToken.Type == t {
+			p.nextToken()
+			return true
+		}
+	}
+
+	expected := make([]string, 0, len(types))
+	for _, t := range types {
+		expected = append(expected, t.String())
+	}
+
+	msg := fmt.Sprintf("expected next token to be one of [%s], got %s instead", strings.Join(expected, ", "), p.peekToken.Type)
+	p.errors = append(p.errors, msg)
+	if p.errorList != nil {
+		p.errorList.Add(msg, p.peekToken)
+	}
+
+	return false
+}
+
 // expectPeekSkipNewlines expects a token type but skips any NEWLINE tokens first
 func (p *Parser) expectPeekSkipNewlines(t lexer.TokenType) bool {
 	// Skip any NEWLINE tokens

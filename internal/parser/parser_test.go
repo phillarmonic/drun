@@ -131,6 +131,36 @@ task "greet" means "Greet someone by name":
 	}
 }
 
+func TestParser_TaskWithMode(t *testing.T) {
+	input := `version: 2.0
+
+task "ci" mode "ci" means "Runs buffered CI checks":
+  run "echo ok"`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if len(program.Tasks) != 1 {
+		t.Fatalf("program.Tasks does not contain 1 task. got=%d", len(program.Tasks))
+	}
+
+	task := program.Tasks[0]
+	if task.Name != "ci" {
+		t.Errorf("task.Name wrong. expected=ci, got=%s", task.Name)
+	}
+
+	if task.Mode != "ci" {
+		t.Errorf("task.Mode wrong. expected=ci, got=%s", task.Mode)
+	}
+
+	if task.Description != "Runs buffered CI checks" {
+		t.Errorf("task.Description wrong. expected='Runs buffered CI checks', got=%s", task.Description)
+	}
+}
+
 func TestParser_BasicVersion(t *testing.T) {
 	input := `version: 2.0`
 

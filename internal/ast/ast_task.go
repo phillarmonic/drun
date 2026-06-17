@@ -11,6 +11,7 @@ import (
 type TaskStatement struct {
 	Token        lexer.Token
 	Name         string
+	Mode         string
 	Description  string
 	Parameters   []ParameterStatement
 	Dependencies []DependencyGroup
@@ -21,6 +22,9 @@ func (ts *TaskStatement) statementNode() {}
 func (ts *TaskStatement) String() string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "task \"%s\"", ts.Name)
+	if ts.Mode != "" {
+		fmt.Fprintf(&out, " mode \"%s\"", ts.Mode)
+	}
 	if ts.Description != "" {
 		fmt.Fprintf(&out, " means \"%s\"", ts.Description)
 	}

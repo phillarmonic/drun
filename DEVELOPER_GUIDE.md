@@ -519,6 +519,9 @@ When adding any new feature:
 3. **Test Domain Logic**: Unit tests without dependencies
 4. **Integrate with Engine**: Orchestrate domain operations
 5. **Expose via CLI**: User-facing interface
+6. **Update the Language Spec**: If syntax, semantics, or examples changed, update [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md) in the same change
+7. **Dogfood the Workflow**: If the feature affects project automation, update [.drun/spec.drun](./.drun/spec.drun)
+8. **Finish with Full Validation**: Run targeted tests while iterating, then finish with `xdrun ci`
 
 This keeps your codebase clean, testable, and maintainable! 🎯
 
@@ -538,7 +541,16 @@ go test -cover ./...
 
 # Run examples (regression tests)
 ./scripts/test.sh
+
+# Run local semantic fuzzing from the drun spec
+xdrun fuzz iterations=100
 ```
+
+Fuzz result labels:
+
+- `PASS` means the mutated `.drun` file parsed successfully and its first discovered task also completed `--dry-run` validation.
+- `SOFT` means the mutated file parsed successfully, but the harness could not find a first task it could dry-run with the built-in parameter guesses. This is informational, not a crash.
+- `MISS` means the mutated file was rejected by the parser. This is expected sometimes because the generator intentionally introduces some malformed but drun-like input.
 
 ### Test Organization
 

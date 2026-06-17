@@ -20,6 +20,7 @@ type HookPlan struct {
 // TaskPlan represents a single task in the execution plan
 type TaskPlan struct {
 	Name        string
+	Mode        string
 	Description string
 	Namespace   string
 	Source      string
@@ -93,6 +94,7 @@ func (p *Planner) Plan(taskName string, program *ast.Program, projectCtx *Projec
 		// Create TaskPlan from domain task
 		taskPlans[domainTask.Name] = &TaskPlan{
 			Name:        domainTask.Name,
+			Mode:        domainTask.Mode,
 			Description: domainTask.Description,
 			Namespace:   domainTask.Namespace,
 			Source:      domainTask.Source,

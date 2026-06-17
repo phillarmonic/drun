@@ -25,8 +25,10 @@ type App struct {
 	listTasks          bool
 	dryRun             bool
 	verbose            bool
+	taskMode           string
 	showVersion        bool
 	initConfig         bool
+	initMinimalConfig  bool
 	saveAsDefault      bool
 	setWorkspace       string
 	selfUpdate         bool
@@ -69,6 +71,7 @@ Examples:
   xdrun build --env=production   # Run 'build' task with environment
   xdrun --list                   # List all available tasks
   xdrun --init                   # Create a new .drun file
+  xdrun --init-minimal           # Create a minimal .drun file
   xdrun --debug --tokens         # Debug lexer tokens
   xdrun --debug --ast            # Debug AST structure
   xdrun --debug --full           # Full debug output
@@ -158,10 +161,12 @@ func (a *App) setupFlags() {
 	flags.BoolVarP(&a.listTasks, "list", "l", false, "[xdrun CLI cmd] List available tasks")
 	flags.BoolVar(&a.dryRun, "dry-run", false, "[xdrun CLI cmd] Show what would be executed without running")
 	flags.BoolVarP(&a.verbose, "verbose", "v", false, "[xdrun CLI cmd] Show detailed execution information")
+	flags.StringVar(&a.taskMode, "task-mode", "", "[xdrun CLI cmd] Override task execution mode for this run (supported: ci, normal)")
 	flags.BoolVar(&a.noDrunCache, "no-drun-cache", false, "[xdrun CLI cmd] Disable remote include caching (always fetch)")
 	flags.BoolVar(&a.showVersion, "version", false, "[xdrun CLI cmd] Show version information")
 	flags.BoolVar(&a.initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
-	flags.BoolVar(&a.saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init)")
+	flags.BoolVar(&a.initMinimalConfig, "init-minimal", false, "[xdrun CLI cmd] Initialize a new minimal .drun task file")
+	flags.BoolVar(&a.saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init or --init-minimal)")
 	flags.StringVar(&a.setWorkspace, "set-workspace", "", "[xdrun CLI cmd] Set workspace default task file location")
 	flags.BoolVar(&a.selfUpdate, "self-update", false, "[xdrun CLI cmd] Check for updates and update xdrun to the latest version")
 	flags.BoolVar(&a.allowUndefinedVars, "allow-undefined-variables", false, "[xdrun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
@@ -216,7 +221,11 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 
 	// Handle --init flag
 	if a.initConfig {
-		return InitializeConfig(a.configFile, a.saveAsDefault)
+		return InitializeConfig(a.configFile, a.saveAsDefault, false)
+	}
+
+	if a.initMinimalConfig {
+		return InitializeConfig(a.configFile, a.saveAsDefault, true)
 	}
 
 	// Handle --set-workspace flag
@@ -250,6 +259,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		a.listTasks,
 		a.dryRun,
 		a.verbose,
+		a.taskMode,
 		a.allowUndefinedVars,
 		a.noDrunCache,
 		args,

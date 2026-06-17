@@ -173,7 +173,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 		}
 
 		// Generate starter configuration
-		template := generateStarterConfig()
+		template := generateStarterConfig(false)
 		if err := os.WriteFile(configLocation, []byte(template), 0600); err != nil {
 			return fmt.Errorf("failed to create template: %w", err)
 		}

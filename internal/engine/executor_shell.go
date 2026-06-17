@@ -65,6 +65,9 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	opts := e.getPlatformShellConfig(ctx)
 	opts.CaptureOutput = true
 	opts.StreamOutput = shellStmt.StreamOutput
+	if shouldBufferShellOutput(ctx, shellStmt) {
+		opts.StreamOutput = false
+	}
 	opts.Output = e.output
 	if svcCtx != nil {
 		opts.WorkingDir = svcCtx.Path
@@ -98,6 +101,9 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	// Execute the script as a single shell session
 	result, err := shell.Execute(script, opts)
 	if err != nil {
+		if shouldBufferShellOutput(ctx, shellStmt) {
+			writeBufferedShellFailure(e.output, result)
+		}
 		_, _ = fmt.Fprintf(e.output, "❌  Multiline command failed: %v\n", err)
 		return err
 	}

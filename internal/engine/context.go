@@ -15,6 +15,7 @@ type ExecutionContext struct {
 	Project            *ProjectContext         // project-level settings and hooks
 	CurrentFile        string                  // path to the current drun file being executed
 	CurrentTask        string                  // name of the currently executing task
+	CurrentTaskMode    string                  // execution mode of the current task (e.g. "ci" or "normal")
 	CurrentNamespace   string                  // namespace of currently executing task/template (for transitive resolution)
 	Program            *ast.Program            // the AST program being executed
 	WorkingDir         string                  // override working directory for shell commands (empty = use process cwd)

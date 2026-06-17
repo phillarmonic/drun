@@ -105,9 +105,9 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 				return nil
 			}
 
-			// Expect parameter value as string
-			if !p.expectPeek(lexer.STRING) {
-				p.addError("expected parameter value as string")
+			// Expect parameter value as string or number
+			if !p.expectPeekOneOf(lexer.STRING, lexer.NUMBER) {
+				p.addError("expected parameter value as string or number")
 				return nil
 			}
 
