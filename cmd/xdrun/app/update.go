@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -25,6 +26,8 @@ type GitHubRelease struct {
 		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
 }
+
+const githubReleasesAPI = "https://api.github.com/repos/phillarmonic/drun/releases"
 
 // HandleSelfUpdate handles the --self-update flag
 func HandleSelfUpdate(versionStr string) error {
@@ -96,11 +99,20 @@ func HandleSelfUpdate(versionStr string) error {
 
 // getLatestVersion fetches the latest version from GitHub
 func getLatestVersion() (string, error) {
+	release, err := getLatestRelease()
+	if err != nil {
+		return "", err
+	}
+
+	return release.TagName, nil
+}
+
+func getLatestRelease() (GitHubRelease, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get("https://api.github.com/repos/phillarmonic/drun/releases/latest")
+	resp, err := client.Get(githubReleasesAPI + "/latest")
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch release information: %w", err)
+		return GitHubRelease{}, fmt.Errorf("failed to fetch release information: %w", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -109,15 +121,40 @@ func getLatestVersion() (string, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return GitHubRelease{}, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
 	var release GitHubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return "", fmt.Errorf("failed to parse release information: %w", err)
+		return GitHubRelease{}, fmt.Errorf("failed to parse release information: %w", err)
 	}
 
-	return release.TagName, nil
+	return release, nil
+}
+
+func getRelease(version string) (GitHubRelease, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(fmt.Sprintf("%s/tags/%s", githubReleasesAPI, version))
+	if err != nil {
+		return GitHubRelease{}, fmt.Errorf("failed to fetch release information: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close response body: %v\n", closeErr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return GitHubRelease{}, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return GitHubRelease{}, fmt.Errorf("failed to parse release information: %w", err)
+	}
+
+	return release, nil
 }
 
 // normalizeVersion removes 'v' prefix and '-dev' suffix for comparison
@@ -181,28 +218,23 @@ func createBackup(currentExe, versionStr string) (string, error) {
 
 // downloadAndInstall downloads and installs the new version
 func downloadAndInstall(version, targetPath string) error {
+	release, err := getRelease(version)
+	if err != nil {
+		return err
+	}
+
 	// Determine platform and architecture
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
 
-	// Map Go arch to release arch
-	var arch string
-	switch goarch {
-	case "amd64":
-		arch = "amd64"
-	case "arm64":
-		arch = "arm64"
-	default:
-		return fmt.Errorf("unsupported architecture: %s", goarch)
+	binaryName, err := releaseBinaryName(goos, goarch)
+	if err != nil {
+		return err
 	}
-
-	// Construct download URL
-	binaryName := fmt.Sprintf("xdrun-%s-%s", goos, arch)
-	if goos == "windows" {
-		binaryName += ".exe"
+	downloadURL, err := findAssetDownloadURL(release, binaryName)
+	if err != nil {
+		return err
 	}
-
-	downloadURL := fmt.Sprintf("https://github.com/phillarmonic/drun/v2/releases/download/%s/%s", version, binaryName)
 
 	fmt.Printf("📥  Downloading %s...\n", binaryName)
 
@@ -264,6 +296,37 @@ func downloadAndInstall(version, targetPath string) error {
 	}
 
 	return nil
+}
+
+func releaseBinaryName(goos, goarch string) (string, error) {
+	switch goarch {
+	case "amd64", "arm64":
+	default:
+		return "", fmt.Errorf("unsupported architecture: %s", goarch)
+	}
+
+	binaryName := fmt.Sprintf("xdrun-%s-%s", goos, goarch)
+	if goos == "windows" {
+		binaryName += ".exe"
+	}
+
+	return binaryName, nil
+}
+
+func findAssetDownloadURL(release GitHubRelease, binaryName string) (string, error) {
+	for _, asset := range release.Assets {
+		if asset.Name == binaryName {
+			return asset.BrowserDownloadURL, nil
+		}
+	}
+
+	availableAssets := make([]string, 0, len(release.Assets))
+	for _, asset := range release.Assets {
+		availableAssets = append(availableAssets, asset.Name)
+	}
+	slices.Sort(availableAssets)
+
+	return "", fmt.Errorf("release asset %q not found for %s (available: %s)", binaryName, release.TagName, strings.Join(availableAssets, ", "))
 }
 
 // installBinary installs the binary, handling permissions as needed
