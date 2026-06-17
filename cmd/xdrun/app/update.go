@@ -86,11 +86,7 @@ func HandleSelfUpdate(versionStr string) error {
 
 	// Display the actual version from the updated binary
 	fmt.Println("\nVerifying updated binary:")
-	// #nosec G204 -- self-update verifies the exact executable path that was just installed.
-	cmd := exec.Command(currentExe, "--version")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := verifyInstalledBinary(currentExe); err != nil {
 		fmt.Printf("⚠️  Warning: Failed to verify updated binary: %v\n", err)
 	}
 
@@ -331,32 +327,129 @@ func findAssetDownloadURL(release GitHubRelease, binaryName string) (string, err
 
 // installBinary installs the binary, handling permissions as needed
 func installBinary(sourcePath, targetPath string) error {
-	// Try direct copy first
+	switch runtime.GOOS {
+	case "windows":
+		return installBinaryWindows(sourcePath, targetPath)
+	case "darwin", "linux":
+		return installBinaryUnix(sourcePath, targetPath)
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+}
+
+func installBinaryUnix(sourcePath, targetPath string) error {
+	targetDir := filepath.Dir(targetPath)
+	tempFile, err := os.CreateTemp(targetDir, "."+filepath.Base(targetPath)+".update-*")
+	if err != nil {
+		return installBinaryUnixElevated(sourcePath, targetPath)
+	}
+	tempPath := tempFile.Name()
+	if closeErr := tempFile.Close(); closeErr != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to prepare temporary install file: %w", closeErr)
+	}
+	defer func() {
+		_ = os.Remove(tempPath)
+	}()
+
+	if err := copyFile(sourcePath, tempPath); err != nil {
+		return fmt.Errorf("failed to stage binary for installation: %w", err)
+	}
+
+	if mode, err := desiredInstallMode(sourcePath, targetPath); err == nil {
+		// #nosec G302 -- installed binary must remain executable for the current user.
+		if chmodErr := os.Chmod(tempPath, mode); chmodErr != nil {
+			return fmt.Errorf("failed to set staged binary permissions: %w", chmodErr)
+		}
+	}
+
+	if err := os.Rename(tempPath, targetPath); err == nil {
+		return nil
+	}
+
+	return installBinaryUnixElevated(sourcePath, targetPath)
+}
+
+func installBinaryUnixElevated(sourcePath, targetPath string) error {
+	fmt.Println("🔐  Requesting elevated permissions...")
+	mode := "755"
+	if desiredMode, err := desiredInstallMode(sourcePath, targetPath); err == nil {
+		mode = fmt.Sprintf("%03o", desiredMode.Perm())
+	}
+
+	// #nosec G204 -- installation intentionally copies the verified binary to the requested target path.
+	cmd := exec.Command("sudo", "install", "-m", mode, sourcePath, targetPath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func installBinaryWindows(sourcePath, targetPath string) error {
+	// Windows generally prevents replacing a running executable in place, so install
+	// via a sibling file first and then replace when the filesystem allows it.
+	pendingPath := targetPath + ".new"
+	_ = os.Remove(pendingPath)
+
+	if err := copyFile(sourcePath, pendingPath); err != nil {
+		return fmt.Errorf("failed to stage binary for installation: %w", err)
+	}
+	defer func() {
+		_ = os.Remove(pendingPath)
+	}()
+
+	if mode, err := desiredInstallMode(sourcePath, targetPath); err == nil {
+		if chmodErr := os.Chmod(pendingPath, mode); chmodErr != nil {
+			return fmt.Errorf("failed to set staged binary permissions: %w", chmodErr)
+		}
+	}
+
+	if err := os.Rename(pendingPath, targetPath); err == nil {
+		return nil
+	}
+
+	// Fall back to a direct copy for cases where Windows permits the overwrite.
 	if err := copyFile(sourcePath, targetPath); err == nil {
 		return nil
 	}
 
-	// If direct copy failed, try with elevated permissions
-	fmt.Println("🔐  Requesting elevated permissions...")
+	return fmt.Errorf("windows cannot replace the running executable in place; a restart may be required to complete the update")
+}
 
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		// Use sudo on Unix-like systems
-		// #nosec G204 -- installation intentionally copies the verified binary to the requested target path.
-		cmd := exec.Command("sudo", "cp", sourcePath, targetPath)
-		cmd.Stdin = os.Stdin
+func desiredInstallMode(sourcePath, targetPath string) (os.FileMode, error) {
+	targetInfo, err := os.Stat(targetPath)
+	if err == nil {
+		return targetInfo.Mode(), nil
+	}
+	if !os.IsNotExist(err) {
+		return 0, err
+	}
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		return 0, err
+	}
+
+	return sourceInfo.Mode(), nil
+}
+
+func verifyInstalledBinary(binaryPath string) error {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		// #nosec G204 -- self-update verifies the exact executable path that was just installed.
+		cmd := exec.Command(binaryPath, "--version")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		return cmd.Run()
+		if err := cmd.Run(); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
 
-	case "windows":
-		// On Windows, we need to use PowerShell with elevation
-		// This is more complex and might require the user to run as administrator
-		return copyFile(sourcePath, targetPath)
-
-	default:
-		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+		time.Sleep(250 * time.Millisecond)
 	}
+
+	return lastErr
 }
 
 // copyFile copies a file from source to destination
