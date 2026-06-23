@@ -87,6 +87,21 @@ xdrun cmd:completion
 
 If you want the generated completion script or shell-specific setup details, check the CLI help for the completion command in your environment.
 
+## Language Server
+
+`xdrun` also includes a simple stdio Language Server Protocol entrypoint for editor integrations:
+
+```bash
+xdrun cmd:lsp
+```
+
+The current server supports:
+
+- `initialize`, `shutdown`, and `exit`
+- Full-document text sync
+- Parser-backed diagnostics
+- Simple keyword and task-name completions
+
 ## Self-Update
 
 Update `xdrun` in place:
@@ -133,6 +148,7 @@ Examples:
 ```bash
 xdrun cmd:completion
 xdrun cmd:from makefile
+xdrun cmd:lsp
 xdrun cmd:secret
 ```
 

@@ -114,7 +114,9 @@ build docker image "custom-name:v1.0"
 
 ```ebnf
 (* Top-level constructs *)
-program = { project_declaration | global_declaration | task_definition } ;
+program = { version_statement | project_declaration | snippet_definition | template_task_definition | task_definition | service_definition | orchestration_definition } ;
+
+version_statement = "version" ":" number_literal ;
 
 (* Project declaration *)
 project_declaration = "project" string_literal [ "version" string_literal ] ":" 
@@ -128,10 +130,19 @@ project_setting = "set" identifier "to" expression
                 | "requires" "tools" ":" { tool_requirement }
                 | shell_config ;
 
+(* Reusable declarations *)
+snippet_definition = "snippet" string_literal ":" statement_block ;
+
+template_task_definition = "template" "task" string_literal ":"
+                         { task_property }
+                         statement_block ;
+
 (* Task definition *)
-task_definition = "task" string_literal [ "mode" string_literal ] [ "means" string_literal ] ":"
+task_definition = "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
                  { task_property }
                  statement_block ;
+
+task_name = string_literal | identifier_like ;
 
 task_property = parameter_declaration
               | dependency_declaration
@@ -182,7 +193,7 @@ statement = expression_statement
 expression_statement = expression ;
 
 control_statement = if_statement
-                  | when_statement
+                  | conditional_when_statement
                   | for_statement
                   | try_statement ;
 
@@ -196,11 +207,11 @@ action_statement = built_in_action
 
 (* Control flow *)
 if_statement = "if" condition ":" statement_block
-              [ "else" "if" condition ":" statement_block ]
+              { "else" "if" condition ":" statement_block }
               [ "else" ":" statement_block ] ;
 
-when_statement = "when" expression ":" statement_block
-                [ "otherwise" ":" statement_block ] ;
+conditional_when_statement = "when" condition ":" statement_block
+                           [ "otherwise" ":" statement_block ] ;
 
 for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
                statement_block ;
@@ -210,7 +221,7 @@ try_statement = "try" ":" statement_block
                [ "finally" ":" statement_block ] ;
 
 (* Task calls *)
-task_call_statement = "call" "task" string_literal [ "with" parameter_list ] ;
+task_call_statement = "call" "task" task_name [ "with" parameter_list ] ;
 
 parameter_list = parameter_assignment { parameter_assignment } ;
 
@@ -255,8 +266,13 @@ argument_list = expression { "," expression } ;
 (* Variables *)
 variable_declaration = "let" identifier "be" expression
                      | "set" identifier "to" expression
-                     | "capture" identifier "from" expression
-                     | "capture" "from" "shell" string "as" variable ;
+                     | capture_expression_statement
+                     | capture_shell_statement ;
+
+capture_expression_statement = "capture" identifier "from" expression ;
+
+capture_shell_statement = "capture" "from" "shell" string_literal "as" variable
+                        | "capture" "from" "shell" "as" variable ":" statement_block ;
 
 constant_declaration = "define" identifier "as" expression ;
 
@@ -307,14 +323,14 @@ shell_action = "run" | "exec" | "shell" ;
 (* Detection statements *)
 detection_statement = "detect" detection_target
                     | "detect" "available" tool_alternatives [ "as" variable_name ]
-                    | "if" tool_list "is" "available" ":" statement_block [ "else" ":" statement_block ]
-                    | "if" tool_list "is" "not" "available" ":" statement_block [ "else" ":" statement_block ]
-                    | "if" ( tool_name | string_literal ) "version" comparison_operator string_literal ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list availability_verb "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list availability_verb "not" "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
+                    | "if" ( tool_name | string_literal ) "version" comparison_operator version_value ":" statement_block [ "else" ":" statement_block ]
                     | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
 
 tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
 
-(* Note: Both "is" and "are" are accepted for tool availability checks *)
+availability_verb = "is" | "are" ;
 
 detection_target = "project" "type"
                  | tool_name [ "version" ] ;
@@ -326,6 +342,7 @@ tool_name = identifier ;
 environment_name = "ci" | "local" | "production" | "staging" | "development" | identifier ;
 
 variable_name = "$" identifier ;
+version_value = string_literal | number_literal ;
 
 (* Shell configuration *)
 shell_config = "shell" "config" ":" { platform_config } ;
@@ -360,6 +377,7 @@ pipe_operation = "replace" string_literal ( "by" | "with" ) string_literal
 (* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
 variable = "$" identifier ;  (* Declared variables: $name, $environment *)
 loop_variable = identifier ; (* Loop variables: item, i, file *)
+identifier_like = identifier { "-" identifier } ;
 
 number_literal = integer_literal | float_literal ;
 integer_literal = digit { digit } ;
@@ -376,6 +394,45 @@ object_member = ( identifier | string_literal ) ":" expression ;
 identifier = letter { letter | digit | "_" } ;
 letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
 digit = "0" | "1" | ... | "9" ;
+
+(* Service and orchestration declarations *)
+service_definition = "service" string_literal "in" string_literal ":" statement_block ;
+
+orchestration_definition = "orchestrate" string_literal ":" statement_block ;
+
+orchestration_action_statement = "orchestrate" string_literal orchestration_action
+                               [ service_filter ]
+                               [ orchestration_option_block ]
+                               [ "starting" "from" ( string_literal | variable | interpolation ) ] ;
+
+orchestration_action = "start"
+                     | "up"
+                     | "stop"
+                     | "restart"
+                     | "recreate"
+                     | "status"
+                     | "show" "endpoints"
+                     | "endpoints"
+                     | "health"
+                     | "health_check"
+                     | "build"
+                     | "pull"
+                     | "down"
+                     | "logs"
+                     | "clone" "repositories"
+                     | "update" "repositories"
+                     | "list" "branches" [ string_literal ]
+                     | "switch" "branch" "to" "default"
+                     | "set" "all" "branches" "to" "default" ;
+
+service_filter = "services" array_literal
+               | "service" ( string_literal | variable | interpolation ) ;
+
+orchestration_option_block = "with" orchestration_option { [ "," ] orchestration_option } ;
+
+orchestration_option = "cache" string_literal
+                     | "branch" string_literal
+                     | "timeout" string_literal ;
 
 (* Comments *)
 single_line_comment = "#" { any_character_except_newline } ;
@@ -1283,20 +1340,30 @@ task "build strategy":
 - **Proper precedence**: Conditions evaluated in order, first match wins
 - **Optional else**: Final `else` clause is optional
 
-#### When Statements (Pattern Matching)
+#### When Statements
 
-```
-when <expression>:
-  is <value>: <statements>
-  is <value>: <statements>
-  else: <statements>
+The current parser-backed `when` form is a conditional block with an optional `otherwise` branch:
+
+```drun
+when <condition>:
+  <statements>
+otherwise:
+  <statements>
 
 # Example:
-when package_manager:
-  is "npm": run "npm ci && npm run build"
-  is "yarn": run "yarn install && yarn build"
-  is "pnpm": run "pnpm install && pnpm build"
-  else: error "Unknown package manager: {package_manager}"
+when $package_manager is "npm":
+  run "npm ci && npm run build"
+otherwise:
+  error "Unsupported package manager: {$package_manager}"
+```
+
+Use `when in <environment> environment:` for environment-targeted detection blocks:
+
+```drun
+when in ci environment:
+  info "Running in CI"
+else:
+  info "Running locally"
 ```
 
 #### For Loops
@@ -5664,6 +5731,19 @@ func (ls *LanguageServer) HandleCompletion(params CompletionParams) ([]Completio
     }
 }
 ```
+
+Drun exposes a simple stdio LSP entrypoint through the CLI:
+
+```bash
+xdrun cmd:lsp
+```
+
+The current implementation is intentionally small and focused on editor essentials:
+
+- `initialize`, `shutdown`, and `exit`
+- Full text-document sync
+- Parser-backed diagnostics
+- Simple keyword and task-name completions
 
 #### Syntax Highlighting
 
