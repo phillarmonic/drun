@@ -43,11 +43,15 @@ func (ds *DetectionStatement) String() string {
 			out.WriteString(" as " + ds.CaptureVar)
 		}
 	case "if_available":
+		condition := strings.ReplaceAll(ds.Condition, "_", " ")
+		if condition == "" {
+			condition = "available"
+		}
 		if len(ds.Alternatives) > 0 {
 			tools := append([]string{ds.Target}, ds.Alternatives...)
-			out.WriteString("if " + strings.Join(tools, ",") + " is available")
+			out.WriteString("if " + strings.Join(tools, ",") + " is " + condition)
 		} else {
-			out.WriteString("if " + ds.Target + " is available")
+			out.WriteString("if " + ds.Target + " is " + condition)
 		}
 		if ds.VersionOp != "" {
 			out.WriteString(" and version " + ds.VersionOp + " " + ds.VersionValue)

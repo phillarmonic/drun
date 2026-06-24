@@ -10,6 +10,10 @@ task "check-docker-ecosystem" means "Check Docker, Buildx, and Compose availabil
 		info "✅ Docker is available"
 		detect docker version
 		info "Docker version: {docker_version}"
+		if docker is running:
+			info "✅ Docker daemon is reachable"
+		else:
+			warn "❌ Docker is installed, but the daemon is not reachable"
 	else:
 		warn "❌ Docker is not available"
 

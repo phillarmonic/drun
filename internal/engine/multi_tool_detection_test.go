@@ -2,6 +2,9 @@ package engine
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -119,5 +122,60 @@ task "test":
 				t.Errorf("expected output to contain %q, but got:\n%s", tt.expectInOutput, outputStr)
 			}
 		})
+	}
+}
+
+func TestDetectionRunningLogic(t *testing.T) {
+	originalPath := os.Getenv("PATH")
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "docker")
+
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"compose\" ] && [ \"$2\" = \"version\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"info\" ]; then\n" +
+		"  exit 1\n" +
+		"fi\n" +
+		"exit 0\n"
+
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(tmpDir, "docker.bat")
+		script = "@echo off\r\n" +
+			"if \"%1\"==\"compose\" if \"%2\"==\"version\" exit /b 0\r\n" +
+			"if \"%1\"==\"info\" exit /b 1\r\n" +
+			"exit /b 0\r\n"
+	}
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake docker: %v", err)
+	}
+
+	t.Setenv("PATH", tmpDir+string(os.PathListSeparator)+originalPath)
+
+	var output bytes.Buffer
+	engine := NewEngine(&output)
+	engine.SetDryRun(true)
+
+	l := lexer.NewLexer(`version: 2.0
+
+task "test":
+  if docker is not running:
+    info "Docker daemon is not reachable"
+  else:
+    error "Should not reach here"`)
+	p := parser.NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser errors: %v", p.Errors())
+	}
+
+	if err := engine.Execute(program, "test"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output.String(), "Docker daemon is not reachable") {
+		t.Fatalf("expected output to mention docker daemon not reachable, got:\n%s", output.String())
 	}
 }

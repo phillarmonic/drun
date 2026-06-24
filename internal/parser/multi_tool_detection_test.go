@@ -45,6 +45,16 @@ task "test":
 			condition:     "not_available",
 		},
 		{
+			name: "multiple tools running",
+			input: `version: 2.0
+
+task "test":
+  if docker,"docker compose" are running:
+    info "ok"`,
+			expectedTools: []string{"docker", "docker compose"},
+			condition:     "running",
+		},
+		{
 			name: "mixed quoted and unquoted tools",
 			input: `version: 2.0
 

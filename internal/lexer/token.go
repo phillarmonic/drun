@@ -228,6 +228,7 @@ const (
 	DETECT      // detect
 	AVAILABLE   // available
 	NOT         // not
+	RUNNING     // running
 	INSTALLED   // installed
 	TOOL        // tool
 	TOOLS       // tools
@@ -855,6 +856,8 @@ func (t TokenType) String() string {
 		return "AVAILABLE"
 	case NOT:
 		return "NOT"
+	case RUNNING:
+		return "RUNNING"
 	case INSTALLED:
 		return "INSTALLED"
 	case TOOL:
@@ -1415,6 +1418,7 @@ var keywords = map[string]TokenType{
 	"detect":        DETECT,
 	"available":     AVAILABLE,
 	"not":           NOT,
+	"running":       RUNNING,
 	"installed":     INSTALLED,
 	"tool":          TOOL,
 	"tools":         TOOLS,

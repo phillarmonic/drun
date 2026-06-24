@@ -2,6 +2,7 @@ package detection
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 )
@@ -202,5 +203,86 @@ func TestDetector_compareVersions(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("compareVersions(%v, %v) = %d, expected %d", test.v1, test.v2, result, test.expected)
 		}
+	}
+}
+
+func TestDetector_IsToolRunningDocker(t *testing.T) {
+	originalPath := os.Getenv("PATH")
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "docker")
+
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"info\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"compose\" ] && [ \"$2\" = \"version\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"buildx\" ] && [ \"$2\" = \"version\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(tmpDir, "docker.bat")
+		script = "@echo off\r\n" +
+			"if \"%1\"==\"info\" exit /b 0\r\n" +
+			"if \"%1\"==\"compose\" if \"%2\"==\"version\" exit /b 0\r\n" +
+			"if \"%1\"==\"buildx\" if \"%2\"==\"version\" exit /b 0\r\n" +
+			"exit /b 0\r\n"
+	}
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake docker: %v", err)
+	}
+
+	t.Setenv("PATH", tmpDir+string(os.PathListSeparator)+originalPath)
+
+	detector := NewDetector()
+	if !detector.IsToolRunning("docker") {
+		t.Fatalf("expected docker to be running")
+	}
+	if !detector.IsToolRunning("docker compose") {
+		t.Fatalf("expected docker compose to be running when docker daemon is reachable")
+	}
+}
+
+func TestDetector_IsToolRunningDockerUnavailableDaemon(t *testing.T) {
+	originalPath := os.Getenv("PATH")
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "docker")
+
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"compose\" ] && [ \"$2\" = \"version\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"info\" ]; then\n" +
+		"  exit 1\n" +
+		"fi\n" +
+		"exit 0\n"
+
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(tmpDir, "docker.bat")
+		script = "@echo off\r\n" +
+			"if \"%1\"==\"compose\" if \"%2\"==\"version\" exit /b 0\r\n" +
+			"if \"%1\"==\"info\" exit /b 1\r\n" +
+			"exit /b 0\r\n"
+	}
+
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("failed to write fake docker: %v", err)
+	}
+
+	t.Setenv("PATH", tmpDir+string(os.PathListSeparator)+originalPath)
+
+	detector := NewDetector()
+	if !detector.IsToolAvailable("docker") {
+		t.Fatalf("expected docker to be available")
+	}
+	if detector.IsToolRunning("docker") {
+		t.Fatalf("expected docker daemon check to fail")
+	}
+	if detector.IsToolRunning("docker compose") {
+		t.Fatalf("expected docker compose running check to fail when daemon is unreachable")
 	}
 }

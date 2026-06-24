@@ -1594,6 +1594,14 @@ else:
 if docker,"docker-compose",kubectl are not available:
   error "One or more required tools are missing"
 
+# For "is running": ALL tools must be running (AND logic)
+if docker,"docker compose" are running:
+  info "Docker CLI and daemon are ready"
+
+# For "is not running": ANY tool may be down (OR logic)
+if docker,"docker compose" are not running:
+  fail "Docker is installed, but the runtime is not reachable"
+
 # Availability can be chained with a version check
 if "golangci-lint" is available and version >= "2.12":
   info "golangci-lint is installed and new enough"
@@ -4629,8 +4637,10 @@ task "security":
 **Key Features:**
 - **Fail-Fast**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error.
 - **Multiple Bounds**: Supports chaining comparison operators (`>=`, `<=`, `>`, `<`) on the same line to define a range.
-- **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the tool must be installed, without version checking.
+- **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the executable must be present on `PATH`, without version checking.
 - **Unquoted Versions**: Supports both quoted (`"1.21"`) and unquoted (`1.21`) version numbers.
+
+`requires tools:` validates installation and version only. It does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
 
 #### Dynamic Detection
 
@@ -4653,10 +4663,17 @@ if docker is available:
 else:
     error "Docker not found"
 
+if docker is running:
+    info "Docker daemon is reachable"
+else:
+    fail "Docker is installed, but the daemon is not reachable"
+
 if kubectl is not available:
     warn "Kubernetes tools not installed"
     info "Skipping Kubernetes deployment"
 ```
+
+`available` checks whether the command can be found and invoked. `running` is stricter and is intended for tools with a runtime component, such as Docker, where the CLI may exist even if the daemon/socket is unavailable.
 
 #### Supported Tool Keywords
 
