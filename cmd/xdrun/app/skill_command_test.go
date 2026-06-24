@@ -76,6 +76,9 @@ func TestInstallProjectSkillCreatesExpectedFiles(t *testing.T) {
 	if !strings.Contains(guide, "saves tokens") && !strings.Contains(guide, "save output tokens") {
 		t.Fatalf("guide should explain ci mode token savings:\n%s", guide)
 	}
+	if !strings.Contains(guide, "https://github.com/phillarmonic/drun") {
+		t.Fatalf("guide should reference the official upstream repo:\n%s", guide)
+	}
 }
 
 func TestInstallProjectSkillSkipsExistingFilesWithoutForce(t *testing.T) {
