@@ -217,14 +217,33 @@ func fetchInitTemplateContent(url string) ([]byte, error) {
 }
 
 func resolveDefaultTemplateManifest(manifestRef, templatesRepo string) (string, error) {
+	resolveLocalDir := func(ref string) (string, error) {
+		if !isLocalTemplatePath(ref) {
+			return ref, nil
+		}
+
+		// #nosec G304,G703 -- template manifest refs intentionally allow user-selected local paths.
+		info, err := os.Stat(ref)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return ref, nil
+			}
+			return "", fmt.Errorf("failed to inspect template manifest path %q: %w", ref, err)
+		}
+		if info.IsDir() {
+			return filepath.Join(ref, "templates.yaml"), nil
+		}
+		return ref, nil
+	}
+
 	if manifestRef != "" {
-		return manifestRef, nil
+		return resolveLocalDir(manifestRef)
 	}
 	if templatesRepo != "" {
 		return filepath.Join(templatesRepo, "templates.yaml"), nil
 	}
 	if explicitManifest := os.Getenv("DRUN_TEMPLATES_MANIFEST"); explicitManifest != "" {
-		return explicitManifest, nil
+		return resolveLocalDir(explicitManifest)
 	}
 	if repoRoot := os.Getenv("DRUN_TEMPLATES_REPO"); repoRoot != "" {
 		return filepath.Join(repoRoot, "templates.yaml"), nil

@@ -603,6 +603,7 @@ task "invalid":
 ```bash
 xdrun --list-templates --templates-repo ../drun-templates
 xdrun --init --template go-cli --templates-repo ../drun-templates
+xdrun --init --from-template ../drun-templates --template go-cli
 
 # Or target a specific manifest:
 xdrun --init \
@@ -616,10 +617,12 @@ xdrun --init \
 - `--list-templates --templates-repo <path>` lists templates from that local repository
 - `--list-templates --from-template <manifest>` lists templates from a specific manifest
 - `--template <name> --templates-repo <path>` resolves through that local repository
-- `--from-template` accepts `github:...`, `drunhub:...`, `https://...`, or a local manifest path
+- `--from-template` accepts `github:...`, `drunhub:...`, `https://...`, a local manifest path, or a local directory root containing `templates.yaml`
 - `--template` is required when `--from-template` is used for initialization
 - If neither `--templates-repo` nor `--from-template` is provided, `xdrun` falls back to configured catalog sources such as `DRUN_TEMPLATES_MANIFEST`, `DRUN_TEMPLATES_REPO`, or the remote official catalog
 - `--file` and `--save-as-default` behave the same as regular `xdrun --init`
+
+For local template development, a directory target lets you test without publishing a remote manifest. If `--from-template` points at a directory, `xdrun` reads `templates.yaml` from that directory root automatically.
 
 #### Manifest Format
 
@@ -4838,6 +4841,13 @@ run "{$package_manager} run build"
 # Docker Buildx variants
 detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
+```
+
+When you only need the resolved command string inline, use the builtin interpolation macro:
+
+```
+run "{docker compose command} up -d"
+run "{docker compose command} logs --tail=100"
 ```
 
 #### Benefits

@@ -54,7 +54,10 @@ Initialize from a local template repository:
 ```bash
 xdrun --list-templates --templates-repo ../drun-templates
 xdrun --init --template go-cli --templates-repo ../drun-templates
+xdrun --init --from-template ../drun-templates --template go-cli
 ```
+
+When `--from-template` points at a local directory, `xdrun` looks for `templates.yaml` at that directory root. This is useful when developing templates locally before publishing a remote manifest.
 
 Then run it:
 

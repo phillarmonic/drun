@@ -54,25 +54,26 @@ var (
 
 // Registry holds all built-in functions
 var Registry = map[string]BuiltinFunction{
-	"current git commit":    getCurrentGitCommit,
-	"current git branch":    getCurrentGitBranch,
-	"now.format":            formatCurrentTime,
-	"file exists":           checkFileExists,
-	"dir exists":            checkDirExists,
-	"env":                   getEnvironmentVariable,
-	"pwd":                   getCurrentDirectory,
-	"hostname":              getHostname,
-	"start progress":        startProgress,
-	"update progress":       updateProgress,
-	"finish progress":       finishProgress,
-	"start timer":           startTimer,
-	"stop timer":            stopTimer,
-	"show elapsed time":     showElapsedTime,
-	"docker compose status": checkDockerComposeStatus,
-	"secret":                getSecret,
-	"dns_resolve":           getDNSResolve,
-	"dns_check":             getDNSCheck,
-	"dns_validate":          getDNSValidate,
+	"current git commit":     getCurrentGitCommit,
+	"current git branch":     getCurrentGitBranch,
+	"now.format":             formatCurrentTime,
+	"file exists":            checkFileExists,
+	"dir exists":             checkDirExists,
+	"env":                    getEnvironmentVariable,
+	"pwd":                    getCurrentDirectory,
+	"hostname":               getHostname,
+	"start progress":         startProgress,
+	"update progress":        updateProgress,
+	"finish progress":        finishProgress,
+	"start timer":            startTimer,
+	"stop timer":             stopTimer,
+	"show elapsed time":      showElapsedTime,
+	"docker compose command": getDockerComposeCommand,
+	"docker compose status":  checkDockerComposeStatus,
+	"secret":                 getSecret,
+	"dns_resolve":            getDNSResolve,
+	"dns_check":              getDNSCheck,
+	"dns_validate":           getDNSValidate,
 }
 
 // getCurrentGitCommit returns the current git commit hash
@@ -485,6 +486,19 @@ func createProgressBar(percentage int) string {
 	bar += "]"
 
 	return bar
+}
+
+func getDockerComposeCommand(ctx Context, args ...string) (string, error) {
+	if len(args) > 0 {
+		return "", fmt.Errorf("docker compose command does not accept arguments")
+	}
+
+	composeCmd, err := detectDockerComposeCommand()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Join(composeCmd, " "), nil
 }
 
 // checkDockerComposeStatus checks if a Docker Compose project is in a usable state

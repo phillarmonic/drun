@@ -443,6 +443,85 @@ func TestResolveDefaultTemplateManifestPrefersTemplatesRepo(t *testing.T) {
 	}
 }
 
+func TestResolveDefaultTemplateManifestUsesTemplatesYAMLForLocalDirectory(t *testing.T) {
+	tempRoot := t.TempDir()
+
+	manifest, err := resolveDefaultTemplateManifest(tempRoot, "")
+	if err != nil {
+		t.Fatalf("resolveDefaultTemplateManifest() error = %v", err)
+	}
+	if manifest != filepath.Join(tempRoot, "templates.yaml") {
+		t.Fatalf("manifest = %q", manifest)
+	}
+}
+
+func TestInitializeConfigAcceptsLocalTemplateDirectoryViaFromTemplate(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "directory-template-app")
+	if err := os.Mkdir(projectDir, 0750); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	templateRepo := filepath.Join(tempRoot, "drun-templates")
+	if err := os.Mkdir(templateRepo, 0750); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    source: "go-cli.drun"
+`
+	templateSpec := `version: 2.0
+
+project "starter" version "1.0":
+task "default" means "Welcome":
+	info "{{project_name}} Drun Spec"
+`
+
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			t.Fatalf("Chdir() restore error = %v", chdirErr)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		switch url {
+		case filepath.Join(templateRepo, "templates.yaml"):
+			return []byte(manifest), nil
+		case filepath.Join(templateRepo, "go-cli.drun"):
+			return []byte(templateSpec), nil
+		default:
+			return nil, os.ErrNotExist
+		}
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+
+	if err := InitializeConfig("", false, false, templateRepo, "go-cli", ""); err != nil {
+		t.Fatalf("InitializeConfig() error = %v", err)
+	}
+
+	content, err := os.ReadFile(".drun/spec.drun")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(content), `project "directory-template-app" version "1.0":`) {
+		t.Fatalf("generated config did not use local template directory:\n%s", string(content))
+	}
+}
+
 func assertGeneratedConfigParses(t *testing.T, config string) {
 	t.Helper()
 
