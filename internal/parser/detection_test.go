@@ -132,6 +132,40 @@ task "docker_task":
 	}
 }
 
+func TestParser_IfToolRunning(t *testing.T) {
+	input := `version: 2.0
+
+task "docker_task":
+  if docker is running:
+    info "Docker daemon is reachable"
+  else:
+    warn "Docker daemon is not reachable"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	task := program.Tasks[0]
+	detectionStmt, ok := task.Body[0].(*ast.DetectionStatement)
+	if !ok {
+		t.Fatalf("first statement should be DetectionStatement. got=%T", task.Body[0])
+	}
+
+	if detectionStmt.Type != "if_available" {
+		t.Errorf("detection type not 'if_available'. got=%q", detectionStmt.Type)
+	}
+
+	if detectionStmt.Target != "docker" {
+		t.Errorf("detection target not 'docker'. got=%q", detectionStmt.Target)
+	}
+
+	if detectionStmt.Condition != "running" {
+		t.Errorf("detection condition not 'running'. got=%q", detectionStmt.Condition)
+	}
+}
+
 func TestParser_IfVersionComparison(t *testing.T) {
 	input := `version: 2.0
 

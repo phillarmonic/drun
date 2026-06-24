@@ -108,12 +108,18 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 					p.nextToken() // consume AVAILABLE
 					stmt.Condition = "available"
 					p.parseOptionalAvailabilityVersion(stmt)
+				case lexer.RUNNING:
+					p.nextToken() // consume RUNNING
+					stmt.Condition = "running"
 				case lexer.NOT:
 					p.nextToken() // consume NOT
 					if p.peekToken.Type == lexer.AVAILABLE {
 						p.nextToken() // consume AVAILABLE
 						stmt.Condition = "not_available"
 						p.parseOptionalAvailabilityVersion(stmt)
+					} else if p.peekToken.Type == lexer.RUNNING {
+						p.nextToken() // consume RUNNING
+						stmt.Condition = "not_running"
 					}
 				}
 			case lexer.VERSION:

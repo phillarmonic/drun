@@ -1,11 +1,13 @@
 package detection
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Detector handles smart detection of tools, frameworks, and environments
@@ -80,6 +82,26 @@ func (d *Detector) IsToolAvailable(tool string) bool {
 
 	d.cache[cacheKey] = available
 	return available
+}
+
+// IsToolRunning checks whether a tool is operational, not merely installed.
+// Docker-family tools require a reachable daemon/socket.
+func (d *Detector) IsToolRunning(tool string) bool {
+	cacheKey := "running_" + tool
+	if cached, exists := d.cache[cacheKey]; exists {
+		return cached.(bool)
+	}
+
+	var running bool
+	switch strings.ToLower(tool) {
+	case "docker", "docker-compose", "docker compose", "docker-buildx", "docker buildx":
+		running = d.isDockerDaemonRunning()
+	default:
+		running = d.IsToolAvailable(tool)
+	}
+
+	d.cache[cacheKey] = running
+	return running
 }
 
 // GetToolVersion gets the version of a tool
@@ -270,6 +292,15 @@ func (d *Detector) isCommandAvailable(command string) bool {
 	return err == nil
 }
 
+func (d *Detector) runCommandWithTimeout(command string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// #nosec G204 -- tool detection intentionally executes known tool status/version commands.
+	cmd := exec.CommandContext(ctx, command, args...)
+	return cmd.Run()
+}
+
 func (d *Detector) getCommandVersion(command, flag, pattern string) string {
 	// #nosec G204 -- tool detection intentionally executes known tool version flags.
 	cmd := exec.Command(command, flag)
@@ -418,8 +449,7 @@ func (d *Detector) compareVersions(v1, v2 []int) int {
 func (d *Detector) isDockerBuildxAvailable() bool {
 	// First try "docker buildx" (modern Docker installations)
 	if d.isCommandAvailable("docker") {
-		cmd := exec.Command("docker", "buildx", "version")
-		if err := cmd.Run(); err == nil {
+		if err := d.runCommandWithTimeout("docker", "buildx", "version"); err == nil {
 			return true
 		}
 	}
@@ -433,14 +463,21 @@ func (d *Detector) isDockerBuildxAvailable() bool {
 func (d *Detector) isDockerComposeAvailable() bool {
 	// First try "docker compose" (Docker Compose V2)
 	if d.isCommandAvailable("docker") {
-		cmd := exec.Command("docker", "compose", "version")
-		if err := cmd.Run(); err == nil {
+		if err := d.runCommandWithTimeout("docker", "compose", "version"); err == nil {
 			return true
 		}
 	}
 
 	// Fallback to standalone "docker-compose" command (V1)
 	return d.isCommandAvailable("docker-compose")
+}
+
+func (d *Detector) isDockerDaemonRunning() bool {
+	if !d.isCommandAvailable("docker") {
+		return false
+	}
+
+	return d.runCommandWithTimeout("docker", "info") == nil
 }
 
 // getDockerBuildxVersion gets the Docker Buildx version

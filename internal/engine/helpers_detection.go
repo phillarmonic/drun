@@ -57,7 +57,8 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 	var conditionMet bool
 	var conditionText string
 
-	if stmt.Condition == "not_available" {
+	switch stmt.Condition {
+	case "not_available":
 		// For "not available": condition is true if ANY tool is not available (OR logic)
 		conditionMet = false
 		for _, tool := range toolsToCheck {
@@ -73,7 +74,39 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 			toolNames := strings.Join(toolsToCheck, ", ")
 			conditionText = fmt.Sprintf("any of [%s] is not available", toolNames)
 		}
-	} else {
+	case "running":
+		// For "running": condition is true if ALL tools are running (AND logic)
+		conditionMet = true
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolRunning(tool) {
+				conditionMet = false
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is running", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("all of [%s] are running", toolNames)
+		}
+	case "not_running":
+		// For "not running": condition is true if ANY tool is not running (OR logic)
+		conditionMet = false
+		for _, tool := range toolsToCheck {
+			if !detector.IsToolRunning(tool) {
+				conditionMet = true
+				break
+			}
+		}
+
+		if len(toolsToCheck) == 1 {
+			conditionText = fmt.Sprintf("%s is not running", stmt.Target)
+		} else {
+			toolNames := strings.Join(toolsToCheck, ", ")
+			conditionText = fmt.Sprintf("any of [%s] is not running", toolNames)
+		}
+	default:
 		// For "is available": condition is true if ALL tools are available (AND logic)
 		conditionMet = true
 		for _, tool := range toolsToCheck {
