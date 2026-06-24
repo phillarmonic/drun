@@ -116,6 +116,7 @@ The updater is designed to:
 - Replace the current binary
 - Keep backups under `~/.drun/`
 - Restore the previous version if the update fails
+- Ignore freshly published releases until the current platform's binary asset is available
 
 ## Makefile Conversion
 

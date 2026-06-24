@@ -20,8 +20,10 @@ import (
 
 // GitHubRelease represents a GitHub release response
 type GitHubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+	Assets     []struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
@@ -39,11 +41,17 @@ func HandleSelfUpdate(versionStr string) error {
 		return fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
-	// Check for latest version
-	latestVersion, err := getLatestVersion()
+	binaryName, err := releaseBinaryName(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return err
+	}
+
+	// Check for the latest compatible version for the current platform.
+	latestRelease, err := getLatestCompatibleRelease(binaryName)
 	if err != nil {
 		return fmt.Errorf("failed to check for updates: %w", err)
 	}
+	latestVersion := latestRelease.TagName
 
 	// Compare versions (normalize both for consistent comparison)
 	currentVersion := normalizeVersion(versionStr)
@@ -93,22 +101,21 @@ func HandleSelfUpdate(versionStr string) error {
 	return nil
 }
 
-// getLatestVersion fetches the latest version from GitHub
-func getLatestVersion() (string, error) {
-	release, err := getLatestRelease()
+func getLatestCompatibleRelease(binaryName string) (GitHubRelease, error) {
+	releases, err := getReleases()
 	if err != nil {
-		return "", err
+		return GitHubRelease{}, err
 	}
 
-	return release.TagName, nil
+	return selectLatestCompatibleRelease(releases, binaryName)
 }
 
-func getLatestRelease() (GitHubRelease, error) {
+func getReleases() ([]GitHubRelease, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get(githubReleasesAPI + "/latest")
+	resp, err := client.Get(githubReleasesAPI)
 	if err != nil {
-		return GitHubRelease{}, fmt.Errorf("failed to fetch release information: %w", err)
+		return nil, fmt.Errorf("failed to fetch release information: %w", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -117,15 +124,15 @@ func getLatestRelease() (GitHubRelease, error) {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return GitHubRelease{}, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
-	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return GitHubRelease{}, fmt.Errorf("failed to parse release information: %w", err)
+	var releases []GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to parse release information: %w", err)
 	}
 
-	return release, nil
+	return releases, nil
 }
 
 func getRelease(version string) (GitHubRelease, error) {
@@ -323,6 +330,29 @@ func findAssetDownloadURL(release GitHubRelease, binaryName string) (string, err
 	slices.Sort(availableAssets)
 
 	return "", fmt.Errorf("release asset %q not found for %s (available: %s)", binaryName, release.TagName, strings.Join(availableAssets, ", "))
+}
+
+func selectLatestCompatibleRelease(releases []GitHubRelease, binaryName string) (GitHubRelease, error) {
+	for _, release := range releases {
+		if release.Draft || release.Prerelease {
+			continue
+		}
+		if hasReleaseAsset(release, binaryName) {
+			return release, nil
+		}
+	}
+
+	return GitHubRelease{}, fmt.Errorf("no published GitHub release includes asset %q yet", binaryName)
+}
+
+func hasReleaseAsset(release GitHubRelease, binaryName string) bool {
+	for _, asset := range release.Assets {
+		if asset.Name == binaryName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // installBinary installs the binary, handling permissions as needed

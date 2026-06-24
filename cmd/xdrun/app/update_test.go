@@ -73,3 +73,77 @@ func TestFindAssetDownloadURL(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestSelectLatestCompatibleRelease(t *testing.T) {
+	t.Parallel()
+
+	mkRelease := func(tag string, draft, prerelease bool, assets ...string) GitHubRelease {
+		release := GitHubRelease{
+			TagName:    tag,
+			Draft:      draft,
+			Prerelease: prerelease,
+		}
+		for _, asset := range assets {
+			release.Assets = append(release.Assets, struct {
+				Name               string `json:"name"`
+				BrowserDownloadURL string `json:"browser_download_url"`
+			}{
+				Name:               asset,
+				BrowserDownloadURL: "https://example.com/" + asset,
+			})
+		}
+		return release
+	}
+
+	t.Run("skips newest release until platform asset exists", func(t *testing.T) {
+		t.Parallel()
+
+		releases := []GitHubRelease{
+			mkRelease("v2.21.0", false, false, "xdrun-linux-amd64"),
+			mkRelease("v2.20.0", false, false, "xdrun-darwin-arm64", "xdrun-linux-amd64"),
+		}
+
+		got, err := selectLatestCompatibleRelease(releases, "xdrun-darwin-arm64")
+		if err != nil {
+			t.Fatalf("selectLatestCompatibleRelease() error = %v", err)
+		}
+		if got.TagName != "v2.20.0" {
+			t.Fatalf("selectLatestCompatibleRelease() tag = %q, want %q", got.TagName, "v2.20.0")
+		}
+	})
+
+	t.Run("skips draft and prerelease versions", func(t *testing.T) {
+		t.Parallel()
+
+		releases := []GitHubRelease{
+			mkRelease("v2.22.0", true, false, "xdrun-darwin-arm64"),
+			mkRelease("v2.21.0-rc1", false, true, "xdrun-darwin-arm64"),
+			mkRelease("v2.20.0", false, false, "xdrun-darwin-arm64"),
+		}
+
+		got, err := selectLatestCompatibleRelease(releases, "xdrun-darwin-arm64")
+		if err != nil {
+			t.Fatalf("selectLatestCompatibleRelease() error = %v", err)
+		}
+		if got.TagName != "v2.20.0" {
+			t.Fatalf("selectLatestCompatibleRelease() tag = %q, want %q", got.TagName, "v2.20.0")
+		}
+	})
+
+	t.Run("errors when no published release has the asset", func(t *testing.T) {
+		t.Parallel()
+
+		releases := []GitHubRelease{
+			mkRelease("v2.21.0", false, false, "xdrun-linux-amd64"),
+			mkRelease("v2.20.0", false, false, "xdrun-windows-amd64.exe"),
+		}
+
+		_, err := selectLatestCompatibleRelease(releases, "xdrun-darwin-arm64")
+		if err == nil {
+			t.Fatal("expected missing compatible release error")
+		}
+		if !strings.Contains(err.Error(), "xdrun-darwin-arm64") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
