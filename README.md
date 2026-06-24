@@ -49,6 +49,13 @@ Or run this command to initialize a Drun spec file in the current directory (a f
 xdrun --init
 ```
 
+Initialize from a local template repository:
+
+```bash
+xdrun --list-templates --templates-repo ../drun-templates
+xdrun --init --template go-cli --templates-repo ../drun-templates
+```
+
 Then run it:
 
 ```bash

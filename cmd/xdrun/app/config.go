@@ -173,7 +173,11 @@ func loadWorkspaceConfig() (*WorkspaceConfig, error) {
 }
 
 // initializeConfig creates a new drun configuration file
-func InitializeConfig(filename string, saveAsDefault bool, minimal bool) error {
+func InitializeConfig(filename string, saveAsDefault bool, minimal bool, fromTemplate, templateName, templatesRepo string) error {
+	if fromTemplate != "" && templateName == "" {
+		return fmt.Errorf("--from-template requires --template")
+	}
+
 	// Determine the target filename
 	targetFile := ".drun/spec.drun"
 	if filename != "" {
@@ -199,6 +203,13 @@ func InitializeConfig(filename string, saveAsDefault bool, minimal bool) error {
 
 	// Generate starter configuration
 	config := generateStarterConfig(minimal)
+	if fromTemplate != "" || templateName != "" {
+		var err error
+		config, err = generateConfigFromTemplate(fromTemplate, templateName, templatesRepo)
+		if err != nil {
+			return err
+		}
+	}
 
 	// Write the file
 	if err := os.WriteFile(targetFile, []byte(config), 0600); err != nil {

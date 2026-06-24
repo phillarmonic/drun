@@ -596,6 +596,101 @@ task "invalid":
 - **Team standards**: Establish indentation standards for your team
 - **Generated files**: `xdrun --init` uses tabs by default
 
+### `xdrun --init` Template Manifests
+
+`xdrun --init` and `xdrun --init-minimal` can bootstrap a spec from a template catalog instead of the built-in starter config:
+
+```bash
+xdrun --list-templates --templates-repo ../drun-templates
+xdrun --init --template go-cli --templates-repo ../drun-templates
+
+# Or target a specific manifest:
+xdrun --init \
+  --from-template github:owner/repo/templates/drun-init.yaml@main \
+  --template go-cli
+```
+
+#### CLI Rules
+
+- `--templates-repo <path>` points at a local template repository root that contains `templates.yaml`
+- `--list-templates --templates-repo <path>` lists templates from that local repository
+- `--list-templates --from-template <manifest>` lists templates from a specific manifest
+- `--template <name> --templates-repo <path>` resolves through that local repository
+- `--from-template` accepts `github:...`, `drunhub:...`, `https://...`, or a local manifest path
+- `--template` is required when `--from-template` is used for initialization
+- If neither `--templates-repo` nor `--from-template` is provided, `xdrun` falls back to configured catalog sources such as `DRUN_TEMPLATES_MANIFEST`, `DRUN_TEMPLATES_REPO`, or the remote official catalog
+- `--file` and `--save-as-default` behave the same as regular `xdrun --init`
+
+#### Manifest Format
+
+The manifest referenced by `--from-template`, or by the official catalog, is not the final `.drun` spec. The manifest can define templates as a map or a sequence:
+
+```yaml
+version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    description: "Drun starter for Go CLI projects"
+    source: "templates/go-cli.drun"
+```
+
+Equivalent sequence form:
+
+```yaml
+version: "1"
+templates:
+  - name: go-cli
+    kind: go-cli
+    description: "Drun starter for Go CLI projects"
+    source: "templates/go-cli.drun"
+```
+
+Each template entry supports:
+
+- `name`: the template selector passed to `--template`
+- `source`: the `.drun` file to fetch; it can be remote, local, or relative to the manifest
+- `kind`: optional specialization such as `go-cli`
+- `description`: optional human-facing description
+
+#### Placeholder Contract
+
+Template-authored `.drun` files can use a small placeholder vocabulary that `xdrun --init` rewrites safely:
+
+- `{{project_name}}`: inferred from the current working directory
+- `{{binary_name}}`: defaults to the inferred project name
+- `{{cmd_path}}`: defaults to `./cmd/{{binary_name}}`
+- `{{module_name}}`: inferred from local `go.mod` when present, otherwise falls back to the project name
+
+#### Go CLI Template Example
+
+For `kind: go-cli`, `xdrun --init` also applies narrow Go-specific rewrites for common command shapes such as `go build -o ./bin/<name>` and `./cmd/<name>`.
+
+Example remote template:
+
+```drun
+# drun (do-run) CLI is a fast, semantic task runner with
+# its own powerful automation language. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+
+version: 2.0
+
+project "{{project_name}}" version "1.0":
+task "default" means "Welcome":
+	info "{{project_name}} Drun Spec"
+
+task "build" means "Build {{binary_name}}":
+	step "Building {{binary_name}}..."
+	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/{{binary_name}} {{cmd_path}}"
+	success "Build completed for {{binary_name}}"
+
+task "install" means "Install {{binary_name}}":
+	step "Installing {{binary_name}}..."
+	run "go install {{cmd_path}}"
+	success "Install completed for {{module_name}}"
+```
+
+This keeps the rewrite contract explicit: init only rewrites known placeholders and a few well-known Go command patterns. It does not attempt free-form semantic rewriting of arbitrary shell commands.
+
 ### String Interpolation
 
 Strings support variable interpolation using `{$variable}` syntax for declared variables and `{variable}` for loop variables:

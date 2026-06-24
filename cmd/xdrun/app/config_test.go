@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 	"github.com/phillarmonic/drun/v2/internal/parser"
+	"gopkg.in/yaml.v3"
 )
 
 func TestInferProjectNameFromWorkingDirUsesFolderName(t *testing.T) {
@@ -100,6 +103,346 @@ func TestGenerateStarterConfigMinimalContainsOnlyWelcomeTask(t *testing.T) {
 	assertGeneratedConfigParses(t, config)
 }
 
+func TestInitializeConfigUsesOfficialManifestWhenTemplateNameProvided(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "official-template-app")
+	if err := os.Mkdir(projectDir, 0750); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			t.Fatalf("Chdir() restore error = %v", chdirErr)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    description: "Go CLI starter"
+    source: "go-cli.drun"
+`
+	templateSpec := `version: 2.0
+
+project "starter" version "1.0":
+task "default" means "Welcome":
+	info "{{project_name}} Drun Spec"
+`
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		switch url {
+		case "/tmp/official/templates.yaml":
+			return []byte(manifest), nil
+		case "/tmp/official/go-cli.drun":
+			return []byte(templateSpec), nil
+		default:
+			return nil, os.ErrNotExist
+		}
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+	err = InitializeConfig("", false, false, "", "go-cli", "/tmp/official")
+	if err != nil {
+		t.Fatalf("InitializeConfig() error = %v", err)
+	}
+
+	content, err := os.ReadFile(".drun/spec.drun")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(content), `project "official-template-app" version "1.0":`) {
+		t.Fatalf("generated config did not use official manifest:\n%s", string(content))
+	}
+}
+
+func TestInitializeConfigRejectsManifestWithoutTemplateName(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "template-app")
+	if err := os.Mkdir(projectDir, 0750); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			t.Fatalf("Chdir() restore error = %v", chdirErr)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	err = InitializeConfig("", false, false, "https://example.com/templates.yaml", "", "")
+	if err == nil || !strings.Contains(err.Error(), "--from-template requires --template") {
+		t.Fatalf("InitializeConfig() error = %v, want manifest/template validation", err)
+	}
+}
+
+func TestInitializeConfigFromTemplateAppliesGoRewrite(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "my-tool")
+	if err := os.Mkdir(projectDir, 0750); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    description: "Go CLI starter"
+    source: "https://templates.example/go-cli.drun"
+`
+	templateSpec := `# drun (do-run) CLI is a fast, semantic task runner with
+# its own powerful automation language. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+
+version: 2.0
+
+project "comb-os" version "1.0":
+task "default" means "Welcome":
+	info "{{project_name}} Drun Spec"
+
+task "build" means "Build {{binary_name}}":
+	step "Building {{binary_name}}..."
+	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/comb-os ./cmd/comb-os"
+	success "Build completed for {{binary_name}}"
+
+task "install" means "Install {{binary_name}}":
+	step "Installing {{binary_name}}..."
+	run "go install ./cmd/comb-os"
+	success "Install completed for {{module_name}}"
+`
+
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			t.Fatalf("Chdir() restore error = %v", chdirErr)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	goMod := "module github.com/example/my-tool\n\ngo 1.24.0\n"
+	if err := os.WriteFile("go.mod", []byte(goMod), 0600); err != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	}
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		switch url {
+		case "https://templates.example/templates.yaml":
+			return []byte(manifest), nil
+		case "https://templates.example/go-cli.drun":
+			return []byte(templateSpec), nil
+		default:
+			return nil, os.ErrNotExist
+		}
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+
+	if err := InitializeConfig("", false, false, "https://templates.example/templates.yaml", "go-cli", ""); err != nil {
+		t.Fatalf("InitializeConfig() error = %v", err)
+	}
+
+	content, err := os.ReadFile(".drun/spec.drun")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	config := string(content)
+	if !strings.Contains(config, `project "my-tool" version "1.0":`) {
+		t.Fatalf("generated config did not rewrite project name:\n%s", config)
+	}
+	if !strings.Contains(config, `run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/my-tool ./cmd/my-tool"`) {
+		t.Fatalf("generated config did not rewrite go build command:\n%s", config)
+	}
+	if !strings.Contains(config, `run "go install ./cmd/my-tool"`) {
+		t.Fatalf("generated config did not rewrite go install command:\n%s", config)
+	}
+	if !strings.Contains(config, `success "Install completed for github.com/example/my-tool"`) {
+		t.Fatalf("generated config did not rewrite module placeholder:\n%s", config)
+	}
+
+	assertGeneratedConfigParses(t, config)
+}
+
+func TestInitTemplateManifestSupportsMapAndSequence(t *testing.T) {
+	t.Run("map", func(t *testing.T) {
+		input := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    source: "https://example.com/go-cli.drun"
+`
+		var manifest initTemplateManifest
+		if err := yaml.Unmarshal([]byte(input), &manifest); err != nil {
+			t.Fatalf("yaml.Unmarshal() error = %v", err)
+		}
+		if len(manifest.Templates) != 1 || manifest.Templates[0].Name != "go-cli" {
+			t.Fatalf("unexpected templates: %+v", manifest.Templates)
+		}
+	})
+
+	t.Run("sequence", func(t *testing.T) {
+		input := `version: "1"
+templates:
+  - name: go-cli
+    kind: go-cli
+    source: "https://example.com/go-cli.drun"
+`
+		var manifest initTemplateManifest
+		if err := yaml.Unmarshal([]byte(input), &manifest); err != nil {
+			t.Fatalf("yaml.Unmarshal() error = %v", err)
+		}
+		if len(manifest.Templates) != 1 || manifest.Templates[0].Name != "go-cli" {
+			t.Fatalf("unexpected templates: %+v", manifest.Templates)
+		}
+	})
+}
+
+func TestLoadInitTemplateManifestResolvesRelativeLocalSources(t *testing.T) {
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    source: "templates/go-cli.drun"
+`
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		if url == "/catalog/templates.yaml" {
+			return []byte(manifest), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+
+	loaded, err := loadInitTemplateManifest("/catalog/templates.yaml")
+	if err != nil {
+		t.Fatalf("loadInitTemplateManifest() error = %v", err)
+	}
+	if loaded.Templates[0].Source != "/catalog/templates/go-cli.drun" {
+		t.Fatalf("resolved source = %q", loaded.Templates[0].Source)
+	}
+}
+
+func TestLoadInitTemplateManifestResolvesRelativeGitHubSources(t *testing.T) {
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    source: "templates/go-cli.drun"
+`
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		if url == "github:phillarmonic/drun-templates/catalog/templates.yaml@main" {
+			return []byte(manifest), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+
+	loaded, err := loadInitTemplateManifest("github:phillarmonic/drun-templates/catalog/templates.yaml@main")
+	if err != nil {
+		t.Fatalf("loadInitTemplateManifest() error = %v", err)
+	}
+	if loaded.Templates[0].Source != "github:phillarmonic/drun-templates/catalog/templates/go-cli.drun@main" {
+		t.Fatalf("resolved source = %q", loaded.Templates[0].Source)
+	}
+}
+
+func TestInitTemplateManifestTemplateByName(t *testing.T) {
+	manifest := &initTemplateManifest{
+		Templates: []initTemplateEntry{
+			{Name: "go-cli", Source: "https://example.com/go-cli.drun", Kind: initTemplateKindGoCLI},
+		},
+	}
+
+	entry, err := manifest.templateByName("go-cli")
+	if err != nil {
+		t.Fatalf("templateByName() error = %v", err)
+	}
+	if entry.Source != "https://example.com/go-cli.drun" {
+		t.Fatalf("templateByName() source = %q", entry.Source)
+	}
+
+	if _, err := manifest.templateByName("missing"); err == nil {
+		t.Fatal("templateByName() expected error for missing template")
+	}
+}
+
+func TestListInitTemplatesUsesDefaultManifest(t *testing.T) {
+	manifest := `version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    description: "Go CLI starter"
+    source: "go-cli.drun"
+  api:
+    source: "api.drun"
+`
+
+	originalFetcher := initTemplateContentFetcher
+	initTemplateContentFetcher = func(url string) ([]byte, error) {
+		if url == "/catalog/templates.yaml" {
+			return []byte(manifest), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	t.Cleanup(func() {
+		initTemplateContentFetcher = originalFetcher
+	})
+	output := captureStdout(t, func() {
+		if err := ListInitTemplates("", "/catalog"); err != nil {
+			t.Fatalf("ListInitTemplates() error = %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "Available init templates (/catalog/templates.yaml):") {
+		t.Fatalf("unexpected list output:\n%s", output)
+	}
+	if !strings.Contains(output, "  - api\n") || !strings.Contains(output, "  - go-cli: Go CLI starter\n") {
+		t.Fatalf("unexpected list output:\n%s", output)
+	}
+}
+
+func TestResolveDefaultTemplateManifestPrefersTemplatesRepo(t *testing.T) {
+	manifest, err := resolveDefaultTemplateManifest("", "/workspace/drun-templates")
+	if err != nil {
+		t.Fatalf("resolveDefaultTemplateManifest() error = %v", err)
+	}
+	if manifest != "/workspace/drun-templates/templates.yaml" {
+		t.Fatalf("manifest = %q", manifest)
+	}
+}
+
 func assertGeneratedConfigParses(t *testing.T, config string) {
 	t.Helper()
 
@@ -113,4 +456,28 @@ func assertGeneratedConfigParses(t *testing.T, config string) {
 	if errs := p.Errors(); len(errs) > 0 {
 		t.Fatalf("generated config parse errors: %v\n%s", errs, config)
 	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	originalStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+
+	os.Stdout = writer
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, reader)
+		done <- buf.String()
+	}()
+
+	fn()
+
+	_ = writer.Close()
+	os.Stdout = originalStdout
+	return <-done
 }
