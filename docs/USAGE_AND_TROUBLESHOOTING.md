@@ -11,7 +11,7 @@ If `xdrun` fails on macOS with `signal: killed`, macOS Gatekeeper has likely qua
 Fix it with:
 
 ```bash
-sudo xattr -d com.apple.quarantine /usr/local/bin/xdrun
+xattr -d com.apple.quarantine ~/.local/bin/xdrun
 ```
 
 If you installed to a different location, use that path instead:
@@ -40,7 +40,7 @@ which xdrun
 If needed, add the install directory manually:
 
 ```bash
-export PATH="$PATH:/usr/local/bin"
+export PATH="$PATH:$HOME/.local/bin"
 ```
 
 ## File Discovery and Configuration

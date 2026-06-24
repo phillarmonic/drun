@@ -91,8 +91,8 @@ check_platform() {
             # Use a common Windows directory that's likely to be in PATH
             INSTALL_DIR="$HOME/bin"
         else
-            # Use standard Unix directory
-            INSTALL_DIR="/usr/local/bin"
+            # Prefer a user-local install to avoid sudo for the default lifecycle.
+            INSTALL_DIR="$HOME/.local/bin"
         fi
     fi
     
@@ -209,17 +209,11 @@ install_binary() {
         exit 1
     fi
     
-    # Check if install directory exists and create it if needed (especially for Windows)
+    # Check if install directory exists and create it if needed.
     if [[ ! -d "$INSTALL_DIR" ]]; then
-        if [[ "$PLATFORM_OS" == "windows" ]]; then
-            log_info "Creating install directory: $INSTALL_DIR"
-            if ! mkdir -p "$INSTALL_DIR"; then
-                log_error "Failed to create install directory: $INSTALL_DIR"
-                log_error "Please create it manually or set INSTALL_DIR environment variable"
-                exit 1
-            fi
-        else
-            log_error "Install directory does not exist: $INSTALL_DIR"
+        log_info "Creating install directory: $INSTALL_DIR"
+        if ! mkdir -p "$INSTALL_DIR"; then
+            log_error "Failed to create install directory: $INSTALL_DIR"
             log_error "Please create it or set INSTALL_DIR environment variable"
             exit 1
         fi
@@ -404,7 +398,7 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
     INSTALL_DIR    Installation directory 
-                   (default: /usr/local/bin on Unix, $HOME/bin on Windows)
+                   (default: $HOME/.local/bin on Unix, $HOME/bin on Windows)
 
 REQUIREMENTS:
     - curl

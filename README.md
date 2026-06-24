@@ -30,7 +30,7 @@ Install a specific tagged version with Go:
 go install github.com/phillarmonic/drun/v2/cmd/xdrun@v2.17.0
 ```
 
-The installer detects platform and architecture, installs `xdrun`, and attempts to make it available on your `PATH`.
+The installer detects platform and architecture, installs `xdrun` to `$HOME/.local/bin` by default on Unix systems, and attempts to make it available on your `PATH`.
 
 ## Quick Start
 
