@@ -35,6 +35,9 @@ task "install" means "Install xdrun with build info":
 	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
 	success "xdrun installed to $GOPATH/bin"
 
+task "skill" means "Show how to install drun AI guidance in a repository":
+	info "Install project AI guidance with: xdrun cmd:skill install drun-basics"
+
 task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
 	step "Linter"

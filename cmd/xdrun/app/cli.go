@@ -83,6 +83,7 @@ Built-in Commands:
   xdrun cmd:dump-env             # Dump all environment variables
   xdrun cmd:link services/api    # Link directories to this task file
   xdrun cmd:lsp                  # Start the Drun language server over stdio
+  xdrun cmd:skill install basics # Install project AI guidance for drun/xdrun
   xdrun cmd:secret add key       # Manage secrets (add, remove, list)`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
@@ -201,6 +202,7 @@ func (a *App) setupCommands() {
 		a.createUnlinkCommand(),
 		a.createUnlinkAllCommand(),
 		a.createLSPCommand(),
+		a.createSkillCommand(),
 		a.createSecretsCommand(),
 	}
 	for _, cmd := range cmds {

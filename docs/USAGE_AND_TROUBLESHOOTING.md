@@ -102,6 +102,28 @@ The current server supports:
 - Parser-backed diagnostics
 - Simple keyword and task-name completions
 
+## AI Skill Installation
+
+`xdrun` can scaffold project-level AI guidance files for repositories that use drun:
+
+```bash
+xdrun cmd:skill install drun-basics
+```
+
+This installs a shared guide at `.drun/ai/drun-basics.md` plus agent-specific entrypoints such as:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.codex/skills/drun-basics/SKILL.md`
+- `.cursor/rules/drun-basics.mdc`
+- `.github/copilot-instructions.md`
+
+For mergeable markdown files such as `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md`, the installer manages a marked drun-owned block so existing repository instructions can stay in place. Standalone generated files are replaced only with `--force`:
+
+```bash
+xdrun cmd:skill install drun-basics --force
+```
+
 ## Self-Update
 
 Update `xdrun` in place:
@@ -116,6 +138,7 @@ The updater is designed to:
 - Replace the current binary
 - Keep backups under `~/.drun/`
 - Restore the previous version if the update fails
+- Ignore freshly published releases until the current platform's binary asset is available
 
 ## Makefile Conversion
 
@@ -149,6 +172,7 @@ Examples:
 xdrun cmd:completion
 xdrun cmd:from makefile
 xdrun cmd:lsp
+xdrun cmd:skill
 xdrun cmd:secret
 ```
 
