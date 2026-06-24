@@ -4570,6 +4570,44 @@ task "deploy":
 4. **Audit Access**: Use `secret list` to review stored secrets
 5. **Avoid Hardcoding**: Never commit secrets to version control
 
+### Project AI Skill Installation
+
+In addition to executing tasks, `xdrun` can install project-level AI guidance files for repositories that use drun. This helps assistants such as Codex, Claude Code, Cursor, and Copilot understand the expected drun/xdrun workflow.
+
+#### Command Syntax
+
+```bash
+xdrun cmd:skill install drun-basics [--target <directory>] [--force]
+```
+
+#### Installed Files
+
+The `drun-basics` bundle installs a shared guide plus agent-specific entrypoints:
+
+- `.drun/ai/drun-basics.md`
+- `.codex/skills/drun-basics/SKILL.md`
+- `.cursor/rules/drun-basics.mdc`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.github/copilot-instructions.md`
+
+#### Behavior
+
+- **Managed blocks**: For mergeable markdown entrypoints such as `AGENTS.md`, `CLAUDE.md`, and `.github/copilot-instructions.md`, drun inserts or updates a named managed block instead of replacing the whole file.
+- **Default mode**: Creates missing standalone guidance files and skips existing standalone generated files.
+- **Force mode**: `--force` overwrites existing standalone generated files.
+- **Target directory**: `--target` installs the bundle into another repository root.
+
+#### Example
+
+```bash
+# Install guidance into the current repository
+xdrun cmd:skill install drun-basics
+
+# Install into a sibling repository and overwrite existing generated files
+xdrun cmd:skill install basics --target ../my-service --force
+```
+
 ---
 
 ## Smart Detection
