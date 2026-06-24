@@ -103,6 +103,7 @@ func (e *Engine) executeMultilineShell(shellStmt *statement.Shell, ctx *Executio
 	if err != nil {
 		if shouldBufferShellOutput(ctx, shellStmt) {
 			writeBufferedShellFailure(e.output, result)
+			writeBufferedShellFailureSummary(e.output, script, result)
 		}
 		_, _ = fmt.Fprintf(e.output, "❌  Multiline command failed: %v\n", err)
 		return err

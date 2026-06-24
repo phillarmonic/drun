@@ -240,6 +240,9 @@ task "ci" mode "ci":
 	if !strings.Contains(output, "stderr:\nnoisy error") {
 		t.Fatalf("Expected buffered stderr to be printed on failure, got: %s", output)
 	}
+	if !strings.Contains(output, "summary: command `echo useful output; echo noisy error >&2; exit 1` failed with exit code 1") {
+		t.Fatalf("Expected buffered failure summary to be printed, got: %s", output)
+	}
 }
 
 func TestCITaskModeIsInheritedByCalledTasks(t *testing.T) {

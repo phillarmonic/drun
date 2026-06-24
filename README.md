@@ -61,6 +61,12 @@ List tasks:
 xdrun --list
 ```
 
+Install AI guidance files for a repository that uses drun:
+
+```bash
+xdrun cmd:skill install drun-basics
+```
+
 Dry run a task:
 
 ```bash

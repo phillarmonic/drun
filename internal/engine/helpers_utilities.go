@@ -255,6 +255,7 @@ func (e *Engine) executeSingleLineShell(shellStmt *statement.Shell, ctx *Executi
 	if err != nil {
 		if shouldBufferShellOutput(ctx, shellStmt) {
 			writeBufferedShellFailure(e.output, result)
+			writeBufferedShellFailureSummary(e.output, interpolatedCommand, result)
 		}
 		_, _ = fmt.Fprintf(e.output, "❌  Command failed: %v\n", err)
 		return err
@@ -325,4 +326,17 @@ func writeBufferedShellFailure(output io.Writer, result *shell.Result) {
 	if stderr != "" {
 		_, _ = fmt.Fprintf(output, "stderr:\n%s\n", stderr)
 	}
+}
+
+func writeBufferedShellFailureSummary(output io.Writer, command string, result *shell.Result) {
+	if output == nil {
+		return
+	}
+
+	exitCode := 1
+	if result != nil && result.ExitCode != 0 {
+		exitCode = result.ExitCode
+	}
+
+	_, _ = fmt.Fprintf(output, "summary: command `%s` failed with exit code %d\n", command, exitCode)
 }
