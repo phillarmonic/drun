@@ -70,6 +70,12 @@ func TestInstallProjectSkillCreatesExpectedFiles(t *testing.T) {
 	if !strings.Contains(guide, "`xdrun --list`") {
 		t.Fatalf("guide should mention xdrun --list:\n%s", guide)
 	}
+	if !strings.Contains(guide, `mode "ci"`) {
+		t.Fatalf("guide should mention mode \"ci\":\n%s", guide)
+	}
+	if !strings.Contains(guide, "saves tokens") && !strings.Contains(guide, "save output tokens") {
+		t.Fatalf("guide should explain ci mode token savings:\n%s", guide)
+	}
 }
 
 func TestInstallProjectSkillSkipsExistingFilesWithoutForce(t *testing.T) {
