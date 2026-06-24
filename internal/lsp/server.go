@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,10 +26,12 @@ const (
 	completionItemKindKeyword  = 14
 )
 
-var taskNamePattern = regexp.MustCompile(`(?m)^\s*task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
+var taskNamePattern = regexp.MustCompile(`(?m)^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
+var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z_][A-Za-z0-9_-]*\}\}`)
 
 var keywordCompletions = []completionItem{
 	{Label: "task", Kind: completionItemKindKeyword, Detail: "Declare a task"},
+	{Label: "template task", Kind: completionItemKindKeyword, Detail: "Declare a task template"},
 	{Label: "project", Kind: completionItemKindKeyword, Detail: "Declare a project"},
 	{Label: "given", Kind: completionItemKindKeyword, Detail: "Optional parameter"},
 	{Label: "requires", Kind: completionItemKindKeyword, Detail: "Required parameter"},
@@ -265,7 +269,7 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			return false, err
 		}
 		text := s.docs[params.TextDocument.URI]
-		items := completionsForSource(text)
+		items := completionsForSource(params.TextDocument.URI, text)
 		return false, s.writeResponse(message{
 			JSONRPC: "2.0",
 			ID:      msg.ID,
@@ -300,7 +304,9 @@ func diagnosticsForSource(uri, text string) []diagnostic {
 		filename = uri
 	}
 
-	_, err := engine.ParseStringWithFilename(text, filename)
+	lspSource := sourceForLSP(filename, text)
+
+	_, err := engine.ParseStringWithFilename(lspSource, filename)
 	if err == nil {
 		return []diagnostic{}
 	}
@@ -335,7 +341,7 @@ func diagnosticsForSource(uri, text string) []diagnostic {
 	}}
 }
 
-func completionsForSource(text string) []completionItem {
+func completionsForSource(uri, text string) []completionItem {
 	items := make([]completionItem, 0, len(keywordCompletions)+8)
 	items = append(items, keywordCompletions...)
 
@@ -344,7 +350,10 @@ func completionsForSource(text string) []completionItem {
 		seen[item.Label] = struct{}{}
 	}
 
-	if program, err := engine.ParseStringWithFilename(text, "<completion>"); err == nil {
+	filename := filenameFromURI(uri)
+	lspSource := sourceForLSP(filename, text)
+
+	if program, err := engine.ParseStringWithFilename(lspSource, "<completion>"); err == nil {
 		items = appendTaskCompletions(items, seen, program)
 		return items
 	}
@@ -383,7 +392,53 @@ func appendTaskCompletions(items []completionItem, seen map[string]struct{}, pro
 		})
 		seen[task.Name] = struct{}{}
 	}
+	for _, template := range program.Templates {
+		if _, exists := seen[template.Name]; exists {
+			continue
+		}
+		items = append(items, completionItem{
+			Label:  template.Name,
+			Kind:   completionItemKindFunction,
+			Detail: "Template task",
+		})
+		seen[template.Name] = struct{}{}
+	}
 	return items
+}
+
+func sourceForLSP(filename, text string) string {
+	if !isTemplateEditingContext(filename, text) {
+		return text
+	}
+
+	return templatePlaceholderPattern.ReplaceAllStringFunc(text, func(match string) string {
+		return strings.Repeat("x", len(match))
+	})
+}
+
+func isTemplateEditingContext(filename, text string) bool {
+	if !templatePlaceholderPattern.MatchString(text) {
+		return false
+	}
+
+	if filename == "" {
+		return false
+	}
+
+	for dir := filepath.Dir(filename); dir != "." && dir != string(filepath.Separator); dir = filepath.Dir(dir) {
+		if _, err := os.Stat(filepath.Join(dir, "templates.yaml")); err == nil {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+
+	return strings.Contains(text, "{{project_name}}") ||
+		strings.Contains(text, "{{binary_name}}") ||
+		strings.Contains(text, "{{cmd_path}}") ||
+		strings.Contains(text, "{{module_name}}")
 }
 
 func (s *Server) readPayload() ([]byte, error) {
