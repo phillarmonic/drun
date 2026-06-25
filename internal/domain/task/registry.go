@@ -151,13 +151,16 @@ func validateTaskVariantFamily(name string, family []*Task, candidate *Task) err
 		return nil
 	}
 
-	if len(candidate.Platforms) == 0 {
-		return fmt.Errorf("task %q duplicates are only allowed when every variant has @platform(...)", name)
-	}
-
+	hasFallback := len(candidate.Platforms) == 0
 	for _, existing := range family {
 		if len(existing.Platforms) == 0 {
-			return fmt.Errorf("task %q duplicates are only allowed when every variant has @platform(...)", name)
+			if hasFallback {
+				return fmt.Errorf("task %q may only declare one unannotated fallback variant", name)
+			}
+			continue
+		}
+		if hasFallback {
+			continue
 		}
 
 		for _, existingPlatform := range existing.Platforms {
@@ -173,16 +176,24 @@ func validateTaskVariantFamily(name string, family []*Task, candidate *Task) err
 }
 
 func resolveTaskVariant(name string, family []*Task, targetPlatform string) (*Task, error) {
-	if len(family) == 1 && len(family[0].Platforms) == 0 {
-		return family[0], nil
-	}
+	var fallback *Task
 
 	for _, candidate := range family {
+		if len(candidate.Platforms) == 0 {
+			if fallback == nil {
+				fallback = candidate
+			}
+			continue
+		}
 		for _, allowed := range candidate.Platforms {
 			if allowed == targetPlatform {
 				return candidate, nil
 			}
 		}
+	}
+
+	if fallback != nil {
+		return fallback, nil
 	}
 
 	available := make([]string, 0, len(family))

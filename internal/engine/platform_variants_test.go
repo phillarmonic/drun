@@ -16,6 +16,10 @@ task "shell":
 @platform("mac")
 task "shell":
   info "mac shell"
+
+@platform("windows")
+task "shell":
+  info "windows shell"
 `)
 	if err != nil {
 		t.Fatalf("ParseString() error = %v", err)
@@ -31,6 +35,10 @@ task "shell":
 	if platform := currentPlatformLabel(); platform == "mac" {
 		if !strings.Contains(output, "mac shell") {
 			t.Fatalf("expected mac output, got %q", output)
+		}
+	} else if platform == "windows" {
+		if !strings.Contains(output, "windows shell") {
+			t.Fatalf("expected windows output, got %q", output)
 		}
 	} else {
 		if !strings.Contains(output, "linux shell") {
@@ -52,6 +60,10 @@ task "shell":
 @platform("mac")
 task "shell":
   info "mac shell"
+
+@platform("windows")
+task "shell":
+  info "windows shell"
 `)
 	if err != nil {
 		t.Fatalf("ParseString() error = %v", err)
@@ -68,10 +80,81 @@ task "shell":
 		if !strings.Contains(output, "mac shell") {
 			t.Fatalf("expected mac output, got %q", output)
 		}
+	} else if platform == "windows" {
+		if !strings.Contains(output, "windows shell") {
+			t.Fatalf("expected windows output, got %q", output)
+		}
 	} else {
 		if !strings.Contains(output, "linux shell") {
 			t.Fatalf("expected linux output, got %q", output)
 		}
+	}
+}
+
+func TestEngineExecuteFallsBackToUnannotatedVariant(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+@platform("linux")
+task "shell":
+  info "linux shell"
+
+task "shell":
+  info "fallback shell"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var out bytes.Buffer
+	engine := NewEngine(&out)
+	if err := engine.Execute(program, "shell"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := out.String()
+	if platform := currentPlatformLabel(); platform == "linux" {
+		if !strings.Contains(output, "linux shell") {
+			t.Fatalf("expected linux output, got %q", output)
+		}
+		return
+	}
+	if !strings.Contains(output, "fallback shell") {
+		t.Fatalf("expected fallback output, got %q", output)
+	}
+}
+
+func TestEngineTaskCallFallsBackToUnannotatedVariant(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+task "entry":
+  call task "shell"
+
+@platform("linux")
+task "shell":
+  info "linux shell"
+
+task "shell":
+  info "fallback shell"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var out bytes.Buffer
+	engine := NewEngine(&out)
+	if err := engine.Execute(program, "entry"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := out.String()
+	if platform := currentPlatformLabel(); platform == "linux" {
+		if !strings.Contains(output, "linux shell") {
+			t.Fatalf("expected linux output, got %q", output)
+		}
+		return
+	}
+	if !strings.Contains(output, "fallback shell") {
+		t.Fatalf("expected fallback output, got %q", output)
 	}
 }
 

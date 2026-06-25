@@ -26,16 +26,17 @@ func selectTaskVariant(name string, tasks []*ast.TaskStatement) (*ast.TaskStatem
 
 	current := platform.Current()
 	var available []string
+	var fallback *ast.TaskStatement
 	for _, task := range tasks {
 		meta, err := platform.ValidateAnnotations("task", task.Name, task.Annotations)
 		if err != nil {
 			return nil, err
 		}
 		if len(meta.Platforms) == 0 {
-			if len(tasks) > 1 {
-				return nil, fmt.Errorf("task %q duplicates are only allowed when every variant has @platform(...)", name)
+			if fallback == nil {
+				fallback = task
 			}
-			return task, nil
+			continue
 		}
 		available = append(available, platform.FormatList(meta.Platforms))
 		for _, allowed := range meta.Platforms {
@@ -43,6 +44,10 @@ func selectTaskVariant(name string, tasks []*ast.TaskStatement) (*ast.TaskStatem
 				return task, nil
 			}
 		}
+	}
+
+	if fallback != nil {
+		return fallback, nil
 	}
 
 	return nil, fmt.Errorf("task %q has no variant for platform %s; available variants: %s", name, current, strings.Join(uniqueStrings(available), "; "))

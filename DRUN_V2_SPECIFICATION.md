@@ -894,7 +894,7 @@ task "shell" means "Open PowerShell":
 - A declaration may list one or more platforms
 - Unknown annotations are rejected
 
-For tasks specifically, `@platform(...)` also enables platform-aware duplicate names. Two tasks may share the same name only when every variant declares disjoint platform sets. drun resolves the correct variant automatically when the task is invoked.
+For tasks specifically, `@platform(...)` also enables platform-aware duplicate names. A task family may contain any number of disjoint platform-tagged variants plus at most one unannotated fallback variant. drun resolves the correct variant automatically when the task is invoked: exact platform match first, then the unannotated fallback if one exists.
 
 If no variant matches the current platform, execution fails with a clear error listing the available variants.
 
