@@ -64,6 +64,10 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 		for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 			switch p.curToken.Type {
 			case lexer.SET:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				setting := p.parseSetStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
@@ -72,6 +76,10 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.nextToken()
 				}
 			case lexer.PARAMETER:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				setting := p.parseProjectParameterStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
@@ -82,12 +90,24 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			case lexer.SNIPPET:
 				setting := p.parseSnippetStatement()
 				if setting != nil {
+					setting.Annotations = append(setting.Annotations, p.consumePendingAnnotations()...)
 					stmt.Settings = append(stmt.Settings, setting)
 				} else {
 					// If parsing failed, advance to avoid infinite loop
 					p.nextToken()
 				}
+			case lexer.DECORATOR:
+				annotation := p.parseAnnotation()
+				if annotation != nil {
+					p.pendingAnnotations = append(p.pendingAnnotations, *annotation)
+				} else {
+					p.nextToken()
+				}
 			case lexer.INCLUDE:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				setting := p.parseIncludeStatement()
 				if setting != nil {
 					stmt.Settings = append(stmt.Settings, setting)
@@ -96,6 +116,10 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.nextToken()
 				}
 			case lexer.BEFORE, lexer.AFTER, lexer.ON:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				hook := p.parseLifecycleHook()
 				if hook != nil {
 					stmt.Settings = append(stmt.Settings, hook)
@@ -104,6 +128,10 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.nextToken()
 				}
 			case lexer.SHELL:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				shellConfig := p.parseShellConfigStatement()
 				if shellConfig != nil {
 					stmt.Settings = append(stmt.Settings, shellConfig)
@@ -112,6 +140,10 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.nextToken()
 				}
 			case lexer.REQUIRES:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				// Check for "requires tools:" block
 				if p.peekToken.Type == lexer.TOOLS {
 					requiresTools := p.parseRequiresToolsStatement()
@@ -134,9 +166,18 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 			case lexer.NEWLINE:
 				p.nextToken() // Skip newlines
 			default:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
 				p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
 				p.nextToken()
 			}
+		}
+
+		if len(p.pendingAnnotations) > 0 {
+			p.addError("annotation(s) in project body must be followed by a snippet declaration")
+			p.pendingAnnotations = nil
 		}
 
 		if p.curToken.Type == lexer.DEDENT {

@@ -2,10 +2,10 @@ package engine
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/phillarmonic/drun/v2/internal/shell"
 )
 
@@ -138,10 +138,10 @@ func (e *Engine) getPlatformShellConfig(ctx *ExecutionContext) *shell.Options {
 	}
 
 	// Determine current platform
-	platform := runtime.GOOS
+	platformName := platform.Current()
 
 	// Get platform-specific configuration
-	config, exists := ctx.Project.ShellConfigs[platform]
+	config, exists := ctx.Project.ShellConfigs[platformName]
 	if !exists {
 		return opts
 	}

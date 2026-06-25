@@ -423,14 +423,15 @@ const (
 	EQUALS // =
 
 	// Punctuation
-	COLON    // :
-	COMMA    // ,
-	LPAREN   // (
-	RPAREN   // )
-	LBRACE   // {
-	RBRACE   // }
-	LBRACKET // [
-	RBRACKET // ]
+	COLON     // :
+	COMMA     // ,
+	LPAREN    // (
+	RPAREN    // )
+	LBRACE    // {
+	RBRACE    // }
+	LBRACKET  // [
+	RBRACKET  // ]
+	DECORATOR // @
 
 	// Indentation (Python-style)
 	INDENT
@@ -1200,6 +1201,8 @@ func (t TokenType) String() string {
 		return "LBRACKET"
 	case RBRACKET:
 		return "RBRACKET"
+	case DECORATOR:
+		return "DECORATOR"
 	case INDENT:
 		return "INDENT"
 	case DEDENT:

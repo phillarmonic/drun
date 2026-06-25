@@ -4,9 +4,61 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/errors"
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
+
+func (p *Parser) parseAnnotation() *ast.Annotation {
+	annotation := &ast.Annotation{Token: p.curToken}
+
+	if !p.expectPeek(lexer.IDENT) {
+		p.addError("expected annotation name after '@'")
+		return nil
+	}
+	annotation.Name = p.curToken.Literal
+
+	if !p.expectPeek(lexer.LPAREN) {
+		p.addError(fmt.Sprintf("expected '(' after annotation name %q", annotation.Name))
+		return nil
+	}
+
+	if p.peekToken.Type == lexer.RPAREN {
+		p.nextToken()
+		p.nextToken()
+		return annotation
+	}
+
+	for {
+		if !p.expectPeek(lexer.STRING) {
+			p.addError(fmt.Sprintf("expected string argument in @%s", annotation.Name))
+			return nil
+		}
+		annotation.Args = append(annotation.Args, p.curToken.Literal)
+
+		if p.peekToken.Type == lexer.COMMA {
+			p.nextToken()
+			continue
+		}
+		if p.peekToken.Type == lexer.RPAREN {
+			p.nextToken()
+			p.nextToken()
+			return annotation
+		}
+
+		p.addError(fmt.Sprintf("expected ',' or ')' after @%s argument", annotation.Name))
+		return nil
+	}
+}
+
+func (p *Parser) consumePendingAnnotations() []ast.Annotation {
+	if len(p.pendingAnnotations) == 0 {
+		return nil
+	}
+	annotations := append([]ast.Annotation(nil), p.pendingAnnotations...)
+	p.pendingAnnotations = nil
+	return annotations
+}
 
 func (p *Parser) parseStringList() []string {
 	var items []string

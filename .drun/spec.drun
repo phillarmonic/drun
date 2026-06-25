@@ -9,8 +9,19 @@ project "Drun" version "2.0":
 		golangci-lint
 		gosec
 
+@platform("linux")
 task "default" means "Welcome to drun v2":
-	echo "Drun CI file"
+	echo "Drun CI file (penguin flavor)"
+	info "Welcome to drun v2! 🚀"
+
+@platform("mac")
+task "default" means "Welcome to drun v2":
+	echo "Drun CI file (Mac flavor)"
+	info "Welcome to drun v2! 🚀"
+
+@platform("windows")
+task "default" means "Welcome to drun v2":
+	echo "Drun CI file (Windows flavor)"
 	info "Welcome to drun v2! 🚀"
 
 task "test" means "Runs unit tests":

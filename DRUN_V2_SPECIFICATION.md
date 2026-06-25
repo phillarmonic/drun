@@ -118,6 +118,8 @@ program = { version_statement | project_declaration | snippet_definition | templ
 
 version_statement = "version" ":" number_literal ;
 
+annotation = "@" identifier "(" [ string_literal { "," string_literal } ] ")" ;
+
 (* Project declaration *)
 project_declaration = "project" string_literal [ "version" string_literal ] ":" 
                      { project_setting } ;
@@ -131,14 +133,14 @@ project_setting = "set" identifier "to" expression
                 | shell_config ;
 
 (* Reusable declarations *)
-snippet_definition = "snippet" string_literal ":" statement_block ;
+snippet_definition = { annotation } "snippet" string_literal ":" statement_block ;
 
-template_task_definition = "template" "task" string_literal ":"
+template_task_definition = { annotation } "template" "task" string_literal ":"
                          { task_property }
                          statement_block ;
 
 (* Task definition *)
-task_definition = "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
+task_definition = { annotation } "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
                  { task_property }
                  statement_block ;
 
@@ -834,7 +836,7 @@ drun v2 supports cross-platform shell configuration with sensible defaults for e
 ```
 project "my-app":
   shell config:
-    darwin:
+    mac:
       executable: "/bin/zsh"
       args:
         - "-l"
@@ -865,9 +867,36 @@ project "my-app":
 #### Platform Detection
 
 drun automatically detects the current platform using Go's `runtime.GOOS`:
-- **darwin**: macOS
+- **mac**: macOS (legacy alias: `darwin`)
 - **linux**: Linux distributions
 - **windows**: Windows
+
+`mac` is the canonical user-facing spelling in drun. Existing specs may continue to use `darwin`; drun normalises both spellings to the same platform internally.
+
+### Declaration Annotations
+
+drun v2 supports declaration decorators immediately before tasks, template tasks, and snippets:
+
+```
+@platform("linux", "mac")
+task "shell" means "Open a Unix shell":
+  run "bash" attached
+
+@platform("windows")
+task "shell" means "Open PowerShell":
+  run "pwsh.exe" attached
+```
+
+#### `@platform(...)`
+
+- Accepted values: `linux`, `mac`, `windows`
+- Legacy alias: `darwin` is accepted and normalised to `mac`
+- A declaration may list one or more platforms
+- Unknown annotations are rejected
+
+For tasks specifically, `@platform(...)` also enables platform-aware duplicate names. Two tasks may share the same name only when every variant declares disjoint platform sets. drun resolves the correct variant automatically when the task is invoked.
+
+If no variant matches the current platform, execution fails with a clear error listing the available variants.
 
 #### Configuration Options
 
@@ -1631,13 +1660,13 @@ when $platform is "windows":
     step "Building for Windows ARM"
 otherwise:
   info "Unix-like platform detected"
-  when $platform is "darwin":
+  when $platform is "mac":
     step "Building for macOS"
   otherwise:
     step "Building for Linux"
 
 # When-otherwise in loops (matrix execution)
-for each $platform in ["windows", "linux", "darwin"]:
+for each $platform in ["windows", "linux", "mac"]:
   when $platform is "windows":
     run "GOOS={$platform} go build -o app.exe"
   otherwise:
@@ -2000,7 +2029,7 @@ project "myapp" version "1.0.0":
   set registry to "ghcr.io/company"    # Project setting
   set api_url to "https://api.example.com"
   set timeout to "30s"
-  set platforms as list to ["linux", "darwin", "windows"]  # Array setting
+  set platforms as list to ["linux", "mac", "windows"]  # Array setting
   set environments as list to ["dev", "staging", "production"]
 ```
 
@@ -2171,7 +2200,7 @@ task "variable_assignment":
   let $items as list to ["value1", "value2", "value3"]
   
   # Array assignment with set
-  set $platforms as list to ["linux", "darwin", "windows"]
+  set $platforms as list to ["linux", "mac", "windows"]
   
   # Arrays are stored as comma-separated strings
   # and can be used in loops
@@ -2485,7 +2514,7 @@ Array literals use square bracket notation with comma-separated values:
 ```
 # Basic array literals
 ["item1", "item2", "item3"]
-["linux", "darwin", "windows"]
+["linux", "mac", "windows"]
 ["dev", "staging", "production"]
 
 # Numbers and mixed types
@@ -2504,7 +2533,7 @@ project "myapp" version "1.0.0":
   set api_url to "https://api.example.com"
   
   # Array settings using "as list to" syntax
-  set platforms as list to ["linux", "darwin", "windows"]
+  set platforms as list to ["linux", "mac", "windows"]
   set environments as list to ["dev", "staging", "production"]
   set node_versions as list to ["16", "18", "20"]
   set databases as list to ["postgres", "mysql", "mongodb"]
@@ -2530,7 +2559,7 @@ Loop variables use the `$variable` syntax for consistency with the scoping syste
 
 ```
 # Direct array literal in loops
-for each platform in ["linux", "darwin", "windows"]:
+for each platform in ["linux", "mac", "windows"]:
   info "Building for {$platform}"
 
 # Using project-defined arrays
@@ -2611,7 +2640,7 @@ Loop variables follow the established scoping rules:
 
 ```
 project "matrix-demo":
-  set platforms as list to ["linux", "darwin", "windows"]
+  set platforms as list to ["linux", "mac", "windows"]
   set registry to "ghcr.io/company"
 
 task "matrix-build":

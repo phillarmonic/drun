@@ -16,6 +16,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/engine"
 	drunErrors "github.com/phillarmonic/drun/v2/internal/errors"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 )
 
 const (
@@ -381,16 +382,30 @@ func completionsForSource(uri, text string) []completionItem {
 }
 
 func appendTaskCompletions(items []completionItem, seen map[string]struct{}, program *ast.Program) []completionItem {
+	taskVariants := make(map[string][]*ast.TaskStatement)
 	for _, task := range program.Tasks {
-		if _, exists := seen[task.Name]; exists {
+		taskVariants[task.Name] = append(taskVariants[task.Name], task)
+	}
+	for _, task := range program.Tasks {
+		variants := taskVariants[task.Name]
+		if len(variants) == 1 {
+			if _, exists := seen[task.Name]; exists {
+				continue
+			}
+			items = append(items, completionItem{
+				Label:  task.Name,
+				Kind:   completionItemKindFunction,
+				Detail: completionDetailForTask(task),
+			})
+			seen[task.Name] = struct{}{}
 			continue
 		}
+
 		items = append(items, completionItem{
 			Label:  task.Name,
 			Kind:   completionItemKindFunction,
-			Detail: "Task",
+			Detail: completionDetailForTask(task),
 		})
-		seen[task.Name] = struct{}{}
 	}
 	for _, template := range program.Templates {
 		if _, exists := seen[template.Name]; exists {
@@ -404,6 +419,14 @@ func appendTaskCompletions(items []completionItem, seen map[string]struct{}, pro
 		seen[template.Name] = struct{}{}
 	}
 	return items
+}
+
+func completionDetailForTask(task *ast.TaskStatement) string {
+	meta, err := platform.ValidateAnnotations("task", task.Name, task.Annotations)
+	if err == nil && len(meta.Platforms) > 0 {
+		return "Task [" + platform.FormatList(meta.Platforms) + "]"
+	}
+	return "Task"
 }
 
 func sourceForLSP(filename, text string) string {

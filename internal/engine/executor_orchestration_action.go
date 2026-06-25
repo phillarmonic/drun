@@ -1455,6 +1455,7 @@ func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*
 
 	var targetTask *ast.TaskStatement
 	var namespace string
+	var err error
 
 	if strings.Contains(taskName, ".") && ctx.Project != nil {
 		namespace = strings.SplitN(taskName, ".", 2)[0]
@@ -1464,20 +1465,22 @@ func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*
 				Token:       template.Token,
 				Name:        template.Name,
 				Description: template.Description,
+				Annotations: template.Annotations,
 				Parameters:  template.Parameters,
 				Body:        template.Body,
 			}
-		} else if task, exists := ctx.Project.IncludedTasks[taskName]; exists {
-			targetTask = task
+		} else if tasks, exists := ctx.Project.IncludedTasks[taskName]; exists {
+			targetTask, err = selectTaskVariant(taskName, tasks)
+			if err != nil {
+				return nil, "", err
+			}
 		}
 	}
 
 	if targetTask == nil {
-		for _, task := range ctx.Program.Tasks {
-			if task.Name == taskName {
-				targetTask = task
-				break
-			}
+		targetTask, err = resolveTaskVariantByName(taskName, ctx.Program.Tasks)
+		if err == nil && targetTask != nil {
+			return targetTask, namespace, nil
 		}
 	}
 
@@ -1488,6 +1491,7 @@ func (e *Engine) resolveTaskReference(ctx *ExecutionContext, taskName string) (*
 					Token:       template.Token,
 					Name:        template.Name,
 					Description: template.Description,
+					Annotations: template.Annotations,
 					Parameters:  template.Parameters,
 					Body:        template.Body,
 				}

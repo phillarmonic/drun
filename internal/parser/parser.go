@@ -15,8 +15,9 @@ type Parser struct {
 	curToken  lexer.Token
 	peekToken lexer.Token
 
-	errors    []string // Legacy error list for backward compatibility
-	errorList *errors.ParseErrorList
+	errors             []string // Legacy error list for backward compatibility
+	errorList          *errors.ParseErrorList
+	pendingAnnotations []ast.Annotation
 }
 
 // New creates a new parser instance
@@ -81,11 +82,19 @@ func (p *Parser) ParseProgram() *ast.Program {
 	// Parse task, template, service, and orchestration statements
 	for p.curToken.Type != lexer.EOF {
 		switch p.curToken.Type {
+		case lexer.DECORATOR:
+			annotation := p.parseAnnotation()
+			if annotation != nil {
+				p.pendingAnnotations = append(p.pendingAnnotations, *annotation)
+			} else {
+				p.synchronize()
+			}
 		case lexer.TEMPLATE:
 			// Check if this is "template task"
 			if p.peekToken.Type == lexer.TASK {
 				template := p.parseTaskTemplateStatement()
 				if template != nil {
+					template.Annotations = append(template.Annotations, p.consumePendingAnnotations()...)
 					program.Templates = append(program.Templates, template)
 				} else {
 					// Error recovery: skip to next task or EOF
@@ -96,6 +105,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 				p.nextToken()
 			}
 		case lexer.SERVICE:
+			if len(p.pendingAnnotations) > 0 {
+				p.addError("annotation(s) must be followed by task, template task, or snippet")
+				p.pendingAnnotations = nil
+			}
 			service := p.parseServiceStatement()
 			if service != nil {
 				program.Services = append(program.Services, service)
@@ -104,6 +117,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 				p.synchronize()
 			}
 		case lexer.ORCHESTRATE:
+			if len(p.pendingAnnotations) > 0 {
+				p.addError("annotation(s) must be followed by task, template task, or snippet")
+				p.pendingAnnotations = nil
+			}
 			orchestration := p.parseOrchestrateStatement()
 			if orchestration != nil {
 				program.Orchestrations = append(program.Orchestrations, orchestration)
@@ -114,6 +131,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 		case lexer.TASK:
 			task := p.parseTaskStatement()
 			if task != nil {
+				task.Annotations = append(task.Annotations, p.consumePendingAnnotations()...)
 				program.Tasks = append(program.Tasks, task)
 			} else {
 				// Error recovery: skip to next task or EOF
@@ -127,6 +145,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 			// Skip stray lexer.DEDENT tokens (they should be consumed by task parsing)
 			p.nextToken()
 		default:
+			if len(p.pendingAnnotations) > 0 {
+				p.addError(fmt.Sprintf("annotation(s) must be followed by task, template task, or snippet, got %s", p.curToken.Type))
+				p.pendingAnnotations = nil
+			}
 			p.addError(fmt.Sprintf("unexpected token: %s", p.curToken.Type))
 			p.nextToken()
 		}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 )
 
 // Project represents a domain project entity
@@ -37,8 +38,12 @@ func NewProject(stmt *ast.ProjectStatement) (*Project, error) {
 			}
 
 		case *ast.ShellConfigStatement:
-			for platform, config := range s.Platforms {
-				project.ShellConfigs[platform] = &ShellConfig{
+			for platformName, config := range s.Platforms {
+				normalized := platformName
+				if canonical, err := platform.Normalize(platformName); err == nil {
+					normalized = canonical
+				}
+				project.ShellConfigs[normalized] = &ShellConfig{
 					Executable:  config.Executable,
 					Args:        config.Args,
 					Environment: config.Environment,
