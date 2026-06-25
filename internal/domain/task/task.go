@@ -5,6 +5,7 @@ import (
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 )
 
 // Task represents a domain task entity
@@ -17,6 +18,7 @@ type Task struct {
 	Body         []statement.Statement
 	Namespace    string
 	Source       string // File where task is defined
+	Platforms    []string
 }
 
 // NewTask creates a new task from AST
@@ -35,6 +37,12 @@ func NewTask(stmt *ast.TaskStatement, namespace, source string) (*Task, error) {
 		Source:      source,
 		Body:        body,
 	}
+
+	meta, err := platform.ValidateAnnotations("task", stmt.Name, stmt.Annotations)
+	if err != nil {
+		return nil, err
+	}
+	task.Platforms = meta.Platforms
 
 	// Convert parameters
 	for _, param := range stmt.Parameters {
@@ -61,6 +69,10 @@ func (t *Task) FullName() string {
 		return t.Name
 	}
 	return t.Namespace + "." + t.Name
+}
+
+func (t *Task) PlatformLabel() string {
+	return platform.FormatList(t.Platforms)
 }
 
 // HasParameter checks if task has a parameter

@@ -24,8 +24,13 @@ func ResolvePartialTaskName(partialName string, program *ast.Program) (string, e
 
 	// Find all tasks that start with the partial name
 	var matches []string
+	seen := make(map[string]struct{}, len(program.Tasks))
 	for _, task := range program.Tasks {
 		if strings.HasPrefix(task.Name, partialName) {
+			if _, exists := seen[task.Name]; exists {
+				continue
+			}
+			seen[task.Name] = struct{}{}
 			matches = append(matches, task.Name)
 		}
 	}
@@ -56,8 +61,13 @@ func ResolvePartialTaskName(partialName string, program *ast.Program) (string, e
 func findSimilarTaskNames(name string, program *ast.Program) []string {
 	var similar []string
 	nameLower := strings.ToLower(name)
+	seen := make(map[string]struct{}, len(program.Tasks))
 
 	for _, task := range program.Tasks {
+		if _, exists := seen[task.Name]; exists {
+			continue
+		}
+		seen[task.Name] = struct{}{}
 		taskLower := strings.ToLower(task.Name)
 
 		// Check if the task name contains the partial name

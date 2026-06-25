@@ -191,7 +191,7 @@ func TestIsBuiltin(t *testing.T) {
 		"hostname", "pwd", "env", "file exists", "now.format",
 		"start progress", "update progress", "finish progress",
 		"start timer", "stop timer", "show elapsed time",
-		"docker compose status", "current git branch",
+		"docker compose command", "docker compose status", "current git branch",
 	}
 
 	for _, builtin := range builtins {
@@ -522,6 +522,49 @@ func TestDetectDockerComposeCommand(t *testing.T) {
 		}
 	} else {
 		t.Errorf("Unexpected command format: %v", cmd)
+	}
+}
+
+func TestGetDockerComposeCommand(t *testing.T) {
+	result, err := getDockerComposeCommand(nil)
+	if err != nil {
+		if !strings.Contains(err.Error(), "neither 'docker compose' nor 'docker-compose' is available") {
+			t.Errorf("Unexpected error message: %v", err)
+		}
+		return
+	}
+
+	if result != "docker compose" && result != "docker-compose" {
+		t.Errorf("Expected detected compose command, got %q", result)
+	}
+}
+
+func TestGetDockerComposeCommandRejectsArgs(t *testing.T) {
+	_, err := getDockerComposeCommand(nil, "unexpected")
+	if err == nil {
+		t.Fatal("Expected error when arguments are provided")
+	}
+
+	if !strings.Contains(err.Error(), "does not accept arguments") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestDockerComposeCommandInterpolation(t *testing.T) {
+	if !IsBuiltin("docker compose command") {
+		t.Fatal("docker compose command should be registered as a builtin function")
+	}
+
+	result, err := CallBuiltin("docker compose command", nil)
+	if err != nil {
+		if !strings.Contains(err.Error(), "neither 'docker compose' nor 'docker-compose' is available") {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		return
+	}
+
+	if result != "docker compose" && result != "docker-compose" {
+		t.Errorf("Expected detected compose command, got %q", result)
 	}
 }
 

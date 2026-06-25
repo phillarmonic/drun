@@ -118,6 +118,8 @@ program = { version_statement | project_declaration | snippet_definition | templ
 
 version_statement = "version" ":" number_literal ;
 
+annotation = "@" identifier "(" [ string_literal { "," string_literal } ] ")" ;
+
 (* Project declaration *)
 project_declaration = "project" string_literal [ "version" string_literal ] ":" 
                      { project_setting } ;
@@ -131,14 +133,14 @@ project_setting = "set" identifier "to" expression
                 | shell_config ;
 
 (* Reusable declarations *)
-snippet_definition = "snippet" string_literal ":" statement_block ;
+snippet_definition = { annotation } "snippet" string_literal ":" statement_block ;
 
-template_task_definition = "template" "task" string_literal ":"
+template_task_definition = { annotation } "template" "task" string_literal ":"
                          { task_property }
                          statement_block ;
 
 (* Task definition *)
-task_definition = "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
+task_definition = { annotation } "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
                  { task_property }
                  statement_block ;
 
@@ -596,6 +598,104 @@ task "invalid":
 - **Team standards**: Establish indentation standards for your team
 - **Generated files**: `xdrun --init` uses tabs by default
 
+### `xdrun --init` Template Manifests
+
+`xdrun --init` and `xdrun --init-minimal` can bootstrap a spec from a template catalog instead of the built-in starter config:
+
+```bash
+xdrun --list-templates --templates-repo ../drun-templates
+xdrun --init --template go-cli --templates-repo ../drun-templates
+xdrun --init --from-template ../drun-templates --template go-cli
+
+# Or target a specific manifest:
+xdrun --init \
+  --from-template github:owner/repo/templates/drun-init.yaml@main \
+  --template go-cli
+```
+
+#### CLI Rules
+
+- `--templates-repo <path>` points at a local template repository root that contains `templates.yaml`
+- `--list-templates --templates-repo <path>` lists templates from that local repository
+- `--list-templates --from-template <manifest>` lists templates from a specific manifest
+- `--template <name> --templates-repo <path>` resolves through that local repository
+- `--from-template` accepts `github:...`, `drunhub:...`, `https://...`, a local manifest path, or a local directory root containing `templates.yaml`
+- `--template` is required when `--from-template` is used for initialization
+- If neither `--templates-repo` nor `--from-template` is provided, `xdrun` falls back to configured catalog sources such as `DRUN_TEMPLATES_MANIFEST`, `DRUN_TEMPLATES_REPO`, or the remote official catalog
+- `--file` and `--save-as-default` behave the same as regular `xdrun --init`
+
+For local template development, a directory target lets you test without publishing a remote manifest. If `--from-template` points at a directory, `xdrun` reads `templates.yaml` from that directory root automatically.
+
+#### Manifest Format
+
+The manifest referenced by `--from-template`, or by the official catalog, is not the final `.drun` spec. The manifest can define templates as a map or a sequence:
+
+```yaml
+version: "1"
+templates:
+  go-cli:
+    kind: go-cli
+    description: "Drun starter for Go CLI projects"
+    source: "templates/go-cli.drun"
+```
+
+Equivalent sequence form:
+
+```yaml
+version: "1"
+templates:
+  - name: go-cli
+    kind: go-cli
+    description: "Drun starter for Go CLI projects"
+    source: "templates/go-cli.drun"
+```
+
+Each template entry supports:
+
+- `name`: the template selector passed to `--template`
+- `source`: the `.drun` file to fetch; it can be remote, local, or relative to the manifest
+- `kind`: optional specialization such as `go-cli`
+- `description`: optional human-facing description
+
+#### Placeholder Contract
+
+Template-authored `.drun` files can use a small placeholder vocabulary that `xdrun --init` rewrites safely:
+
+- `{{project_name}}`: inferred from the current working directory
+- `{{binary_name}}`: defaults to the inferred project name
+- `{{cmd_path}}`: defaults to `./cmd/{{binary_name}}`
+- `{{module_name}}`: inferred from local `go.mod` when present, otherwise falls back to the project name
+
+#### Go CLI Template Example
+
+For `kind: go-cli`, `xdrun --init` also applies narrow Go-specific rewrites for common command shapes such as `go build -o ./bin/<name>` and `./cmd/<name>`.
+
+Example remote template:
+
+```drun
+# drun (do-run) CLI is a fast, semantic task runner with
+# its own powerful automation language. Effortless tasks, serious speed.
+# Learn more at https://github.com/phillarmonic/drun
+
+version: 2.0
+
+project "{{project_name}}" version "1.0":
+task "default" means "Welcome":
+	info "{{project_name}} Drun Spec"
+
+task "build" means "Build {{binary_name}}":
+	step "Building {{binary_name}}..."
+	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/{{binary_name}} {{cmd_path}}"
+	success "Build completed for {{binary_name}}"
+
+task "install" means "Install {{binary_name}}":
+	step "Installing {{binary_name}}..."
+	run "go install {{cmd_path}}"
+	success "Install completed for {{module_name}}"
+```
+
+This keeps the rewrite contract explicit: init only rewrites known placeholders and a few well-known Go command patterns. It does not attempt free-form semantic rewriting of arbitrary shell commands.
+
 ### String Interpolation
 
 Strings support variable interpolation using `{$variable}` syntax for declared variables and `{variable}` for loop variables:
@@ -736,7 +836,7 @@ drun v2 supports cross-platform shell configuration with sensible defaults for e
 ```
 project "my-app":
   shell config:
-    darwin:
+    mac:
       executable: "/bin/zsh"
       args:
         - "-l"
@@ -767,9 +867,36 @@ project "my-app":
 #### Platform Detection
 
 drun automatically detects the current platform using Go's `runtime.GOOS`:
-- **darwin**: macOS
+- **mac**: macOS (legacy alias: `darwin`)
 - **linux**: Linux distributions
 - **windows**: Windows
+
+`mac` is the canonical user-facing spelling in drun. Existing specs may continue to use `darwin`; drun normalises both spellings to the same platform internally.
+
+### Declaration Annotations
+
+drun v2 supports declaration decorators immediately before tasks, template tasks, and snippets:
+
+```
+@platform("linux", "mac")
+task "shell" means "Open a Unix shell":
+  run "bash" attached
+
+@platform("windows")
+task "shell" means "Open PowerShell":
+  run "pwsh.exe" attached
+```
+
+#### `@platform(...)`
+
+- Accepted values: `linux`, `mac`, `windows`
+- Legacy alias: `darwin` is accepted and normalised to `mac`
+- A declaration may list one or more platforms
+- Unknown annotations are rejected
+
+For tasks specifically, `@platform(...)` also enables platform-aware duplicate names. A task family may contain any number of disjoint platform-tagged variants plus at most one unannotated fallback variant. drun resolves the correct variant automatically when the task is invoked: exact platform match first, then the unannotated fallback if one exists.
+
+If no variant matches the current platform, execution fails with a clear error listing the available variants.
 
 #### Configuration Options
 
@@ -1533,13 +1660,13 @@ when $platform is "windows":
     step "Building for Windows ARM"
 otherwise:
   info "Unix-like platform detected"
-  when $platform is "darwin":
+  when $platform is "mac":
     step "Building for macOS"
   otherwise:
     step "Building for Linux"
 
 # When-otherwise in loops (matrix execution)
-for each $platform in ["windows", "linux", "darwin"]:
+for each $platform in ["windows", "linux", "mac"]:
   when $platform is "windows":
     run "GOOS={$platform} go build -o app.exe"
   otherwise:
@@ -1902,7 +2029,7 @@ project "myapp" version "1.0.0":
   set registry to "ghcr.io/company"    # Project setting
   set api_url to "https://api.example.com"
   set timeout to "30s"
-  set platforms as list to ["linux", "darwin", "windows"]  # Array setting
+  set platforms as list to ["linux", "mac", "windows"]  # Array setting
   set environments as list to ["dev", "staging", "production"]
 ```
 
@@ -2073,7 +2200,7 @@ task "variable_assignment":
   let $items as list to ["value1", "value2", "value3"]
   
   # Array assignment with set
-  set $platforms as list to ["linux", "darwin", "windows"]
+  set $platforms as list to ["linux", "mac", "windows"]
   
   # Arrays are stored as comma-separated strings
   # and can be used in loops
@@ -2387,7 +2514,7 @@ Array literals use square bracket notation with comma-separated values:
 ```
 # Basic array literals
 ["item1", "item2", "item3"]
-["linux", "darwin", "windows"]
+["linux", "mac", "windows"]
 ["dev", "staging", "production"]
 
 # Numbers and mixed types
@@ -2406,7 +2533,7 @@ project "myapp" version "1.0.0":
   set api_url to "https://api.example.com"
   
   # Array settings using "as list to" syntax
-  set platforms as list to ["linux", "darwin", "windows"]
+  set platforms as list to ["linux", "mac", "windows"]
   set environments as list to ["dev", "staging", "production"]
   set node_versions as list to ["16", "18", "20"]
   set databases as list to ["postgres", "mysql", "mongodb"]
@@ -2432,7 +2559,7 @@ Loop variables use the `$variable` syntax for consistency with the scoping syste
 
 ```
 # Direct array literal in loops
-for each platform in ["linux", "darwin", "windows"]:
+for each platform in ["linux", "mac", "windows"]:
   info "Building for {$platform}"
 
 # Using project-defined arrays
@@ -2513,7 +2640,7 @@ Loop variables follow the established scoping rules:
 
 ```
 project "matrix-demo":
-  set platforms as list to ["linux", "darwin", "windows"]
+  set platforms as list to ["linux", "mac", "windows"]
   set registry to "ghcr.io/company"
 
 task "matrix-build":
@@ -4743,6 +4870,13 @@ run "{$package_manager} run build"
 # Docker Buildx variants
 detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
+```
+
+When you only need the resolved command string inline, use the builtin interpolation macro:
+
+```
+run "{docker compose command} up -d"
+run "{docker compose command} logs --tail=100"
 ```
 
 #### Benefits

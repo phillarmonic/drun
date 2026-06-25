@@ -21,7 +21,9 @@ go build -ldflags "${LDFLAGS}" -o bin/xdrun ./cmd/xdrun
 
 echo "✅ Build complete: bin/xdrun"
 echo "Test with: ./bin/xdrun --version"
-echo "Installing to /usr/local/bin/xdrun"
-sudo cp bin/xdrun /usr/local/bin/xdrun
-echo "✅ Installed to /usr/local/bin/xdrun"
-/usr/local/bin/xdrun --version
+INSTALL_DIR="${HOME}/.local/bin"
+mkdir -p "${INSTALL_DIR}"
+echo "Installing to ${INSTALL_DIR}/xdrun"
+cp bin/xdrun "${INSTALL_DIR}/xdrun"
+echo "✅ Installed to ${INSTALL_DIR}/xdrun"
+"${INSTALL_DIR}/xdrun" --version

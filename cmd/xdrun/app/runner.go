@@ -8,6 +8,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/engine"
 	"github.com/phillarmonic/drun/v2/internal/errors"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/phillarmonic/drun/v2/internal/secrets"
 )
 
@@ -160,7 +161,11 @@ func ListAllTasks(eng *engine.Engine, program *ast.Program) error {
 	}
 
 	for _, task := range tasks {
-		fmt.Printf("  %-20s  %s\n", task.Name, task.Description)
+		platformSuffix := ""
+		if len(task.Platforms) > 0 {
+			platformSuffix = " [" + platform.FormatList(task.Platforms) + "]"
+		}
+		fmt.Printf("  %-20s  %s\n", task.Name+platformSuffix, task.Description)
 	}
 
 	return nil

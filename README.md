@@ -30,7 +30,7 @@ Install a specific tagged version with Go:
 go install github.com/phillarmonic/drun/v2/cmd/xdrun@v2.17.0
 ```
 
-The installer detects platform and architecture, installs `xdrun`, and attempts to make it available on your `PATH`.
+The installer detects platform and architecture, installs `xdrun` to `$HOME/.local/bin` by default on Unix systems, and attempts to make it available on your `PATH`.
 
 ## Quick Start
 
@@ -48,6 +48,16 @@ Or run this command to initialize a Drun spec file in the current directory (a f
 ```bash
 xdrun --init
 ```
+
+Initialize from a local template repository:
+
+```bash
+xdrun --list-templates --templates-repo ../drun-templates
+xdrun --init --template go-cli --templates-repo ../drun-templates
+xdrun --init --from-template ../drun-templates --template go-cli
+```
+
+When `--from-template` points at a local directory, `xdrun` looks for `templates.yaml` at that directory root. This is useful when developing templates locally before publishing a remote manifest.
 
 Then run it:
 

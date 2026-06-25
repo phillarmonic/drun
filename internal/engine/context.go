@@ -69,7 +69,7 @@ type ProjectContext struct {
 	ShellConfigs      map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
 	IncludedSnippets  map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
 	IncludedTemplates map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
-	IncludedTasks     map[string]*ast.TaskStatement             // namespaced tasks: "docker.deploy"
+	IncludedTasks     map[string][]*ast.TaskStatement           // namespaced tasks: "docker.deploy"
 	IncludedSettings  map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
 	IncludedParams    map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
 	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
@@ -127,7 +127,7 @@ func (pc *ProjectContext) GetIncludedTemplates() map[string]*ast.TaskTemplateSta
 	return pc.IncludedTemplates
 }
 
-func (pc *ProjectContext) GetIncludedTasks() map[string]*ast.TaskStatement {
+func (pc *ProjectContext) GetIncludedTasks() map[string][]*ast.TaskStatement {
 	if pc == nil {
 		return nil
 	}

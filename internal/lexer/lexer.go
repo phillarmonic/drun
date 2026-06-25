@@ -114,6 +114,9 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok.Type = RBRACKET
 		tok.Literal = string(l.ch)
+	case '@':
+		tok.Type = DECORATOR
+		tok.Literal = string(l.ch)
 	case '+':
 		tok.Type = PLUS
 		tok.Literal = string(l.ch)

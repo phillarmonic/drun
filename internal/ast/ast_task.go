@@ -13,6 +13,7 @@ type TaskStatement struct {
 	Name         string
 	Mode         string
 	Description  string
+	Annotations  []Annotation
 	Parameters   []ParameterStatement
 	Dependencies []DependencyGroup
 	Body         []Statement
@@ -21,6 +22,10 @@ type TaskStatement struct {
 func (ts *TaskStatement) statementNode() {}
 func (ts *TaskStatement) String() string {
 	var out strings.Builder
+	for _, annotation := range ts.Annotations {
+		out.WriteString(annotation.String())
+		out.WriteString("\n")
+	}
 	fmt.Fprintf(&out, "task \"%s\"", ts.Name)
 	if ts.Mode != "" {
 		fmt.Fprintf(&out, " mode \"%s\"", ts.Mode)
@@ -106,6 +111,7 @@ type TaskTemplateStatement struct {
 	Token       lexer.Token
 	Name        string
 	Description string
+	Annotations []Annotation
 	Parameters  []ParameterStatement
 	Body        []Statement
 }
@@ -113,6 +119,10 @@ type TaskTemplateStatement struct {
 func (tts *TaskTemplateStatement) statementNode() {}
 func (tts *TaskTemplateStatement) String() string {
 	var out strings.Builder
+	for _, annotation := range tts.Annotations {
+		out.WriteString(annotation.String())
+		out.WriteString("\n")
+	}
 	fmt.Fprintf(&out, "template task \"%s\"", tts.Name)
 	if tts.Description != "" {
 		fmt.Fprintf(&out, " means \"%s\"", tts.Description)

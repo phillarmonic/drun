@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/phillarmonic/drun/v2/internal/engine"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -41,10 +42,38 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	tasks := eng.ListTasks(program)
 
 	var completions []string
+	type completionMeta struct {
+		description string
+		platforms   []string
+	}
+	families := make(map[string]*completionMeta, len(tasks))
 
-	// User-defined tasks come first
 	for _, task := range tasks {
-		completions = append(completions, task.Name+"\t[task] "+task.Description)
+		meta, exists := families[task.Name]
+		if !exists {
+			families[task.Name] = &completionMeta{
+				description: task.Description,
+				platforms:   append([]string(nil), task.Platforms...),
+			}
+			continue
+		}
+		meta.platforms = append(meta.platforms, task.Platforms...)
+		if meta.description == "" || meta.description == "No description" {
+			meta.description = task.Description
+		}
+	}
+
+	for _, task := range tasks {
+		meta, exists := families[task.Name]
+		if !exists {
+			continue
+		}
+		description := "[task] " + meta.description
+		if len(meta.platforms) > 0 {
+			description += " [" + platform.FormatList(uniquePlatforms(meta.platforms)) + "]"
+		}
+		completions = append(completions, task.Name+"\t"+description)
+		delete(families, task.Name)
 	}
 
 	// Built-in cmd:* commands come after user tasks
@@ -64,4 +93,17 @@ func builtinCmdCompletions(cmd *cobra.Command) []string {
 		}
 	}
 	return completions
+}
+
+func uniquePlatforms(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }

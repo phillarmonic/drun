@@ -23,6 +23,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/errors"
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 	"github.com/phillarmonic/drun/v2/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/phillarmonic/drun/v2/internal/remote"
 	"github.com/phillarmonic/drun/v2/internal/types"
 )
@@ -245,6 +246,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 
 	// Register all tasks with domain registry
 	e.taskRegistry.Clear() // Clear registry for fresh execution
+	e.taskRegistry.SetCurrentPlatform(platform.Current())
 	if err := e.registerTasks(program.Tasks, currentFile); err != nil {
 		return fmt.Errorf("task registration failed: %v", err)
 	}
@@ -685,7 +687,7 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 		ShellConfigs:      make(map[string]*ast.PlatformShellConfig, 4),        // Pre-allocate for typical platform count
 		IncludedSnippets:  make(map[string]*ast.SnippetStatement, 16),          // Pre-allocate for included snippets
 		IncludedTemplates: make(map[string]*ast.TaskTemplateStatement, 16),     // Pre-allocate for included templates
-		IncludedTasks:     make(map[string]*ast.TaskStatement, 16),             // Pre-allocate for included tasks
+		IncludedTasks:     make(map[string][]*ast.TaskStatement, 16),           // Pre-allocate for included tasks
 		IncludedSettings:  make(map[string]string, 16),                         // Pre-allocate for included settings
 		IncludedParams:    make(map[string]*ast.ProjectParameterStatement, 16), // Pre-allocate for included parameters
 		IncludedFiles:     make(map[string]bool, 4),                            // Pre-allocate for included files
@@ -724,8 +726,12 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 			}
 		case *ast.ShellConfigStatement:
 			// Store shell configurations for each platform
-			for platform, config := range s.Platforms {
-				ctx.ShellConfigs[platform] = config
+			for platformName, config := range s.Platforms {
+				normalized := platformName
+				if canonical, err := platform.Normalize(platformName); err == nil {
+					normalized = canonical
+				}
+				ctx.ShellConfigs[normalized] = config
 			}
 		case *ast.IncludeStatement:
 			// Process include statement
@@ -753,6 +759,10 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 
 // executeTask executes a single task with the given context (AST version for templates)
 func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) error {
+	if err := enforceDeclarationPlatform("task", task.Name, task.Annotations); err != nil {
+		return err
+	}
+
 	prevTaskMode := ctx.CurrentTaskMode
 	ctx.CurrentTaskMode = resolvedTaskMode(task.Mode, prevTaskMode, e.taskModeOverride)
 	defer func() {
@@ -947,60 +957,9 @@ func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionCon
 		return nil
 	}
 
-	// Find the task or template to call
-	var targetTask *ast.TaskStatement
-
-	var taskNamespace string // Track the namespace for transitive resolution
-
-	// Check if it's a namespaced reference (contains dot)
-	if strings.Contains(callStmt.TaskName, ".") && ctx.Project != nil {
-		// Extract namespace from the task name (e.g., "docker.build" -> "docker")
-		parts := strings.SplitN(callStmt.TaskName, ".", 2)
-		taskNamespace = parts[0]
-
-		// First check included templates
-		if template, exists := ctx.Project.IncludedTemplates[callStmt.TaskName]; exists {
-			// Convert template to task for execution
-			targetTask = &ast.TaskStatement{
-				Token:       template.Token,
-				Name:        template.Name,
-				Description: template.Description,
-				Parameters:  template.Parameters,
-				Body:        template.Body,
-			}
-		} else if task, exists := ctx.Project.IncludedTasks[callStmt.TaskName]; exists {
-			// Check included tasks
-			targetTask = task
-		}
-	} else {
-		// Local task/template - check local templates first
-		for _, template := range ctx.Program.Templates {
-			if template.Name == callStmt.TaskName {
-				// Convert template to task for execution
-				targetTask = &ast.TaskStatement{
-					Token:       template.Token,
-					Name:        template.Name,
-					Description: template.Description,
-					Parameters:  template.Parameters,
-					Body:        template.Body,
-				}
-				break
-			}
-		}
-
-		// If not a template, check regular tasks
-		if targetTask == nil {
-			for _, task := range ctx.Program.Tasks {
-				if task.Name == callStmt.TaskName {
-					targetTask = task
-					break
-				}
-			}
-		}
-	}
-
-	if targetTask == nil {
-		return fmt.Errorf("task '%s' not found", callStmt.TaskName)
+	targetTask, taskNamespace, err := e.resolveTaskReference(ctx, callStmt.TaskName)
+	if err != nil {
+		return err
 	}
 
 	// Create a new execution context for the called task
@@ -1086,6 +1045,10 @@ func (e *Engine) executeUseSnippet(useStmt *statement.UseSnippet, ctx *Execution
 		return fmt.Errorf("snippet '%s' not found", useStmt.SnippetName)
 	}
 
+	if err := enforceDeclarationPlatform("snippet", snippet.Name, snippet.Annotations); err != nil {
+		return err
+	}
+
 	// Save the current namespace and set new one if snippet is from included project
 	oldNamespace := ctx.CurrentNamespace
 	if snippetNamespace != "" {
@@ -1131,6 +1094,10 @@ func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *
 
 	if template == nil {
 		return fmt.Errorf("template '%s' not found", tfts.TemplateName)
+	}
+
+	if err := enforceDeclarationPlatform("template task", template.Name, template.Annotations); err != nil {
+		return err
 	}
 
 	// Create a new execution context for the instantiated task
@@ -1251,6 +1218,7 @@ func (e *Engine) ListTasks(program *ast.Program) []TaskInfo {
 		info := TaskInfo{
 			Name:        domainTask.Name,
 			Description: domainTask.Description,
+			Platforms:   append([]string(nil), domainTask.Platforms...),
 		}
 		if info.Description == "" {
 			info.Description = "No description"
@@ -1264,6 +1232,7 @@ func (e *Engine) ListTasks(program *ast.Program) []TaskInfo {
 type TaskInfo struct {
 	Name        string
 	Description string
+	Platforms   []string
 }
 
 // ExecuteString is a convenience function that parses and executes v2 source code

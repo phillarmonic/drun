@@ -70,6 +70,15 @@ func TestInstallProjectSkillCreatesExpectedFiles(t *testing.T) {
 	if !strings.Contains(guide, "`xdrun --list`") {
 		t.Fatalf("guide should mention xdrun --list:\n%s", guide)
 	}
+	if !strings.Contains(guide, `@platform("linux", "mac")`) {
+		t.Fatalf("guide should mention platform annotations:\n%s", guide)
+	}
+	if !strings.Contains(guide, "uses the unannotated task as the fallback") {
+		t.Fatalf("guide should explain unannotated fallback task behavior:\n%s", guide)
+	}
+	if !strings.Contains(guide, "Legacy `darwin` still parses") {
+		t.Fatalf("guide should mention darwin compatibility:\n%s", guide)
+	}
 	if !strings.Contains(guide, `mode "ci"`) {
 		t.Fatalf("guide should mention mode \"ci\":\n%s", guide)
 	}

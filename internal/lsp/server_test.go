@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -89,6 +91,64 @@ func TestServerCompletionIncludesKeywordsAndTasks(t *testing.T) {
 	assertCompletionLabel(t, items, "task")
 	assertCompletionLabel(t, items, "deploy")
 	assertCompletionLabel(t, items, "attached")
+}
+
+func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {
+	tempRoot := t.TempDir()
+	templateDir := filepath.Join(tempRoot, "drun-templates", "templates")
+	if err := os.MkdirAll(templateDir, 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tempRoot, "drun-templates", "templates.yaml"), []byte("version: \"1\"\n"), 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	templatePath := filepath.Join(templateDir, "go-cli.drun")
+	templateURI := "file://" + filepath.ToSlash(templatePath)
+	templateText := "version: 2.0\n\nproject \"{{project_name}}\" version \"1.0\":\ntemplate task \"build-template\":\n  run \"go build -o ./bin/{{binary_name}} {{cmd_path}}\"\n"
+
+	input := joinFrames(
+		frame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`),
+		frame(fmt.Sprintf(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"%s","languageId":"drun","version":1,"text":%q}}}`, templateURI, templateText)),
+		frame(fmt.Sprintf(`{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"%s"}}}`, templateURI)),
+		frame(`{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`),
+		frame(`{"jsonrpc":"2.0","method":"exit","params":{}}`),
+	)
+
+	var output bytes.Buffer
+	server := NewServer(bytes.NewReader(input), &output)
+	if err := server.Run(); err != nil {
+		t.Fatalf("server run failed: %v", err)
+	}
+
+	messages := decodeFrames(t, output.Bytes())
+
+	var diagnosticsMsg message
+	var completionMsg message
+	for _, msg := range messages {
+		switch {
+		case msg.Method == "textDocument/publishDiagnostics":
+			diagnosticsMsg = msg
+		case string(msg.ID) == "2":
+			completionMsg = msg
+		}
+	}
+
+	var params publishDiagnosticsParams
+	if err := json.Unmarshal(diagnosticsMsg.Params, &params); err != nil {
+		t.Fatalf("unmarshal diagnostics params: %v", err)
+	}
+	if len(params.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for template placeholders, got %#v", params.Diagnostics)
+	}
+
+	var items []completionItem
+	if err := json.Unmarshal(mustMarshal(completionMsg.Result), &items); err != nil {
+		t.Fatalf("unmarshal completion items: %v", err)
+	}
+
+	assertCompletionLabel(t, items, "template task")
+	assertCompletionLabel(t, items, "build-template")
 }
 
 func assertCompletionLabel(t *testing.T, items []completionItem, label string) {

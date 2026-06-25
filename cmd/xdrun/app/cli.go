@@ -29,6 +29,10 @@ type App struct {
 	showVersion        bool
 	initConfig         bool
 	initMinimalConfig  bool
+	initFromTemplate   string
+	initTemplateName   string
+	templatesRepo      string
+	listTemplates      bool
 	saveAsDefault      bool
 	setWorkspace       string
 	selfUpdate         bool
@@ -70,7 +74,13 @@ Examples:
   xdrun hello                    # Run the 'hello' task from a .drun file
   xdrun build --env=production   # Run 'build' task with environment
   xdrun --list                   # List all available tasks
+  xdrun --list-templates --templates-repo ../drun-templates
+                                 # List available init templates from a local template repo
   xdrun --init                   # Create a new .drun file
+  xdrun --init --template go-cli --templates-repo ../drun-templates
+                                 # Create a new .drun file from a local template repo
+  xdrun --init --from-template github:owner/repo/templates.yaml@main --template go-cli
+                                 # Create a new .drun file from a specific template manifest
   xdrun --init-minimal           # Create a minimal .drun file
   xdrun --debug --tokens         # Debug lexer tokens
   xdrun --debug --ast            # Debug AST structure
@@ -168,6 +178,10 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.showVersion, "version", false, "[xdrun CLI cmd] Show version information")
 	flags.BoolVar(&a.initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
 	flags.BoolVar(&a.initMinimalConfig, "init-minimal", false, "[xdrun CLI cmd] Initialize a new minimal .drun task file")
+	flags.StringVar(&a.initFromTemplate, "from-template", "", "[xdrun CLI cmd] Initialize from a specific template manifest (github:/drunhub:/https:// or local path)")
+	flags.StringVar(&a.initTemplateName, "template", "", "[xdrun CLI cmd] Template entry name to use with --from-template or --templates-repo")
+	flags.StringVar(&a.templatesRepo, "templates-repo", "", "[xdrun CLI cmd] Local template repository root containing templates.yaml")
+	flags.BoolVar(&a.listTemplates, "list-templates", false, "[xdrun CLI cmd] List available init templates from a manifest, local template repo, or configured catalog")
 	flags.BoolVar(&a.saveAsDefault, "save-as-default", false, "[xdrun CLI cmd] Save custom file name as workspace default (use with --init or --init-minimal)")
 	flags.StringVar(&a.setWorkspace, "set-workspace", "", "[xdrun CLI cmd] Set workspace default task file location")
 	flags.BoolVar(&a.selfUpdate, "self-update", false, "[xdrun CLI cmd] Check for updates and update xdrun to the latest version")
@@ -223,13 +237,23 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		return HandleSelfUpdate(a.version)
 	}
 
+	if a.listTemplates {
+		if a.initConfig || a.initMinimalConfig {
+			return fmt.Errorf("--list-templates cannot be combined with --init or --init-minimal")
+		}
+		if a.initTemplateName != "" {
+			return fmt.Errorf("--template cannot be combined with --list-templates")
+		}
+		return ListInitTemplates(a.initFromTemplate, a.templatesRepo)
+	}
+
 	// Handle --init flag
 	if a.initConfig {
-		return InitializeConfig(a.configFile, a.saveAsDefault, false)
+		return InitializeConfig(a.configFile, a.saveAsDefault, false, a.initFromTemplate, a.initTemplateName, a.templatesRepo)
 	}
 
 	if a.initMinimalConfig {
-		return InitializeConfig(a.configFile, a.saveAsDefault, true)
+		return InitializeConfig(a.configFile, a.saveAsDefault, true, a.initFromTemplate, a.initTemplateName, a.templatesRepo)
 	}
 
 	// Handle --set-workspace flag

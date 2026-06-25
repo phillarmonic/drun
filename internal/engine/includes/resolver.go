@@ -33,7 +33,7 @@ type ProjectContext interface {
 	GetIncludedFiles() map[string]bool
 	GetIncludedSnippets() map[string]*ast.SnippetStatement
 	GetIncludedTemplates() map[string]*ast.TaskTemplateStatement
-	GetIncludedTasks() map[string]*ast.TaskStatement
+	GetIncludedTasks() map[string][]*ast.TaskStatement
 	GetIncludedSettings() map[string]string
 	GetIncludedParams() map[string]*ast.ProjectParameterStatement
 }
@@ -178,7 +178,7 @@ func (r *Resolver) ProcessInclude(ctx ProjectContext, include *ast.IncludeStatem
 	if includeTasks {
 		for _, task := range program.Tasks {
 			namespacedName := namespace + "." + task.Name
-			ctx.GetIncludedTasks()[namespacedName] = task
+			ctx.GetIncludedTasks()[namespacedName] = append(ctx.GetIncludedTasks()[namespacedName], task)
 			if r.verbose {
 				_, _ = fmt.Fprintf(r.output, "  ✓  Loaded task: %s\n", namespacedName)
 			}

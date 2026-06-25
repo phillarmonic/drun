@@ -8,15 +8,20 @@ import (
 
 // SnippetStatement represents a reusable code block
 type SnippetStatement struct {
-	Token lexer.Token
-	Name  string
-	Body  []Statement
+	Token       lexer.Token
+	Name        string
+	Annotations []Annotation
+	Body        []Statement
 }
 
 func (ss *SnippetStatement) statementNode()      {}
 func (ss *SnippetStatement) projectSettingNode() {}
 func (ss *SnippetStatement) String() string {
-	out := fmt.Sprintf("snippet \"%s\":", ss.Name)
+	var out string
+	for _, annotation := range ss.Annotations {
+		out += annotation.String() + "\n"
+	}
+	out += fmt.Sprintf("snippet \"%s\":", ss.Name)
 	for _, stmt := range ss.Body {
 		out += "\n  " + stmt.String()
 	}
