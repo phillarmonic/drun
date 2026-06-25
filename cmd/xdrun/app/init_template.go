@@ -23,7 +23,7 @@ const (
 	initTemplateCacheDuration      = time.Minute
 	initTemplateFetchTimeout       = 30 * time.Second
 	initTemplateManifestVerion     = "1"
-	officialTemplateManifestRemote = "github:phillarmonic/drun-templates/templates.yaml@main"
+	officialTemplateManifestRemote = "github:phillarmonic/drun-templates/templates.yaml@master"
 )
 
 var initTemplateContentFetcher = fetchInitTemplateContent
