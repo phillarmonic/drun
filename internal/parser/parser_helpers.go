@@ -630,15 +630,64 @@ func (p *Parser) expectPeekFunctionName() bool {
 
 // parseConditionExpression parses condition expressions like "environment is production"
 func (p *Parser) parseConditionExpression() string {
-	var parts []string
+	var builder strings.Builder
+	prevLiteral := ""
 
 	// Read tokens until we hit a colon
 	for p.peekToken.Type != lexer.COLON && p.peekToken.Type != lexer.EOF {
 		p.nextToken()
-		parts = append(parts, p.curToken.Literal)
+		currentLiteral := p.curToken.Literal
+
+		if builder.Len() > 0 && shouldInsertConditionSpace(prevLiteral, currentLiteral) {
+			builder.WriteByte(' ')
+		}
+		builder.WriteString(currentLiteral)
+		prevLiteral = currentLiteral
 	}
 
-	return strings.Join(parts, " ")
+	return builder.String()
+}
+
+func shouldInsertConditionSpace(prev, current string) bool {
+	if prev == "" || current == "" {
+		return false
+	}
+
+	if (current == "." || current == "/") && startsPathLiteralAfterKeyword(prev) {
+		return true
+	}
+
+	noSpaceAfter := map[string]bool{
+		".": true,
+		"/": true,
+		"-": true,
+		"{": true,
+		"(": true,
+		"[": true,
+	}
+	if noSpaceAfter[prev] {
+		return false
+	}
+
+	noSpaceBefore := map[string]bool{
+		".": true,
+		"/": true,
+		"-": true,
+		"}": true,
+		")": true,
+		"]": true,
+		",": true,
+	}
+	return !noSpaceBefore[current]
+}
+
+func startsPathLiteralAfterKeyword(prev string) bool {
+	switch prev {
+	case "file", "folder", "directory", "dir":
+		return true
+	default:
+		return false
+	}
 }
 
 // parseSimpleCondition parses simple conditions for break/continue statements
