@@ -350,3 +350,49 @@ task "plain-negated":
 		t.Fatalf("Expected negated file check to skip missing branch in original cwd, got:\n%s", out.String())
 	}
 }
+
+func TestUnquotedDotfileConditionsUseOriginalCwd(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("KEY=value"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	input := `version: 2.0
+
+task "plain":
+    if file .env exists:
+        run "echo exists"
+    else:
+        run "echo missing"
+
+task "plain-negated":
+    if file .env not exists:
+        run "echo missing"
+    else:
+        run "echo exists"
+`
+	program := parseForWorkdirTest(t, input)
+
+	var out bytes.Buffer
+	eng := NewEngine(&out)
+	if err := eng.Execute(program, "plain"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected unquoted dotfile check to find .env in original cwd, got:\n%s", out.String())
+	}
+
+	out.Reset()
+	if err := eng.Execute(program, "plain-negated"); err != nil {
+		t.Fatalf("Execution failed: %v\nOutput:\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "missing") || !strings.Contains(out.String(), "exists") {
+		t.Fatalf("Expected unquoted negated dotfile check to skip missing branch, got:\n%s", out.String())
+	}
+}

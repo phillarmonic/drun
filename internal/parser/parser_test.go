@@ -414,3 +414,47 @@ task "test with \"escaped\" quotes":
 		t.Errorf("runStmt.Command wrong. expected='echo \"Hello World\"', got=%s", runStmt.Command)
 	}
 }
+
+func TestParser_UnquotedDotfileCondition(t *testing.T) {
+	input := `version: 2.0
+
+task "test":
+  if file .env exists:
+    info "exists"
+  if file .env not exists:
+    info "missing"`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if len(program.Tasks) != 1 {
+		t.Fatalf("program should contain 1 task. got=%d", len(program.Tasks))
+	}
+
+	task := program.Tasks[0]
+	if task == nil {
+		t.Fatalf("program.Tasks[0] is nil")
+	}
+	if len(task.Body) != 2 {
+		t.Fatalf("task body should contain 2 statements. got=%d", len(task.Body))
+	}
+
+	firstIf, ok := task.Body[0].(*ast.ConditionalStatement)
+	if !ok {
+		t.Fatalf("task.Body[0] is not a ConditionalStatement. got=%T", task.Body[0])
+	}
+	if firstIf.Condition != "file .env exists" {
+		t.Fatalf("expected first condition %q, got %q", "file .env exists", firstIf.Condition)
+	}
+
+	secondIf, ok := task.Body[1].(*ast.ConditionalStatement)
+	if !ok {
+		t.Fatalf("task.Body[1] is not a ConditionalStatement. got=%T", task.Body[1])
+	}
+	if secondIf.Condition != "file .env not exists" {
+		t.Fatalf("expected second condition %q, got %q", "file .env not exists", secondIf.Condition)
+	}
+}
