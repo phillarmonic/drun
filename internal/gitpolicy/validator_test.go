@@ -100,3 +100,38 @@ func TestPolicy_ValidateCommitMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestPolicy_ValidateCommitMessage_ConventionalCommits(t *testing.T) {
+	policy := &Policy{
+		BranchPattern:     "{type}/{identifier}-{description}",
+		BranchTypes:       []string{"feat", "fix", "chore"},
+		CommitMinLength:   10,
+		CommitBans:        []string{"WIP", "wip", "fixup"},
+		CommitPattern:     "conventional commits",
+		ExtractIdentifier: true,
+	}
+
+	tests := []struct {
+		name       string
+		msg        string
+		branchName string
+		wantErr    bool
+	}{
+		{"valid conventional header", "feat: add parser support", "", false},
+		{"valid conventional with scope and breaking change", "feat(parser)!: PHIL-01 support conventional commits", "feat/PHIL-01-parser", false},
+		{"valid conventional with body", "fix(engine): PHIL-01 reject invalid headers\n\nAdds strict header validation.", "fix/PHIL-01-engine", false},
+		{"missing type separator", "feat add parser support", "", true},
+		{"missing description", "feat:", "", true},
+		{"uppercase type rejected", "Feat: add parser support", "", true},
+		{"missing branch identifier", "feat(parser): add parser support", "feat/PHIL-01-parser", true},
+		{"banned still rejected", "WIP", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := policy.ValidateCommitMessage(tt.msg, tt.branchName); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateCommitMessage() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -56,6 +56,7 @@ var keywordCompletions = []completionItem{
 	{Label: "default branches", Kind: completionItemKindKeyword, Detail: "Default branch list (inside git policy)"},
 	{Label: "branch naming", Kind: completionItemKindKeyword, Detail: "Branch naming convention (inside git policy)"},
 	{Label: "commit messages", Kind: completionItemKindKeyword, Detail: "Commit message convention (inside git policy)"},
+	{Label: "conventional commits", Kind: completionItemKindKeyword, Detail: "Built-in commit message policy mode"},
 	{Label: "enforce signed commits", Kind: completionItemKindKeyword, Detail: "Require GPG/SSH signed commits"},
 	{Label: "ban", Kind: completionItemKindKeyword, Detail: "Ban a commit message pattern"},
 	{Label: "min length", Kind: completionItemKindKeyword, Detail: "Minimum commit message length"},

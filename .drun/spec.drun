@@ -15,7 +15,7 @@ project "Drun" version "2.0":
 			naming: "{type}/{identifier}-{description}"
 			types: "feat", "fix", "chore", "hotfix"
 		commit:
-			messages: "{identifier}: {message}"
+			messages: "conventional commits"
 			ban: "WIP", "wip"
 			min length: 10
 			extract identifier from branch

@@ -245,6 +245,61 @@ task "deploy":
 	}
 }
 
+func TestParser_ProjectWithGitPolicyConventionalCommits(t *testing.T) {
+	input := `version: 2.0
+
+project "myapp":
+  git policy:
+    branch:
+      default branches: "main"
+      naming: "{type}/{identifier}-{description}"
+      types: "feat", "fix"
+    commit:
+      messages: "conventional commits"
+      ban: "WIP"
+      min length: 10
+      extract identifier from branch
+      enforce signed commits
+
+task "deploy":
+  info "Deploying application"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	checkParserErrors(t, p)
+
+	if program == nil || program.Project == nil {
+		t.Fatalf("program.Project is nil")
+	}
+
+	if len(program.Project.Settings) != 1 {
+		t.Fatalf("project should have 1 setting. got=%d", len(program.Project.Settings))
+	}
+
+	gitPolicy, ok := program.Project.Settings[0].(*ast.GitPolicyStatement)
+	if !ok {
+		t.Fatalf("project.Settings[0] is not *ast.GitPolicyStatement. got=%T", program.Project.Settings[0])
+	}
+
+	if gitPolicy.CommitPattern != "conventional commits" {
+		t.Errorf("gitPolicy.CommitPattern not %q. got=%q", "conventional commits", gitPolicy.CommitPattern)
+	}
+	if !gitPolicy.ExtractIdentifier {
+		t.Error("gitPolicy.ExtractIdentifier should be true")
+	}
+	if !gitPolicy.EnforceSignedCommits {
+		t.Error("gitPolicy.EnforceSignedCommits should be true")
+	}
+	if gitPolicy.CommitMinLength != 10 {
+		t.Errorf("gitPolicy.CommitMinLength not 10. got=%d", gitPolicy.CommitMinLength)
+	}
+	if len(gitPolicy.CommitBans) != 1 || gitPolicy.CommitBans[0] != "WIP" {
+		t.Errorf("gitPolicy.CommitBans unexpected: %#v", gitPolicy.CommitBans)
+	}
+}
+
 func TestParser_ProjectOptional(t *testing.T) {
 	input := `version: 2.0
 

@@ -91,6 +91,7 @@ func TestServerCompletionIncludesKeywordsAndTasks(t *testing.T) {
 	assertCompletionLabel(t, items, "task")
 	assertCompletionLabel(t, items, "deploy")
 	assertCompletionLabel(t, items, "attached")
+	assertCompletionLabel(t, items, "conventional commits")
 }
 
 func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {

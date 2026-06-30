@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var conventionalCommitHeaderPattern = regexp.MustCompile(`^[a-z]+(?:-[a-z]+)*(?:\([^\r\n()]+\))?!?: [^\s\r\n].*$`)
+
 // Policy represents the project's git conventions.
 type Policy struct {
 	DefaultBranches      []string
@@ -162,6 +164,16 @@ func (p *Policy) ValidateCommitMessage(msg, branchName string) error {
 		}
 	}
 
+	if isConventionalCommitPattern(p.CommitPattern) {
+		if err := validateConventionalCommitMessage(msg); err != nil {
+			return err
+		}
+		if identifier != "" && !strings.Contains(msg, identifier) {
+			return fmt.Errorf("commit message must include branch identifier '%s'", identifier)
+		}
+		return nil
+	}
+
 	// Fast path: if pattern is exactly "{identifier}: {message}"
 	if p.CommitPattern == "{identifier}: {message}" {
 		if identifier != "" {
@@ -195,5 +207,26 @@ func (p *Policy) ValidateCommitMessage(msg, branchName string) error {
 		}
 	}
 
+	return nil
+}
+
+func isConventionalCommitPattern(pattern string) bool {
+	switch strings.ToLower(strings.TrimSpace(pattern)) {
+	case "conventional", "conventional commit", "conventional commits", "conventional-commits":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateConventionalCommitMessage(msg string) error {
+	header := msg
+	if idx := strings.IndexAny(msg, "\r\n"); idx >= 0 {
+		header = msg[:idx]
+	}
+	header = strings.TrimSpace(header)
+	if !conventionalCommitHeaderPattern.MatchString(header) {
+		return errors.New("commit message must follow Conventional Commits format: type(scope): description")
+	}
 	return nil
 }
