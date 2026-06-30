@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/phillarmonic/figlet/figletlib"
 )
@@ -39,7 +40,16 @@ func ShowVersion(version, commit, date string) error {
 		fmt.Printf("commit: %s\n", commit)
 	}
 	if date != "unknown" {
-		fmt.Printf("built: %s\n", date)
+		fmt.Printf("Built in %s\n", formatBuildDate(date))
 	}
 	return nil
+}
+
+func formatBuildDate(date string) string {
+	parsed, err := time.Parse(time.RFC3339, date)
+	if err != nil {
+		return date
+	}
+
+	return parsed.UTC().Format("02/01/2006 15:04 UTC")
 }

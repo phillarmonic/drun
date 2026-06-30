@@ -2,11 +2,22 @@ package app
 
 import (
 	"os"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/engine"
 	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/spf13/cobra"
 )
+
+var defaultBuiltinCmdNames = map[string]struct{}{
+	"cmd:from":       {},
+	"cmd:link":       {},
+	"cmd:secret":     {},
+	"cmd:skill":      {},
+	"cmd:stateless":  {},
+	"cmd:unlink":     {},
+	"cmd:unlink-all": {},
+}
 
 // Domain: Shell Completion
 // This file contains logic for shell completion
@@ -17,13 +28,18 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
+	builtins := builtinCmdCompletions(cmd, toComplete, shouldIncludeBuiltinByDefault)
+	if isCmdNamespacePrefix(toComplete) {
+		return builtinCmdCompletions(cmd, toComplete, includeAllBuiltins), cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	}
+
 	// Get config file from flag
 	configFile, _ := cmd.Flags().GetString("file")
 
 	// Try to find and parse the drun file
 	actualConfigFile, err := FindConfigFile(configFile)
 	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
+		return builtins, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 	}
 
 	// #nosec G304 -- completion intentionally parses the discovered drun task file.
@@ -77,7 +93,7 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	}
 
 	// Built-in cmd:* commands come after user tasks
-	completions = append(completions, builtinCmdCompletions(cmd)...)
+	completions = append(completions, builtins...)
 
 	// KeepOrder ensures zsh/fish respect the order we provide (tasks before builtins)
 	return completions, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
@@ -85,14 +101,37 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 
 // builtinCmdCompletions returns the cmd:* subcommand completions in a consistent order.
 // These are appended after user tasks so user-defined names appear first in the list.
-func builtinCmdCompletions(cmd *cobra.Command) []string {
+func builtinCmdCompletions(cmd *cobra.Command, toComplete string, include func(name string) bool) []string {
 	var completions []string
 	for _, sub := range cmd.Root().Commands() {
 		if len(sub.Name()) > 4 && sub.Name()[:4] == "cmd:" {
+			if toComplete != "" && !strings.HasPrefix(sub.Name(), toComplete) {
+				continue
+			}
+			if !include(sub.Name()) {
+				continue
+			}
 			completions = append(completions, sub.Name()+"\t"+sub.Short)
 		}
 	}
 	return completions
+}
+
+func isCmdNamespacePrefix(toComplete string) bool {
+	if toComplete == "" {
+		return false
+	}
+
+	return strings.HasPrefix("cmd:", toComplete)
+}
+
+func shouldIncludeBuiltinByDefault(name string) bool {
+	_, ok := defaultBuiltinCmdNames[name]
+	return ok
+}
+
+func includeAllBuiltins(string) bool {
+	return true
 }
 
 func uniquePlatforms(values []string) []string {
