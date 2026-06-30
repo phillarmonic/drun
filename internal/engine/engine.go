@@ -252,7 +252,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	}
 
 	// Create project context for planning
-	projectCtx, err := e.createProjectContext(program.Project, currentFile)
+	projectCtx, err := e.BuildProjectContext(program.Project, currentFile)
 	if err != nil {
 		return fmt.Errorf("creating project context: %w", err)
 	}
@@ -671,8 +671,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 	return nil
 }
 
-// createProjectContext creates a project context from the project statement
-func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
+// BuildProjectContext creates a ProjectContext from a project statement
+func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
 	if project == nil {
 		return nil, nil
 	}
@@ -750,6 +750,14 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 					Name:        astTool.Name,
 					Constraints: constraints,
 				})
+			}
+		case *ast.GitPolicyStatement:
+			// Convert to domain statement immediately since it's small and pure data
+			domainStmt, err := statement.FromAST(s)
+			if err == nil {
+				if policy, ok := domainStmt.(*statement.GitPolicy); ok {
+					ctx.GitPolicy = policy
+				}
 			}
 		}
 	}
@@ -878,6 +886,11 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeChangeWorkdir(s, ctx)
 	case *statement.RequiresTools:
 		return e.executeRequiresTools(s, ctx)
+	case *statement.GitValidate:
+		return e.executeGitValidate(s, ctx)
+	case *statement.GitPolicy:
+		// Processed during project setup, ignored during execution
+		return nil
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}

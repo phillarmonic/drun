@@ -373,6 +373,19 @@ const (
 	EXISTS // exists
 	EMPTY  // empty
 
+	// Git Policy keywords
+	BRANCHES   // branches
+	NAMING     // naming
+	MESSAGES   // messages
+	TYPES_KW   // types (plural, distinct from TYPE)
+	ENFORCE    // enforce
+	SIGNED     // signed
+	COMMITS    // commits
+	DEFAULT_KW // default
+	BAN        // ban
+	VALIDATE   // validate
+	NAME_KW    // name (keyword for git validate branch name)
+
 	// Shell operations
 	RUN     // run
 	EXEC    // exec
@@ -1107,6 +1120,28 @@ func (t TokenType) String() string {
 		return "ARE"
 	case EXISTS:
 		return "EXISTS"
+	case BRANCHES:
+		return "BRANCHES"
+	case NAMING:
+		return "NAMING"
+	case MESSAGES:
+		return "MESSAGES"
+	case TYPES_KW:
+		return "TYPES_KW"
+	case ENFORCE:
+		return "ENFORCE"
+	case SIGNED:
+		return "SIGNED"
+	case COMMITS:
+		return "COMMITS"
+	case DEFAULT_KW:
+		return "DEFAULT_KW"
+	case BAN:
+		return "BAN"
+	case VALIDATE:
+		return "VALIDATE"
+	case NAME_KW:
+		return "NAME_KW"
 	case RUN:
 		return "RUN"
 	case EXEC:
@@ -1547,6 +1582,17 @@ var keywords = map[string]TokenType{
 	"are":           ARE,
 	"exists":        EXISTS,
 	"empty":         EMPTY,
+	"branches":      BRANCHES,
+	"naming":        NAMING,
+	"messages":      MESSAGES,
+	"types":         TYPES_KW,
+	"enforce":       ENFORCE,
+	"signed":        SIGNED,
+	"commits":       COMMITS,
+	"default":       DEFAULT_KW,
+	"ban":           BAN,
+	"validate":      VALIDATE,
+	"name":          NAME_KW,
 	"run":           RUN,
 	"exec":          EXEC,
 	"shell":         SHELL,

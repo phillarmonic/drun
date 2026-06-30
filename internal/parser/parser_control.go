@@ -481,6 +481,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			git := p.parseGitStatement()
 			if git != nil {
 				body = append(body, git)
+			} else if p.peekToken.Type == lexer.VALIDATE {
+				gitValidate := p.parseGitValidateStatement()
+				if gitValidate != nil {
+					body = append(body, gitValidate)
+				}
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()

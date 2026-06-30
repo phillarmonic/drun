@@ -51,6 +51,15 @@ var keywordCompletions = []completionItem{
 	{Label: "orchestrate", Kind: completionItemKindKeyword, Detail: "Orchestration definition or action"},
 	{Label: "service", Kind: completionItemKindKeyword, Detail: "Service definition"},
 	{Label: "attached", Kind: completionItemKindKeyword, Detail: "Interactive run modifier"},
+	{Label: "git policy", Kind: completionItemKindKeyword, Detail: "Git conventions policy block"},
+	{Label: "git validate", Kind: completionItemKindKeyword, Detail: "Validate git conventions"},
+	{Label: "default branches", Kind: completionItemKindKeyword, Detail: "Default branch list (inside git policy)"},
+	{Label: "branch naming", Kind: completionItemKindKeyword, Detail: "Branch naming convention (inside git policy)"},
+	{Label: "commit messages", Kind: completionItemKindKeyword, Detail: "Commit message convention (inside git policy)"},
+	{Label: "enforce signed commits", Kind: completionItemKindKeyword, Detail: "Require GPG/SSH signed commits"},
+	{Label: "ban", Kind: completionItemKindKeyword, Detail: "Ban a commit message pattern"},
+	{Label: "min length", Kind: completionItemKindKeyword, Detail: "Minimum commit message length"},
+	{Label: "extract identifier from branch", Kind: completionItemKindKeyword, Detail: "Auto-extract ticket ID from branch name"},
 }
 
 type Server struct {

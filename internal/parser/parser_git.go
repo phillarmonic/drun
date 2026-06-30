@@ -7,6 +7,11 @@ import (
 
 // parseGitStatement parses Git operations
 func (p *Parser) parseGitStatement() *ast.GitStatement {
+	// Check for "git validate ..." — delegate to the git policy parser
+	if p.peekToken.Type == lexer.VALIDATE {
+		return nil // signal to caller to try parseGitValidateStatement instead
+	}
+
 	stmt := &ast.GitStatement{
 		Token:   p.curToken,
 		Options: make(map[string]string),

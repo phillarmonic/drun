@@ -4737,6 +4737,70 @@ xdrun cmd:skill install basics --target ../my-service --force
 
 ---
 
+## Git Policy and Hooks ⭐ *New*
+
+Drun allows you to define project-wide git conventions (branch naming, commit messages) directly in the project block, and automatically validate them at runtime or via git hooks.
+
+### Project Git Policy
+
+The `git policy:` block is used to configure your conventions:
+
+```drun
+project "myapp":
+  git policy:
+    default branches: "master", "main"
+    branch naming: "{type}/{identifier}-{description}"
+    types: "feat", "fix", "chore"
+    commit messages: "{identifier}: {message}"
+    ban: "WIP", "wip", "fixup"
+    min length: 10
+    extract identifier from branch
+    enforce signed commits
+```
+
+**Settings:**
+- `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
+- `branch naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
+- `types`: Allowed values for the `{type}` placeholder.
+- `commit messages`: The required pattern for commit messages.
+- `ban`: A list of exact commit messages that are rejected (like `WIP`).
+- `min length`: The minimum number of characters for a commit message.
+- `extract identifier from branch`: Automatically pulls the `{identifier}` (like `PHIL-01`) from the current branch name and enforces its presence in the commit message according to the `commit messages` pattern.
+- `enforce signed commits`: Validates that commits are signed (GPG/SSH).
+
+### Validation (git validate)
+
+You can manually trigger git policy validation inside any task using the `git validate` statement:
+
+```drun
+task "pre-flight" means "Run checks before push":
+  git validate branch_name
+  git validate commit_message
+  git validate signed_commits
+  
+  # Or validate everything at once:
+  git validate all
+```
+
+### Git Hooks Lifecycle (cmd:hook)
+
+Instead of manually running checks in tasks, you can use drun to manage and enforce git hooks on developer machines:
+
+```bash
+# Install drun git hooks (commit-msg, pre-push) to enforce the policy
+xdrun cmd:hook install
+
+# List installed hooks and their status
+xdrun cmd:hook list
+
+# Uninstall drun git hooks
+xdrun cmd:hook uninstall
+```
+
+When installed, drun automatically checks commit messages against your policy and blocks pushes if commits are unsigned (when `enforce signed commits` is enabled).
+
+---
+
 ## Smart Detection
 
 ### Tool Detection
