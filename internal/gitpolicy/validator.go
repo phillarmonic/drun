@@ -48,7 +48,7 @@ func (p *Policy) ValidateBranchName(branchName string) error {
 	// We support {type}, {identifier}, {description}
 	// Let's build a regex from the pattern
 	regexStr := "^" + regexp.QuoteMeta(p.BranchPattern) + "$"
-	
+
 	// Replace {type}
 	if strings.Contains(p.BranchPattern, "{type}") {
 		if len(p.BranchTypes) > 0 {
@@ -93,7 +93,7 @@ func (p *Policy) ExtractIdentifierFromBranch(branchName string) (string, error) 
 
 	// Build regex to capture the identifier group
 	regexStr := "^" + regexp.QuoteMeta(p.BranchPattern) + "$"
-	
+
 	// Track which group index is the identifier
 	groupIndex := -1
 	currentIdx := 1
@@ -111,7 +111,6 @@ func (p *Policy) ExtractIdentifierFromBranch(branchName string) (string, error) 
 	idx := strings.Index(regexStr, regexp.QuoteMeta("{identifier}"))
 	if idx >= 0 {
 		groupIndex = currentIdx
-		currentIdx++
 		regexStr = strings.Replace(regexStr, regexp.QuoteMeta("{identifier}"), `([a-zA-Z0-9]+-[0-9]+|[a-zA-Z0-9]+)`, 1)
 	}
 
@@ -180,8 +179,8 @@ func (p *Policy) ValidateCommitMessage(msg, branchName string) error {
 		}
 		return nil
 	}
-	
-	// Custom pattern logic... 
+
+	// Custom pattern logic...
 	// For now we'll just check if the prefix matches the identifier if present
 	if identifier != "" && strings.Contains(p.CommitPattern, "{identifier}") {
 		prefixParts := strings.Split(p.CommitPattern, "{identifier}")

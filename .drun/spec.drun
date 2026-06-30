@@ -10,13 +10,15 @@ project "Drun" version "2.0":
 		gosec
 	
 	git policy:
-		default branches: "master", "develop"
-		branch naming: "{type}/{identifier}-{description}"
-		types: "feat", "fix", "chore", "hotfix"
-		commit messages: "{identifier}: {message}"
-		ban: "WIP", "wip"
-		min length: 10
-		extract identifier from branch
+		branch:
+			default branches: "master", "develop"
+			naming: "{type}/{identifier}-{description}"
+			types: "feat", "fix", "chore", "hotfix"
+		commit:
+			messages: "{identifier}: {message}"
+			ban: "WIP", "wip"
+			min length: 10
+			extract identifier from branch
 
 @platform("linux")
 task "default" means "Welcome to drun v2":

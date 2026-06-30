@@ -28,39 +28,54 @@ func (gp *GitPolicyStatement) String() string {
 	var out strings.Builder
 	out.WriteString("git policy:")
 
-	if len(gp.DefaultBranches) > 0 {
-		out.WriteString("\n  default branches:")
-		for _, b := range gp.DefaultBranches {
-			fmt.Fprintf(&out, "\n    %s", b)
+	if gp.BranchPattern != "" || len(gp.DefaultBranches) > 0 || len(gp.BranchTypes) > 0 {
+		out.WriteString("\n  branch:")
+		if len(gp.DefaultBranches) > 0 {
+			out.WriteString("\n    default branches: ")
+			for i, b := range gp.DefaultBranches {
+				if i > 0 {
+					out.WriteString(", ")
+				}
+				fmt.Fprintf(&out, "\"%s\"", b)
+			}
 		}
-	}
-
-	if gp.BranchPattern != "" {
-		out.WriteString("\n  branch naming:")
-		fmt.Fprintf(&out, "\n    pattern \"%s\"", gp.BranchPattern)
+		if gp.BranchPattern != "" {
+			fmt.Fprintf(&out, "\n    naming: \"%s\"", gp.BranchPattern)
+		}
 		if len(gp.BranchTypes) > 0 {
-			fmt.Fprintf(&out, "\n    types: %s", strings.Join(gp.BranchTypes, ", "))
+			out.WriteString("\n    types: ")
+			for i, t := range gp.BranchTypes {
+				if i > 0 {
+					out.WriteString(", ")
+				}
+				fmt.Fprintf(&out, "\"%s\"", t)
+			}
 		}
 	}
 
-	if gp.CommitPattern != "" || gp.ExtractIdentifier || gp.CommitMinLength > 0 || len(gp.CommitBans) > 0 {
-		out.WriteString("\n  commit messages:")
+	if gp.CommitPattern != "" || gp.ExtractIdentifier || gp.CommitMinLength > 0 || len(gp.CommitBans) > 0 || gp.EnforceSignedCommits {
+		out.WriteString("\n  commit:")
 		if gp.CommitPattern != "" {
-			fmt.Fprintf(&out, "\n    pattern \"%s\"", gp.CommitPattern)
+			fmt.Fprintf(&out, "\n    messages: \"%s\"", gp.CommitPattern)
+		}
+		if len(gp.CommitBans) > 0 {
+			out.WriteString("\n    ban: ")
+			for i, ban := range gp.CommitBans {
+				if i > 0 {
+					out.WriteString(", ")
+				}
+				fmt.Fprintf(&out, "\"%s\"", ban)
+			}
+		}
+		if gp.CommitMinLength > 0 {
+			fmt.Fprintf(&out, "\n    min length: %d", gp.CommitMinLength)
 		}
 		if gp.ExtractIdentifier {
 			out.WriteString("\n    extract identifier from branch")
 		}
-		if gp.CommitMinLength > 0 {
-			fmt.Fprintf(&out, "\n    min length %d", gp.CommitMinLength)
+		if gp.EnforceSignedCommits {
+			out.WriteString("\n    enforce signed commits")
 		}
-		for _, ban := range gp.CommitBans {
-			fmt.Fprintf(&out, "\n    ban \"%s\"", ban)
-		}
-	}
-
-	if gp.EnforceSignedCommits {
-		out.WriteString("\n  enforce signed commits")
 	}
 
 	return out.String()

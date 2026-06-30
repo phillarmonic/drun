@@ -4748,25 +4748,29 @@ The `git policy:` block is used to configure your conventions:
 ```drun
 project "myapp":
   git policy:
-    default branches: "master", "main"
-    branch naming: "{type}/{identifier}-{description}"
-    types: "feat", "fix", "chore"
-    commit messages: "{identifier}: {message}"
-    ban: "WIP", "wip", "fixup"
-    min length: 10
-    extract identifier from branch
-    enforce signed commits
+    branch:
+      default branches: "master", "main"
+      naming: "{type}/{identifier}-{description}"
+      types: "feat", "fix", "chore"
+    commit:
+      messages: "{identifier}: {message}"
+      ban: "WIP", "wip", "fixup"
+      min length: 10
+      extract identifier from branch
+      enforce signed commits
 ```
 
 **Settings:**
-- `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
-- `branch naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
-- `types`: Allowed values for the `{type}` placeholder.
-- `commit messages`: The required pattern for commit messages.
-- `ban`: A list of exact commit messages that are rejected (like `WIP`).
-- `min length`: The minimum number of characters for a commit message.
-- `extract identifier from branch`: Automatically pulls the `{identifier}` (like `PHIL-01`) from the current branch name and enforces its presence in the commit message according to the `commit messages` pattern.
-- `enforce signed commits`: Validates that commits are signed (GPG/SSH).
+- `branch`: Block for branch-specific rules.
+  - `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
+  - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
+  - `types`: Allowed values for the `{type}` placeholder.
+- `commit`: Block for commit-specific rules.
+  - `messages`: The required pattern for commit messages.
+  - `ban`: A list of exact commit messages that are rejected (like `WIP`).
+  - `min length`: The minimum number of characters for a commit message.
+  - `extract identifier from branch`: Automatically pulls the `{identifier}` from the current branch name and enforces its presence in the commit message.
+  - `enforce signed commits`: Validates that commits are signed (GPG/SSH).
 
 ### Validation (git validate)
 

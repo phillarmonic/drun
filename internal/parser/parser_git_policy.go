@@ -54,117 +54,160 @@ func (p *Parser) parseGitPolicyStatement() *ast.GitPolicyStatement {
 			p.nextToken()
 			continue
 
-		case lexer.DEFAULT_KW:
-			// "default branches:"
-			if p.peekToken.Type == lexer.BRANCHES {
-				p.nextToken() // consume BRANCHES
-				if !p.expectPeek(lexer.COLON) {
-					p.nextToken()
-					continue
-				}
-				stmt.DefaultBranches = append(stmt.DefaultBranches, p.parseCommaSeparatedStrings()...)
-			} else {
-				p.addError(fmt.Sprintf("expected 'branches' after 'default', got %s", p.peekToken.Type))
-				p.nextToken()
-			}
-
 		case lexer.BRANCH:
-			// "branch naming:"
-			if p.peekToken.Type == lexer.NAMING {
-				p.nextToken() // consume NAMING
-				if !p.expectPeek(lexer.COLON) {
-					p.nextToken()
-					continue
-				}
-				if p.expectPeek(lexer.STRING) {
-					stmt.BranchPattern = p.curToken.Literal
-					p.nextToken() // move past the string
-				}
-			} else {
-				p.addError(fmt.Sprintf("expected 'naming' after 'branch', got %s", p.peekToken.Type))
-				p.nextToken()
-			}
-
-		case lexer.TYPES_KW:
-			// "types:"
+			// "branch:"
 			if !p.expectPeek(lexer.COLON) {
 				p.nextToken()
 				continue
 			}
-			stmt.BranchTypes = p.parseCommaSeparatedStrings()
+
+			// Expect indented block
+			if !p.expectPeekSkipNewlines(lexer.INDENT) {
+				p.nextToken()
+				continue
+			}
+			p.nextToken() // move to first token in block
+
+			for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+				switch p.curToken.Type {
+				case lexer.NEWLINE, lexer.COMMENT, lexer.MULTILINE_COMMENT:
+					p.nextToken()
+					continue
+
+				case lexer.DEFAULT_KW:
+					// "default branches:"
+					if p.peekToken.Type == lexer.BRANCHES {
+						p.nextToken() // consume BRANCHES
+						if !p.expectPeek(lexer.COLON) {
+							p.nextToken()
+							continue
+						}
+						stmt.DefaultBranches = append(stmt.DefaultBranches, p.parseCommaSeparatedStrings()...)
+					} else {
+						p.addError(fmt.Sprintf("expected 'branches' after 'default', got %s", p.peekToken.Type))
+						p.nextToken()
+					}
+
+				case lexer.NAMING:
+					if !p.expectPeek(lexer.COLON) {
+						p.nextToken()
+						continue
+					}
+					if p.expectPeek(lexer.STRING) {
+						stmt.BranchPattern = p.curToken.Literal
+						p.nextToken() // move past the string
+					}
+
+				case lexer.TYPES_KW:
+					if !p.expectPeek(lexer.COLON) {
+						p.nextToken()
+						continue
+					}
+					stmt.BranchTypes = p.parseCommaSeparatedStrings()
+
+				default:
+					p.addError(fmt.Sprintf("unexpected token in branch block: %s (%q)", p.curToken.Type, p.curToken.Literal))
+					p.nextToken()
+				}
+			}
+
+			// Move past DEDENT of the branch block
+			if p.curToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
 
 		case lexer.COMMIT:
-			// "commit messages:"
-			if p.peekToken.Type == lexer.MESSAGES {
-				p.nextToken() // consume MESSAGES
-				if !p.expectPeek(lexer.COLON) {
-					p.nextToken()
-					continue
-				}
-				if p.expectPeek(lexer.STRING) {
-					stmt.CommitPattern = p.curToken.Literal
-					p.nextToken() // move past the string
-				}
-			} else {
-				p.addError(fmt.Sprintf("expected 'messages' after 'commit', got %s", p.peekToken.Type))
-				p.nextToken()
-			}
-
-		case lexer.BAN:
-			// "ban:"
+			// "commit:"
 			if !p.expectPeek(lexer.COLON) {
 				p.nextToken()
 				continue
 			}
-			stmt.CommitBans = p.parseCommaSeparatedStrings()
 
-		case lexer.MIN:
-			// "min length:"
-			if p.peekToken.Type == lexer.LENGTH {
-				p.nextToken() // consume LENGTH
-				if !p.expectPeek(lexer.COLON) {
+			// Expect indented block
+			if !p.expectPeekSkipNewlines(lexer.INDENT) {
+				p.nextToken()
+				continue
+			}
+			p.nextToken() // move to first token in block
+
+			for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+				switch p.curToken.Type {
+				case lexer.NEWLINE, lexer.COMMENT, lexer.MULTILINE_COMMENT:
 					p.nextToken()
 					continue
-				}
-				if p.expectPeek(lexer.NUMBER) {
-					n, err := strconv.Atoi(p.curToken.Literal)
-					if err == nil {
-						stmt.CommitMinLength = n
-					} else {
-						p.addError(fmt.Sprintf("invalid min length value: %q", p.curToken.Literal))
+
+				case lexer.MESSAGES:
+					if !p.expectPeek(lexer.COLON) {
+						p.nextToken()
+						continue
 					}
-					p.nextToken() // move past the number
+					if p.expectPeek(lexer.STRING) {
+						stmt.CommitPattern = p.curToken.Literal
+						p.nextToken() // move past the string
+					}
+
+				case lexer.BAN:
+					if !p.expectPeek(lexer.COLON) {
+						p.nextToken()
+						continue
+					}
+					stmt.CommitBans = p.parseCommaSeparatedStrings()
+
+				case lexer.MIN:
+					if p.peekToken.Type == lexer.LENGTH {
+						p.nextToken() // consume LENGTH
+						if !p.expectPeek(lexer.COLON) {
+							p.nextToken()
+							continue
+						}
+						if p.expectPeek(lexer.NUMBER) {
+							n, err := strconv.Atoi(p.curToken.Literal)
+							if err == nil {
+								stmt.CommitMinLength = n
+							} else {
+								p.addError(fmt.Sprintf("invalid min length value: %q", p.curToken.Literal))
+							}
+							p.nextToken() // move past the number
+						}
+					} else {
+						p.addError(fmt.Sprintf("expected 'length' after 'min', got %s", p.peekToken.Type))
+						p.nextToken()
+					}
+
+				case lexer.EXTRACT:
+					p.nextToken() // consume EXTRACT
+					if p.curToken.Type == lexer.IDENT && p.curToken.Literal == "identifier" {
+						p.nextToken()
+					}
+					if p.curToken.Type == lexer.FROM {
+						p.nextToken()
+					}
+					if p.curToken.Type == lexer.BRANCH {
+						p.nextToken()
+					}
+					stmt.ExtractIdentifier = true
+
+				case lexer.ENFORCE:
+					if p.peekToken.Type == lexer.SIGNED {
+						p.nextToken() // consume SIGNED
+						if p.peekToken.Type == lexer.COMMITS {
+							p.nextToken() // consume COMMITS
+						}
+						stmt.EnforceSignedCommits = true
+						p.nextToken() // advance past the clause
+					} else {
+						p.addError(fmt.Sprintf("expected 'signed' after 'enforce', got %s", p.peekToken.Type))
+						p.nextToken()
+					}
+
+				default:
+					p.addError(fmt.Sprintf("unexpected token in commit block: %s (%q)", p.curToken.Type, p.curToken.Literal))
+					p.nextToken()
 				}
-			} else {
-				p.addError(fmt.Sprintf("expected 'length' after 'min', got %s", p.peekToken.Type))
-				p.nextToken()
 			}
 
-		case lexer.EXTRACT:
-			// "extract identifier from branch"
-			p.nextToken() // consume EXTRACT
-			if p.curToken.Type == lexer.IDENT && p.curToken.Literal == "identifier" {
-				p.nextToken()
-			}
-			if p.curToken.Type == lexer.FROM {
-				p.nextToken()
-			}
-			if p.curToken.Type == lexer.BRANCH {
-				p.nextToken()
-			}
-			stmt.ExtractIdentifier = true
-
-		case lexer.ENFORCE:
-			// "enforce signed commits"
-			if p.peekToken.Type == lexer.SIGNED {
-				p.nextToken() // consume SIGNED
-				if p.peekToken.Type == lexer.COMMITS {
-					p.nextToken() // consume COMMITS
-				}
-				stmt.EnforceSignedCommits = true
-				p.nextToken() // advance past the clause
-			} else {
-				p.addError(fmt.Sprintf("expected 'signed' after 'enforce', got %s", p.peekToken.Type))
+			// Move past DEDENT of the commit block
+			if p.curToken.Type == lexer.DEDENT {
 				p.nextToken()
 			}
 
