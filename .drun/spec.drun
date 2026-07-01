@@ -8,6 +8,17 @@ project "Drun" version "2.0":
 		go >= 1.26
 		golangci-lint
 		gosec
+	
+	git policy:
+		branch:
+			default branches: "master", "develop"
+			naming: "{type}/{identifier}-{description}"
+			types: "feat", "fix", "chore", "hotfix"
+		commit:
+			messages: "conventional commits"
+			ban: "WIP", "wip"
+			min length: 10
+			extract identifier from branch
 
 @platform("linux")
 task "default" means "Welcome to drun v2":

@@ -439,5 +439,20 @@ func buildDrunBasicsGuide(projectName string) string {
 		`  run "go test ./..."`,
 		"```",
 		"",
-	}, "\n"), projectName, projectName)
+		"## Git Policy and Hooks",
+		"",
+		"Projects can define git conventions in the project body using the `git policy:` block.",
+		"When a git policy is defined, use `xdrun cmd:hook install` to install drun-managed git hooks (like commit-msg, pre-push) that enforce these conventions.",
+		"",
+		"```drun",
+		`project "%s" version "1.0":`,
+		`  git policy:`,
+		`    default branches: "master", "main"`,
+		`    branch naming: "{type}/{identifier}-{description}"`,
+		`    types: "feat", "fix", "chore"`,
+		`    commit messages: "{identifier}: {message}"`,
+		`    extract identifier from branch`,
+		`    enforce signed commits`,
+		"```",
+	}, "\n"), projectName, projectName, projectName)
 }

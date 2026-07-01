@@ -34,6 +34,8 @@ const (
 	TypeOrchestration    StatementType = "orchestration"
 	TypeChangeWorkdir    StatementType = "change_workdir"
 	TypeRequiresTools    StatementType = "requires_tools"
+	TypeGitPolicy        StatementType = "git_policy"
+	TypeGitValidate      StatementType = "git_validate"
 )
 
 // Action represents an action statement (info, step, success, etc.)
@@ -303,3 +305,25 @@ type RequiresTools struct {
 }
 
 func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }
+
+// GitPolicy represents a project-level setting for git conventions.
+type GitPolicy struct {
+	DefaultBranches      []string
+	BranchPattern        string
+	BranchTypes          []string
+	CommitPattern        string
+	ExtractIdentifier    bool
+	CommitMinLength      int
+	CommitBans           []string
+	EnforceSignedCommits bool
+}
+
+func (gp *GitPolicy) Type() StatementType { return TypeGitPolicy }
+
+// GitValidate represents an inline git validation statement within a task.
+type GitValidate struct {
+	Target string // "branch_name", "commit_message", "signed_commits", "all"
+	Value  string // optional explicit value to validate (e.g. commit message text)
+}
+
+func (gv *GitValidate) Type() StatementType { return TypeGitValidate }

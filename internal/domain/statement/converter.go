@@ -296,6 +296,24 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Path: s.Path,
 		}, nil
 
+	case *ast.GitPolicyStatement:
+		return &GitPolicy{
+			DefaultBranches:      s.DefaultBranches,
+			BranchPattern:        s.BranchPattern,
+			BranchTypes:          s.BranchTypes,
+			CommitPattern:        s.CommitPattern,
+			ExtractIdentifier:    s.ExtractIdentifier,
+			CommitMinLength:      s.CommitMinLength,
+			CommitBans:           s.CommitBans,
+			EnforceSignedCommits: s.EnforceSignedCommits,
+		}, nil
+
+	case *ast.GitValidateStatement:
+		return &GitValidate{
+			Target: s.Target,
+			Value:  s.Value,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown AST statement type: %T", astStmt)
 	}

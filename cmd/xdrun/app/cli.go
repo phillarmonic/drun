@@ -94,7 +94,8 @@ Built-in Commands:
   xdrun cmd:link services/api    # Link directories to this task file
   xdrun cmd:lsp                  # Start the Drun language server over stdio
   xdrun cmd:skill install basics # Install project AI guidance for drun/xdrun
-  xdrun cmd:secret add key       # Manage secrets (add, remove, list)`,
+  xdrun cmd:secret add key       # Manage secrets (add, remove, list)
+  xdrun cmd:hook install         # Install git hooks for git policies`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: CompleteTaskNames,
@@ -218,6 +219,7 @@ func (a *App) setupCommands() {
 		a.createLSPCommand(),
 		a.createSkillCommand(),
 		a.createSecretsCommand(),
+		a.createHookCommand(),
 	}
 	for _, cmd := range cmds {
 		cmd.Hidden = true

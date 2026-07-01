@@ -74,6 +74,7 @@ type ProjectContext struct {
 	IncludedParams    map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
 	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
 	RequiredTools     []statement.ToolRequirement               // project-level required tools
+	GitPolicy         *statement.GitPolicy                      // project-level git policy
 }
 
 // Implement interpolation.ProjectContext interface
