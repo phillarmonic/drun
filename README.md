@@ -49,6 +49,18 @@ Or run this command to initialize a Drun spec file in the current directory (a f
 xdrun --init
 ```
 
+To initialize the project spec under `infra/.drun/spec.drun` instead:
+
+```bash
+xdrun --init --file infra/.drun/spec.drun
+```
+
+Or under `infra/drun/spec.drun`:
+
+```bash
+xdrun --init --file ops/drun/spec.drun
+```
+
 Initialize from a local template repository:
 
 ```bash

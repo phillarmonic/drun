@@ -47,9 +47,29 @@ export PATH="$PATH:$HOME/.local/bin"
 
 `xdrun` looks for task files in this order:
 
-1. Workspace default from `.drun/.drun_workspace`
-2. Default file at `.drun/spec.drun`
-3. Explicit file path passed with `--file`
+1. Explicit file path passed with `--file`
+2. Stateless workspace config under `~/.drun/stateless/` when the directory is marked stateless
+3. Linked directory config from `~/.drun/links.yml`
+4. Workspace default from `.drun/.drun_workspace.yml`
+5. Built-in fallback locations:
+   - `.drun/spec.drun`
+   - `.drun`
+   - `spec.drun`
+   - `infra/.drun/spec.drun`
+   - `infra/drun/spec.drun`
+   - `ops/drun/spec.drun`
+   - `ops/spec.drun`
+6. Extra fallback locations from `~/.drun/config.yml` under `extraTaskFileSearchPaths`
+
+Example home config:
+
+```yaml
+extraTaskFileSearchPaths:
+  - automation/project.drun
+  - platform/spec.drun
+```
+
+Relative paths in `extraTaskFileSearchPaths` are resolved from the current workspace directory. Absolute paths are also supported.
 
 Create a starter file:
 
@@ -61,6 +81,18 @@ Create a custom file and save it as the workspace default:
 
 ```bash
 xdrun --init --file=my-project.drun --save-as-default
+```
+
+Create a spec under `ops/drun/spec.drun`:
+
+```bash
+xdrun --init --file ops/drun/spec.drun
+```
+
+Or under `infra/drun/spec.drun`:
+
+```bash
+xdrun --init --file infra/drun/spec.drun
 ```
 
 Point the workspace to an existing file:
