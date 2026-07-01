@@ -86,6 +86,7 @@ func getDefaultConfigSearchPaths() ([]string, error) {
 		"spec.drun",
 		"infra/.drun/spec.drun",
 		"infra/drun/spec.drun",
+		"ops/.drun/spec.drun",
 		"ops/drun/spec.drun",
 		"ops/spec.drun",
 	}
@@ -96,6 +97,22 @@ func getDefaultConfigSearchPaths() ([]string, error) {
 	}
 
 	return append(defaultLocations, userConfig.ExtraTaskFileSearchPaths...), nil
+}
+
+func isBuiltInDefaultConfigPath(filename string) bool {
+	defaultLocations, err := getDefaultConfigSearchPaths()
+	if err != nil {
+		return false
+	}
+
+	cleanFilename := filepath.Clean(filename)
+	for _, location := range defaultLocations {
+		if cleanFilename == filepath.Clean(location) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // getWorkspaceDefaultFile checks for workspace configuration and returns default file
@@ -234,8 +251,8 @@ func InitializeConfig(filename string, saveAsDefault bool, minimal bool, fromTem
 
 	fmt.Printf("✅  Created %s\n", targetFile)
 
-	// Save as workspace default if requested or if using custom filename
-	if saveAsDefault || (filename != "" && filename != ".drun/spec.drun") {
+	// Save as workspace default if requested or if using a non-default filename
+	if saveAsDefault || (filename != "" && !isBuiltInDefaultConfigPath(filename)) {
 		if err := saveCustomFileAsDefault(targetFile); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to save as workspace default: %v\n", err)
 		} else {

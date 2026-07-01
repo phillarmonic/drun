@@ -568,6 +568,47 @@ func TestFindConfigFileFindsInfraDrunDefaultLocation(t *testing.T) {
 	})
 }
 
+func TestInitializeMinimalConfigDoesNotCreateWorkspaceDefaultForBuiltInInfraLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "infra-default-init")
+	if err := os.MkdirAll(projectDir, 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		if err := InitializeConfig("infra/drun/spec.drun", false, true, "", "", ""); err != nil {
+			t.Fatalf("InitializeConfig() error = %v", err)
+		}
+
+		if _, err := os.Stat(filepath.Join(projectDir, ".drun", ".drun_workspace.yml")); !os.IsNotExist(err) {
+			t.Fatalf("workspace default file should not be created for built-in default path, got err=%v", err)
+		}
+	})
+}
+
+func TestInitializeConfigCreatesWorkspaceDefaultForCustomLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "custom-default-init")
+	if err := os.MkdirAll(projectDir, 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		if err := InitializeConfig("automation/project.drun", false, false, "", "", ""); err != nil {
+			t.Fatalf("InitializeConfig() error = %v", err)
+		}
+
+		workspaceConfigPath := filepath.Join(projectDir, ".drun", ".drun_workspace.yml")
+		content, err := os.ReadFile(workspaceConfigPath)
+		if err != nil {
+			t.Fatalf("ReadFile(workspace config) error = %v", err)
+		}
+		if !strings.Contains(string(content), "defaultTaskFile: automation/project.drun") {
+			t.Fatalf("workspace config did not persist custom default:\n%s", string(content))
+		}
+	})
+}
+
 func TestFindConfigFileUsesHomeExtraSearchPaths(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "custom-search-project")
