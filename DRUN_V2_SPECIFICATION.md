@@ -4951,6 +4951,8 @@ run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
 When you only need the resolved command string inline, use the builtin interpolation macro:
 
 ```
+run "{compose_cmd} up -d"
+run "{compose_cmd} logs --tail=100"
 run "{docker compose command} up -d"
 run "{docker compose command} logs --tail=100"
 ```
