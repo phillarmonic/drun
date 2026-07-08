@@ -12,6 +12,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/builtins"
 	"github.com/phillarmonic/drun/v2/internal/cache"
+	"github.com/phillarmonic/drun/v2/internal/detection"
 	"github.com/phillarmonic/drun/v2/internal/domain/parameter"
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 	"github.com/phillarmonic/drun/v2/internal/domain/task"
@@ -24,6 +25,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 	"github.com/phillarmonic/drun/v2/internal/parser"
 	"github.com/phillarmonic/drun/v2/internal/platform"
+	"github.com/phillarmonic/drun/v2/internal/provisioning"
 	"github.com/phillarmonic/drun/v2/internal/remote"
 	"github.com/phillarmonic/drun/v2/internal/types"
 )
@@ -64,6 +66,13 @@ type Engine struct {
 
 	// Secrets management
 	secretsManager SecretsManager
+
+	allowToolVersionChanges bool
+	userProvisioningSources []string
+	embeddedProvisionings   []provisioning.EmbeddedSource
+	newToolDetector         func() toolDetector
+	newProvisioningResolver func(workingDir string) provisioningResolver
+	provisionCommandRunner  func(command string, execCtx *ExecutionContext) error
 
 	// Legacy regex patterns (still used by variable operations)
 	quotedArgRegex *regexp.Regexp
@@ -111,6 +120,10 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		// Secrets management
 		secretsManager: options.SecretsManager,
 
+		allowToolVersionChanges: options.AllowToolVersionChanges,
+		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
+		embeddedProvisionings:   append([]provisioning.EmbeddedSource(nil), options.EmbeddedProvisioningSources...),
+
 		// Execution components
 		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
 
@@ -118,6 +131,21 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
+
+	e.newToolDetector = func() toolDetector {
+		return detection.NewDetector()
+	}
+	e.newProvisioningResolver = func(workingDir string) provisioningResolver {
+		opts := []provisioning.Option{}
+		if e.cacheManager != nil {
+			opts = append(opts, provisioning.WithCacheManager(e.cacheManager))
+		}
+		if len(e.embeddedProvisionings) > 0 {
+			opts = append(opts, provisioning.WithEmbeddedSources(e.embeddedProvisionings))
+		}
+		return provisioning.NewResolver(workingDir, opts...)
+	}
+	e.provisionCommandRunner = e.runProvisioningCommand
 
 	// Set the engine as the domain statement executor
 	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
