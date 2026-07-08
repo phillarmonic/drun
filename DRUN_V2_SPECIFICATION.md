@@ -4902,6 +4902,8 @@ provisioningSources:
   - "github:acme/shared-tooling/catalog/provisionings.yaml@stable"
 ```
 
+drun also ships an embedded fallback catalog for common Go ecosystem tools. The initial built-in catalog includes `golangci-lint`, `gosec`, `govulncheck`, and `staticcheck`, and each entry uses `go install ...@latest` plus a version-aware `go install ...@v{version}` template when drun can derive one exact requested version.
+
 #### `provisionings.yaml` v1
 
 Provisioning catalogs are YAML manifests with schema version `1`. Like template catalogs, they may define provisionings as either a map or a sequence.

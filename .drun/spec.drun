@@ -6,16 +6,8 @@ version: 2.0
 project "Drun" version "2.0":
 	requires tools:
 		go >= 1.26
-		golangci-lint
-		gosec
-	# Planned provisioning source form once tool provisioning lands:
-	# provisioning sources:
-	# 	"./.drun/provisionings.yaml"
-	# 	"github:phillarmonic/drun-tooling/catalog/provisionings.yaml@main"
-	# Planned provisioning form once tool provisioning lands:
-	# requires tools:
-	# 	golangci-lint provision
-	# 	gosec >= 2.27 <= 2.27 provision
+		golangci-lint provision
+		gosec provision
 	
 	git policy:
 		branch:

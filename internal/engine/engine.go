@@ -101,6 +101,8 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	httpsFetcher := remote.NewHTTPSFetcher()
 	drunhubFetcher := remote.NewDrunhubFetcher(githubFetcher)
 	interp := interpolation.NewInterpolator()
+	embeddedProvisionings := append([]provisioning.EmbeddedSource(nil), options.EmbeddedProvisioningSources...)
+	embeddedProvisionings = append(embeddedProvisionings, provisioning.DefaultEmbeddedSources()...)
 
 	e := &Engine{
 		output:           options.Output,
@@ -122,7 +124,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 		allowToolVersionChanges: options.AllowToolVersionChanges,
 		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
-		embeddedProvisionings:   append([]provisioning.EmbeddedSource(nil), options.EmbeddedProvisioningSources...),
+		embeddedProvisionings:   embeddedProvisionings,
 
 		// Execution components
 		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
