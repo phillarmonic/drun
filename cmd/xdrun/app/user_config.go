@@ -12,6 +12,7 @@ import (
 // UserConfig represents user-level drun settings stored in the home directory.
 type UserConfig struct {
 	ExtraTaskFileSearchPaths []string `yaml:"extraTaskFileSearchPaths"`
+	ProvisioningSources      []string `yaml:"provisioningSources"`
 }
 
 func getUserConfigPath() (string, error) {
@@ -43,11 +44,12 @@ func loadUserConfig() (*UserConfig, error) {
 		return nil, fmt.Errorf("failed to parse user config: %w", err)
 	}
 
-	config.ExtraTaskFileSearchPaths = normalizeSearchPaths(config.ExtraTaskFileSearchPaths)
+	config.ExtraTaskFileSearchPaths = normalizeStringList(config.ExtraTaskFileSearchPaths)
+	config.ProvisioningSources = normalizeStringList(config.ProvisioningSources)
 	return &config, nil
 }
 
-func normalizeSearchPaths(paths []string) []string {
+func normalizeStringList(paths []string) []string {
 	if len(paths) == 0 {
 		return nil
 	}

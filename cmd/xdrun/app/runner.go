@@ -23,6 +23,7 @@ func ExecuteTask(
 	verbose bool,
 	taskModeOverride string,
 	allowUndefinedVars bool,
+	allowToolVersionChanges bool,
 	noDrunCache bool,
 	args []string,
 ) error {
@@ -75,12 +76,19 @@ func ExecuteTask(
 		secretsMgr = nil
 	}
 
+	userConfig, err := loadUserConfig()
+	if err != nil {
+		return err
+	}
+
 	// Create engine with secrets support
 	eng := engine.NewEngineWithOptions(
 		engine.WithOutput(os.Stdout),
 		engine.WithDryRun(dryRun),
 		engine.WithVerbose(verbose),
 		engine.WithTaskModeOverride(taskModeOverride),
+		engine.WithAllowToolVersionChanges(allowToolVersionChanges),
+		engine.WithUserProvisioningSources(userConfig.ProvisioningSources),
 		engine.WithSecretsManager(secretsMgr),
 	)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)

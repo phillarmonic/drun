@@ -41,6 +41,21 @@ func TestNewEngineWithOptions(t *testing.T) {
 	}
 }
 
+func TestNewEngineWithOptions_ProvisioningControls(t *testing.T) {
+	engine := NewEngineWithOptions(
+		WithAllowToolVersionChanges(true),
+		WithUserProvisioningSources([]string{"~/.drun/provisionings.yaml"}),
+	)
+
+	if !engine.allowToolVersionChanges {
+		t.Fatal("expected allowToolVersionChanges to be enabled")
+	}
+
+	if len(engine.userProvisioningSources) != 1 || engine.userProvisioningSources[0] != "~/.drun/provisionings.yaml" {
+		t.Fatalf("userProvisioningSources = %#v", engine.userProvisioningSources)
+	}
+}
+
 func TestNewEngine_BackwardCompatibility(t *testing.T) {
 	output := &bytes.Buffer{}
 	engine := NewEngine(output)
