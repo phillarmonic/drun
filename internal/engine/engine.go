@@ -747,10 +747,13 @@ func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile 
 					})
 				}
 				ctx.RequiredTools = append(ctx.RequiredTools, statement.ToolRequirement{
-					Name:        astTool.Name,
-					Constraints: constraints,
+					Name:          astTool.Name,
+					Constraints:   constraints,
+					AutoProvision: astTool.AutoProvision,
 				})
 			}
+		case *ast.ProvisioningSourcesStatement:
+			ctx.ProvisioningSources = append(ctx.ProvisioningSources, s.Sources...)
 		case *ast.GitPolicyStatement:
 			// Convert to domain statement immediately since it's small and pure data
 			domainStmt, err := statement.FromAST(s)

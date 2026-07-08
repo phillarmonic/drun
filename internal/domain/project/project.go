@@ -10,14 +10,15 @@ import (
 
 // Project represents a domain project entity
 type Project struct {
-	Name          string
-	Version       string
-	Settings      map[string]string
-	ShellConfigs  map[string]*ShellConfig
-	SetupHooks    []Hook
-	TeardownHooks []Hook
-	BeforeHooks   []Hook
-	AfterHooks    []Hook
+	Name                string
+	Version             string
+	Settings            map[string]string
+	ProvisioningSources []string
+	ShellConfigs        map[string]*ShellConfig
+	SetupHooks          []Hook
+	TeardownHooks       []Hook
+	BeforeHooks         []Hook
+	AfterHooks          []Hook
 }
 
 // NewProject creates a new project from AST
@@ -49,6 +50,9 @@ func NewProject(stmt *ast.ProjectStatement) (*Project, error) {
 					Environment: config.Environment,
 				}
 			}
+
+		case *ast.ProvisioningSourcesStatement:
+			project.ProvisioningSources = append(project.ProvisioningSources, s.Sources...)
 
 		case *ast.LifecycleHook:
 			// Convert hook body from AST to domain

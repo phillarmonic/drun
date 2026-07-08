@@ -15,8 +15,9 @@ type VersionConstraint struct {
 
 // ToolRequirement represents a tool requirement with optional version constraints
 type ToolRequirement struct {
-	Name        string              // tool name (e.g., "gosec", "golangci-lint")
-	Constraints []VersionConstraint // zero or more version constraints
+	Name          string              // tool name (e.g., "gosec", "golangci-lint")
+	Constraints   []VersionConstraint // zero or more version constraints
+	AutoProvision bool                // whether drun may provision the tool automatically
 }
 
 func (tr *ToolRequirement) String() string {
@@ -24,6 +25,9 @@ func (tr *ToolRequirement) String() string {
 	out.WriteString(tr.Name)
 	for _, c := range tr.Constraints {
 		fmt.Fprintf(&out, " %s \"%s\"", c.Operator, c.Version)
+	}
+	if tr.AutoProvision {
+		out.WriteString(" provision")
 	}
 	return out.String()
 }
@@ -43,6 +47,23 @@ func (rts *RequiresToolsStatement) String() string {
 	for _, tool := range rts.Tools {
 		out.WriteString("\n  ")
 		out.WriteString(tool.String())
+	}
+	return out.String()
+}
+
+// ProvisioningSourcesStatement represents a project-level "provisioning sources:" block.
+type ProvisioningSourcesStatement struct {
+	Token   lexer.Token
+	Sources []string
+}
+
+func (pss *ProvisioningSourcesStatement) statementNode()      {}
+func (pss *ProvisioningSourcesStatement) projectSettingNode() {}
+func (pss *ProvisioningSourcesStatement) String() string {
+	var out strings.Builder
+	out.WriteString("provisioning sources:")
+	for _, source := range pss.Sources {
+		fmt.Fprintf(&out, "\n  %q", source)
 	}
 	return out.String()
 }

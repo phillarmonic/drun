@@ -294,8 +294,9 @@ type VersionConstraint struct {
 
 // ToolRequirement represents a tool requirement with optional version constraints
 type ToolRequirement struct {
-	Name        string              // tool name (e.g., "gosec", "golangci-lint")
-	Constraints []VersionConstraint // zero or more version constraints
+	Name          string              // tool name (e.g., "gosec", "golangci-lint")
+	Constraints   []VersionConstraint // zero or more version constraints
+	AutoProvision bool                // whether runtime may install or upgrade the tool automatically
 }
 
 // RequiresTools represents a "requires tools:" block that validates tool

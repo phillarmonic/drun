@@ -161,6 +161,29 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.addError(fmt.Sprintf("unexpected 'requires' in project body (did you mean 'requires tools:'?), got requires %s", p.peekToken.Type))
 					p.nextToken()
 				}
+			case lexer.IDENT:
+				if p.curToken.Literal == "provisioning" {
+					if len(p.pendingAnnotations) > 0 {
+						p.addError("annotation(s) in project body must be followed by a snippet declaration")
+						p.pendingAnnotations = nil
+					}
+					provisioningSources := p.parseProvisioningSourcesStatement()
+					if provisioningSources != nil {
+						stmt.Settings = append(stmt.Settings, provisioningSources)
+					} else {
+						p.nextToken()
+					}
+					if p.curToken.Type == lexer.DEDENT {
+						p.nextToken()
+					}
+				} else {
+					if len(p.pendingAnnotations) > 0 {
+						p.addError("annotation(s) in project body must be followed by a snippet declaration")
+						p.pendingAnnotations = nil
+					}
+					p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
+					p.nextToken()
+				}
 			case lexer.GIT:
 				if len(p.pendingAnnotations) > 0 {
 					p.addError("annotation(s) in project body must be followed by a snippet declaration")

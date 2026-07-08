@@ -12,7 +12,7 @@ func TestParser_RequiresTools_ProjectLevel(t *testing.T) {
 
 project "Test":
   requires tools:
-    gosec >= "2.27" <= "3.0"
+    gosec >= "2.27" <= "3.0" provision
     golangci-lint >= 2.12
     docker
 `
@@ -49,6 +49,9 @@ project "Test":
 	if tool1.Constraints[1].Operator != "<=" || tool1.Constraints[1].Version != "3.0" {
 		t.Errorf("tool1 constraint 1 wrong: %s %s", tool1.Constraints[1].Operator, tool1.Constraints[1].Version)
 	}
+	if !tool1.AutoProvision {
+		t.Errorf("tool1 AutoProvision wrong. expected true")
+	}
 
 	// Check golangci-lint
 	tool2 := stmt.Tools[1]
@@ -61,6 +64,9 @@ project "Test":
 	if tool2.Constraints[0].Operator != ">=" || tool2.Constraints[0].Version != "2.12" {
 		t.Errorf("tool2 constraint 0 wrong: %s %s", tool2.Constraints[0].Operator, tool2.Constraints[0].Version)
 	}
+	if tool2.AutoProvision {
+		t.Errorf("tool2 AutoProvision wrong. expected false")
+	}
 
 	// Check docker
 	tool3 := stmt.Tools[2]
@@ -69,6 +75,9 @@ project "Test":
 	}
 	if len(tool3.Constraints) != 0 {
 		t.Errorf("tool3 constraints wrong. expected 0, got %d", len(tool3.Constraints))
+	}
+	if tool3.AutoProvision {
+		t.Errorf("tool3 AutoProvision wrong. expected false")
 	}
 }
 
@@ -148,5 +157,44 @@ func TestParser_RequiresTools_ProjectLevel_CRLF(t *testing.T) {
 
 	if len(stmt.Tools) != 3 {
 		t.Fatalf("expected 3 tools, got %d", len(stmt.Tools))
+	}
+}
+
+func TestParser_ProvisioningSources_ProjectLevel(t *testing.T) {
+	input := `version: 2.0
+
+project "Test":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+    "https://example.com/drun/provisionings.yaml"
+    "github:acme/devx-catalog/catalog/provisionings.yaml@main"
+`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if len(program.Project.Settings) != 1 {
+		t.Fatalf("expected 1 project setting, got %d", len(program.Project.Settings))
+	}
+
+	stmt, ok := program.Project.Settings[0].(*ast.ProvisioningSourcesStatement)
+	if !ok {
+		t.Fatalf("expected ProvisioningSourcesStatement, got %T", program.Project.Settings[0])
+	}
+
+	if len(stmt.Sources) != 3 {
+		t.Fatalf("expected 3 sources, got %d", len(stmt.Sources))
+	}
+
+	if stmt.Sources[0] != "./.drun/provisionings.yaml" {
+		t.Fatalf("unexpected first source: %q", stmt.Sources[0])
+	}
+
+	expected := "provisioning sources:\n  \"./.drun/provisionings.yaml\"\n  \"https://example.com/drun/provisionings.yaml\"\n  \"github:acme/devx-catalog/catalog/provisionings.yaml@main\""
+	if got := stmt.String(); got != expected {
+		t.Fatalf("unexpected String() output:\nexpected:\n%s\n\ngot:\n%s", expected, got)
 	}
 }

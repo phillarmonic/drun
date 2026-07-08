@@ -283,8 +283,9 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 				})
 			}
 			tools = append(tools, ToolRequirement{
-				Name:        astTool.Name,
-				Constraints: constraints,
+				Name:          astTool.Name,
+				Constraints:   constraints,
+				AutoProvision: astTool.AutoProvision,
 			})
 		}
 		return &RequiresTools{
