@@ -4868,6 +4868,119 @@ task "security":
 
 `requires tools:` validates installation and version only. Even with `provision`, it does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
 
+#### Provisioning Sources
+
+When a requirement opts into provisioning, drun resolves installers from one or more catalog sources. Sources can be declared directly in the project:
+
+```drun
+project "myapp":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+    "./tooling"
+    "https://example.com/drun/provisionings.yaml"
+    "github:acme/devx-catalog/catalog/provisionings.yaml@main"
+    "ssh://git@github.com/acme/internal-tooling.git//catalog/provisionings.yaml?ref=main"
+
+  requires tools:
+    golangci-lint >= "1.64" provision
+    gosec >= "2.22" <= "2.22" provision
+```
+
+`provisioning sources:` is a project-level setting. Each entry is a catalog source searched in declaration order. Supported source kinds are:
+
+- Local manifest file path such as `./.drun/provisionings.yaml`
+- Local directory path such as `./tooling`, which implies `./tooling/provisionings.yaml`
+- HTTPS manifest URL
+- GitHub shorthand in the form `github:owner/repo/path/provisionings.yaml@ref`
+- SSH-backed Git manifest URL in the form `ssh://git@host/org/repo.git//path/provisionings.yaml?ref=<branch-or-tag>`
+
+User-level fallback sources may also be declared in `~/.drun/config.yml`:
+
+```yaml
+provisioningSources:
+  - "~/.drun/provisionings.yaml"
+  - "github:acme/shared-tooling/catalog/provisionings.yaml@stable"
+```
+
+#### `provisionings.yaml` v1
+
+Provisioning catalogs are YAML manifests with schema version `1`. Like template catalogs, they may define provisionings as either a map or a sequence.
+
+Map form:
+
+```yaml
+version: "1"
+provisionings:
+  golangci-lint:
+    description: "Install golangci-lint"
+    targets:
+      - os: darwin
+        arch: arm64
+        install: "brew install golangci-lint"
+        install_versioned: "brew install golangci-lint@{version}"
+      - os: linux
+        install: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        install_versioned: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@v{version}"
+```
+
+Equivalent sequence form:
+
+```yaml
+version: "1"
+provisionings:
+  - name: golangci-lint
+    description: "Install golangci-lint"
+    targets:
+      - os: darwin
+        arch: arm64
+        install: "brew install golangci-lint"
+        install_versioned: "brew install golangci-lint@{version}"
+```
+
+Each provisioning entry supports:
+
+- `name`: required in sequence form; implied by the map key in map form
+- `description`: optional human-facing explanation
+- `aliases`: optional alternative executable names that resolve to the same entry
+- `targets`: required list of installer targets
+
+Each target supports:
+
+- `os`: optional operating system selector such as `darwin`, `linux`, or `windows`
+- `arch`: optional CPU selector such as `amd64` or `arm64`
+- `install`: required command used when no exact version should be passed
+- `install_versioned`: optional command template used when drun has one exact requested version to pass
+
+Within a single manifest, provisioning names must be unique after alias expansion. Duplicate entries at the same name are invalid.
+
+#### Catalog Resolution And Specificity
+
+drun resolves provisioning entries using this precedence order:
+
+1. Project `provisioning sources:` in declaration order
+2. User `provisioningSources` from `~/.drun/config.yml` in declaration order
+3. Embedded drun default catalog
+
+The first source that contains a matching provisioning entry wins. drun does not merge multiple catalogs for the same tool during a single lookup.
+
+Inside the chosen source, drun picks the most specific installer target in this order:
+
+1. Matching `name` or `alias` with exact `os` and exact `arch`
+2. Matching `name` or `alias` with exact `os` and no `arch`
+3. Matching `name` or `alias` with no `os` and no `arch`
+
+If two targets in the same manifest have identical specificity for the same tool, the manifest is invalid and provisioning must fail with an ambiguity error.
+
+#### Exact Version Forwarding
+
+Provisioning lookups always use the tool name, but version arguments are forwarded only when the requirement requests one exact version and the selected target provides `install_versioned`.
+
+- `gosec >= "2.22" <= "2.22" provision` forwards `2.22`
+- `gosec >= "2.22" provision` does not forward a version because the requirement is open-ended
+- `gosec provision` does not forward a version
+
+If drun derives one exact version but the chosen target omits `install_versioned`, it falls back to `install`. If the requirement can only be satisfied by mutating to an exact version and the catalog has no version-aware installer path, provisioning fails before execution continues.
+
 #### Dynamic Detection
 
 The language also automatically detects available tools and uses appropriate commands when you prefer not to use strict requirements:
