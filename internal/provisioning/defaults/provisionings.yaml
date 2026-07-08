@@ -1,25 +1,8 @@
 version: "1"
 provisionings:
-  golangci-lint:
-    description: "Install golangci-lint with go install"
+  dummy-provisioner:
+    description: "Minimal embedded fallback used when no first-party catalog is available"
+    aliases: ["dummy-tool"]
     targets:
-      - install: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
-        install_versioned: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@v{version}"
-
-  gosec:
-    description: "Install gosec with go install"
-    targets:
-      - install: "go install github.com/securego/gosec/v2/cmd/gosec@latest"
-        install_versioned: "go install github.com/securego/gosec/v2/cmd/gosec@v{version}"
-
-  govulncheck:
-    description: "Install govulncheck with go install"
-    targets:
-      - install: "go install golang.org/x/vuln/cmd/govulncheck@latest"
-        install_versioned: "go install golang.org/x/vuln/cmd/govulncheck@v{version}"
-
-  staticcheck:
-    description: "Install staticcheck with go install"
-    targets:
-      - install: "go install honnef.co/go/tools/cmd/staticcheck@latest"
-        install_versioned: "go install honnef.co/go/tools/cmd/staticcheck@v{version}"
+      - install: "echo embedded dummy provisioner"
+        install_versioned: "echo embedded dummy provisioner {version}"

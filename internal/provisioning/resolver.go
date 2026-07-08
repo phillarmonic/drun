@@ -25,6 +25,7 @@ const (
 	defaultManifestName  = "provisionings.yaml"
 	defaultFetchTimeout  = 30 * time.Second
 	defaultCacheDuration = time.Minute
+	officialManifestRef  = "github:phillarmonic/drun-provisionings/provisionings.yaml@master"
 )
 
 var ErrNoProvisioningMatch = errors.New("no provisioning entry found")
@@ -52,6 +53,7 @@ type Resolver struct {
 	git          gitFetcher
 
 	embedded []EmbeddedSource
+	builtin  []string
 
 	fetchTimeout  time.Duration
 	cacheDuration time.Duration
@@ -97,6 +99,12 @@ func WithCacheManager(cm *cache.Manager) Option {
 func WithEmbeddedSources(sources []EmbeddedSource) Option {
 	return func(r *Resolver) {
 		r.embedded = append([]EmbeddedSource(nil), sources...)
+	}
+}
+
+func WithBuiltinSources(sources []string) Option {
+	return func(r *Resolver) {
+		r.builtin = append([]string(nil), sources...)
 	}
 }
 
@@ -148,6 +156,7 @@ func NewResolver(workingDir string, opts ...Option) *Resolver {
 		fetchTimeout:  defaultFetchTimeout,
 		cacheDuration: defaultCacheDuration,
 		manifestCache: make(map[string]*Manifest),
+		builtin:       []string{officialManifestRef},
 	}
 
 	for _, opt := range opts {
@@ -231,6 +240,22 @@ func (r *Resolver) ResolveRequirement(ctx context.Context, req statement.ToolReq
 		resolution, err := r.resolveFromReference(ctx, req.Name, source, exactVersion, hasExactVersion)
 		if err == nil {
 			return resolution, nil
+		}
+		if !errors.Is(err, ErrNoProvisioningMatch) {
+			return nil, err
+		}
+	}
+
+	for _, source := range r.builtin {
+		resolution, err := r.resolveFromReference(ctx, req.Name, source, exactVersion, hasExactVersion)
+		if err == nil {
+			return resolution, nil
+		}
+		// Built-in first-party catalogs are opportunistic fallbacks. If the
+		// remote source is unavailable, continue to the bundled embedded
+		// defaults instead of failing the whole requirement.
+		if err != nil && !errors.Is(err, ErrNoProvisioningMatch) {
+			continue
 		}
 		if !errors.Is(err, ErrNoProvisioningMatch) {
 			return nil, err

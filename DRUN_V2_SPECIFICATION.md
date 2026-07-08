@@ -4902,7 +4902,7 @@ provisioningSources:
   - "github:acme/shared-tooling/catalog/provisionings.yaml@stable"
 ```
 
-drun also ships an embedded fallback catalog for common Go ecosystem tools. The initial built-in catalog includes `golangci-lint`, `gosec`, `govulncheck`, and `staticcheck`, and each entry uses `go install ...@latest` plus a version-aware `go install ...@v{version}` template when drun can derive one exact requested version.
+drun also ships a tiny embedded fallback catalog for smoke testing and last-resort fallback behavior. The substantive first-party tool catalog lives in the official `phillarmonic/drun-provisionings` repository and is consulted before the embedded fallback.
 
 #### `provisionings.yaml` v1
 
@@ -4961,7 +4961,8 @@ drun resolves provisioning entries using this precedence order:
 
 1. Project `provisioning sources:` in declaration order
 2. User `provisioningSources` from `~/.drun/config.yml` in declaration order
-3. Embedded drun default catalog
+3. Official first-party `phillarmonic/drun-provisionings` catalog
+4. Embedded drun default catalog
 
 The first source that contains a matching provisioning entry wins. drun does not merge multiple catalogs for the same tool during a single lookup.
 

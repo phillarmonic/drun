@@ -131,6 +131,17 @@ task "repl":
 
 Plain `run "command"` remains non-interactive and is still the default for ordinary automation steps.
 
+## Tool Provisioning
+
+When a `requires tools:` entry opts into `provision`, `drun` resolves installers from provisioning catalogs in this order:
+
+1. Project `provisioning sources:`
+2. User `provisioningSources` from `~/.drun/config.yml`
+3. The official first-party catalog at `github:phillarmonic/drun-provisionings/provisionings.yaml@master`
+4. The embedded fallback catalog shipped with `drun`
+
+The official catalog is implicit. You only need to declare `provisioning sources:` when you want to override or extend it.
+
 ## Learn More
 
 - Usage and troubleshooting: [docs/USAGE_AND_TROUBLESHOOTING.md](./docs/USAGE_AND_TROUBLESHOOTING.md)

@@ -128,6 +128,7 @@ provisionings:
 
 	resolver := NewResolver(projectDir,
 		WithCurrentPlatform("linux", "amd64"),
+		WithBuiltinSources(nil),
 		WithEmbeddedSources([]EmbeddedSource{{
 			Name: "embedded-defaults",
 			Content: []byte(`version: "1"
@@ -155,6 +156,49 @@ provisionings:
 	}
 	if embeddedResolution.Source != "embedded-defaults" {
 		t.Fatalf("embedded resolution source = %q", embeddedResolution.Source)
+	}
+}
+
+func TestResolverResolveRequirement_OfficialRepoTakesPrecedenceOverEmbedded(t *testing.T) {
+	t.Parallel()
+
+	github := &fakeGitHubFetcher{
+		content: map[string][]byte{
+			"phillarmonic/drun-provisionings/provisionings.yaml@master": []byte(`version: "1"
+provisionings:
+  golangci-lint:
+    targets:
+      - install: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+`),
+		},
+	}
+
+	resolver := NewResolver(t.TempDir(),
+		WithCurrentPlatform("linux", "amd64"),
+		WithGitHubFetcher(github),
+		WithEmbeddedSources([]EmbeddedSource{{
+			Name: "embedded-defaults",
+			Content: []byte(`version: "1"
+provisionings:
+  golangci-lint:
+    targets:
+      - install: "echo embedded"
+`),
+		}}),
+	)
+
+	resolution, err := resolver.ResolveRequirement(context.Background(), statement.ToolRequirement{Name: "golangci-lint"}, SourceSet{})
+	if err != nil {
+		t.Fatalf("ResolveRequirement() error = %v", err)
+	}
+	if resolution.Source != officialManifestRef {
+		t.Fatalf("resolution.Source = %q", resolution.Source)
+	}
+	if github.calls != 1 {
+		t.Fatalf("github fetch calls = %d, want 1", github.calls)
+	}
+	if got := resolution.InstallCommand(); got != "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest" {
+		t.Fatalf("InstallCommand() = %q", got)
 	}
 }
 
