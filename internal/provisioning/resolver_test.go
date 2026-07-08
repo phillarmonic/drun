@@ -202,6 +202,35 @@ provisionings:
 	}
 }
 
+func TestResolverResolveRequirement_FallsBackToEmbeddedWhenOfficialRepoUnavailable(t *testing.T) {
+	t.Parallel()
+
+	resolver := NewResolver(t.TempDir(),
+		WithCurrentPlatform("linux", "amd64"),
+		WithGitHubFetcher(&fakeGitHubFetcher{}),
+		WithEmbeddedSources([]EmbeddedSource{{
+			Name: "embedded-defaults",
+			Content: []byte(`version: "1"
+provisionings:
+  golangci-lint:
+    targets:
+      - install: "echo embedded"
+`),
+		}}),
+	)
+
+	resolution, err := resolver.ResolveRequirement(context.Background(), statement.ToolRequirement{Name: "golangci-lint"}, SourceSet{})
+	if err != nil {
+		t.Fatalf("ResolveRequirement() error = %v", err)
+	}
+	if resolution.Source != "embedded-defaults" {
+		t.Fatalf("resolution.Source = %q", resolution.Source)
+	}
+	if got := resolution.InstallCommand(); got != "echo embedded" {
+		t.Fatalf("InstallCommand() = %q", got)
+	}
+}
+
 func TestResolverResolveRequirement_RemoteSourcesAndCache(t *testing.T) {
 	t.Parallel()
 
@@ -388,6 +417,45 @@ provisionings:
 	})
 	if err == nil || !strings.Contains(err.Error(), "duplicate provisioning name or alias") {
 		t.Fatalf("expected duplicate alias error, got %v", err)
+	}
+}
+
+func TestResolverResolveRequirement_ExactVersionFallsBackToDefaultInstall(t *testing.T) {
+	t.Parallel()
+
+	projectDir := t.TempDir()
+	manifest := filepath.Join(projectDir, "project.yaml")
+	if err := os.WriteFile(manifest, []byte(`version: "1"
+provisionings:
+  gosec:
+    targets:
+      - os: linux
+        install: "go install gosec@latest"
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	resolver := NewResolver(projectDir, WithCurrentPlatform("linux", "amd64"))
+	resolution, err := resolver.ResolveRequirement(context.Background(), statement.ToolRequirement{
+		Name: "gosec",
+		Constraints: []statement.VersionConstraint{
+			{Operator: ">=", Version: "2.22"},
+			{Operator: "<=", Version: "2.22"},
+		},
+	}, SourceSet{
+		Project: []string{manifest},
+	})
+	if err != nil {
+		t.Fatalf("ResolveRequirement() error = %v", err)
+	}
+	if resolution.ExactVersion != "2.22" {
+		t.Fatalf("resolution.ExactVersion = %q", resolution.ExactVersion)
+	}
+	if resolution.UsesVersionedInstall {
+		t.Fatalf("expected default install path when install_versioned is absent")
+	}
+	if got := resolution.InstallCommand(); got != "go install gosec@latest" {
+		t.Fatalf("InstallCommand() = %q", got)
 	}
 }
 

@@ -86,7 +86,7 @@ func TestParser_RequiresTools_TaskLevel(t *testing.T) {
 
 task "security":
   requires tools:
-    gosec >= "2.27"
+    gosec >= "2.27" provision
 `
 	lexer := lexer.NewLexer(input)
 	parser := NewParser(lexer)
@@ -121,6 +121,9 @@ task "security":
 	}
 	if tool1.Constraints[0].Operator != ">=" || tool1.Constraints[0].Version != "2.27" {
 		t.Errorf("tool constraint wrong: %s %s", tool1.Constraints[0].Operator, tool1.Constraints[0].Version)
+	}
+	if !tool1.AutoProvision {
+		t.Errorf("tool AutoProvision wrong. expected true")
 	}
 }
 

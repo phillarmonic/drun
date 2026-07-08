@@ -171,6 +171,43 @@ func TestEngine_checkToolRequirements_VersionMismatchAutoProvisionRechecks(t *te
 	}
 }
 
+func TestEngine_checkToolRequirements_PostProvisionRecheckFailure(t *testing.T) {
+	e := NewEngine(io.Discard)
+	e.newProvisioningResolver = func(string) provisioningResolver {
+		return fakeProvisioningResolver{
+			resolve: func(_ statement.ToolRequirement, _ provisioning.SourceSet) (*provisioning.Resolution, error) {
+				return &provisioning.Resolution{
+					Source: "project.yaml",
+					Target: provisioning.Target{Install: "install missing-tool"},
+				}, nil
+			},
+		}
+	}
+	e.provisionCommandRunner = func(command string, _ *ExecutionContext) error {
+		if command != "install missing-tool" {
+			t.Fatalf("unexpected provisioning command %q", command)
+		}
+		return nil
+	}
+	e.newToolDetector = sequenceDetectorFactory(
+		fakeToolDetector{available: map[string]bool{"missing-tool": false}},
+		fakeToolDetector{available: map[string]bool{"missing-tool": false}},
+	)
+
+	err := e.checkToolRequirements(
+		e.newToolDetector(),
+		[]statement.ToolRequirement{{Name: "missing-tool", AutoProvision: true}},
+		&ProjectContext{ProvisioningSources: []string{"./project.yaml"}},
+		&ExecutionContext{},
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "post-provision check for tool 'missing-tool' failed") {
+		t.Fatalf("expected post-provision failure, got %q", err.Error())
+	}
+}
+
 func TestFormatConstraints(t *testing.T) {
 	constraints := []statement.VersionConstraint{
 		{Operator: ">=", Version: "1.0"},
