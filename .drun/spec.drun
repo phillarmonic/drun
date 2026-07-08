@@ -8,6 +8,10 @@ project "Drun" version "2.0":
 		go >= 1.26
 		golangci-lint
 		gosec
+	# Planned provisioning form once tool provisioning lands:
+	# requires tools:
+	# 	golangci-lint provision
+	# 	gosec >= 2.27 provision
 	
 	git policy:
 		branch:

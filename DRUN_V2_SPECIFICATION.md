@@ -4837,13 +4837,36 @@ task "security":
   run "gosec ./..."
 ```
 
+To opt a requirement into automatic installation or version mutation, add a trailing `provision` marker to that tool line:
+
+```drun
+project "myapp":
+  requires tools:
+    golangci-lint >= "1.55" provision
+    govulncheck provision
+
+task "security":
+  requires tools:
+    gosec >= "2.27" provision
+  info "Running gosec"
+  run "gosec ./..."
+```
+
 **Key Features:**
-- **Fail-Fast**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error.
+- **Fail-Fast By Default**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error unless that specific line ends with `provision`.
 - **Multiple Bounds**: Supports chaining comparison operators (`>=`, `<=`, `>`, `<`) on the same line to define a range.
 - **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the executable must be present on `PATH`, without version checking.
 - **Unquoted Versions**: Supports both quoted (`"1.21"`) and unquoted (`1.21`) version numbers.
+- **Per-Line Provisioning Intent**: `provision` applies only to the requirement on the same line. Other tools in the block keep their normal fail-fast behavior unless they also opt in.
 
-`requires tools:` validates installation and version only. It does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
+**Provisioning Semantics:**
+- **Missing Tool + `provision`**: If the executable is missing and the requirement line ends with `provision`, drun resolves a provisioning entry for that tool, runs it, and then re-checks the requirement before continuing.
+- **Missing Tool Without `provision`**: If the executable is missing and the line does not end with `provision`, execution fails immediately.
+- **Version Mismatch + `provision`**: If the tool exists but does not satisfy the declared version constraint, drun warns and refuses to mutate the installed version unless the run was started with `--allow-tool-version-changes`.
+- **Version Mismatch + Flag**: With `--allow-tool-version-changes`, a provisionable requirement may upgrade or downgrade the installed tool to satisfy the declared constraint, then must re-run detection and version validation before execution continues.
+- **Provisioning Failure**: If no provisioning entry exists, provisioning exits non-zero, or the post-provision re-check still fails, the enclosing project/task fails before any dependent work runs.
+
+`requires tools:` validates installation and version only. Even with `provision`, it does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
 
 #### Dynamic Detection
 
