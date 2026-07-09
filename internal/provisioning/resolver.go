@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -716,7 +717,7 @@ func parseGitSource(source string) (string, string, string, error) {
 		manifestPath = defaultManifestName
 	}
 
-	return repoURL.String(), filepath.FromSlash(manifestPath), parsed.Query().Get("ref"), nil
+	return repoURL.String(), path.Clean("/" + manifestPath)[1:], parsed.Query().Get("ref"), nil
 }
 
 type gitCommandFetcher struct{}

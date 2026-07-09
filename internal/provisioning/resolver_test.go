@@ -334,6 +334,25 @@ provisionings:
 	}
 }
 
+func TestParseGitSource_ManifestPathUsesForwardSlashes(t *testing.T) {
+	t.Parallel()
+
+	repoURL, manifestPath, ref, err := parseGitSource("ssh://git@github.com/acme/internal-tooling.git//catalog/provisionings.yaml?ref=main")
+	if err != nil {
+		t.Fatalf("parseGitSource() error = %v", err)
+	}
+
+	if repoURL != "ssh://git@github.com/acme/internal-tooling.git" {
+		t.Fatalf("repoURL = %q", repoURL)
+	}
+	if manifestPath != "catalog/provisionings.yaml" {
+		t.Fatalf("manifestPath = %q", manifestPath)
+	}
+	if ref != "main" {
+		t.Fatalf("ref = %q", ref)
+	}
+}
+
 func TestResolverResolveRequirement_FirstMatchingSourceDoesNotFallThrough(t *testing.T) {
 	t.Parallel()
 
