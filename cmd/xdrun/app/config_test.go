@@ -213,18 +213,18 @@ templates:
 
 version: 2.0
 
-project "comb-os" version "1.0":
+project "example-app" version "1.0":
 task "default" means "Welcome":
 	info "{{project_name}} Drun Spec"
 
 task "build" means "Build {{binary_name}}":
 	step "Building {{binary_name}}..."
-	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/comb-os ./cmd/comb-os"
+	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/example-app ./cmd/example-app"
 	success "Build completed for {{binary_name}}"
 
 task "install" means "Install {{binary_name}}":
 	step "Installing {{binary_name}}..."
-	run "go install ./cmd/comb-os"
+	run "go install ./cmd/example-app"
 	success "Install completed for {{module_name}}"
 `
 
