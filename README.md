@@ -142,6 +142,27 @@ When a `requires tools:` entry opts into `provision`, `drun` resolves installers
 
 The official catalog is implicit. You only need to declare `provisioning sources:` when you want to override or extend it.
 
+Use `--allow-tool-version-changes` when a provisionable requirement is already installed but needs an upgrade or downgrade to satisfy the declared version:
+
+```bash
+xdrun --allow-tool-version-changes lint
+```
+
+Project example:
+
+```drun
+project "api":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+
+  requires tools:
+    golangci-lint >= "1.64" provision
+    gosec >= "2.22" <= "2.22" provision
+    govulncheck provision
+```
+
+See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) for a fuller example covering project overrides, the implicit first-party catalog, the embedded fallback, and exact-version requests.
+
 ## Learn More
 
 - Usage and troubleshooting: [docs/USAGE_AND_TROUBLESHOOTING.md](./docs/USAGE_AND_TROUBLESHOOTING.md)

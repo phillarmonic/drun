@@ -4904,6 +4904,8 @@ provisioningSources:
 
 drun also ships a tiny embedded fallback catalog for smoke testing and last-resort fallback behavior. The substantive first-party tool catalog lives in the official `phillarmonic/drun-provisionings` repository and is consulted before the embedded fallback.
 
+An end-to-end example that combines project overrides, exact-version forwarding, the implicit first-party catalog, and the embedded fallback lives at `examples/73-tool-provisioning.drun`.
+
 #### `provisionings.yaml` v1
 
 Provisioning catalogs are YAML manifests with schema version `1`. Like template catalogs, they may define provisionings as either a map or a sequence.
@@ -4981,6 +4983,20 @@ Provisioning lookups always use the tool name, but version arguments are forward
 - `gosec >= "2.22" <= "2.22" provision` forwards `2.22`
 - `gosec >= "2.22" provision` does not forward a version because the requirement is open-ended
 - `gosec provision` does not forward a version
+
+Example:
+
+```drun
+project "quality":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+
+  requires tools:
+    gosec >= "2.22" <= "2.22" provision
+    dummy-tool >= "1.2.3" <= "1.2.3" provision
+```
+
+In that example, `gosec` forwards `2.22` to `install_versioned` when the selected target supports it. If `dummy-tool` is not defined by the project or user catalogs, drun continues to the implicit first-party catalog and finally the embedded fallback catalog before failing.
 
 If drun derives one exact version but the chosen target omits `install_versioned`, it falls back to `install`. If the requirement can only be satisfied by mutating to an exact version and the catalog has no version-aware installer path, provisioning fails before execution continues.
 

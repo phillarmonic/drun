@@ -218,6 +218,40 @@ xdrun deploy environment=production version=v1.2.3
 
 CLI behavior flags still use `--flag` syntax.
 
+## Tool Provisioning
+
+`requires tools:` stays fail-fast by default. Add trailing `provision` on an individual tool requirement when `drun` may install the missing tool automatically.
+
+```drun
+project "quality":
+  requires tools:
+    golangci-lint >= "1.64" provision
+    govulncheck provision
+```
+
+If the tool already exists but its version does not satisfy the declared constraint, `drun` refuses to mutate that installed version unless the run includes:
+
+```bash
+xdrun --allow-tool-version-changes lint
+```
+
+Provisioning catalogs are resolved in this order:
+
+1. Project `provisioning sources:`
+2. User `provisioningSources` from `~/.drun/config.yml`
+3. The implicit first-party catalog at `github:phillarmonic/drun-provisionings/provisionings.yaml@master`
+4. The embedded fallback catalog shipped with `drun`
+
+User-level fallback sources live in `~/.drun/config.yml`:
+
+```yaml
+provisioningSources:
+  - "~/.drun/provisionings.yaml"
+  - "github:acme/devx/catalog/provisionings.yaml@stable"
+```
+
+When a requirement pins one exact version, `drun` forwards that version to `install_versioned` if the selected catalog target provides it. For example, `gosec >= "2.22" <= "2.22" provision` forwards `2.22`, while `gosec >= "2.22" provision` does not because the range is open-ended.
+
 ```bash
 xdrun deploy environment=production --dry-run
 xdrun --list
