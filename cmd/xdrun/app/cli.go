@@ -21,23 +21,24 @@ type App struct {
 	rootCmd *cobra.Command
 
 	// Flags
-	configFile         string
-	listTasks          bool
-	dryRun             bool
-	verbose            bool
-	taskMode           string
-	showVersion        bool
-	initConfig         bool
-	initMinimalConfig  bool
-	initFromTemplate   string
-	initTemplateName   string
-	templatesRepo      string
-	listTemplates      bool
-	saveAsDefault      bool
-	setWorkspace       string
-	selfUpdate         bool
-	allowUndefinedVars bool
-	noDrunCache        bool
+	configFile              string
+	listTasks               bool
+	dryRun                  bool
+	verbose                 bool
+	taskMode                string
+	showVersion             bool
+	initConfig              bool
+	initMinimalConfig       bool
+	initFromTemplate        string
+	initTemplateName        string
+	templatesRepo           string
+	listTemplates           bool
+	saveAsDefault           bool
+	setWorkspace            string
+	selfUpdate              bool
+	allowUndefinedVars      bool
+	allowToolVersionChanges bool
+	noDrunCache             bool
 
 	// Debug flags
 	debugMode          bool
@@ -94,7 +95,8 @@ Built-in Commands:
   xdrun cmd:link services/api    # Link directories to this task file
   xdrun cmd:lsp                  # Start the Drun language server over stdio
   xdrun cmd:skill install basics # Install project AI guidance for drun/xdrun
-  xdrun cmd:secret add key       # Manage secrets (add, remove, list)`,
+  xdrun cmd:secret add key       # Manage secrets (add, remove, list)
+  xdrun cmd:hook install         # Install git hooks for git policies`,
 		RunE:              app.run,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: CompleteTaskNames,
@@ -186,6 +188,7 @@ func (a *App) setupFlags() {
 	flags.StringVar(&a.setWorkspace, "set-workspace", "", "[xdrun CLI cmd] Set workspace default task file location")
 	flags.BoolVar(&a.selfUpdate, "self-update", false, "[xdrun CLI cmd] Check for updates and update xdrun to the latest version")
 	flags.BoolVar(&a.allowUndefinedVars, "allow-undefined-variables", false, "[xdrun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
+	flags.BoolVar(&a.allowToolVersionChanges, "allow-tool-version-changes", false, "[xdrun CLI cmd] Allow provisioning to upgrade or downgrade installed tools when versioned requirements opt into provision")
 
 	// Debug flags
 	flags.BoolVar(&a.debugMode, "debug", false, "[xdrun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
@@ -218,6 +221,7 @@ func (a *App) setupCommands() {
 		a.createLSPCommand(),
 		a.createSkillCommand(),
 		a.createSecretsCommand(),
+		a.createHookCommand(),
 	}
 	for _, cmd := range cmds {
 		cmd.Hidden = true
@@ -289,6 +293,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		a.verbose,
 		a.taskMode,
 		a.allowUndefinedVars,
+		a.allowToolVersionChanges,
 		a.noDrunCache,
 		args,
 	)

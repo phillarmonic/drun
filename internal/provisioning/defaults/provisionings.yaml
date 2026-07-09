@@ -1,0 +1,8 @@
+version: "1"
+provisionings:
+  dummy-provisioner:
+    description: "Minimal embedded fallback used when no first-party catalog is available"
+    aliases: ["dummy-tool"]
+    targets:
+      - install: "echo embedded dummy provisioner"
+        install_versioned: "echo embedded dummy provisioner {version}"

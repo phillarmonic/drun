@@ -66,6 +66,46 @@ func (p *Parser) parseRequiresToolsStatement() *ast.RequiresToolsStatement {
 	return stmt
 }
 
+// parseProvisioningSourcesStatement parses a "provisioning sources:" block.
+func (p *Parser) parseProvisioningSourcesStatement() *ast.ProvisioningSourcesStatement {
+	stmt := &ast.ProvisioningSourcesStatement{Token: p.curToken}
+
+	if p.peekToken.Type != lexer.IDENT || p.peekToken.Literal != "sources" {
+		p.addError(fmt.Sprintf("expected 'sources' after 'provisioning', got %s instead", p.peekToken.Type))
+		return nil
+	}
+	p.nextToken()
+
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+		return nil
+	}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		switch p.curToken.Type {
+		case lexer.NEWLINE, lexer.COMMENT, lexer.MULTILINE_COMMENT:
+			p.nextToken()
+		case lexer.STRING:
+			stmt.Sources = append(stmt.Sources, p.curToken.Literal)
+			p.nextToken()
+		default:
+			p.addError(fmt.Sprintf("expected provisioning source string, got %s instead", p.curToken.Type))
+			p.nextToken()
+		}
+	}
+
+	if len(stmt.Sources) == 0 {
+		p.addError("provisioning sources: block must contain at least one source")
+		return nil
+	}
+
+	return stmt
+}
+
 // parseToolRequirement parses a single tool requirement line.
 // Examples:
 //
@@ -110,6 +150,11 @@ func (p *Parser) parseToolRequirement() *ast.ToolRequirement {
 		})
 
 		// Advance to see if there's another constraint
+		p.nextToken()
+	}
+
+	if p.curToken.Type == lexer.IDENT && p.curToken.Literal == "provision" {
+		req.AutoProvision = true
 		p.nextToken()
 	}
 

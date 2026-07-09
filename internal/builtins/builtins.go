@@ -68,6 +68,7 @@ var Registry = map[string]BuiltinFunction{
 	"start timer":            startTimer,
 	"stop timer":             stopTimer,
 	"show elapsed time":      showElapsedTime,
+	"compose_cmd":            getDockerComposeCommand,
 	"docker compose command": getDockerComposeCommand,
 	"docker compose status":  checkDockerComposeStatus,
 	"secret":                 getSecret,

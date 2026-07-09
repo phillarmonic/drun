@@ -65,6 +65,9 @@ Follow this recommended order to learn drun v2:
 - [07-smart-detection.drun](07-smart-detection.drun) - All smart detection features
 - [06-cicd-pipeline.drun](06-cicd-pipeline.drun) - Detection in real workflows
 
+### Tool Provisioning
+- [73-tool-provisioning.drun](73-tool-provisioning.drun) - Project catalog overrides, implicit fallbacks, and exact-version provisioning requests
+
 ## 🔍 By Use Case
 
 ### Web Development
@@ -76,6 +79,7 @@ Follow this recommended order to learn drun v2:
 - **CI/CD Pipelines**: [06-cicd-pipeline.drun](06-cicd-pipeline.drun)
 - **Kubernetes**: [05-kubernetes.drun](05-kubernetes.drun)
 - **Monitoring**: [05-kubernetes.drun](05-kubernetes.drun), [06-cicd-pipeline.drun](06-cicd-pipeline.drun)
+- **Tool Provisioning**: [73-tool-provisioning.drun](73-tool-provisioning.drun)
 
 ### Automation
 - **Deployment**: [05-kubernetes.drun](05-kubernetes.drun), [06-cicd-pipeline.drun](06-cicd-pipeline.drun)

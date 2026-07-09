@@ -12,6 +12,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/builtins"
 	"github.com/phillarmonic/drun/v2/internal/cache"
+	"github.com/phillarmonic/drun/v2/internal/detection"
 	"github.com/phillarmonic/drun/v2/internal/domain/parameter"
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 	"github.com/phillarmonic/drun/v2/internal/domain/task"
@@ -24,6 +25,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 	"github.com/phillarmonic/drun/v2/internal/parser"
 	"github.com/phillarmonic/drun/v2/internal/platform"
+	"github.com/phillarmonic/drun/v2/internal/provisioning"
 	"github.com/phillarmonic/drun/v2/internal/remote"
 	"github.com/phillarmonic/drun/v2/internal/types"
 )
@@ -65,6 +67,13 @@ type Engine struct {
 	// Secrets management
 	secretsManager SecretsManager
 
+	allowToolVersionChanges bool
+	userProvisioningSources []string
+	embeddedProvisionings   []provisioning.EmbeddedSource
+	newToolDetector         func() toolDetector
+	newProvisioningResolver func(workingDir string) provisioningResolver
+	provisionCommandRunner  func(command string, execCtx *ExecutionContext) error
+
 	// Legacy regex patterns (still used by variable operations)
 	quotedArgRegex *regexp.Regexp
 	paramArgRegex  *regexp.Regexp
@@ -92,6 +101,8 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	httpsFetcher := remote.NewHTTPSFetcher()
 	drunhubFetcher := remote.NewDrunhubFetcher(githubFetcher)
 	interp := interpolation.NewInterpolator()
+	embeddedProvisionings := append([]provisioning.EmbeddedSource(nil), options.EmbeddedProvisioningSources...)
+	embeddedProvisionings = append(embeddedProvisionings, provisioning.DefaultEmbeddedSources()...)
 
 	e := &Engine{
 		output:           options.Output,
@@ -111,6 +122,10 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		// Secrets management
 		secretsManager: options.SecretsManager,
 
+		allowToolVersionChanges: options.AllowToolVersionChanges,
+		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
+		embeddedProvisionings:   embeddedProvisionings,
+
 		// Execution components
 		planner: planner.NewPlanner(options.TaskRegistry, options.DepResolver),
 
@@ -118,6 +133,21 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		quotedArgRegex: regexp.MustCompile(`^([^(]+)\((.+)\)$`),
 		paramArgRegex:  regexp.MustCompile(`^([^(]+)\(([^)]+)\)$`),
 	}
+
+	e.newToolDetector = func() toolDetector {
+		return detection.NewDetector()
+	}
+	e.newProvisioningResolver = func(workingDir string) provisioningResolver {
+		opts := []provisioning.Option{}
+		if e.cacheManager != nil {
+			opts = append(opts, provisioning.WithCacheManager(e.cacheManager))
+		}
+		if len(e.embeddedProvisionings) > 0 {
+			opts = append(opts, provisioning.WithEmbeddedSources(e.embeddedProvisionings))
+		}
+		return provisioning.NewResolver(workingDir, opts...)
+	}
+	e.provisionCommandRunner = e.runProvisioningCommand
 
 	// Set the engine as the domain statement executor
 	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
@@ -252,7 +282,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	}
 
 	// Create project context for planning
-	projectCtx, err := e.createProjectContext(program.Project, currentFile)
+	projectCtx, err := e.BuildProjectContext(program.Project, currentFile)
 	if err != nil {
 		return fmt.Errorf("creating project context: %w", err)
 	}
@@ -671,8 +701,8 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 	return nil
 }
 
-// createProjectContext creates a project context from the project statement
-func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
+// BuildProjectContext creates a ProjectContext from a project statement
+func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
 	if project == nil {
 		return nil, nil
 	}
@@ -747,9 +777,20 @@ func (e *Engine) createProjectContext(project *ast.ProjectStatement, currentFile
 					})
 				}
 				ctx.RequiredTools = append(ctx.RequiredTools, statement.ToolRequirement{
-					Name:        astTool.Name,
-					Constraints: constraints,
+					Name:          astTool.Name,
+					Constraints:   constraints,
+					AutoProvision: astTool.AutoProvision,
 				})
+			}
+		case *ast.ProvisioningSourcesStatement:
+			ctx.ProvisioningSources = append(ctx.ProvisioningSources, s.Sources...)
+		case *ast.GitPolicyStatement:
+			// Convert to domain statement immediately since it's small and pure data
+			domainStmt, err := statement.FromAST(s)
+			if err == nil {
+				if policy, ok := domainStmt.(*statement.GitPolicy); ok {
+					ctx.GitPolicy = policy
+				}
 			}
 		}
 	}
@@ -878,6 +919,11 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeChangeWorkdir(s, ctx)
 	case *statement.RequiresTools:
 		return e.executeRequiresTools(s, ctx)
+	case *statement.GitValidate:
+		return e.executeGitValidate(s, ctx)
+	case *statement.GitPolicy:
+		// Processed during project setup, ignored during execution
+		return nil
 	default:
 		return fmt.Errorf("unknown domain statement type: %T", stmt)
 	}

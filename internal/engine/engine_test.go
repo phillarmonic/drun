@@ -6,6 +6,7 @@ import (
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/provisioning"
 )
 
 func TestNewEngineWithOptions(t *testing.T) {
@@ -38,6 +39,48 @@ func TestNewEngineWithOptions(t *testing.T) {
 
 	if !engine.verbose {
 		t.Error("Expected verbose to be true")
+	}
+}
+
+func TestNewEngineWithOptions_ProvisioningControls(t *testing.T) {
+	engine := NewEngineWithOptions(
+		WithAllowToolVersionChanges(true),
+		WithUserProvisioningSources([]string{"~/.drun/provisionings.yaml"}),
+	)
+
+	if !engine.allowToolVersionChanges {
+		t.Fatal("expected allowToolVersionChanges to be enabled")
+	}
+
+	if len(engine.userProvisioningSources) != 1 || engine.userProvisioningSources[0] != "~/.drun/provisionings.yaml" {
+		t.Fatalf("userProvisioningSources = %#v", engine.userProvisioningSources)
+	}
+
+	defaultSources := provisioning.DefaultEmbeddedSources()
+	if len(defaultSources) == 0 {
+		t.Fatal("expected built-in embedded provisioning sources")
+	}
+	if len(engine.embeddedProvisionings) < len(defaultSources) {
+		t.Fatalf("embeddedProvisionings = %#v", engine.embeddedProvisionings)
+	}
+	if engine.embeddedProvisionings[len(engine.embeddedProvisionings)-1].Name != defaultSources[0].Name {
+		t.Fatalf("last embedded source = %q", engine.embeddedProvisionings[len(engine.embeddedProvisionings)-1].Name)
+	}
+}
+
+func TestNewEngineWithOptions_CustomEmbeddedSourcesPrecedeDefaults(t *testing.T) {
+	engine := NewEngineWithOptions(
+		WithEmbeddedProvisioningSources([]provisioning.EmbeddedSource{{
+			Name:    "custom",
+			Content: []byte("version: \"1\"\nprovisionings:\n  custom:\n    targets:\n      - install: \"echo custom\"\n"),
+		}}),
+	)
+
+	if len(engine.embeddedProvisionings) < 2 {
+		t.Fatalf("embeddedProvisionings = %#v", engine.embeddedProvisionings)
+	}
+	if engine.embeddedProvisionings[0].Name != "custom" {
+		t.Fatalf("first embedded source = %q", engine.embeddedProvisionings[0].Name)
 	}
 }
 

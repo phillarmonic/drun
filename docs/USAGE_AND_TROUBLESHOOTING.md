@@ -47,9 +47,29 @@ export PATH="$PATH:$HOME/.local/bin"
 
 `xdrun` looks for task files in this order:
 
-1. Workspace default from `.drun/.drun_workspace`
-2. Default file at `.drun/spec.drun`
-3. Explicit file path passed with `--file`
+1. Explicit file path passed with `--file`
+2. Stateless workspace config under `~/.drun/stateless/` when the directory is marked stateless
+3. Linked directory config from `~/.drun/links.yml`
+4. Workspace default from `.drun/.drun_workspace.yml`
+5. Built-in fallback locations:
+   - `.drun/spec.drun`
+   - `.drun`
+   - `spec.drun`
+   - `infra/.drun/spec.drun`
+   - `infra/drun/spec.drun`
+   - `ops/drun/spec.drun`
+   - `ops/spec.drun`
+6. Extra fallback locations from `~/.drun/config.yml` under `extraTaskFileSearchPaths`
+
+Example home config:
+
+```yaml
+extraTaskFileSearchPaths:
+  - automation/project.drun
+  - platform/spec.drun
+```
+
+Relative paths in `extraTaskFileSearchPaths` are resolved from the current workspace directory. Absolute paths are also supported.
 
 Create a starter file:
 
@@ -61,6 +81,18 @@ Create a custom file and save it as the workspace default:
 
 ```bash
 xdrun --init --file=my-project.drun --save-as-default
+```
+
+Create a spec under `ops/drun/spec.drun`:
+
+```bash
+xdrun --init --file ops/drun/spec.drun
+```
+
+Or under `infra/drun/spec.drun`:
+
+```bash
+xdrun --init --file infra/drun/spec.drun
 ```
 
 Point the workspace to an existing file:
@@ -185,6 +217,40 @@ xdrun deploy environment=production version=v1.2.3
 ```
 
 CLI behavior flags still use `--flag` syntax.
+
+## Tool Provisioning
+
+`requires tools:` stays fail-fast by default. Add trailing `provision` on an individual tool requirement when `drun` may install the missing tool automatically.
+
+```drun
+project "quality":
+  requires tools:
+    golangci-lint >= "1.64" provision
+    govulncheck provision
+```
+
+If the tool already exists but its version does not satisfy the declared constraint, `drun` refuses to mutate that installed version unless the run includes:
+
+```bash
+xdrun --allow-tool-version-changes lint
+```
+
+Provisioning catalogs are resolved in this order:
+
+1. Project `provisioning sources:`
+2. User `provisioningSources` from `~/.drun/config.yml`
+3. The implicit first-party catalog at `github:phillarmonic/drun-provisionings/provisionings.yaml@master`
+4. The embedded fallback catalog shipped with `drun`
+
+User-level fallback sources live in `~/.drun/config.yml`:
+
+```yaml
+provisioningSources:
+  - "~/.drun/provisionings.yaml"
+  - "github:acme/devx/catalog/provisionings.yaml@stable"
+```
+
+When a requirement pins one exact version, `drun` forwards that version to `install_versioned` if the selected catalog target provides it. For example, `gosec >= "2.22" <= "2.22" provision` forwards `2.22`, while `gosec >= "2.22" provision` does not because the range is open-ended.
 
 ```bash
 xdrun deploy environment=production --dry-run

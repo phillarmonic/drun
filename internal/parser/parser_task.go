@@ -188,6 +188,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 				git := p.parseGitStatement()
 				if git != nil {
 					stmt.Body = append(stmt.Body, git)
+				} else if p.peekToken.Type == lexer.VALIDATE {
+					// parseGitStatement returned nil because this is "git validate ..."
+					gitValidate := p.parseGitValidateStatement()
+					if gitValidate != nil {
+						stmt.Body = append(stmt.Body, gitValidate)
+					}
 				}
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {

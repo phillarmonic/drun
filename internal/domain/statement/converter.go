@@ -283,8 +283,9 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 				})
 			}
 			tools = append(tools, ToolRequirement{
-				Name:        astTool.Name,
-				Constraints: constraints,
+				Name:          astTool.Name,
+				Constraints:   constraints,
+				AutoProvision: astTool.AutoProvision,
 			})
 		}
 		return &RequiresTools{
@@ -294,6 +295,24 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 	case *ast.ChangeWorkdirStatement:
 		return &ChangeWorkdir{
 			Path: s.Path,
+		}, nil
+
+	case *ast.GitPolicyStatement:
+		return &GitPolicy{
+			DefaultBranches:      s.DefaultBranches,
+			BranchPattern:        s.BranchPattern,
+			BranchTypes:          s.BranchTypes,
+			CommitPattern:        s.CommitPattern,
+			ExtractIdentifier:    s.ExtractIdentifier,
+			CommitMinLength:      s.CommitMinLength,
+			CommitBans:           s.CommitBans,
+			EnforceSignedCommits: s.EnforceSignedCommits,
+		}, nil
+
+	case *ast.GitValidateStatement:
+		return &GitValidate{
+			Target: s.Target,
+			Value:  s.Value,
 		}, nil
 
 	default:

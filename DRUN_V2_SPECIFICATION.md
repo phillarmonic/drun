@@ -4737,6 +4737,82 @@ xdrun cmd:skill install basics --target ../my-service --force
 
 ---
 
+## Git Policy and Hooks ⭐ *New*
+
+Drun allows you to define project-wide git conventions (branch naming, commit messages) directly in the project block, and automatically validate them at runtime or via git hooks.
+
+### Project Git Policy
+
+The `git policy:` block is used to configure your conventions:
+
+```drun
+project "myapp":
+  git policy:
+    branch:
+      default branches: "master", "main"
+      naming: "{type}/{identifier}-{description}"
+      types: "feat", "fix", "chore"
+    commit:
+      messages: "conventional commits"
+      ban: "WIP", "wip", "fixup"
+      min length: 10
+      extract identifier from branch
+      enforce signed commits
+```
+
+**Settings:**
+- `branch`: Block for branch-specific rules.
+  - `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
+  - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
+  - `types`: Allowed values for the `{type}` placeholder.
+- `commit`: Block for commit-specific rules.
+  - `messages`: The required pattern for commit messages. Use `"conventional commits"` to enforce the Conventional Commits header format (`type(scope): description` with optional `!`).
+  - `ban`: A list of exact commit messages that are rejected (like `WIP`).
+  - `min length`: The minimum number of characters for a commit message.
+  - `extract identifier from branch`: Automatically pulls the `{identifier}` from the current branch name and enforces its presence in the commit message. When used with `"conventional commits"`, the identifier can appear anywhere in the commit message.
+  - `enforce signed commits`: Validates that commits are signed (GPG/SSH).
+
+Example conventional commit messages that pass:
+
+```text
+feat(parser): PHIL-01 support conventional commit validation
+fix(engine)!: CORE-77 reject invalid commit headers
+chore(release): 1.2.3
+```
+
+### Validation (git validate)
+
+You can manually trigger git policy validation inside any task using the `git validate` statement:
+
+```drun
+task "pre-flight" means "Run checks before push":
+  git validate branch_name
+  git validate commit_message
+  git validate signed_commits
+  
+  # Or validate everything at once:
+  git validate all
+```
+
+### Git Hooks Lifecycle (cmd:hook)
+
+Instead of manually running checks in tasks, you can use drun to manage and enforce git hooks on developer machines:
+
+```bash
+# Install drun git hooks (commit-msg, pre-push) to enforce the policy
+xdrun cmd:hook install
+
+# List installed hooks and their status
+xdrun cmd:hook list
+
+# Uninstall drun git hooks
+xdrun cmd:hook uninstall
+```
+
+When installed, drun automatically checks commit messages against your policy and blocks pushes if commits are unsigned (when `enforce signed commits` is enabled).
+
+---
+
 ## Smart Detection
 
 ### Tool Detection
@@ -4761,13 +4837,168 @@ task "security":
   run "gosec ./..."
 ```
 
+To opt a requirement into automatic installation or version mutation, add a trailing `provision` marker to that tool line:
+
+```drun
+project "myapp":
+  requires tools:
+    golangci-lint >= "1.55" provision
+    govulncheck provision
+
+task "security":
+  requires tools:
+    gosec >= "2.27" provision
+  info "Running gosec"
+  run "gosec ./..."
+```
+
 **Key Features:**
-- **Fail-Fast**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error.
+- **Fail-Fast By Default**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error unless that specific line ends with `provision`.
 - **Multiple Bounds**: Supports chaining comparison operators (`>=`, `<=`, `>`, `<`) on the same line to define a range.
 - **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the executable must be present on `PATH`, without version checking.
 - **Unquoted Versions**: Supports both quoted (`"1.21"`) and unquoted (`1.21`) version numbers.
+- **Per-Line Provisioning Intent**: `provision` applies only to the requirement on the same line. Other tools in the block keep their normal fail-fast behavior unless they also opt in.
 
-`requires tools:` validates installation and version only. It does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
+**Provisioning Semantics:**
+- **Missing Tool + `provision`**: If the executable is missing and the requirement line ends with `provision`, drun resolves a provisioning entry for that tool, runs it, and then re-checks the requirement before continuing.
+- **Missing Tool Without `provision`**: If the executable is missing and the line does not end with `provision`, execution fails immediately.
+- **Version Mismatch + `provision`**: If the tool exists but does not satisfy the declared version constraint, drun warns and refuses to mutate the installed version unless the run was started with `--allow-tool-version-changes`.
+- **Version Mismatch + Flag**: With `--allow-tool-version-changes`, a provisionable requirement may upgrade or downgrade the installed tool to satisfy the declared constraint, then must re-run detection and version validation before execution continues.
+- **Provisioning Failure**: If no provisioning entry exists, provisioning exits non-zero, or the post-provision re-check still fails, the enclosing project/task fails before any dependent work runs.
+
+`requires tools:` validates installation and version only. Even with `provision`, it does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
+
+#### Provisioning Sources
+
+When a requirement opts into provisioning, drun resolves installers from one or more catalog sources. Sources can be declared directly in the project:
+
+```drun
+project "myapp":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+    "./tooling"
+    "https://example.com/drun/provisionings.yaml"
+    "github:acme/devx-catalog/catalog/provisionings.yaml@main"
+    "ssh://git@github.com/acme/internal-tooling.git//catalog/provisionings.yaml?ref=main"
+
+  requires tools:
+    golangci-lint >= "1.64" provision
+    gosec >= "2.22" <= "2.22" provision
+```
+
+`provisioning sources:` is a project-level setting. Each entry is a catalog source searched in declaration order. Supported source kinds are:
+
+- Local manifest file path such as `./.drun/provisionings.yaml`
+- Local directory path such as `./tooling`, which implies `./tooling/provisionings.yaml`
+- HTTPS manifest URL
+- GitHub shorthand in the form `github:owner/repo/path/provisionings.yaml@ref`
+- SSH-backed Git manifest URL in the form `ssh://git@host/org/repo.git//path/provisionings.yaml?ref=<branch-or-tag>`
+
+User-level fallback sources may also be declared in `~/.drun/config.yml`:
+
+```yaml
+provisioningSources:
+  - "~/.drun/provisionings.yaml"
+  - "github:acme/shared-tooling/catalog/provisionings.yaml@stable"
+```
+
+drun also ships a tiny embedded fallback catalog for smoke testing and last-resort fallback behavior. The substantive first-party tool catalog lives in the official `phillarmonic/drun-provisionings` repository and is consulted before the embedded fallback.
+
+An end-to-end example that combines project overrides, exact-version forwarding, the implicit first-party catalog, and the embedded fallback lives at `examples/73-tool-provisioning.drun`.
+
+#### `provisionings.yaml` v1
+
+Provisioning catalogs are YAML manifests with schema version `1`. Like template catalogs, they may define provisionings as either a map or a sequence.
+
+Map form:
+
+```yaml
+version: "1"
+provisionings:
+  golangci-lint:
+    description: "Install golangci-lint"
+    targets:
+      - os: darwin
+        arch: arm64
+        install: "brew install golangci-lint"
+        install_versioned: "brew install golangci-lint@{version}"
+      - os: linux
+        install: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        install_versioned: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@v{version}"
+```
+
+Equivalent sequence form:
+
+```yaml
+version: "1"
+provisionings:
+  - name: golangci-lint
+    description: "Install golangci-lint"
+    targets:
+      - os: darwin
+        arch: arm64
+        install: "brew install golangci-lint"
+        install_versioned: "brew install golangci-lint@{version}"
+```
+
+Each provisioning entry supports:
+
+- `name`: required in sequence form; implied by the map key in map form
+- `description`: optional human-facing explanation
+- `aliases`: optional alternative executable names that resolve to the same entry
+- `targets`: required list of installer targets
+
+Each target supports:
+
+- `os`: optional operating system selector such as `darwin`, `linux`, or `windows`
+- `arch`: optional CPU selector such as `amd64` or `arm64`
+- `install`: required command used when no exact version should be passed
+- `install_versioned`: optional command template used when drun has one exact requested version to pass
+
+Within a single manifest, provisioning names must be unique after alias expansion. Duplicate entries at the same name are invalid.
+
+#### Catalog Resolution And Specificity
+
+drun resolves provisioning entries using this precedence order:
+
+1. Project `provisioning sources:` in declaration order
+2. User `provisioningSources` from `~/.drun/config.yml` in declaration order
+3. Official first-party `phillarmonic/drun-provisionings` catalog
+4. Embedded drun default catalog
+
+The first source that contains a matching provisioning entry wins. drun does not merge multiple catalogs for the same tool during a single lookup.
+
+Inside the chosen source, drun picks the most specific installer target in this order:
+
+1. Matching `name` or `alias` with exact `os` and exact `arch`
+2. Matching `name` or `alias` with exact `os` and no `arch`
+3. Matching `name` or `alias` with no `os` and no `arch`
+
+If two targets in the same manifest have identical specificity for the same tool, the manifest is invalid and provisioning must fail with an ambiguity error.
+
+#### Exact Version Forwarding
+
+Provisioning lookups always use the tool name, but version arguments are forwarded only when the requirement requests one exact version and the selected target provides `install_versioned`.
+
+- `gosec >= "2.22" <= "2.22" provision` forwards `2.22`
+- `gosec >= "2.22" provision` does not forward a version because the requirement is open-ended
+- `gosec provision` does not forward a version
+
+Example:
+
+```drun
+project "quality":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+
+  requires tools:
+    gosec >= "2.22" <= "2.22" provision
+    dummy-tool >= "1.2.3" <= "1.2.3" provision
+```
+
+In that example, `gosec` forwards `2.22` to `install_versioned` when the selected target supports it. If `dummy-tool` is not defined by the project or user catalogs, drun continues to the implicit first-party catalog and finally the embedded fallback catalog before failing.
+
+If drun derives one exact version but the chosen target omits `install_versioned`, it falls back to `install`. If the requirement can only be satisfied by mutating to an exact version and the catalog has no version-aware installer path, provisioning fails before execution continues.
 
 #### Dynamic Detection
 
@@ -4875,6 +5106,8 @@ run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
 When you only need the resolved command string inline, use the builtin interpolation macro:
 
 ```
+run "{compose_cmd} up -d"
+run "{compose_cmd} logs --tail=100"
 run "{docker compose command} up -d"
 run "{docker compose command} logs --tail=100"
 ```

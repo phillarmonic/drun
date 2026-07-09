@@ -161,6 +161,51 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.addError(fmt.Sprintf("unexpected 'requires' in project body (did you mean 'requires tools:'?), got requires %s", p.peekToken.Type))
 					p.nextToken()
 				}
+			case lexer.IDENT:
+				if p.curToken.Literal == "provisioning" {
+					if len(p.pendingAnnotations) > 0 {
+						p.addError("annotation(s) in project body must be followed by a snippet declaration")
+						p.pendingAnnotations = nil
+					}
+					provisioningSources := p.parseProvisioningSourcesStatement()
+					if provisioningSources != nil {
+						stmt.Settings = append(stmt.Settings, provisioningSources)
+					} else {
+						p.nextToken()
+					}
+					if p.curToken.Type == lexer.DEDENT {
+						p.nextToken()
+					}
+				} else {
+					if len(p.pendingAnnotations) > 0 {
+						p.addError("annotation(s) in project body must be followed by a snippet declaration")
+						p.pendingAnnotations = nil
+					}
+					p.addError(fmt.Sprintf("unexpected token in project body: %s", p.curToken.Type))
+					p.nextToken()
+				}
+			case lexer.GIT:
+				if len(p.pendingAnnotations) > 0 {
+					p.addError("annotation(s) in project body must be followed by a snippet declaration")
+					p.pendingAnnotations = nil
+				}
+				// Check for "git policy:" block
+				if p.peekToken.Type == lexer.POLICY {
+					gitPolicy := p.parseGitPolicyStatement()
+					if gitPolicy != nil {
+						stmt.Settings = append(stmt.Settings, gitPolicy)
+					} else {
+						// If parsing failed, advance to avoid infinite loop
+						p.nextToken()
+					}
+					// Advance past DEDENT for project parser to continue
+					if p.curToken.Type == lexer.DEDENT {
+						p.nextToken()
+					}
+				} else {
+					p.addError(fmt.Sprintf("unexpected 'git' in project body (did you mean 'git policy:'?), got git %s", p.peekToken.Type))
+					p.nextToken()
+				}
 			case lexer.COMMENT, lexer.MULTILINE_COMMENT:
 				p.nextToken() // Skip comments
 			case lexer.NEWLINE:
@@ -833,6 +878,11 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 					git := p.parseGitStatement()
 					if git != nil {
 						hook.Body = append(hook.Body, git)
+					} else if p.peekToken.Type == lexer.VALIDATE {
+						gitValidate := p.parseGitValidateStatement()
+						if gitValidate != nil {
+							hook.Body = append(hook.Body, gitValidate)
+						}
 					}
 				}
 			} else if p.isHTTPToken(p.curToken.Type) {

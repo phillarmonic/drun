@@ -49,6 +49,18 @@ Or run this command to initialize a Drun spec file in the current directory (a f
 xdrun --init
 ```
 
+To initialize the project spec under `infra/.drun/spec.drun` instead:
+
+```bash
+xdrun --init --file infra/.drun/spec.drun
+```
+
+Or under `infra/drun/spec.drun`:
+
+```bash
+xdrun --init --file ops/drun/spec.drun
+```
+
 Initialize from a local template repository:
 
 ```bash
@@ -118,6 +130,38 @@ task "repl":
 ```
 
 Plain `run "command"` remains non-interactive and is still the default for ordinary automation steps.
+
+## Tool Provisioning
+
+When a `requires tools:` entry opts into `provision`, `drun` resolves installers from provisioning catalogs in this order:
+
+1. Project `provisioning sources:`
+2. User `provisioningSources` from `~/.drun/config.yml`
+3. The official first-party catalog at `github:phillarmonic/drun-provisionings/provisionings.yaml@master`
+4. The embedded fallback catalog shipped with `drun`
+
+The official catalog is implicit. You only need to declare `provisioning sources:` when you want to override or extend it.
+
+Use `--allow-tool-version-changes` when a provisionable requirement is already installed but needs an upgrade or downgrade to satisfy the declared version:
+
+```bash
+xdrun --allow-tool-version-changes lint
+```
+
+Project example:
+
+```drun
+project "api":
+  provisioning sources:
+    "./.drun/provisionings.yaml"
+
+  requires tools:
+    golangci-lint >= "1.64" provision
+    gosec >= "2.22" <= "2.22" provision
+    govulncheck provision
+```
+
+See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) for a fuller example covering project overrides, the implicit first-party catalog, the embedded fallback, and exact-version requests.
 
 ## Learn More
 

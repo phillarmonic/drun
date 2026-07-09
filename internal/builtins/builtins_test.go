@@ -191,7 +191,7 @@ func TestIsBuiltin(t *testing.T) {
 		"hostname", "pwd", "env", "file exists", "now.format",
 		"start progress", "update progress", "finish progress",
 		"start timer", "stop timer", "show elapsed time",
-		"docker compose command", "docker compose status", "current git branch",
+		"compose_cmd", "docker compose command", "docker compose status", "current git branch",
 	}
 
 	for _, builtin := range builtins {
@@ -565,6 +565,29 @@ func TestDockerComposeCommandInterpolation(t *testing.T) {
 
 	if result != "docker compose" && result != "docker-compose" {
 		t.Errorf("Expected detected compose command, got %q", result)
+	}
+}
+
+func TestComposeCmdAliasInterpolation(t *testing.T) {
+	if !IsBuiltin("compose_cmd") {
+		t.Fatal("compose_cmd should be registered as a builtin function")
+	}
+
+	aliasResult, aliasErr := CallBuiltin("compose_cmd", nil)
+	canonicalResult, canonicalErr := CallBuiltin("docker compose command", nil)
+
+	if aliasErr != nil || canonicalErr != nil {
+		if aliasErr == nil || canonicalErr == nil {
+			t.Fatalf("Expected alias and canonical builtins to agree on availability, got aliasErr=%v canonicalErr=%v", aliasErr, canonicalErr)
+		}
+		if aliasErr.Error() != canonicalErr.Error() {
+			t.Fatalf("Expected alias and canonical builtins to return the same error, got aliasErr=%v canonicalErr=%v", aliasErr, canonicalErr)
+		}
+		return
+	}
+
+	if aliasResult != canonicalResult {
+		t.Fatalf("Expected alias result %q to match canonical result %q", aliasResult, canonicalResult)
 	}
 }
 

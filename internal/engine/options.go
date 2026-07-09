@@ -7,6 +7,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/cache"
 	"github.com/phillarmonic/drun/v2/internal/domain/parameter"
 	"github.com/phillarmonic/drun/v2/internal/domain/task"
+	"github.com/phillarmonic/drun/v2/internal/provisioning"
 )
 
 // EngineOptions configures the engine with optional dependencies
@@ -36,6 +37,15 @@ type EngineOptions struct {
 
 	// Runtime task mode override for the invocation
 	TaskModeOverride string
+
+	// Allow runtime provisioning to change an installed tool's version.
+	AllowToolVersionChanges bool
+
+	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
+	UserProvisioningSources []string
+
+	// Embedded built-in provisioning catalogs shipped with drun.
+	EmbeddedProvisioningSources []provisioning.EmbeddedSource
 
 	// Secrets manager
 	SecretsManager SecretsManager
@@ -90,6 +100,28 @@ func WithVerbose(verbose bool) Option {
 func WithTaskModeOverride(mode string) Option {
 	return func(o *EngineOptions) {
 		o.TaskModeOverride = mode
+	}
+}
+
+// WithAllowToolVersionChanges allows runtime provisioning to upgrade or
+// downgrade installed tools when a versioned requirement opts into provisioning.
+func WithAllowToolVersionChanges(allow bool) Option {
+	return func(o *EngineOptions) {
+		o.AllowToolVersionChanges = allow
+	}
+}
+
+// WithUserProvisioningSources sets user-level fallback provisioning catalogs.
+func WithUserProvisioningSources(sources []string) Option {
+	return func(o *EngineOptions) {
+		o.UserProvisioningSources = append([]string(nil), sources...)
+	}
+}
+
+// WithEmbeddedProvisioningSources sets built-in provisioning catalogs.
+func WithEmbeddedProvisioningSources(sources []provisioning.EmbeddedSource) Option {
+	return func(o *EngineOptions) {
+		o.EmbeddedProvisioningSources = append([]provisioning.EmbeddedSource(nil), sources...)
 	}
 }
 

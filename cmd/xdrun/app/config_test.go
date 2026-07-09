@@ -213,18 +213,18 @@ templates:
 
 version: 2.0
 
-project "comb-os" version "1.0":
+project "example-app" version "1.0":
 task "default" means "Welcome":
 	info "{{project_name}} Drun Spec"
 
 task "build" means "Build {{binary_name}}":
 	step "Building {{binary_name}}..."
-	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/comb-os ./cmd/comb-os"
+	run "go build -ldflags=\"-X 'main.version=v0.0.1 (dev build)'\" -o ./bin/example-app ./cmd/example-app"
 	success "Build completed for {{binary_name}}"
 
 task "install" means "Install {{binary_name}}":
 	step "Installing {{binary_name}}..."
-	run "go install ./cmd/comb-os"
+	run "go install ./cmd/example-app"
 	success "Install completed for {{module_name}}"
 `
 
@@ -522,6 +522,128 @@ task "default" means "Welcome":
 	}
 }
 
+func TestFindConfigFileFindsInfraDefaultLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "infra-project")
+	if err := os.MkdirAll(filepath.Join(projectDir, "infra", ".drun"), 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	specPath := filepath.Join(projectDir, "infra", ".drun", "spec.drun")
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		got, err := FindConfigFile("")
+		if err != nil {
+			t.Fatalf("FindConfigFile() error = %v", err)
+		}
+		if got != "infra/.drun/spec.drun" {
+			t.Fatalf("FindConfigFile() = %q, want %q", got, "infra/.drun/spec.drun")
+		}
+	})
+}
+
+func TestFindConfigFileFindsInfraDrunDefaultLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "infra-drun-project")
+	if err := os.MkdirAll(filepath.Join(projectDir, "infra", "drun"), 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	specPath := filepath.Join(projectDir, "infra", "drun", "spec.drun")
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		got, err := FindConfigFile("")
+		if err != nil {
+			t.Fatalf("FindConfigFile() error = %v", err)
+		}
+		if got != "infra/drun/spec.drun" {
+			t.Fatalf("FindConfigFile() = %q, want %q", got, "infra/drun/spec.drun")
+		}
+	})
+}
+
+func TestInitializeMinimalConfigDoesNotCreateWorkspaceDefaultForBuiltInInfraLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "infra-default-init")
+	if err := os.MkdirAll(projectDir, 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		if err := InitializeConfig("infra/drun/spec.drun", false, true, "", "", ""); err != nil {
+			t.Fatalf("InitializeConfig() error = %v", err)
+		}
+
+		if _, err := os.Stat(filepath.Join(projectDir, ".drun", ".drun_workspace.yml")); !os.IsNotExist(err) {
+			t.Fatalf("workspace default file should not be created for built-in default path, got err=%v", err)
+		}
+	})
+}
+
+func TestInitializeConfigCreatesWorkspaceDefaultForCustomLocation(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "custom-default-init")
+	if err := os.MkdirAll(projectDir, 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	withWorkingDir(t, projectDir, func() {
+		if err := InitializeConfig("automation/project.drun", false, false, "", "", ""); err != nil {
+			t.Fatalf("InitializeConfig() error = %v", err)
+		}
+
+		workspaceConfigPath := filepath.Join(projectDir, ".drun", ".drun_workspace.yml")
+		content, err := os.ReadFile(workspaceConfigPath)
+		if err != nil {
+			t.Fatalf("ReadFile(workspace config) error = %v", err)
+		}
+		if !strings.Contains(string(content), "defaultTaskFile: automation/project.drun") {
+			t.Fatalf("workspace config did not persist custom default:\n%s", string(content))
+		}
+	})
+}
+
+func TestFindConfigFileUsesHomeExtraSearchPaths(t *testing.T) {
+	tempRoot := t.TempDir()
+	projectDir := filepath.Join(tempRoot, "custom-search-project")
+	if err := os.MkdirAll(filepath.Join(projectDir, "automation"), 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	specPath := filepath.Join(projectDir, "automation", "project.drun")
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	homeDir := filepath.Join(tempRoot, "home")
+	if err := os.MkdirAll(filepath.Join(homeDir, ".drun"), 0750); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	userConfig := "extraTaskFileSearchPaths:\n  - automation/project.drun\n"
+	if err := os.WriteFile(filepath.Join(homeDir, ".drun", "config.yml"), []byte(userConfig), 0600); err != nil {
+		t.Fatalf("WriteFile(config.yml) error = %v", err)
+	}
+
+	withEnv(t, "HOME", homeDir, func() {
+		withWorkingDir(t, projectDir, func() {
+			got, err := FindConfigFile("")
+			if err != nil {
+				t.Fatalf("FindConfigFile() error = %v", err)
+			}
+			if got != "automation/project.drun" {
+				t.Fatalf("FindConfigFile() = %q, want %q", got, "automation/project.drun")
+			}
+		})
+	})
+}
+
 func assertGeneratedConfigParses(t *testing.T, config string) {
 	t.Helper()
 
@@ -559,4 +681,48 @@ func captureStdout(t *testing.T, fn func()) string {
 	_ = writer.Close()
 	os.Stdout = originalStdout
 	return <-done
+}
+
+func withWorkingDir(t *testing.T, dir string, fn func()) {
+	t.Helper()
+
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+
+	t.Cleanup(func() {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			t.Fatalf("Chdir() restore error = %v", chdirErr)
+		}
+	})
+
+	fn()
+}
+
+func withEnv(t *testing.T, key, value string, fn func()) {
+	t.Helper()
+
+	originalValue, hadValue := os.LookupEnv(key)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("Setenv(%q) error = %v", key, err)
+	}
+
+	t.Cleanup(func() {
+		var err error
+		if hadValue {
+			err = os.Setenv(key, originalValue)
+		} else {
+			err = os.Unsetenv(key)
+		}
+		if err != nil {
+			t.Fatalf("restore env %q error = %v", key, err)
+		}
+	})
+
+	fn()
 }
