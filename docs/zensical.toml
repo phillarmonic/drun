@@ -1,11 +1,11 @@
 [project]
 site_name = "drun"
 site_description = "Documentation for the drun automation language and xdrun CLI."
-site_author = "The drun authors"
+site_author = "Phillarmonic Software"
 site_url = "https://phillarmonic.github.io/drun/"
 repo_url = "https://github.com/phillarmonic/drun"
 repo_name = "phillarmonic/drun"
-copyright = "Copyright &copy; 2026 The drun authors"
+copyright = "Copyright &copy; 2026 Phillarmonic Software"
 extra_css = ["stylesheets/shiki.css"]
 extra_javascript = ["javascripts/shiki.mjs"]
 
