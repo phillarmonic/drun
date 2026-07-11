@@ -27,10 +27,11 @@ nav = [
       { "Detection, execution, and errors" = "reference/runtime/detection-execution-and-errors.md" },
     ] },
     { "Examples" = "reference/examples.md" },
-    { "Implementation and pattern macros" = "reference/implementation-and-pattern-macros.md" },
+    { "Pattern macros" = "reference/language/pattern-macros.md" },
     { "Orchestration specification" = "reference/orchestration.md" },
   ] },
   { "Guides" = [
+    { "GitHub Actions" = "guides/github-actions.md" },
     { "Microservices orchestration" = "guides/orchestration.md" },
     { "Stateless mode and partial names" = "guides/stateless-and-partial-names.md" },
   ] },
@@ -42,6 +43,7 @@ nav = [
     { "Developer guide" = "development/index.md" },
     { "Architecture" = "development/architecture.md" },
     { "Contributing" = "development/contributing.md" },
+    { "Implementation notes" = "development/implementation.md" },
     { "Orchestration implementation" = "development/orchestration-implementation.md" },
     { "Packages" = [
       { "Package map" = "development/packages/index.md" },
