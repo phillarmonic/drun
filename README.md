@@ -165,7 +165,8 @@ See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) f
 
 ## Learn More
 
-- Usage and troubleshooting: [usage and troubleshooting](./docs/docs/getting-started/usage-and-troubleshooting.md)
+- Getting started: [installation, initialization, running tasks, and templates](./docs/docs/getting-started/index.md)
+- Troubleshooting: [common installation and usage problems](./docs/docs/getting-started/troubleshooting.md)
 - Language reference: [language specification](./docs/docs/reference/language/overview.md)
 - Examples: [examples](./docs/docs/examples/index.md)
 - Orchestration: [orchestration guide](./docs/docs/guides/orchestration.md)

@@ -4,7 +4,7 @@ drun is a readable automation language executed by the `xdrun` CLI. This site is
 
 ## Choose your path
 
-- **New to drun?** Start with [usage and troubleshooting](getting-started/usage-and-troubleshooting.md), then browse the [examples](examples/index.md).
+- **New to drun?** Follow the [getting started guide](getting-started/index.md), then browse the [examples](examples/index.md).
 - **Writing Drunfiles?** Use the [language specification](reference/language/overview.md) and [built-in actions](reference/language/built-in-actions.md).
 - **Orchestrating services?** Follow the [orchestration guide](guides/orchestration.md), with the normative details in the [orchestration specification](reference/orchestration.md).
 - **Contributing?** Read the [developer guide](development/index.md), [architecture guide](development/architecture.md), and [contribution workflow](development/contributing.md).

@@ -12,7 +12,13 @@ extra_javascript = ["javascripts/shiki.mjs"]
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = [
-    { "Usage and troubleshooting" = "getting-started/usage-and-troubleshooting.md" },
+    { "Overview" = "getting-started/index.md" },
+    { "Install" = "getting-started/install.md" },
+    { "Shell autocomplete" = "getting-started/autocomplete.md" },
+    { "Initialize a spec" = "getting-started/initialize.md" },
+    { "Run tasks" = "getting-started/run.md" },
+    { "Project templates" = "getting-started/templates.md" },
+    { "Troubleshooting" = "getting-started/troubleshooting.md" },
   ] },
   { "Language specification" = [
     { "Overview and philosophy" = "reference/language/overview.md" },
