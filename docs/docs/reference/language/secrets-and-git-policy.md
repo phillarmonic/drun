@@ -325,16 +325,17 @@ project "myapp":
 ```
 
 **Settings:**
+
 - `branch`: Block for branch-specific rules.
-  - `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
-  - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
-  - `types`: Allowed values for the `{type}` placeholder.
+    - `default branches`: Branches that are exempt from the naming rules (e.g., `main`, `develop`).
+    - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
+    - `types`: Allowed values for the `{type}` placeholder.
 - `commit`: Block for commit-specific rules.
-  - `messages`: The required pattern for commit messages. Use `"conventional commits"` to enforce the Conventional Commits header format (`type(scope): description` with optional `!`).
-  - `ban`: A list of exact commit messages that are rejected (like `WIP`).
-  - `min length`: The minimum number of characters for a commit message.
-  - `extract identifier from branch`: Automatically pulls the `{identifier}` from the current branch name and enforces its presence in the commit message. When used with `"conventional commits"`, the identifier can appear anywhere in the commit message.
-  - `enforce signed commits`: Validates that commits are signed (GPG/SSH).
+    - `messages`: The required pattern for commit messages. Use `"conventional commits"` to enforce the Conventional Commits header format (`type(scope): description` with optional `!`).
+    - `ban`: A list of exact commit messages that are rejected (like `WIP`).
+    - `min length`: The minimum number of characters for a commit message.
+    - `extract identifier from branch`: Automatically pulls the `{identifier}` from the current branch name and enforces its presence in the commit message. When used with `"conventional commits"`, the identifier can appear anywhere in the commit message.
+    - `enforce signed commits`: Validates that commits are signed (GPG/SSH).
 
 Example conventional commit messages that pass:
 
@@ -376,4 +377,3 @@ xdrun cmd:hook uninstall
 When installed, drun automatically checks commit messages against your policy and blocks pushes if commits are unsigned (when `enforce signed commits` is enabled).
 
 ---
-

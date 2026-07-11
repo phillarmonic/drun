@@ -53,3 +53,9 @@
 .shiki code {
   background: transparent;
 }
+
+/* Plain-text examples have no syntax semantics, so keep every line legible. */
+.shiki.language-text code,
+.shiki.language-text .line span {
+  color: #fff !important;
+}
