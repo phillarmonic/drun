@@ -8,7 +8,7 @@ drun v2 supports both single-line and multiline shell command execution with con
 
 #### Single-Line Commands (Current)
 
-```
+```drun
 # Execute and stream output
 run "echo 'Hello World'"
 run "command" attached
@@ -56,7 +56,7 @@ xdrun build --task-mode=ci
 
 For complex shell operations, use the block syntax with natural indentation:
 
-```
+```drun
 # Multiline execution with streaming
 run:
   echo "Starting deployment process..."
@@ -85,10 +85,10 @@ shell:
 exec:
   # Database backup
   pg_dump myapp_production > backup_$(date +%Y%m%d).sql
-  
+
   # Compress backup
   gzip backup_$(date +%Y%m%d).sql
-  
+
   # Upload to storage
   aws s3 cp backup_$(date +%Y%m%d).sql.gz s3://backups/
 ```
@@ -96,12 +96,12 @@ exec:
 #### Execution Behavior
 
 **Single-line commands**: Execute as individual shell commands
-```
+```drun
 run "echo hello"  # Executes: /bin/sh -c "echo hello"
 ```
 
 **Attached single-line `run` commands**: Stay connected to the current terminal for interactive programs
-```
+```drun
 run "command" attached
 run in service $servicename "npm run dev" attached
 ```
@@ -109,7 +109,7 @@ run in service $servicename "npm run dev" attached
 Use `attached` only with single-line `run` statements when the command needs stdin or terminal behavior. Plain `run` remains non-interactive by default.
 
 **Multiline commands**: Execute as a single shell session
-```
+```drun
 run:
   export VAR=value
   echo $VAR        # VAR is available from previous line
@@ -171,10 +171,10 @@ task "deploy":
 
 - **Task-scoped**: The working directory change applies only within the current task. It does not affect called tasks (`call task`), dependent tasks (`depends on`), or any other task.
 - **Relative paths from original cwd**: Relative paths are always resolved from the process's original working directory (the cwd when xdrun was invoked), not chained from a previous `use workdir`. This means:
-  ```drun
+  ```text
   use workdir "a"  # resolves to <original_cwd>/a
   use workdir "b"  # resolves to <original_cwd>/b  (NOT <original_cwd>/a/b)
-  ```
+  ```text
 - **Absolute paths**: Absolute paths are used as-is.
 - **Variable interpolation**: Full interpolation support — use `{$var}`, `{env('VAR')}`, etc.
 - **Validation**: The resolved path must exist and be a directory. Non-existent paths fail immediately with a descriptive error.
@@ -184,7 +184,7 @@ task "deploy":
 
 Variables work seamlessly in multiline blocks:
 
-```
+```drun
 let $environment = "production"
 let $version = "v1.2.3"
 
@@ -200,7 +200,7 @@ run:
 
 Multiline commands support the same error handling as single-line commands:
 
-```
+```drun
 try:
   run:
     echo "Starting risky operation..."
@@ -208,7 +208,7 @@ try:
     echo "Operation completed"
 catch command_error:
   error "Multiline command failed: {command_error}"
-  
+
   # Cleanup on failure
   shell:
     echo "Cleaning up..."
@@ -224,20 +224,20 @@ catch command_error:
 
 #### Examples
 
-```
+```drun
 task "deploy application":
   info "Starting deployment process"
-  
+
   # Single-line for simple operations
   run "echo 'Deployment started at $(date)'"
-  
+
   # Multiline for complex build process
   run:
     echo "Building application..."
     npm ci
     npm run build
     npm run test
-  
+
   # Capture complex information
   capture from shell as $deployment_info:
     echo "=== Deployment Information ==="
@@ -246,16 +246,16 @@ task "deploy application":
     echo "Commit: $(git rev-parse HEAD)"
     echo "Built by: $(whoami) on $(hostname)"
     echo "Build time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  
+
   info "Build information: {$deployment_info}"
-  
+
   # Multiline deployment commands
   shell:
     echo "Deploying to Kubernetes..."
     kubectl apply -f k8s/
     kubectl set image deployment/myapp app=myapp:latest
     kubectl rollout status deployment/myapp --timeout=300s
-  
+
   success "Deployment completed successfully"
 ```
 
@@ -263,7 +263,7 @@ task "deploy application":
 
 #### Image Operations
 
-```
+```drun
 # Build image
 build docker image                           # Infers name from project
 build docker image "myapp:latest"          # Explicit name
@@ -279,7 +279,7 @@ pull image "nginx:alpine"
 
 #### Container Operations
 
-```
+```drun
 # Run container
 run container "myapp:latest"
 run container "myapp:latest" on port 8080
@@ -297,7 +297,7 @@ get logs from container "myapp"
 
 #### Docker Compose
 
-```
+```drun
 # Service management
 start docker compose services
 stop docker compose services
@@ -321,7 +321,7 @@ task "open-shell" given $servicename defaults to "some-service":
 
 #### Deployment Operations
 
-```
+```drun
 # Deploy application
 deploy "myapp:latest" to kubernetes
 deploy "myapp:latest" to kubernetes namespace "production"
@@ -339,7 +339,7 @@ check status of deployment "myapp"
 
 #### Service Operations
 
-```
+```drun
 # Service management
 expose deployment "myapp" on port 8080
 create service "myapp-service" for deployment "myapp"
@@ -350,7 +350,7 @@ create ingress for service "myapp-service" with host "app.example.com"
 
 #### Resource Management
 
-```
+```drun
 # Apply manifests
 apply kubernetes manifests from "k8s/"
 apply kubernetes manifest "deployment.yaml"
@@ -365,7 +365,7 @@ get logs from pod "myapp-pod-123"
 
 #### Repository Operations
 
-```
+```drun
 # Commit operations
 commit changes
 commit changes with message "Add new feature"
@@ -386,7 +386,7 @@ fetch from remote
 
 #### Tag Operations
 
-```
+```drun
 # Tag management
 create tag "v1.2.3"
 create tag "v1.2.3" with message "Release version 1.2.3"
@@ -398,7 +398,7 @@ delete tag "v1.2.3"
 
 #### File Operations
 
-```
+```drun
 # File management
 copy "source.txt" to "destination.txt"
 move "old-name.txt" to "new-name.txt"
@@ -419,7 +419,7 @@ The `replace` action accepts an indented list of `"old" with "new"` clauses, per
 
 #### File Inspection
 
-```
+```drun
 # File checking
 check if file "config.json" exists
 check if directory ".git" exists
@@ -427,11 +427,11 @@ get size of file "large-file.dat"
 get modification time of file "config.json"
 ```
 
-#### Directory Empty Checks ⭐ *New*
+#### Directory Empty Checks  *New*
 
 Check if directories are empty or contain files using semantic conditions:
 
-```
+```drun
 # Basic directory empty checks
 if folder "build" is empty:
   info "Build directory is clean"
@@ -473,7 +473,7 @@ if directory "tests/coverage" is empty:
 
 #### HTTP Operations
 
-```
+```drun
 # HTTP requests
 get "https://api.example.com/status"
 post "https://api.example.com/deploy" content type json with body "version=1.2.3"
@@ -507,12 +507,12 @@ The `download` statement provides a native Go HTTP client with advanced features
 - Automatic redirect following
 
 **Basic Syntax:**
-```
+```drun
 download "<url>" to "<path>"
 ```
 
 **Advanced Options:**
-```
+```drun
 # Simple download with progress tracking
 download "https://example.com/file.zip" to "downloads/file.zip"
 
@@ -534,33 +534,33 @@ download "https://api.example.com/data" to "data.json" with header "Accept: appl
 
 The download statement supports granular Unix file permissions using a matrix notation:
 
-```
+```drun
 # Make downloaded binary executable by user
-download "https://github.com/cli/cli/releases/download/v2.40.0/gh_linux_amd64" to "gh" 
-  allow overwrite 
+download "https://github.com/cli/cli/releases/download/v2.40.0/gh_linux_amd64" to "gh"
+  allow overwrite
   allow permissions ["execute"] to ["user"]
 
 # Read/write for user, read-only for group/others
-download "https://example.com/config.json" to "config.json" 
-  allow overwrite 
-  allow permissions ["read","write"] to ["user"] 
+download "https://example.com/config.json" to "config.json"
+  allow overwrite
+  allow permissions ["read","write"] to ["user"]
   allow permissions ["read"] to ["group","others"]
 
 # Multiple permission specifications
-download "https://example.com/script.sh" to "script.sh" 
-  allow overwrite 
+download "https://example.com/script.sh" to "script.sh"
+  allow overwrite
   allow permissions ["read"] to ["user","group","others"]
   allow permissions ["write","execute"] to ["user"]
 
 # Download and set complete permissions
-download "https://example.com/tool" to "bin/tool" 
+download "https://example.com/tool" to "bin/tool"
   allow permissions ["execute","read"] to ["user"]
   allow permissions ["read"] to ["group","others"]
 ```
 
 **Permission Types:**
 - `read` - Read permission
-- `write` - Write permission  
+- `write` - Write permission
 - `execute` - Execute permission
 
 **Permission Targets:**
@@ -569,20 +569,20 @@ download "https://example.com/tool" to "bin/tool"
 - `others` - All other users
 
 **Complete Example:**
-```
+```drun
 task "download_and_install_binary":
   info "Downloading binary with full configuration"
-  
+
   # Download with progress bar, auth, timeout, and permissions
-  download "https://github.com/user/tool/releases/download/v1.0/tool-linux-amd64" 
-    to "bin/tool" 
-    allow overwrite 
-    timeout "120s" 
+  download "https://github.com/user/tool/releases/download/v1.0/tool-linux-amd64"
+    to "bin/tool"
+    allow overwrite
+    timeout "120s"
     retry "5"
     with auth bearer "github-token"
     allow permissions ["execute","read"] to ["user"]
     allow permissions ["read"] to ["group","others"]
-  
+
   success "Binary installed and configured!"
 ```
 
@@ -596,18 +596,18 @@ The download statement shows real-time progress with:
 - Estimated time remaining (ETA)
 
 Example output:
-```
-⬇️  Downloading: https://example.com/large-file.zip
+```drun
+  Downloading: https://example.com/large-file.zip
    → downloads/large-file.zip
-   📥 [████████████████░░░░░░░░░░░░░░] 55.2% | 2.3 GB/4.2 GB | 15.3 MB/s | ETA: 2m15s
-   📊 4.2 GB in 4m32s (15.45 MB/s)
-✅ Downloaded successfully to: downloads/large-file.zip
-   🔒 Set permissions: -rwxr--r--
+    [████████████████░░░░░░░░░░░░░░] 55.2% | 2.3 GB/4.2 GB | 15.3 MB/s | ETA: 2m15s
+    4.2 GB in 4m32s (15.45 MB/s)
+ Downloaded successfully to: downloads/large-file.zip
+    Set permissions: -rwxr--r--
 ```
 
 **Error Handling:**
 
-```
+```drun
 # Prevent accidental overwrites
 try:
   download "https://example.com/file.zip" to "existing-file.zip"
@@ -626,7 +626,7 @@ The download statement supports automatic extraction of archives using the pure-
 - **Archives:** ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, 7Z, RAR
 - **Compression:** GZ, BZ2, XZ, ZSTD, BROTLI, LZ4, SNAPPY, LZW
 
-```
+```drun
 # Download and extract archive
 download "https://example.com/release.zip" to "release.zip" extract to "release/"
 
@@ -644,12 +644,12 @@ download "https://github.com/user/tool/releases/download/v1.0/tool.zip"
 
 **Extraction Examples:**
 
-```
+```drun
 # Extract ZIP archive
 task "install_from_zip":
-  download "https://releases.example.com/app-v1.0.0.zip" 
+  download "https://releases.example.com/app-v1.0.0.zip"
     to "app-v1.0.0.zip"
-    extract to "app/" 
+    extract to "app/"
     remove archive
 
 # Extract tarball with compression
@@ -683,7 +683,7 @@ task "parallel_installs":
 
 **Real-World Examples:**
 
-```
+```drun
 # Download GitHub release binary
 task "install_gh_cli":
   download "https://github.com/cli/cli/releases/download/v2.40.0/gh_2.40.0_linux_amd64.tar.gz"
@@ -704,7 +704,7 @@ task "download_data":
 # Download with environment-specific permissions
 task "download_config":
   requires $env from ["dev","prod"]
-  
+
   when $env == "prod":
     download "https://config.example.com/prod.json" to "config.json"
       allow overwrite
@@ -717,7 +717,7 @@ task "download_config":
 
 #### Network Health Checks and Service Waiting
 
-```
+```drun
 # Service waiting with timeout and retry
 wait for service at "https://app.example.com/health" to be ready
 wait for service at "https://app.example.com" to be ready timeout "60s"
@@ -730,7 +730,7 @@ wait for service at "https://api.example.com" to be ready timeout "30s" retry "5
 
 #### Network Testing
 
-```
+```drun
 # Port connectivity testing
 test connection to "database.example.com" on port 5432
 test connection to "localhost" on port 8080 timeout "10s"
@@ -742,7 +742,7 @@ ping host "8.8.8.8" timeout "3s"
 
 #### Advanced Network Operations
 
-```
+```drun
 # Service waiting with detailed configuration
 wait for service at "https://microservice.local/health" to be ready timeout "120s" retry "10s"
 
@@ -755,19 +755,19 @@ ping host "gateway.local" timeout "2s"
 # Combined network validation
 task "validate_infrastructure":
   info "Validating network infrastructure"
-  
+
   # Check external connectivity
   ping host "8.8.8.8" timeout "3s"
   ping host "1.1.1.1" timeout "3s"
-  
+
   # Validate service dependencies
   test connection to "database.local" on port 5432 timeout "10s"
   test connection to "redis.local" on port 6379 timeout "5s"
-  
+
   # Wait for application services
   wait for service at "https://api.local/health" to be ready timeout "60s"
   wait for service at "https://web.local/health" to be ready timeout "30s"
-  
+
   success "Infrastructure validation completed!"
 ```
 
@@ -775,7 +775,7 @@ task "validate_infrastructure":
 
 #### Status Messages
 
-```
+```drun
 step "Starting deployment process"
 info "Configuration loaded successfully"
 warn "Using default configuration"
@@ -786,34 +786,34 @@ success "Deployment completed successfully"
 **Output Formatting:**
 
 - `step` - Displays message in a box (no line breaks by default):
-  ```
+  ```drun
   ┌────────────────────────────────┐
   │ Starting deployment process    │
   └────────────────────────────────┘
   ```
   Multiline strings are supported and each line is rendered inside the same box:
-  ```
+  ```drun
   step "Executing semantic fuzz tests against example-based inputs
   Iterations: 50"
   ```
   Produces:
-  ```
+  ```text
   ┌─────────────────────────────────────────────────────────────┐
   │ Executing semantic fuzz tests against example-based inputs │
   │ Iterations: 50                                             │
   └─────────────────────────────────────────────────────────────┘
   ```
-- `info` - Displays with ℹ️ emoji prefix: `ℹ️  Configuration loaded successfully`
-- `warn` - Displays with ⚠️ emoji prefix: `⚠️  Using default configuration`
-- `error` - Displays with ❌ emoji prefix: `❌ Failed to connect to database`
-- `success` - Displays with ✅ emoji prefix: `✅ Deployment completed successfully`
-- `fail` - Displays with 💥 emoji prefix and exits with error
+- `info` - Displays an informational message.
+- `warn` - Displays a warning message.
+- `error` - Displays an error message.
+- `success` - Displays a success message.
+- `fail` - Displays a failure message and exits with an error.
 
 **Optional Line Breaks for `step`:**
 
 By default, step boxes have no extra spacing. Add line breaks when you need visual separation:
 
-```
+```drun
 # Default: no line breaks (compact)
 step "Build phase"
 
@@ -832,38 +832,38 @@ step "Build phase" add line break before add line break after
 ```drun
 task "compact":
   info "Starting deployment"
-  
+
   # Compact steps - default behavior
   step "Phase 1: Build"
   info "Building application..."
-  
+
   step "Phase 2: Test"
   info "Running tests..."
-  
+
   step "Phase 3: Deploy"
   info "Deploying to production..."
-  
+
   success "Deployment complete!"
 
 task "spaced":
   info "Starting deployment"
-  
+
   # Well-spaced sections with line breaks
   step "Phase 1: Build" add line break before add line break after
   info "Building application..."
-  
+
   step "Phase 2: Test" add line break before add line break after
   info "Running tests..."
-  
+
   step "Phase 3: Deploy" add line break before add line break after
   info "Deploying to production..."
-  
+
   success "Deployment complete!"
 ```
 
 #### Process Control
 
-```
+```drun
 fail                                    # Exit with error code 1
 fail with "Custom error message"        # Exit with custom message
 exit with code 0                        # Exit with specific code
@@ -875,7 +875,7 @@ drun v2 provides built-in progress indicators and timer functions for tracking l
 
 ##### Progress Indicators
 
-```
+```drun
 # Start a progress indicator
 info "{start progress('Initializing system')}"
 
@@ -890,7 +890,7 @@ info "{finish progress('System ready!')}"
 
 ##### Timer Functions
 
-```
+```drun
 # Start a named timer
 info "{start timer('deployment_timer')}"
 
@@ -903,27 +903,27 @@ info "{stop timer('deployment_timer')}"
 
 ##### Advanced Progress and Timer Usage
 
-```
+```drun
 task "deployment with progress":
   # Start both progress and timer
   info "{start progress('Starting deployment')}"
   info "{start timer('deploy')}"
-  
+
   # Simulate deployment steps with progress updates
   info "{update progress('20', 'Building application')}"
   shell "sleep 1"  # Simulate build time
-  
+
   info "{update progress('40', 'Pushing to registry')}"
   shell "sleep 1"  # Simulate push time
-  
+
   info "{update progress('60', 'Deploying to cluster')}"
   shell "sleep 1"  # Simulate deploy time
-  
+
   info "{update progress('80', 'Running health checks')}"
   shell "sleep 1"  # Simulate health check time
-  
+
   info "{update progress('100', 'Deployment verification')}"
-  
+
   # Show final timing and complete progress
   info "{show elapsed time('deploy')}"
   info "{finish progress('Deployment completed successfully!')}"
@@ -932,24 +932,24 @@ task "deployment with progress":
 
 ##### Multiple Named Progress Indicators and Timers
 
-```
+```drun
 task "parallel operations":
   # Multiple progress indicators
   info "{start progress('Database migration', 'db_progress')}"
   info "{start progress('Asset compilation', 'asset_progress')}"
-  
+
   # Multiple timers
   info "{start timer('db_timer')}"
   info "{start timer('asset_timer')}"
-  
+
   # Update different progress indicators
   info "{update progress('30', 'Migrating users table', 'db_progress')}"
   info "{update progress('50', 'Compiling CSS', 'asset_progress')}"
-  
+
   # Complete operations
   info "{finish progress('Database migration complete', 'db_progress')}"
   info "{stop timer('db_timer')}"
-  
+
   info "{finish progress('Asset compilation complete', 'asset_progress')}"
   info "{stop timer('asset_timer')}"
 ```
@@ -957,7 +957,7 @@ task "parallel operations":
 **Built-in Function Reference:**
 
 - `{start progress('message')}` - Start default progress indicator
-- `{start progress('message', 'name')}` - Start named progress indicator  
+- `{start progress('message', 'name')}` - Start named progress indicator
 - `{update progress('percentage', 'message')}` - Update default progress (0-100)
 - `{update progress('percentage', 'message', 'name')}` - Update named progress
 - `{finish progress('message')}` - Complete default progress indicator
@@ -1003,7 +1003,7 @@ set $api_key to {env('API_KEY')}
 set $timestamp to {now.format('2006-01-02 15:04:05')}
 ```
 
-#### Built-in Function Pipe Operations ⭐ *New*
+#### Built-in Function Pipe Operations  *New*
 
 Built-in functions support pipe operations for data transformation, allowing you to chain operations together:
 
@@ -1019,7 +1019,7 @@ set $clean_branch to {current git branch | replace "/" by "-" | lowercase}
 task "build":
   given $image_tag defaults to "{current git branch | replace '/' by '-' | lowercase}"
   given $commit_short defaults to "{current git commit}"
-  
+
   info "Building image: myapp:{$image_tag}"
   info "From commit: {$commit_short}"
 ```
@@ -1042,15 +1042,15 @@ task "git branch operations":
   # Basic git branch usage
   set $current_branch to {current git branch}
   info "Current branch: {$current_branch}"
-  
+
   # Transform branch name for Docker tags (no slashes allowed)
   set $docker_tag to {current git branch | replace "/" by "-"}
   info "Docker tag: myapp:{$docker_tag}"
-  
+
   # Create deployment-safe branch names
   set $deploy_name to {current git branch | replace "/" by "-" | lowercase}
   info "Deployment name: {$deploy_name}"
-  
+
   # Use in complex expressions
   set $image_name to "registry.example.com/myapp:{current git branch | replace '/' by '-'}"
   info "Full image name: {$image_name}"
@@ -1060,7 +1060,7 @@ task "parameter defaults with pipes":
   given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
   given $build_tag defaults to "{current git commit}"
   given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
-  
+
   info "Deployment config:"
   info "  Branch: {$deployment_branch}"
   info "  Tag: {$build_tag}"
@@ -1086,4 +1086,3 @@ task "parameter defaults with pipes":
 - **Expression Context**: Work in any expression context (info messages, conditions, etc.)
 
 ---
-

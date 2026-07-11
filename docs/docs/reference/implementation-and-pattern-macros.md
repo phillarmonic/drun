@@ -4,49 +4,19 @@
 
 ### Architecture Overview
 
-drun v2 uses a **completely new execution engine** separate from v1:
+drun parses its semantic language directly into an abstract syntax tree and executes it through the engine. The active implementation is organized under `internal/lexer`, `internal/parser`, `internal/ast`, and `internal/engine`.
 
-```
-drun/
-├── internal/
-│   ├── v1/           # Legacy v1 components (YAML-based)
-│   │   ├── model/    # v1 data structures
-│   │   ├── spec/     # v1 YAML loader
-│   │   ├── runner/   # v1 task execution
-│   │   ├── cache/    # v1 caching system
-│   │   ├── dag/      # v1 dependency graph
-│   │   ├── http/     # v1 HTTP integration
-│   │   ├── pool/     # v1 worker pools
-│   │   ├── shell/    # v1 shell execution
-│   │   └── tmpl/     # v1 template engine
-│   └── v2/           # New v2 components (semantic language)
-│       ├── lexer/    # Lexical analysis domain
-│       │   ├── token.go    # Token definitions
-│       │   ├── lexer.go    # Tokenizer implementation
-│       │   └── lexer_test.go
-│       ├── parser/   # Syntax parsing domain
-│       │   ├── parser.go   # Parser implementation
-│       │   └── parser_test.go
-│       ├── ast/      # Abstract Syntax Tree domain
-│       │   └── ast.go      # AST node definitions
-│       └── engine/   # Execution engine domain
-│           ├── engine.go   # Direct execution engine
-│           └── engine_test.go
-└── cmd/xdrun/
-    └── main.go       # CLI integration for both v1 and v2
-```
+### Engine Components
 
-### v2 Engine Components
-
-1. **Lexer** (`internal/v2/lexer/`): Tokenizes semantic language into tokens
-2. **Parser** (`internal/v2/parser/`): Builds Abstract Syntax Tree from tokens
-3. **AST** (`internal/v2/ast/`): Defines semantic language node structures
-4. **Engine** (`internal/v2/engine/`): Directly executes AST nodes
-5. **Runtime**: Built-in actions, smart detection, shell integration
+1. **Lexer** (`internal/lexer/`): Tokenizes the semantic language.
+2. **Parser** (`internal/parser/`): Builds the abstract syntax tree.
+3. **AST** (`internal/ast/`): Defines language node structures.
+4. **Engine** (`internal/engine/`): Plans and executes parsed tasks directly.
+5. **Runtime services**: Provide built-in actions, detection, interpolation, and shell integration.
 
 ### Domain Separation
 
-Each v2 component is organized into its own domain package:
+Each component is organized into its own domain package:
 
 - **`lexer/`**: Handles tokenization of source code
 - **`parser/`**: Converts tokens into structured AST
@@ -65,7 +35,7 @@ const (
     STRING TokenType = iota
     NUMBER
     BOOLEAN
-    
+
     // Keywords
     TASK
     PROJECT
@@ -75,12 +45,12 @@ const (
     IF
     WHEN
     FOR
-    
+
     // Operators
     ASSIGN      // "be", "to"
     EQUALS      // "is", "=="
     NOT_EQUALS  // "is not", "!="
-    
+
     // Punctuation
     COLON
     COMMA
@@ -128,23 +98,6 @@ type Statement interface {
 }
 ```
 
-### Code Generation
-
-#### Template System
-
-```go
-type CodeGenerator struct {
-    templates map[string]*template.Template
-}
-
-func (g *CodeGenerator) GenerateYAML(task *TaskDefinition) (string, error) {
-    tmpl := g.templates["task"]
-    var buf bytes.Buffer
-    err := tmpl.Execute(&buf, task)
-    return buf.String(), err
-}
-```
-
 #### Smart Detection Engine
 
 ```go
@@ -178,19 +131,17 @@ func (d *DockerDetector) Detect(projectPath string) (DetectionResult, error) {
 
 ```go
 type ExecutionEngine struct {
-    compiler *Compiler
-    runner   *drun.Runner  // Existing drun v1 runner
+    parser *parser.Parser
+    engine *engine.Engine
 }
 
 func (e *ExecutionEngine) Execute(source string, args []string) error {
-    // Compile semantic v2 to v1 YAML
-    yamlConfig, err := e.compiler.Compile(source)
+    project, err := e.parser.Parse(source)
     if err != nil {
         return err
     }
-    
-    // Use existing drun v1 execution engine
-    return e.runner.Execute(yamlConfig, args)
+
+    return e.engine.Execute(project, args)
 }
 ```
 
@@ -204,7 +155,7 @@ type CompileError struct {
 }
 
 func (e *CompileError) Error() string {
-    return fmt.Sprintf("%s at line %d, column %d", 
+    return fmt.Sprintf("%s at line %d, column %d",
         e.Message, e.Position.Line, e.Position.Column)
 }
 ```
@@ -222,7 +173,7 @@ type LanguageServer struct {
 func (ls *LanguageServer) HandleCompletion(params CompletionParams) ([]CompletionItem, error) {
     // Provide intelligent completions based on context
     context := ls.analyzeContext(params.Position)
-    
+
     switch context.Type {
     case "action":
         return ls.getActionCompletions(context)
@@ -259,7 +210,7 @@ The current implementation is intentionally small and focused on editor essentia
       "match": "\\b(task|project|if|when|for|try|catch)\\b"
     },
     {
-      "name": "keyword.declaration.drun", 
+      "name": "keyword.declaration.drun",
       "match": "\\b(requires|given|depends|let|set)\\b"
     },
     {
@@ -289,7 +240,7 @@ type CachedResult struct {
 func (c *CompilationCache) Get(source string, modTime time.Time) (string, bool) {
     c.mutex.RLock()
     defer c.mutex.RUnlock()
-    
+
     if result, exists := c.cache[source]; exists {
         if result.ModTime.Equal(modTime) {
             return result.YAML, true
@@ -313,7 +264,7 @@ func (ic *IncrementalCompiler) CompileChanged(changes []Change) error {
     for _, change := range changes {
         ic.markDirty(change.AffectedNodes...)
     }
-    
+
     return ic.compileMarkedNodes()
 }
 ```
@@ -355,28 +306,28 @@ drun v2 includes a comprehensive set of built-in pattern macros that provide com
 task "deploy" means "Deploy with validation":
   # Basic semantic versioning
   requires $version as string matching semver
-  
+
   # Extended semantic versioning
   requires $release as string matching semver_extended
-  
+
   # UUID validation
   requires $deployment_id as string matching uuid
-  
+
   # URL validation
   requires $api_endpoint as string matching url
-  
+
   # IPv4 address validation
   requires $server_ip as string matching ipv4
-  
+
   # Slug validation for project names
   requires $project_slug as string matching slug
-  
+
   # Docker tag validation
   requires $image_tag as string matching docker_tag
-  
+
   # Git branch validation
   requires $branch as string matching git_branch
-  
+
   info "Deploying {version} to {server_ip}"
 ```
 
@@ -389,10 +340,10 @@ task "validation_examples":
   # Using pattern macros (recommended)
   requires $version as string matching semver
   requires $id as string matching uuid
-  
+
   # Using raw patterns (for custom validation)
   requires $custom as string matching pattern "^custom-[0-9]+$"
-  
+
   # Email validation (built-in)
   requires $email as string matching email format
 ```
@@ -405,10 +356,9 @@ Pattern macros provide descriptive error messages:
 # Semver validation error
 Error: parameter 'version': value '1.2.3' does not match semver pattern (Basic semantic versioning (e.g., v1.2.3))
 
-# UUID validation error  
+# UUID validation error
 Error: parameter 'id': value 'not-a-uuid' does not match uuid pattern (UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000))
 ```
 
 
 ---
-

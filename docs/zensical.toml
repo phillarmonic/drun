@@ -6,6 +6,8 @@ site_url = "https://phillarmonic.github.io/drun/"
 repo_url = "https://github.com/phillarmonic/drun"
 repo_name = "phillarmonic/drun"
 copyright = "Copyright &copy; 2026 The drun authors"
+extra_css = ["stylesheets/shiki.css"]
+extra_javascript = ["javascripts/shiki.mjs"]
 
 nav = [
   { "Home" = "index.md" },
@@ -24,7 +26,7 @@ nav = [
     { "Runtime" = [
       { "Detection, execution, and errors" = "reference/runtime/detection-execution-and-errors.md" },
     ] },
-    { "Examples and migration" = "reference/examples-and-migration.md" },
+    { "Examples" = "reference/examples.md" },
     { "Implementation and pattern macros" = "reference/implementation-and-pattern-macros.md" },
     { "Orchestration specification" = "reference/orchestration.md" },
   ] },
@@ -97,6 +99,17 @@ anchor_linenums = true
 [project.markdown_extensions.pymdownx.superfences]
 custom_fences = [
   { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+  { name = "drun", class = "language-drun", format = "pymdownx.superfences.fence_code_format" },
+  { name = "bash", class = "language-bash", format = "pymdownx.superfences.fence_code_format" },
+  { name = "sh", class = "language-sh", format = "pymdownx.superfences.fence_code_format" },
+  { name = "shell", class = "language-shell", format = "pymdownx.superfences.fence_code_format" },
+  { name = "go", class = "language-go", format = "pymdownx.superfences.fence_code_format" },
+  { name = "yaml", class = "language-yaml", format = "pymdownx.superfences.fence_code_format" },
+  { name = "yml", class = "language-yml", format = "pymdownx.superfences.fence_code_format" },
+  { name = "json", class = "language-json", format = "pymdownx.superfences.fence_code_format" },
+  { name = "makefile", class = "language-makefile", format = "pymdownx.superfences.fence_code_format" },
+  { name = "ebnf", class = "language-ebnf", format = "pymdownx.superfences.fence_code_format" },
+  { name = "text", class = "language-text", format = "pymdownx.superfences.fence_code_format" },
 ]
 [project.markdown_extensions.pymdownx.tabbed]
 alternate_style = true

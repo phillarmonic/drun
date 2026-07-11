@@ -26,7 +26,7 @@
 
 The compiler infers types based on context:
 
-```
+```drun
 let count be 42                    # number
 let name be "hello"                # string
 let enabled be true                # boolean
@@ -39,7 +39,7 @@ let config be {port: 8080}         # object
 
 Parameters can specify type constraints:
 
-```
+```drun
 requires port as number between 1000 and 9999
 requires timeout as duration
 requires files as list of paths
@@ -54,7 +54,7 @@ requires config as object
 
 #### Simple Conditions
 
-```
+```drun
 # Boolean conditions
 if enabled:
   start service
@@ -62,7 +62,7 @@ if enabled:
 if not maintenance_mode:
   accept traffic
 
-# Comparison conditions  
+# Comparison conditions
 if replicas > 0:
   scale deployment
 
@@ -97,7 +97,7 @@ if dir "{$output_path}" is not empty:
 
 The `when-otherwise` syntax provides a clean alternative to `if-else` for simple conditional logic:
 
-```
+```drun
 # Basic when-otherwise
 when $platform is "windows":
   step "Building Windows binary with .exe extension"
@@ -146,7 +146,7 @@ for each $platform in ["windows", "linux", "mac"]:
 
 #### Smart Detection Conditions
 
-```
+```drun
 # Tool availability detection
 if docker is available:
   build container
@@ -210,7 +210,7 @@ when node project exists:
 
 #### Compound Conditions
 
-```
+```drun
 # Logical operators
 if docker is running and kubernetes is available:
   deploy containerized application
@@ -227,7 +227,7 @@ if (environment is "production" and git repo is clean) or force_deploy:
 
 #### Simple Iteration
 
-```
+```drun
 for each $item in $collection:
   process item
 
@@ -238,7 +238,7 @@ for each item at index in collection:
 
 #### Parallel Execution
 
-```
+```drun
 for each region in ["us-east", "eu-west"] in parallel:
   deploy to {region}
 
@@ -253,7 +253,7 @@ wait for all to complete
 
 #### Range Iteration
 
-```
+```drun
 for port from 3000 to 3005:
   check if port {port} is available
 
@@ -269,7 +269,7 @@ for i from 1 to retry_count:
 
 #### Filtered Iteration
 
-```
+```drun
 for each file in "src/**/*.js" where file is modified:
   lint {file}
 
@@ -279,11 +279,11 @@ for each container in docker containers where status is "running":
 
 ### Loop Control
 
-```
+```drun
 for each $service in $services:
   if service is healthy:
     continue
-  
+
   try:
     restart service
   catch:

@@ -8,7 +8,7 @@ drun v2 supports array literals for defining lists of values directly in the cod
 
 Array literals use square bracket notation with comma-separated values:
 
-```
+```drun
 # Basic array literals
 ["item1", "item2", "item3"]
 ["linux", "mac", "windows"]
@@ -23,12 +23,12 @@ Array literals use square bracket notation with comma-separated values:
 
 Arrays can be defined at the project level using two syntaxes:
 
-```
+```drun
 project "myapp" version "1.0.0":
   # Simple string settings
   set registry to "ghcr.io/company"
   set api_url to "https://api.example.com"
-  
+
   # Array settings using "as list to" syntax
   set platforms as list to ["linux", "mac", "windows"]
   set environments as list to ["dev", "staging", "production"]
@@ -38,12 +38,12 @@ project "myapp" version "1.0.0":
 
 **Accessing Project Arrays:** Project-level arrays must be accessed using the consistent `$globals.` prefix:
 
-```
-# ✅ Correct: Use $globals prefix for consistency
+```drun
+# Correct: Use $globals prefix for consistency
 for each $platform in $globals.platforms:
   info "Building for {$platform}"
 
-# ❌ Deprecated: Direct access (will show deprecation warning)
+# Deprecated: Direct access (will show deprecation warning)
 for each $platform in $platforms:
   info "Building for {$platform}"
 ```
@@ -54,7 +54,7 @@ This maintains consistency with other global variable access patterns like `{$gl
 
 Loop variables use the `$variable` syntax for consistency with the scoping system. For readability in prose-style code, bare identifiers (`for service in [...]`) are also accepted and automatically normalised to `$service` within the loop body:
 
-```
+```drun
 # Direct array literal in loops
 for each platform in ["linux", "mac", "windows"]:
   info "Building for {$platform}"
@@ -71,7 +71,7 @@ Matrix execution allows comprehensive testing across multiple dimensions:
 
 #### Sequential Matrix Execution
 
-```
+```drun
 # Cross-platform builds (OS × Architecture)
 for each $platform in $globals.platforms:
   for each $arch in ["amd64", "arm64"]:
@@ -86,7 +86,7 @@ for each $db in $globals.databases:
 
 #### Parallel Matrix Execution
 
-```
+```drun
 # Multi-region deployment (parallel regions, sequential services)
 for each $region in ["us-east", "eu-west", "ap-south"] in parallel:
   for each $service in ["api", "web", "worker"]:
@@ -104,7 +104,7 @@ for each $job in ["lint", "test", "security-scan", "build"] in parallel:
 
 #### Mixed Parallel/Sequential Execution
 
-```
+```drun
 # Parallel environments, sequential deployment steps
 for each $env in ["dev", "staging", "production"] in parallel:
   for each $step in ["build", "test", "deploy", "verify"]:
@@ -135,7 +135,7 @@ for each $env in ["dev", "staging", "production"] in parallel:
 
 Loop variables follow the established scoping rules:
 
-```
+```drun
 project "matrix-demo":
   set platforms as list to ["linux", "mac", "windows"]
   set registry to "ghcr.io/company"
@@ -177,13 +177,13 @@ version: 2.0
 project "docker-automation" version "1.0.0":
   # Boolean parameter with default
   parameter $no_cache as boolean defaults to "false"
-  
+
   # String parameter with constraint list
   parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
-  
+
   # String parameter with pattern validation
   parameter $registry as string defaults to "docker.io"
-  
+
   # Number parameter with range
   parameter $timeout as number defaults to 300
 
@@ -237,14 +237,14 @@ project "my-app" version "1.0.0":
     info "═══════════════════════════════════"
     info "  Starting task execution"
     info "═══════════════════════════════════"
-  
+
   # Environment check snippet
   snippet "check-env":
     if env DOCKER_HOST exists:
       info "Docker: Remote host at ${DOCKER_HOST}"
     else:
       info "Docker: Local daemon"
-  
+
   # Cleanup snippet
   snippet "cleanup-temp":
     info "Cleaning up temporary files..."
@@ -253,20 +253,20 @@ project "my-app" version "1.0.0":
 task "build" means "Build application":
   use snippet "log-start"
   use snippet "check-env"
-  
+
   info "Building application..."
   # Build logic here
-  
+
   use snippet "cleanup-temp"
   success "Build complete"
 
 task "deploy" means "Deploy application":
   use snippet "log-start"
   use snippet "check-env"
-  
+
   info "Deploying application..."
   # Deploy logic here
-  
+
   success "Deploy complete"
 ```
 
@@ -297,7 +297,7 @@ version: 2.0
 project "docker-builds" version "1.0.0":
   parameter $no_cache as boolean defaults to "false"
   parameter $registry as string defaults to "docker.io"
-  
+
   snippet "show-config":
     info "Registry: {$registry}"
     info "Cache: {$no_cache ? 'disabled' : 'enabled'}"
@@ -307,15 +307,15 @@ template task "docker-build":
   given $target defaults to "prod"
   given $tag defaults to "latest"
   given $platform defaults to "linux/amd64"
-  
+
   step "Building Docker image"
   use snippet "show-config"
-  
+
   info "Target: {$target}"
   info "Tag: {$registry}/{$tag}"
   info "Platform: {$platform}"
   info "Building: docker build {$no_cache ? '--no-cache' : ''} --target={$target} --platform={$platform} -t {$registry}/{$tag} ."
-  
+
   success "Built {$tag}"
 
 # Use the template with different parameters
@@ -335,12 +335,12 @@ task "build:base" means "Build base image":
 # Complex task that calls template multiple times
 task "build:all" means "Build all images":
   info "Building complete application stack..."
-  
+
   call task "build:web"
   call task "build:api"
   call task "build:worker"
   call task "build:base"
-  
+
   success "All images built successfully!"
 ```
 
@@ -375,7 +375,7 @@ project "microservices" version "1.0.0":
   parameter $environment as string from ["dev", "staging", "prod"] defaults to "dev"
   parameter $registry as string defaults to "docker.io"
   parameter $push as boolean defaults to "false"
-  
+
   # Reusable configuration display
   snippet "show-build-config":
     info "╔════════════════════════════════╗"
@@ -386,7 +386,7 @@ project "microservices" version "1.0.0":
     info "Cache: {$no_cache ? 'disabled' : 'enabled'}"
     info "Push: {$push ? 'yes' : 'no'}"
     info ""
-  
+
   # Reusable Docker login check
   snippet "check-registry-auth":
     if $push is true:
@@ -394,8 +394,8 @@ project "microservices" version "1.0.0":
       if env DOCKER_AUTH exists:
         info "✓ Registry authentication configured"
       else:
-        warn "⚠ No registry authentication found"
-  
+        warn " No registry authentication found"
+
   # Cleanup snippet
   snippet "cleanup":
     info "Cleaning up build artifacts..."
@@ -406,29 +406,29 @@ template task "docker-build":
   given $service defaults to "app"
   given $target defaults to "prod"
   given $tag defaults to "latest"
-  
+
   step "Building {$service} image"
   use snippet "show-build-config"
   use snippet "check-registry-auth"
-  
+
   info "Service: {$service}"
   info "Target: {$target}"
   info "Full tag: {$registry}/{$service}:{$tag}"
-  
+
   info "Building image..."
   # Actual Docker build would go here
-  
+
   if $push is true:
     info "Pushing to registry..."
     # Actual Docker push would go here
-  
+
   success "✓ Built {$service}:{$tag}"
 
 # Template for testing services
 template task "test-service":
   given $service defaults to "app"
   given $test_suite defaults to "all"
-  
+
   step "Testing {$service}"
   info "Test suite: {$test_suite}"
   info "Running tests..."
@@ -460,22 +460,22 @@ task "build:all" means "Build all services":
   info "  Building Complete Microservices Stack"
   info "═══════════════════════════════════════"
   info ""
-  
+
   call task "build:frontend"
   call task "build:backend"
   call task "build:worker"
-  
-  success "✨ All services built successfully!"
+
+  success " All services built successfully!"
 
 task "test:all" means "Test all services":
   call task "test:frontend"
   call task "test:backend"
-  success "✨ All tests passed!"
+  success " All tests passed!"
 
 task "ci" means "Complete CI pipeline":
   call task "build:all"
   call task "test:all"
-  success "✨ CI pipeline completed!"
+  success " CI pipeline completed!"
 ```
 
 #### Usage Examples
@@ -521,12 +521,12 @@ Namespaced includes allow you to import snippets, templates, and tasks from exte
 project "myapp":
     # Include everything from a file
     include "shared/docker.drun"
-    
+
     # Selective includes
     include snippets from "shared/utils.drun"
     include templates from "shared/k8s.drun"
     include tasks from "shared/common.drun"
-    
+
     # Multiple selectors
     include snippets, templates from "shared/helpers.drun"
 ```
@@ -542,8 +542,8 @@ project "docker":
         if env DOCKER_AUTH exists:
             info "✓ Docker authenticated"
         else:
-            warn "⚠ No Docker authentication"
-    
+            warn " No Docker authentication"
+
     template task "build":
         given $image defaults to "app:latest"
         info "Building {$image}..."
@@ -566,7 +566,7 @@ When an included element references another element from the same file, it's aut
 project "docker":
     snippet "login-check":
         info "Checking auth..."
-    
+
     template task "push":
         given $image
         use snippet "login-check"    # No namespace needed within same file
@@ -585,7 +585,7 @@ task "deploy":
 
 Include paths are resolved in the following order:
 
-1. **Relative to current file**: `../shared/docker.drun` 
+1. **Relative to current file**: `../shared/docker.drun`
 2. **Relative to workspace root**: `shared/docker.drun`
 3. **Absolute path**: `/absolute/path/docker.drun`
 
@@ -607,29 +607,29 @@ version: 2.0
 
 project "docker":
     parameter $registry as string defaults to "docker.io"
-    
+
     snippet "login-check":
         if env DOCKER_AUTH exists:
             info "✓ Authenticated with {$registry}"
         else:
-            warn "⚠ No authentication for {$registry}"
-    
+            warn " No authentication for {$registry}"
+
     snippet "cleanup":
         info "Cleaning up Docker resources..."
-    
+
     template task "build":
         given $target defaults to "prod"
         given $image defaults to "app:latest"
-        
+
         step "Building Docker image"
         use snippet "login-check"
         info "docker build --target={$target} -t {$image} ."
         use snippet "cleanup"
         success "Built {$image}"
-    
+
     template task "push":
         given $image defaults to "app:latest"
-        
+
         step "Pushing to registry"
         use snippet "login-check"
         info "docker push {$registry}/{$image}"
@@ -640,7 +640,7 @@ version: 2.0
 
 project "myapp":
     include "shared/docker.drun"
-    
+
     parameter $version as string defaults to "1.0.0"
 
 task "build:web":
@@ -687,13 +687,13 @@ Include files directly from GitHub repositories using the `github:` protocol:
 project "myapp":
     # Include from GitHub with auto branch detection
     include "github:owner/repo/path/to/file.drun"
-    
+
     # Include from specific branch
     include "github:owner/repo/path/to/file.drun@main"
-    
+
     # Include from specific tag
     include "github:owner/repo/path/to/file.drun@v1.0.0"
-    
+
     # Include from specific commit
     include "github:owner/repo/path/to/file.drun@abc123"
 ```
@@ -708,7 +708,7 @@ Include files from any HTTPS URL:
 project "myapp":
     # Include from raw GitHub URL
     include "https://raw.githubusercontent.com/owner/repo/main/shared/workflow.drun"
-    
+
     # Include from any HTTPS source
     include "https://example.com/shared/tasks.drun"
 ```
@@ -721,13 +721,13 @@ Drunhub is the official standard library repository at `https://github.com/phill
 project "myapp":
     # Import from drunhub - uses project name as namespace
     include from drunhub "ops/docker"
-    
+
     # Import with custom namespace (overrides project name)
     include from drunhub "ops/kubernetes" as k8s
-    
+
     # Import from nested folders
     include from drunhub "utils/logging/advanced" as log
-    
+
     # Import from specific branch/tag
     include from drunhub "ops/docker@v1.0" as ops
 ```
@@ -747,17 +747,17 @@ version: 2.0
 project "deploy-app":
     # Import Docker utilities as "ops" namespace
     include from drunhub "ops/docker" as ops
-    
+
     # Import Kubernetes helpers
     include from drunhub "ops/kubernetes" as k8s
 
 task "deploy":
     # Use snippet from ops namespace
     use snippet "ops.check-docker"
-    
+
     # Call task from k8s namespace
     call task "k8s.deploy" with namespace="production" replicas=3
-    
+
     success "✓ Deployed successfully!"
 ```
 
@@ -769,7 +769,7 @@ The `as` clause also works with regular includes:
 project "myapp":
     # Override namespace from included file
     include "shared/docker-utils.drun" as docker
-    
+
     # Now use docker.* instead of the original project name
     use snippet "docker.build"
 ```
@@ -799,10 +799,10 @@ version: 2.0
 project "my-awesome-app":
     # Include Docker utilities from your organization
     include "github:myorg/drun-workflows/docker.drun@v1.2.0"
-    
+
     # Include Kubernetes helpers from community
     include "github:drun-community/k8s-workflows/deployment.drun"
-    
+
     # Include CI/CD patterns from team repo
     include "https://raw.githubusercontent.com/myteam/workflows/main/ci.drun"
 

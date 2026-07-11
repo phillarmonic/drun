@@ -4,7 +4,7 @@
 
 ### Project Declaration
 
-```
+```drun
 project <name> [version <version>]:
   [project_settings]
 
@@ -22,7 +22,7 @@ project "microservices":
 
 drun v2 supports cross-platform shell configuration with sensible defaults for each operating system. This allows you to specify different shell executables, startup arguments, and environment variables for different platforms.
 
-```
+```drun
 project "my-app":
   shell config:
     mac:
@@ -33,7 +33,7 @@ project "my-app":
       environment:
         TERM: "xterm-256color"
         SHELL_SESSION_HISTORY: "0"
-    
+
     linux:
       executable: "/bin/bash"
       args:
@@ -42,7 +42,7 @@ project "my-app":
       environment:
         TERM: "xterm-256color"
         HISTCONTROL: "ignoredups"
-    
+
     windows:
       executable: "powershell.exe"
       args:
@@ -66,7 +66,7 @@ drun automatically detects the current platform using Go's `runtime.GOOS`:
 
 drun v2 supports declaration decorators immediately before tasks, template tasks, and snippets:
 
-```
+```drun
 @platform("linux", "mac")
 task "shell" means "Open a Unix shell":
   run "bash" attached
@@ -106,7 +106,7 @@ If no shell configuration is provided, drun uses sensible defaults:
 
 All shell commands (`run`, `exec`, `shell`, `capture`) automatically use the platform-specific configuration:
 
-```
+```drun
 task "example":
   run "echo $SHELL"        # Uses configured shell
   run "echo $TERM"         # Uses configured environment
@@ -121,16 +121,16 @@ drun v2 supports two types of lifecycle hooks that allow you to execute code at 
 
 These hooks run around individual task execution:
 
-```
+```drun
 project "myapp":
   before any task:
-    info "🚀 Starting task: {$globals.current_task}"
+    info " Starting task: {$globals.current_task}"
     capture task_start_time from now
-  
+
   after any task:
     capture task_end_time from now
     let task_duration be {task_end_time} - {task_start_time}
-    info "✅ Task completed in {task_duration}"
+    info " Task completed in {task_duration}"
 ```
 
 - **`before any task`**: Executes before each individual task runs
@@ -140,18 +140,18 @@ project "myapp":
 
 These hooks run once per drun execution, providing tool-level startup and shutdown capabilities:
 
-```
+```drun
 project "myapp":
   on drun setup:
-    info "🚀 Starting drun execution pipeline"
-    info "📊 Tool version: {$globals.drun_version}"
+    info " Starting drun execution pipeline"
+    info " Tool version: {$globals.drun_version}"
     capture pipeline_start_time from now
-  
+
   on drun teardown:
     capture pipeline_end_time from now
     let total_time be {pipeline_end_time} - {pipeline_start_time}
-    info "🏁 Drun execution pipeline completed"
-    info "📊 Total execution time: {total_time}"
+    info " Drun execution pipeline completed"
+    info " Total execution time: {total_time}"
 ```
 
 - **`on drun setup`**: Executes once at the very beginning of drun execution (before any tasks)
@@ -182,7 +182,7 @@ When both types of lifecycle hooks are present, they execute in this order:
 
 ### Task Definition
 
-```
+```drun
 task <name> [means <description>]:
   [parameters]
   [dependencies]
@@ -197,7 +197,7 @@ task "hello":
 task "deploy" means "Deploy application to environment":
   requires $environment from ["dev", "staging", "production"]
   depends on build and test
-  
+
   deploy myapp to kubernetes namespace {$environment}
 ```
 
@@ -207,7 +207,7 @@ Tasks can call other tasks directly using the `call task` statement. This allows
 
 #### Basic Syntax
 
-```
+```drun
 call task "task_name"
 ```
 
@@ -239,7 +239,7 @@ call task "my-special-task"
 
 #### With Parameters
 
-```
+```drun
 call task "task_name" with param1="value1" param2="value2"
 call task task_name with param1="value1" param2="value2"  # Unquoted task name
 call task fuzz with iterations=100                         # Numeric literals are allowed bare
@@ -271,16 +271,16 @@ task "build-application":
 
 task "full-pipeline":
   info "Starting full CI/CD pipeline"
-  
+
   # Call tasks without parameters
   call task "setup-environment"
-  
+
   # Call tasks with parameters
   call task "run-tests" with test_type="unit"
   call task "run-tests" with test_type="integration"
   call task "build-application" with target="production"
   call task fuzz with iterations=100
-  
+
   success "Full pipeline completed successfully!"
 ```
 
@@ -325,7 +325,7 @@ drun has two types of parameters with distinct semantic meanings:
 
 Parameters declared with `requires` **MUST** be provided by the user (unless a default is specified).
 
-```
+```drun
 requires <name> [constraints] [defaults to <value>]
 
 # Examples:
@@ -351,7 +351,7 @@ requires $environment from ["dev", "staging", "production"] defaults to "dev"
 
 Parameters declared with `given` are optional. They _may_ specify a default value but are no longer required to do so. When no default is supplied, the parameter resolves to an empty string unless populated at runtime.
 
-```
+```drun
 given <name> defaults to <value> [constraints]
 
 # Examples:
@@ -394,14 +394,14 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 task "deploy":
   # Critical parameter - must be provided
   requires $name
-  
+
   # Validated required parameter with safe default
   requires $environment from ["dev", "staging", "production"] defaults to "dev"
-  
+
   # Optional configuration with default
   given $replicas defaults to "3"
   given $timeout defaults to "30s"
-  
+
   info "Deploying {$name} to {$environment} with {$replicas} replicas"
 ```
 
@@ -420,7 +420,7 @@ xdrun deploy name=myapp environment=production replicas=5
 
 The `empty` keyword provides a semantic way to specify empty values and is completely interchangeable with empty strings (`""`):
 
-```
+```drun
 # Default value usage
 given $name defaults to empty
 given $features as list defaults to empty
@@ -448,7 +448,7 @@ given $enabled defaults to false    # boolean parameter (use false, not empty)
 
 #### Variadic Parameters
 
-```
+```drun
 accepts <name> as list [of <type>]
 
 # Examples:
@@ -459,13 +459,13 @@ accepts configs as list of strings
 
 ### Dependencies
 
-```
+```drun
 depends on <dependency_list>
 
 # Sequential dependencies
 depends on build and test then deploy
 
-# Parallel dependencies  
+# Parallel dependencies
 depends on lint, test, security_scan
 
 # Mixed dependencies
@@ -476,7 +476,7 @@ depends on build then test, integration_test then deploy
 
 #### Simple Assignment
 
-```
+```drun
 let <name> be <expression>
 set <name> to <expression>
 
@@ -493,7 +493,7 @@ drun v2 supports two types of capture operations:
 #### Expression Capture
 Captures values from expressions, functions, and built-in operations:
 
-```
+```drun
 capture <name> from <expression>
 
 # Examples:
@@ -505,7 +505,7 @@ capture calculated_value from {a} + {b}
 #### Shell Command Capture
 Captures output from shell commands:
 
-```
+```drun
 capture from shell "<command>" as $<variable>
 
 # Examples:
@@ -518,7 +518,7 @@ capture from shell "whoami" as $current_user
 
 For complex shell operations that span multiple commands, use the multiline syntax:
 
-```
+```drun
 capture from shell as $<variable>:
   <command1>
   <command2>
@@ -527,7 +527,7 @@ capture from shell as $<variable>:
 
 **Examples:**
 
-```
+```drun
 # Capture system information
 capture from shell as $system_info:
   echo "System Information:"
@@ -568,7 +568,7 @@ capture from shell as $file_report:
 
 #### Conditional Assignment
 
-```
+```drun
 let <name> be:
   when <condition>: <value>
   when <condition>: <value>
@@ -577,7 +577,7 @@ let <name> be:
 # Example:
 let database_url be:
   when environment is "production": secret "prod_db_url"
-  when environment is "staging": secret "staging_db_url"  
+  when environment is "staging": secret "staging_db_url"
   else: "sqlite:///local.db"
 ```
 
@@ -585,7 +585,7 @@ let database_url be:
 
 #### If Statements
 
-```
+```drun
 if <condition>:
   <statements>
 [else if <condition>:
@@ -607,24 +607,24 @@ else:
   error "Invalid deployment conditions"
 ```
 
-#### Enhanced If-Else Chains ⭐ *New*
+#### Enhanced If-Else Chains  *New*
 
 drun v2 supports natural `else if` syntax for cleaner conditional logic:
 
 ```drun
 task "deployment strategy":
   requires $environment from ["dev", "staging", "production"]
-  
+
   if $environment == "production":
-    info "🚀 Production deployment"
+    info " Production deployment"
     set $replicas to 5
     set $timeout to "300s"
   else if $environment == "staging":
-    info "🧪 Staging deployment"  
+    info " Staging deployment"
     set $replicas to 3
     set $timeout to "180s"
   else if $environment == "dev":
-    info "🔧 Development deployment"
+    info " Development deployment"
     set $replicas to 1
     set $timeout to "60s"
   else:
@@ -684,7 +684,7 @@ else:
 
 #### For Loops
 
-```
+```drun
 for each <variable> in <expression> [in parallel]:
   <statements>
 
@@ -708,7 +708,7 @@ for each $region in ["us-east", "eu-west"] in parallel:
 
 #### Exception Handling
 
-```
+```drun
 try:
   <statements>
 [catch <error_type>:

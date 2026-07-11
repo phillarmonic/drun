@@ -52,7 +52,7 @@ xdrun cmd:stateless list
 ```
 
 Output:
-```
+```text
 Stateless directories:
   ✓ /tmp/drun-test-stateless
     → /home/user/.drun/stateless/909e63477a73559a/spec.drun
@@ -65,15 +65,15 @@ xdrun cmd:stateless info
 ```
 
 Output for stateless directory:
-```
-📁 Current directory is marked as STATELESS
+```text
+ Current directory is marked as STATELESS
    Config location: /home/user/.drun/stateless/909e63477a73559a/spec.drun
-   Status: ✅ Config file exists
+   Status:  Config file exists
 ```
 
 Output for normal directory:
-```
-📁 Current directory is NOT marked as stateless
+```text
+ Current directory is NOT marked as stateless
    Using local configuration (.drun/spec.drun)
    Run 'xdrun cmd:stateless add' to mark as stateless
 ```
@@ -123,8 +123,8 @@ xdrun bu
 ```
 
 Output:
-```
-ℹ️  Building the project
+```text
+  Building the project
 Building project...
 ```
 
@@ -134,9 +134,9 @@ xdrun -v bet
 ```
 
 Output:
-```
-🎯 Resolved 'bet' → 'beta'
-ℹ️  Running beta task
+```text
+ Resolved 'bet' → 'beta'
+  Running beta task
 ...
 ```
 
@@ -148,7 +148,7 @@ xdrun b
 ```
 
 Output:
-```
+```text
 Error: ambiguous task name 'b' - matches multiple tasks:
   - benchmark (use: xdrun ben)
   - beta (use: xdrun bet)
@@ -167,7 +167,7 @@ xdrun tst
 ```
 
 Output:
-```
+```text
 Error: task 'tst' not found
 
 Did you mean one of these?
@@ -187,9 +187,9 @@ xdrun build
 
 The error message shows the shortest unique prefix for each matching task:
 
-```
+```text
   - benchmark (use: xdrun ben)
-  - beta (use: xdrun bet)  
+  - beta (use: xdrun bet)
   - build (use: xdrun bu)
 ```
 
@@ -245,17 +245,17 @@ Partial task name matching:
 ## Benefits
 
 ### Stateless Drun
-- ✅ Use drun with third-party repositories
-- ✅ Keep personal automation private
-- ✅ No need to fork repositories just to add drun configs
-- ✅ Different team members can have different workflows
+-  Use drun with third-party repositories
+-  Keep personal automation private
+-  No need to fork repositories just to add drun configs
+-  Different team members can have different workflows
 
 ### Partial Task Names
-- ✅ Faster task execution with fewer keystrokes
-- ✅ Better developer experience
-- ✅ Smart error messages guide you to the right task
-- ✅ Fuzzy matching helps with typos
-- ✅ Backwards compatible - full names still work
+-  Faster task execution with fewer keystrokes
+-  Better developer experience
+-  Smart error messages guide you to the right task
+-  Fuzzy matching helps with typos
+-  Backwards compatible - full names still work
 
 ## Future Enhancements
 
@@ -276,18 +276,18 @@ Potential improvements for future versions:
 Both features have been tested with:
 
 ### Stateless Drun Tests
-- ✅ Adding directories as stateless
-- ✅ Creating template configurations
-- ✅ Listing stateless directories
-- ✅ Removing stateless marking
-- ✅ Deleting configurations
-- ✅ Info command shows correct status
-- ✅ Task execution from stateless config
+-  Adding directories as stateless
+-  Creating template configurations
+-  Listing stateless directories
+-  Removing stateless marking
+-  Deleting configurations
+-  Info command shows correct status
+-  Task execution from stateless config
 
 ### Partial Name Tests
-- ✅ Exact match resolution
-- ✅ Unique partial match resolution
-- ✅ Ambiguous match error with suggestions
-- ✅ No match with fuzzy suggestions
-- ✅ Full task names still work
-- ✅ Verbose mode shows resolution
+-  Exact match resolution
+-  Unique partial match resolution
+-  Ambiguous match error with suggestions
+-  No match with fuzzy suggestions
+-  Full task names still work
+-  Verbose mode shows resolution

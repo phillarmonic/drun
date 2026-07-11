@@ -182,7 +182,7 @@ All parser files are part of the same `parser` package, so they can call each ot
 func (p *Parser) parseTaskStatement() *ast.TaskStatement {
     // Can call methods from parser_control.go
     controlFlow := p.parseControlFlowStatement()
-    
+
     // Can call methods from parser_helpers.go
     if p.isActionToken(p.curToken.Type) {
         // ...

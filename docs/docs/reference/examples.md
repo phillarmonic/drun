@@ -1,33 +1,33 @@
-# Examples and migration
+# Examples
 
 ## Examples
 
 ### Simple Task
 
-```
+```drun
 task "hello":
   info "Hello, drun v2!"
 ```
 
 ### Task with Parameters
 
-```
+```drun
 task "greet" means "Greet someone by name":
   requires name
   given title defaults to "friend"
-  
+
   info "Hello, {title} {name}!"
 ```
 
 ### Docker Build and Deploy
 
-```
+```drun
 project "webapp" version "1.0.0":
   set registry to "ghcr.io/company"
 
 task "build" means "Build Docker image":
   given tag defaults to "{current git commit}"
-  
+
   step "Building application image"
   build docker image "{registry}/webapp:{tag}"
   success "Build completed: {registry}/webapp:{tag}"
@@ -36,57 +36,57 @@ task "deploy" means "Deploy to Kubernetes":
   requires environment from ["dev", "staging", "production"]
   given replicas defaults to 3
   depends on build
-  
+
   step "Deploying to {environment}"
-  
+
   when environment is "production":
     require manual approval "Deploy to production?"
     ensure git repo is clean
-  
+
   deploy webapp:latest to kubernetes namespace {environment} with {replicas} replicas
   wait for rollout to complete
-  
+
   success "Deployment to {environment} completed"
 ```
 
-### Git Branch Operations ⭐ *New*
+### Git Branch Operations  *New*
 
-```
+```drun
 version: 2.0
 
 task "git branch operations" means "Demonstrate git branch builtin and pipe operations":
-  info "🌿 Testing git branch operations..."
-  
+  info " Testing git branch operations..."
+
   # Basic git branch builtin
   set $branch to {current git branch}
   info "Current branch: {$branch}"
-  
+
   # Git branch with pipe operations
   set $safe_branch to {current git branch | replace "/" by "-"}
   info "Safe branch name: {$safe_branch}"
-  
+
   # Use in parameter defaults
   given $deployment_branch defaults to "{current git branch | replace '/' by '-' | lowercase}"
   info "Deployment branch: {$deployment_branch}"
-  
-  success "✅ Git branch operations completed!"
+
+  success " Git branch operations completed!"
 
 task "parameter defaults with builtins" means "Demonstrate builtin functions in parameter defaults":
   given $commit defaults to "{current git commit}"
   given $branch defaults to "{current git branch}"
   given $safe_branch defaults to "{current git branch | replace '/' by '-'}"
-  
-  info "📋 Parameter values:"
+
+  info " Parameter values:"
   info "  Commit: {$commit}"
-  info "  Branch: {$branch}" 
+  info "  Branch: {$branch}"
   info "  Safe branch: {$safe_branch}"
-  
-  success "✅ Parameter defaults test completed!"
+
+  success " Parameter defaults test completed!"
 ```
 
 ### Complex CI/CD Pipeline
 
-```
+```drun
 project "microservices":
   set registry to "ghcr.io/company"
   set environments to ["dev", "staging", "production"]
@@ -107,12 +107,12 @@ task "build all" means "Build all service images":
 task "deploy pipeline" means "Full deployment pipeline":
   requires target_env from {environments}
   depends on test_matrix and build_all
-  
+
   let deployment_id be "deploy-{now.unix}"
   let failed_services be empty list
-  
+
   step "Starting deployment {deployment_id} to {target_env}"
-  
+
   for each service in {services}:
     try:
       deploy {service}:latest to kubernetes namespace {target_env}
@@ -122,56 +122,56 @@ task "deploy pipeline" means "Full deployment pipeline":
     catch deployment_error:
       error "{service} deployment failed: {deployment_error}"
       add {service} to {failed_services}
-  
+
   if {failed_services} is not empty:
     error "Deployment failed for services: {failed_services}"
-    
+
     for each service in {failed_services}:
       rollback {service} in {target_env}
-    
+
     fail "Deployment {deployment_id} failed"
   else:
     success "Deployment {deployment_id} completed successfully"
-    notify slack "✅ All services deployed to {target_env}"
+    notify slack " All services deployed to {target_env}"
 ```
 
 ### Advanced Features Example
 
-```
+```drun
 project "advanced-example":
   set notification_webhook to secret "slack_webhook"
-  
+
   before any task:
     capture start_time from now
     info "Starting task execution at {start_time}"
-  
+
   after any task:
     capture end_time from now
     let duration be {end_time} - {start_time}
     info "Task completed in {duration}"
-  
+
   # Tool-level lifecycle hooks (run once per drun execution)
   on drun setup:
-    info "🚀 Starting drun execution pipeline"
-    info "📊 Tool version: {$globals.drun_version}"
+    info " Starting drun execution pipeline"
+    info " Tool version: {$globals.drun_version}"
     capture pipeline_start_time from now
-  
+
   on drun teardown:
     capture pipeline_end_time from now
     let total_time be {pipeline_end_time} - {pipeline_start_time}
-    info "🏁 Drun execution pipeline completed"
-    info "📊 Total execution time: {total_time}"
+    info " Drun execution pipeline completed"
+    info " Total execution time: {total_time}"
 
 task "smart deployment" means "Intelligent deployment with auto-detection":
   requires environment from ["dev", "staging", "production"]
   given force_deploy defaults to false
-  
+
   # Smart project detection
   when symfony is detected:
     let app_type be "symfony"
     let health_endpoint be "/health"
   when laravel is detected:
-    let app_type be "laravel"  
+    let app_type be "laravel"
     let health_endpoint be "/api/health"
   when node project exists:
     let app_type be "node"
@@ -179,31 +179,31 @@ task "smart deployment" means "Intelligent deployment with auto-detection":
   else:
     let app_type be "generic"
     let health_endpoint be "/"
-  
+
   step "Detected {app_type} application"
-  
+
   # Environment-specific validation
   when environment is "production":
     if not force_deploy and git repo is dirty:
       error "Cannot deploy dirty repository to production"
       fail
-    
+
     if not git tag exists for current commit:
       warn "No git tag found for current commit"
       require manual approval "Deploy untagged commit to production?"
-  
+
   # Smart build detection
   if file "Dockerfile" exists:
     step "Building containerized application"
     build docker image "myapp:latest"
-    
+
     if kubernetes is available:
       deploy myapp:latest to kubernetes namespace {environment}
     else:
       run container "myapp:latest" on port 8080
   else:
     step "Deploying non-containerized application"
-    
+
     when app_type is "symfony":
       run "composer install --no-dev --optimize-autoloader"
       run "php bin/console cache:clear --env=prod"
@@ -214,10 +214,10 @@ task "smart deployment" means "Intelligent deployment with auto-detection":
     when app_type is "node":
       install dependencies
       run "npm run build"
-  
+
   # Health check
   step "Performing health check"
-  
+
   for attempt from 1 to 5:
     try:
       check health of service at "https://app-{environment}.example.com{health_endpoint}"
@@ -229,119 +229,14 @@ task "smart deployment" means "Intelligent deployment with auto-detection":
         fail
       warn "Health check attempt {attempt} failed, retrying in {attempt * 2} seconds..."
       wait {attempt * 2} seconds
-  
+
   # Notification
-  let message be "✅ {app_type} application deployed to {environment}"
+  let message be " {app_type} application deployed to {environment}"
   send POST request to {notification_webhook} with data {
     text: message,
     username: "drun-bot"
   }
-  
+
   success "Deployment completed successfully"
 ```
-
----
-
-## Migration Path
-
-### From drun v1 to v2
-
-#### Automatic Migration Tool
-
-A migration tool would convert existing YAML configurations to semantic v2 syntax:
-
-```bash
-drun migrate drun.yml --output drun.v2 --format semantic
-```
-
-#### Migration Examples
-
-##### Simple Recipe Migration
-
-**v1 YAML:**
-```yaml
-recipes:
-  hello:
-    help: "Say hello"
-    run: echo "Hello, World!"
-```
-
-**v2 Semantic:**
-```
-task "hello" means "Say hello":
-  info "Hello, World!"
-```
-
-##### Complex Recipe Migration
-
-**v1 YAML:**
-```yaml
-recipes:
-  deploy:
-    help: "Deploy to environment"
-    positionals:
-      - name: environment
-        required: true
-        one_of: ["dev", "staging", "production"]
-    deps: [build]
-    run: |
-      kubectl set image deployment/myapp myapp=myapp:latest --namespace={{ .environment }}
-      kubectl rollout status deployment/myapp --namespace={{ .environment }}
-```
-
-**v2 Semantic:**
-```
-task "deploy" means "Deploy to environment":
-  requires environment from ["dev", "staging", "production"]
-  depends on build
-  
-  deploy myapp:latest to kubernetes namespace {environment}
-  wait for rollout to complete
-```
-
-### Gradual Migration Strategy
-
-#### Phase 1: Coexistence
-- v2 compiler generates v1 YAML
-- Existing v1 configurations continue to work
-- Teams can migrate individual tasks
-
-#### Phase 2: Enhanced Features
-- v2-specific features (enhanced smart detection)
-- Improved error messages and debugging
-- Advanced IDE support
-
-#### Phase 3: Full Migration
-- v1 format deprecated but supported
-- New features only available in v2
-- Migration tooling and documentation
-
-### Backward Compatibility
-
-#### v1 Include Support
-
-```
-# v2 can include v1 YAML files
-project "mixed-project":
-  include "legacy-tasks.yml"  # v1 YAML file
-
-task "new-task":  # v2 semantic syntax
-  depends on legacy_build  # Task from v1 file
-  deploy with modern syntax
-```
-
-#### Escape Hatch to Shell
-
-```
-# When semantic syntax isn't sufficient
-task "custom-operation":
-  run shell command: |
-    # Raw shell script for complex operations
-    for file in $(find . -name "*.log" -mtime +7); do
-      gzip "$file"
-      mv "$file.gz" archive/
-    done
-```
-
----
 

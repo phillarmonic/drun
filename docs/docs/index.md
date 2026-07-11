@@ -16,7 +16,7 @@ drun is a readable automation language executed by the `xdrun` CLI. This site is
 | Getting started | Installation, CLI usage, configuration, and troubleshooting |
 | Language specification | Normative syntax, semantics, runtime behavior, and built-ins |
 | Guides | Task-oriented workflows and feature walkthroughs |
-| Examples | Complete Drunfiles and migration examples |
+| Examples | Complete Drunfiles and usage patterns |
 | Development | Architecture, packages, testing, and contribution guidance |
 
 The language reference deliberately keeps its technical specification style. It is split by concern so each page is searchable, linkable, and small enough to navigate comfortably.

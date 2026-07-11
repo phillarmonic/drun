@@ -6,13 +6,13 @@ This directory contains the internal implementation of the drun execution engine
 
 ## Package Overview
 
-### 📊 Package Statistics
+### Package Statistics
 
 | Package | Files | Lines | Purpose |
 |---------|-------|-------|---------|
 | `ast/` | 15 | ~1,500 | Abstract Syntax Tree definitions |
 | `parser/` | 26 | ~5,000 | Syntax parsing |
-| `domain/` | 7 | ~840 | **Domain layer (business logic)** ✨ |
+| `domain/` | 7 | ~840 | **Domain layer (business logic)**  |
 | `engine/` | 35 | ~6,500 | Execution engine |
 | `lexer/` | 6 | ~800 | Tokenization |
 | `builtins/` | 2 | ~200 | Built-in functions |
@@ -29,7 +29,7 @@ This directory contains the internal implementation of the drun execution engine
 
 ## Package Details
 
-### 🌳 ast/ - Abstract Syntax Tree
+### ast/ - Abstract Syntax Tree
 
 **Purpose:** Defines all AST node types representing drun language constructs.
 
@@ -63,7 +63,7 @@ stmt := &ast.ShellStatement{
 
 ---
 
-### 📝 parser/ - Syntax Parser
+### parser/ - Syntax Parser
 
 **Purpose:** Parses drun source code into AST.
 
@@ -103,11 +103,11 @@ program, err := p.ParseProgram()
 ---
 
 
-### 🎯 domain/ - Domain Layer
+### domain/ - Domain Layer
 
 **Purpose:** Business logic layer separating domain concepts from execution concerns.
 
-**Status:** ✅ Fully integrated with engine
+**Status:**  Fully integrated with engine
 
 **Key Files:**
 - `task/task.go` - Task entity with validation
@@ -118,7 +118,7 @@ program, err := p.ParseProgram()
 - `project/project.go` - Project configuration
 
 **Architecture:**
-```
+```text
 CLI Layer → Engine Layer → Domain Layer
                  ↓              ↓
            Orchestration   Business Logic
@@ -186,20 +186,20 @@ err := e.paramValidator.Validate(domainParam, typedValue)
 
 **Test Coverage:**
 - `task/task_test.go` - 32 tests
-- `task/registry_test.go` - 16 tests  
+- `task/registry_test.go` - 16 tests
 - `task/dependencies_test.go` - 21 tests
 - `parameter/validation_test.go` - 17 tests
 
 **When to Use Domain Layer:**
-- ✅ Adding new validation rules
-- ✅ Extending task/parameter properties
-- ✅ Adding business logic operations
-- ❌ AST changes (use `ast/` instead)
-- ❌ Execution logic (use `engine/` instead)
+-  Adding new validation rules
+-  Extending task/parameter properties
+-  Adding business logic operations
+-  AST changes (use `ast/` instead)
+-  Execution logic (use `engine/` instead)
 
 ---
 
-### ⚙️ engine/ - Execution Engine
+### engine/ - Execution Engine
 
 **Purpose:** Executes AST by orchestrating executors and subsystems.
 
@@ -259,7 +259,7 @@ err := eng.RunTask("build", params)
 ```
 
 **Architecture:**
-```
+```text
 Engine (orchestrator)
 ├── Interpolation System (variable resolution)
 ├── Hooks System (lifecycle hooks)
@@ -279,7 +279,7 @@ Engine (orchestrator)
 
 ---
 
-### 🔤 lexer/ - Lexical Analysis
+### lexer/ - Lexical Analysis
 
 **Purpose:** Tokenizes drun source code.
 
@@ -301,7 +301,7 @@ token := l.NextToken()
 
 ---
 
-### 🛠️ Support Packages
+### Support Packages
 
 #### builtins/ - Built-in Functions
 
@@ -382,13 +382,13 @@ value := types.StringValue("hello")
 ### 1. Single Responsibility
 
 Each package/file has ONE clear purpose:
-- ✅ `parser_docker.go` - Only Docker parsing
-- ✅ `executor_git.go` - Only Git execution
-- ✅ `helpers_download.go` - Only download helpers
+-  `parser_docker.go` - Only Docker parsing
+-  `executor_git.go` - Only Git execution
+-  `helpers_download.go` - Only download helpers
 
 ### 2. Dependency Direction
 
-```
+```text
 CLI → Engine → Parser → Lexer → AST
           ↓
     Support Packages
@@ -470,7 +470,7 @@ After refactoring, we maintain these size limits:
 | Helpers | 100-200 lines | 300 lines |
 | Core orchestration | 200-500 lines | 1000 lines |
 
-**Current Status:** ✅ All files within guidelines
+**Current Status:**  All files within guidelines
 
 ---
 
@@ -504,7 +504,7 @@ Looking for Docker support?
 ### Unit Tests
 
 Each package has its own tests:
-```
+```text
 internal/parser/parser_docker_test.go
 internal/engine/executor_docker_test.go
 internal/ast/ast_test.go
@@ -535,10 +535,10 @@ Most frequently executed code:
 
 ### Optimization Points
 
-- ✅ Variable lookups cached in context
-- ✅ Includes cached by resolver
-- ✅ Regex patterns compiled once
-- ✅ Shell opts reused across commands
+-  Variable lookups cached in context
+-  Includes cached by resolver
+-  Regex patterns compiled once
+-  Shell opts reused across commands
 
 ---
 
@@ -546,30 +546,30 @@ Most frequently executed code:
 
 ### Before Refactoring
 
-```
+```text
 internal/
-├── ast.go (1,133 lines) ❌
-├── parser.go (4,874 lines) ❌
-├── engine.go (5,179 lines) ❌
+├── ast.go (1,133 lines)
+├── parser.go (4,874 lines)
+├── engine.go (5,179 lines)
 └── ... (support packages)
 ```
 
 ### After (Current)
 
-```
+```text
 internal/
-├── ast/ (15 files, ~100-200 lines each) ✅
-├── parser/ (26 files, ~200-300 lines each) ✅
-├── engine/ (36 files, ~150-300 lines each) ✅
+├── ast/ (15 files, ~100-200 lines each)
+├── parser/ (26 files, ~200-300 lines each)
+├── engine/ (36 files, ~150-300 lines each)
 └── ... (support packages)
 ```
 
 **Improvement:**
-- 📊 10x better file sizes
-- 🎯 Clear responsibilities
-- 🧪 Easier to test
-- 📖 Easier to understand
-- 🚀 Faster to modify
+-  10x better file sizes
+-  Clear responsibilities
+-  Easier to test
+-  Easier to understand
+-  Faster to modify
 
 ---
 
@@ -577,11 +577,11 @@ internal/
 
 When adding new code:
 
-1. ✅ Follow existing patterns
-2. ✅ Keep files under 500 lines
-3. ✅ Group by domain, not layer
-4. ✅ Add tests for new code
-5. ✅ Update documentation
+1.  Follow existing patterns
+2.  Keep files under 500 lines
+3.  Group by domain, not layer
+4.  Add tests for new code
+5.  Update documentation
 
 ---
 
@@ -593,5 +593,5 @@ When adding new code:
 
 ---
 
-*Last Updated: October 5, 2025*  
+*Last Updated: October 5, 2025*
 *Current Version*

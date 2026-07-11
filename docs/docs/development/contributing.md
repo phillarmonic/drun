@@ -78,7 +78,7 @@ go install ./cmd/xdrun
 
 drun follows a clean, layered architecture:
 
-```
+```text
 cmd/xdrun/             # CLI entry point
 ├── main.go            # Main entry (440 lines)
 └── app/               # CLI modules
@@ -123,7 +123,7 @@ See [internal/README.md](packages/index.md) for detailed package documentation.
 
 Write clear commit messages:
 
-```
+```text
 Add HTTP timeout configuration
 
 - Add timeout option to HTTP statements
@@ -159,12 +159,12 @@ func TestParseDockerBuild(t *testing.T) {
     input := `build docker image "myapp:latest"`
     l := lexer.New(input)
     p := New(l)
-    
+
     stmt, err := p.parseDockerStatement()
     if err != nil {
         t.Fatalf("parser error: %v", err)
     }
-    
+
     if stmt.Action != "build" {
         t.Errorf("expected action 'build', got '%s'", stmt.Action)
     }
@@ -181,11 +181,11 @@ func TestDockerBuildExecution(t *testing.T) {
     task "test":
       build docker image "test:latest"
     `
-    
+
     eng := NewEngine(os.Stdout)
     program, _ := ParseString(source)
     eng.LoadProject(program)
-    
+
     err := eng.RunTask("test", nil)
     // Assert results...
 }
@@ -218,7 +218,7 @@ go test -cover ./...
 
 **Keep files small and focused:**
 - AST definitions: 100-200 lines
-- Parsers: 200-300 lines  
+- Parsers: 200-300 lines
 - Executors: 150-250 lines
 - Helpers: 100-200 lines
 - Maximum: 500 lines per file
@@ -226,14 +226,14 @@ go test -cover ./...
 **Group by domain, not layer:**
 
 Good:
-```
+```text
 ast_docker.go
 parser_docker.go
 executor_docker.go
 ```
 
 Bad:
-```
+```text
 all_ast_types.go (5000 lines)
 ```
 
@@ -393,16 +393,16 @@ import "github.com/phillarmonic/drun/v2/internal/ast"
 
 func (p *Parser) parseSlackStatement() (*ast.SlackStatement, error) {
     stmt := &ast.SlackStatement{}
-    
+
     // Consume "notify"
     stmt.Action = p.curToken.Literal
-    
+
     if !p.expectPeek(IDENT) || p.curToken.Literal != "slack" {
         return nil, p.error("expected 'slack' after 'notify'")
     }
-    
+
     // Parse channel and message...
-    
+
     return stmt, nil
 }
 ```
@@ -429,9 +429,9 @@ func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) erro
     // Interpolate variables
     message := e.interpolateVariables(stmt.Message, ctx)
     channel := e.interpolateVariables(stmt.Channel, ctx)
-    
+
     // Send to Slack...
-    
+
     return nil
 }
 ```
@@ -474,10 +474,10 @@ func YourFunction(args ...string) (string, error) {
     if len(args) < 1 {
         return "", fmt.Errorf("yourFunction requires at least 1 argument")
     }
-    
+
     // Implementation
     result := doSomething(args[0])
-    
+
     return result, nil
 }
 ```
@@ -602,7 +602,7 @@ Each file/package should have one clear purpose.
 
 ### 3. Dependency Direction
 
-```
+```text
 CLI → Engine → Parser → Lexer → AST
       ↓
   Support Packages

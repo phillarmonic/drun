@@ -46,14 +46,14 @@ xdrun cmd:from makefile -i examples/makefile-conversion/example.Makefile \
 
 The converter handles:
 
-- ✅ **Targets** → drun tasks
-- ✅ **Dependencies** → `depends on` declarations
-- ✅ **Variables** → drun variables with interpolation
-- ✅ **Comments** → task descriptions
-- ✅ **Shell commands** → `run`, `echo`, `create dir`, etc.
-- ✅ **.PHONY targets** → properly marked
-- ✅ **@ prefix** (silent) → preserved as appropriate drun actions
-- ✅ **- prefix** (ignore errors) → wrapped in `try/ignore` blocks
+-  **Targets** → drun tasks
+-  **Dependencies** → `depends on` declarations
+-  **Variables** → drun variables with interpolation
+-  **Comments** → task descriptions
+-  **Shell commands** → `run`, `echo`, `create dir`, etc.
+-  **.PHONY targets** → properly marked
+-  **@ prefix** (silent) → preserved as appropriate drun actions
+-  **- prefix** (ignore errors) → wrapped in `try/ignore` blocks
 
 ## Example Conversion
 

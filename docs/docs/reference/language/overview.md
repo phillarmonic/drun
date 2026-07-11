@@ -46,7 +46,7 @@ xdrun [task_name] [param1=value1] [param2=value2] [--cli-flags]
 
 The language prioritizes human readability over machine optimization. Every construct should read like natural English while maintaining precise semantics.
 
-```
+```drun
 # Good: Natural and clear
 deploy myapp to production with 3 replicas
 
@@ -58,13 +58,13 @@ kubectl.apply(deployment.spec(replicas=3, namespace="production"))
 
 Focus on *what* should happen, not *how* to do it. The compiler handles implementation details.
 
-```
+```drun
 # Declarative: What should happen
 ensure database is running
 
 # Imperative: How to do it (handled by compiler)
 # if ! docker ps | grep -q postgres; then
-#   docker run -d postgres:13
+# docker run -d postgres:13
 # fi
 ```
 
@@ -72,7 +72,7 @@ ensure database is running
 
 The language should infer sensible defaults based on context and project structure.
 
-```
+```drun
 # Infers image name from project context
 build docker image
 

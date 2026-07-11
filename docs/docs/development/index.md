@@ -50,7 +50,7 @@ graph LR
     B --> C[Read internal/README.md]
     C --> D[Explore specific packages]
     D --> E[Run examples]
-    
+
     style A fill:#e1f5ff
     style E fill:#e1ffe1
 ```
@@ -97,7 +97,7 @@ Read these in order:
 
 ### System Layers
 
-```
+```text
 ┌─────────────────────────────────────┐
 │  CLI Layer (cmd/xdrun/)             │  User interaction & debug flags
 ├─────────────────────────────────────┤
@@ -127,7 +127,7 @@ Read these in order:
 
 ### Package Organization
 
-```
+```text
 internal/
 ├── ast/               # 15 files - AST node definitions
 ├── parser/            # 26 files - Syntax parsing
@@ -189,10 +189,10 @@ type Engine struct {
 func (e *Engine) ExecuteWithParamsAndFile(...) error {
     // 1. Register tasks in domain registry
     e.registerTasks(program.Tasks, currentFile)
-    
+
     // 2. Create comprehensive execution plan
     plan, err := e.planner.Plan(taskName, program, projectCtx)
-    
+
     // 3. Execute using plan (no redundant AST scans)
     for _, taskName := range plan.ExecutionOrder {
         taskPlan, _ := plan.GetTask(taskName)
@@ -202,8 +202,7 @@ func (e *Engine) ExecuteWithParamsAndFile(...) error {
         }
     }
 }
-```
-
+```text
 **Architectural Benefits:**
 - **Domain-Driven** - Business logic separated from infrastructure
 - **Explicit Planning** - Upfront execution plan eliminates waste
@@ -284,7 +283,7 @@ func (t *Task) Validate() error {
         if !valid {
             return &TaskError{
                 Task:    t.Name,
-                Message: fmt.Sprintf("invalid priority '%s', must be one of: %v", 
+                Message: fmt.Sprintf("invalid priority '%s', must be one of: %v",
                     t.Priority, ValidPriorities),
             }
         }
@@ -332,7 +331,7 @@ func (r *Registry) ListByPriority() []*Task {
     result = append(result, medium...)
     result = append(result, low...)
     result = append(result, unspecified...)
-    
+
     return result
 }
 ```
@@ -352,7 +351,7 @@ func NewTask(stmt *ast.TaskStatement, namespace, source string) *Task {
         Source:      source,
         Body:        stmt.Body,
     }
-    
+
     // ... rest of conversion
     return task
 }
@@ -387,7 +386,7 @@ func (e *Engine) ListTasksByPriority(program *ast.Program) []TaskInfo {
 
     // Get tasks from domain registry sorted by priority
     domainTasks := e.taskRegistry.ListByPriority()
-    
+
     tasks := make([]TaskInfo, 0, len(domainTasks))
     for _, domainTask := range domainTasks {
         info := TaskInfo{
@@ -428,7 +427,7 @@ if a.listByPriority {
 
 ### Why This Pattern Works
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │ CLI Layer: User interaction                     │
 │  - Flags, commands, output formatting           │
@@ -450,10 +449,10 @@ if a.listByPriority {
 ```
 
 **Benefits:**
-- ✅ Easy to test (domain logic isolated)
-- ✅ Reusable (priority logic works anywhere)
-- ✅ Maintainable (change priority rules in one place)
-- ✅ Clear (each layer has single responsibility)
+-  Easy to test (domain logic isolated)
+-  Reusable (priority logic works anywhere)
+-  Maintainable (change priority rules in one place)
+-  Clear (each layer has single responsibility)
 
 ### Testing the Domain Layer
 
@@ -489,14 +488,14 @@ func TestTaskPriorityValidation(t *testing.T) {
 
 func TestRegistryListByPriority(t *testing.T) {
     registry := NewRegistry()
-    
+
     // Register tasks with different priorities
     registry.Register(&Task{Name: "task1", Priority: "low"})
     registry.Register(&Task{Name: "task2", Priority: "high"})
     registry.Register(&Task{Name: "task3", Priority: "medium"})
-    
+
     tasks := registry.ListByPriority()
-    
+
     // Should be ordered: high, medium, low
     if tasks[0].Name != "task2" || tasks[0].Priority != "high" {
         t.Error("Expected high priority task first")
@@ -523,7 +522,7 @@ When adding any new feature:
 7. **Dogfood the Workflow**: If the feature affects project automation, update [.drun/spec.drun](./.drun/spec.drun)
 8. **Finish with Full Validation**: Run targeted tests while iterating, then finish with `xdrun ci`
 
-This keeps your codebase clean, testable, and maintainable! 🎯
+This keeps your codebase clean, testable, and maintainable!
 
 ## Testing
 
@@ -566,7 +565,7 @@ func TestParseDockerBuild(t *testing.T) {
     input := `build docker image "myapp:latest"`
     l := lexer.New(input)
     p := New(l)
-    
+
     stmt, err := p.parseDockerStatement()
     assert.NoError(t, err)
     assert.Equal(t, "build", stmt.Action)
@@ -588,7 +587,7 @@ func TestParseDockerBuild(t *testing.T) {
 - Helpers: 100-200 lines
 
 **Group by domain:**
-```
+```text
 Good: ast_docker.go, parser_docker.go, executor_docker.go
 Bad: ast.go (all AST in one file)
 ```
@@ -683,13 +682,13 @@ package parser
 
 func (p *Parser) parseSlackStatement() (*ast.SlackStatement, error) {
     stmt := &ast.SlackStatement{}
-    
+
     if !p.expectPeek(IDENT) {
         return nil, p.error("expected 'slack'")
     }
-    
+
     // Parse channel, message...
-    
+
     return stmt, nil
 }
 ```
@@ -716,9 +715,9 @@ func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) erro
     // Interpolate variables
     message := e.interpolateVariables(stmt.Message, ctx)
     channel := e.interpolateVariables(stmt.Channel, ctx)
-    
+
     // Send to Slack...
-    
+
     return nil
 }
 ```
@@ -734,7 +733,7 @@ case *statement.Slack:
 
 Create:
 - `internal/parser/parser_slack_test.go` - Parser tests
-- `internal/domain/statement/slack_test.go` - Domain converter tests  
+- `internal/domain/statement/slack_test.go` - Domain converter tests
 - `internal/engine/executor_slack_test.go` - Executor tests
 
 #### 7. Update Documentation
@@ -752,7 +751,7 @@ Create:
 
 The tree representation of drun code:
 
-```
+```text
 Program
 └── Task("build")
     ├── ShellStatement("npm install")
@@ -783,7 +782,7 @@ type ExecutionContext struct {
 
 Variable replacement in strings:
 
-```
+```text
 "Hello {$name}" → "Hello World"
 "{$files} filtered by extension '.js'" → "app.js,test.js"
 ```
@@ -908,18 +907,18 @@ Check interpolation logic in:
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Domain Decoupling | ✅ Complete | Tasks/Projects use domain statements |
-| Execution Planning | ✅ Implemented | Planner generates comprehensive plans |
-| Dependency Injection | ✅ Available | Options-based configuration |
-| Debug Diagnostics | ✅ Available | Graphviz, Mermaid, JSON exports |
+| Domain Decoupling |  Complete | Tasks/Projects use domain statements |
+| Execution Planning |  Implemented | Planner generates comprehensive plans |
+| Dependency Injection |  Available | Options-based configuration |
+| Debug Diagnostics |  Available | Graphviz, Mermaid, JSON exports |
 | Code Organization | 100+ focused files | Modular, maintainable structure |
 
 **Current Status:**
-- ✅ All unit tests passing
-- ✅ 60 examples working
-- ✅ All features functional
-- ✅ Zero regressions
-- ✅ Production ready
+-  All unit tests passing
+-  60 examples working
+-  All features functional
+-  Zero regressions
+-  Production ready
 
 ---
 
@@ -943,7 +942,7 @@ Check interpolation logic in:
 
 ### Documentation Navigation
 
-```
+```text
 Need to understand...                    → Read...
 ─────────────────────────────────────────────────────────────
 How the system works                    → ARCHITECTURE.md
@@ -981,5 +980,5 @@ Happy coding!
 
 ---
 
-*Last Updated: May 30, 2026*  
+*Last Updated: May 30, 2026*
 *Version: 2.15.0 - Refactor of the whole internal system*

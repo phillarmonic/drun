@@ -87,18 +87,18 @@ task "configure":
 
 task "deploy":
   depends on "configure"
-  
+
   # Check if secrets exist
   secret exists "api_key"
   secret exists "db_password"
-  
+
   # Use secrets in deployment
   run """
     kubectl create secret generic app-secrets \
       --from-literal=api-key={secret('api_key')} \
       --from-literal=db-password={secret('db_password')}
   """
-  
+
   success "Deployed with secrets"
 
 task "cleanup":
@@ -121,7 +121,7 @@ task "cleanup":
 The `secret()` builtin function allows seamless secret access in interpolations:
 
 **Syntax:**
-```
+```drun
 {secret('key')}                           # Get from current project namespace
 {secret('key', 'default')}                # Get with default value
 {secret('key', '', 'namespace')}          # Get from specific namespace
@@ -238,10 +238,10 @@ project "my-app" version "1.0":
 task "deploy":
   # Access project-scoped secret
   info "Deploying with key: {secret('api_key')}"
-  
+
   # Access global secret
   info "Team token: {secret('shared_token', '', 'global')}"
-  
+
   # Access custom namespace secret
   info "Alpha key: {secret('team_key', '', 'team-alpha')}"
 ```
@@ -301,7 +301,7 @@ xdrun cmd:skill install basics --target ../my-service --force
 
 ---
 
-## Git Policy and Hooks ⭐ *New*
+## Git Policy and Hooks  *New*
 
 Drun allows you to define project-wide git conventions (branch naming, commit messages) directly in the project block, and automatically validate them at runtime or via git hooks.
 
@@ -353,7 +353,7 @@ task "pre-flight" means "Run checks before push":
   git validate branch_name
   git validate commit_message
   git validate signed_commits
-  
+
   # Or validate everything at once:
   git validate all
 ```

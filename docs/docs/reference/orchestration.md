@@ -194,10 +194,10 @@ service "gateway" in "./gateway":
 ```
 
 **When to use `allocate_tty`:**
-- ✅ When your build uses `docker compose exec` to run commands inside containers
-- ✅ When scripts require a TTY (check for "input device is not a TTY" errors)
-- ✅ When commands need interactive terminal features
-- ❌ Not needed for regular shell commands, docker build, or make
+-  When your build uses `docker compose exec` to run commands inside containers
+-  When scripts require a TTY (check for "input device is not a TTY" errors)
+-  When commands need interactive terminal features
+-  Not needed for regular shell commands, docker build, or make
 
 #### Complex Real-World Example
 
@@ -407,11 +407,11 @@ orchestrate "local_stack":
 - Helpful warning message suggests adding entries to `/etc/hosts`
 
 **Example Output (on failure):**
-```
-🔍 DNS resolution check:
-   ❌ api.local - not resolvable
+```text
+ DNS resolution check:
+    api.local - not resolvable
 
-⚠️  DNS resolution failed for: api.local
+  DNS resolution failed for: api.local
 These domains may need to be added to your /etc/hosts file
 ```
 
@@ -450,10 +450,10 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 
 | Feature | `start` | `up` |
 |---------|---------|------|
-| Skip if healthy | ✅ Yes | ❌ No |
-| Check for updates | ✅ Yes | ✅ Yes |
-| Force repo updates on main/master | ❌ No | ✅ Yes |
-| Force rebuild | ❌ No | ✅ Yes |
+| Skip if healthy |  Yes |  No |
+| Check for updates |  Yes |  Yes |
+| Force repo updates on main/master |  No |  Yes |
+| Force rebuild |  No |  Yes |
 | **Use for** | Quick restarts | Development, fresh deploys |
 
 #### Resume from a Specific Service
@@ -471,7 +471,7 @@ orchestrate "<group_name>" <action> starting from $variable
 ```drun
 task "up" means "Start the stack":
     given $service defaults to empty
-    
+
     when $service is not empty:
         # Resume from a specific service if provided
         orchestrate "my_stack" up starting from {$service}
@@ -582,7 +582,7 @@ The branch management actions help you keep repositories aligned with their defa
 ```drun
 task "restart_service":
     given $service defaults to empty
-    
+
     when $service is not empty:
         # All three syntaxes work:
         orchestrate "stack" restart service "api"        # Literal
@@ -612,19 +612,19 @@ task "endpoints":
 ```
 
 **Example Output:**
-```
-🌐 Service endpoints for orchestration: my_stack
+```text
+ Service endpoints for orchestration: my_stack
 
-✅ Running services with endpoints:
+ Running services with endpoints:
    • api: http://localhost:8080/health
    • frontend: http://localhost:3000/
    • admin: http://localhost:9000/admin
 
-✅ Running services (no endpoints):
+ Running services (no endpoints):
    • database
    • redis
 
-⏹️  Stopped services:
+  Stopped services:
    • worker
    • scheduler
 ```
@@ -641,35 +641,35 @@ The orchestration system features a BuildKit-inspired real-time progress display
 
 #### Status Indicators
 
-- ⏸️ **Pending** - Waiting to start
-- 🔄 **Starting** - Service is starting
-- ✅ **Healthy** - Started and passed health checks
-- ❌ **Failed** - Failed to start or unhealthy
-- 🛑 **Stopping** - Being stopped
-- ⏹️ **Stopped** - Successfully stopped
+-  **Pending** - Waiting to start
+-  **Starting** - Service is starting
+-  **Healthy** - Started and passed health checks
+-  **Failed** - Failed to start or unhealthy
+-  **Stopping** - Being stopped
+-  **Stopped** - Successfully stopped
 
 #### Example Output
 
-```
-🚀 Starting orchestration: full_stack
+```text
+ Starting orchestration: full_stack
    4 services in dependency order
 
-  ⏸️ database     
-  ⏸️ redis        
-  ⏸️ api          
-  ⏸️ frontend     
+   database
+   redis
+   api
+   frontend
 
-  🔄 database     Starting service... [0s]
-  🔄 database     Waiting for health check... [0s]
-  ✅ database     Healthy [2s]
-  🔄 redis        Starting service... [0s]
-  ✅ redis        Healthy [1s]
-  🔄 api          Starting service... [0s]
-  ✅ api          Healthy [3s]
-  🔄 frontend     Starting service... [0s]
-  ✅ frontend     Healthy [2s]
+   database     Starting service... [0s]
+   database     Waiting for health check... [0s]
+   database     Healthy [2s]
+   redis        Starting service... [0s]
+   redis        Healthy [1s]
+   api          Starting service... [0s]
+   api          Healthy [3s]
+   frontend     Starting service... [0s]
+   frontend     Healthy [2s]
 
-✅ 4/4 services completed successfully
+ 4/4 services completed successfully
 ```
 
 ### Circuit Breaker
@@ -686,19 +686,19 @@ orchestrate "critical":
 
 #### Behavior
 
-```
-🚀 Starting orchestration: critical
-   🔴 Circuit breaker: ENABLED - will stop all on failure
+```text
+ Starting orchestration: critical
+    Circuit breaker: ENABLED - will stop all on failure
 
-  ✅ database     Healthy [2s]
-  ❌ api          Health check failed [5s]
+   database     Healthy [2s]
+   api          Health check failed [5s]
 
-🔴 Circuit breaker triggered! Rolling back all services...
+ Circuit breaker triggered! Rolling back all services...
 
-  🛑 database     Rolling back... [0s]
-  ⏹️ database     Stopped (rollback) [0s]
+   database     Rolling back... [0s]
+   database     Stopped (rollback) [0s]
 
-❌ 1/3 services failed
+ 1/3 services failed
 Error: circuit breaker: health check failed for 'api', all services stopped
 ```
 
@@ -716,15 +716,15 @@ orchestrate "resilient":
 
 #### Behavior
 
-```
-🚀 Starting orchestration: resilient
+```text
+ Starting orchestration: resilient
 
-  ✅ database     Healthy [2s]
-  ❌ api          Health check failed [5s]
-  🔄 api          ⚠️  Unhealthy: health check failed [5s]
-  ✅ frontend     Healthy [2s]
+   database     Healthy [2s]
+   api          Health check failed [5s]
+   api            Unhealthy: health check failed [5s]
+   frontend     Healthy [2s]
 
-✅ 2/3 services completed successfully
+ 2/3 services completed successfully
 ```
 
 ### Complete Example
@@ -775,12 +775,12 @@ orchestrate "platform":
 
 # Tasks
 task "start":
-    info "🚀 Starting platform..."
+    info " Starting platform..."
     orchestrate "platform" start
     success "Platform ready at http://localhost:3000"
 
 task "stop":
-    info "🛑 Stopping platform..."
+    info " Stopping platform..."
     orchestrate "platform" stop
 
 task "restart":
@@ -860,8 +860,8 @@ Shutdown occurs in reverse topological order:
 
 #### Health Check Failures
 
-```
-  ❌ api    Waiting for health check...: health check failed after 5 attempts [10s]
+```text
+   api    Waiting for health check...: health check failed after 5 attempts [10s]
 ```
 
 **Common causes:**
@@ -872,8 +872,8 @@ Shutdown occurs in reverse topological order:
 
 #### Docker Compose Errors
 
-```
-  ❌ service  Starting service...: docker compose failed: exit status 1
+```text
+   service  Starting service...: docker compose failed: exit status 1
 Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is already allocated
 ```
 
@@ -885,8 +885,8 @@ Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is alread
 
 #### Missing Service Path
 
-```
-  ❌ service  Starting service...: docker compose failed: chdir /path: no such file or directory
+```text
+   service  Starting service...: docker compose failed: chdir /path: no such file or directory
 ```
 
 **Common causes:**
@@ -975,7 +975,7 @@ service "api" in "./api":
 
 #### Data Flow
 
-```
+```text
 Drunfile
    ↓
 Parser (service & orchestrate)
@@ -1042,7 +1042,7 @@ The circuit breaker uses intelligent dependency-aware rollback:
 Circuit breaker is triggered by various failure types:
 
 - Docker Compose build failures
-- Docker Compose startup failures  
+- Docker Compose startup failures
 - Health check timeout failures
 - Service dependency resolution failures
 
@@ -1051,7 +1051,7 @@ Circuit breaker is triggered by various failure types:
 **BuildKit-Style Visual Feedback**
 Real-time progress display with comprehensive state tracking:
 
-- Status icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
+- Distinct pending, building, starting, healthy, and failed service states.
 - Inline progress updates without output cluttering
 - Build output integration with progress display
 - Final summary with success/failure counts

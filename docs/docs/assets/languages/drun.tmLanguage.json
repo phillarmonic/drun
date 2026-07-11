@@ -1,0 +1,1450 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "drun",
+  "scopeName": "source.drun",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#meta"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#single-quoted"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "meta": {
+      "patterns": [
+        {
+          "include": "#version"
+        },
+        {
+          "include": "#annotation"
+        },
+        {
+          "include": "#task-template"
+        },
+        {
+          "include": "#task-definition"
+        },
+        {
+          "include": "#snippet-definition"
+        },
+        {
+          "include": "#parameter-definition"
+        },
+        {
+          "include": "#dependency-declaration"
+        },
+        {
+          "include": "#variable-declaration"
+        },
+        {
+          "include": "#control-flow"
+        },
+        {
+          "include": "#detection-conditions"
+        },
+        {
+          "include": "#include-statement"
+        },
+        {
+          "include": "#call-task"
+        },
+        {
+          "include": "#lifecycle-hooks"
+        },
+        {
+          "include": "#git-policy"
+        },
+        {
+          "include": "#provisioning-sources"
+        },
+        {
+          "include": "#shell-config"
+        },
+        {
+          "include": "#capture-shell"
+        },
+        {
+          "include": "#env-conditions"
+        },
+        {
+          "include": "#http-actions"
+        },
+        {
+          "include": "#download-actions"
+        },
+        {
+          "include": "#network-actions"
+        },
+        {
+          "include": "#orchestration"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.drun",
+          "match": "#.*$"
+        },
+        {
+          "name": "comment.block.drun",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "version": {
+      "patterns": [
+        {
+          "name": "meta.version.drun",
+          "match": "^(\\s*)(version)(\\s*:\\s*)(\\d+(?:\\.\\d+)*)\\s*$",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.version.drun"
+            },
+            "4": {
+              "name": "constant.numeric.version.drun"
+            }
+          }
+        }
+      ]
+    },
+    "annotation": {
+      "patterns": [
+        {
+          "name": "meta.annotation.drun",
+          "match": "^(\\s*)(@)([A-Za-z_][A-Za-z0-9_]*)(\\()(.*?)(\\))\\s*$",
+          "captures": {
+            "2": {
+              "name": "punctuation.definition.annotation.drun"
+            },
+            "3": {
+              "name": "entity.name.annotation.drun"
+            },
+            "4": {
+              "name": "punctuation.section.group.begin.drun"
+            },
+            "6": {
+              "name": "punctuation.section.group.end.drun"
+            }
+          }
+        }
+      ]
+    },
+    "task-template": {
+      "patterns": [
+        {
+          "name": "meta.definition.template-task.drun",
+          "match": "^(\\s*)(template)(\\s+)(task)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.template.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.task.drun"
+            },
+            "6": {
+              "name": "entity.name.function.task.drun"
+            }
+          }
+        }
+      ]
+    },
+    "task-definition": {
+      "patterns": [
+        {
+          "name": "meta.definition.task.drun",
+          "match": "^(\\s*)(task)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.task.drun"
+            },
+            "4": {
+              "name": "entity.name.function.task.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.definition.task-description.drun",
+          "begin": "\\b(means)(\\s+)(\")",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.declaration.description.drun"
+            },
+            "3": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "name": "string.quoted.double.documentation.drun",
+              "match": "[^\"]+"
+            }
+          ]
+        },
+        {
+          "name": "meta.definition.project.drun",
+          "match": "^(\\s*)(project)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(?:(\\s+)(version)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"))?",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.project.drun"
+            },
+            "4": {
+              "name": "entity.name.type.project.drun"
+            },
+            "6": {
+              "name": "keyword.declaration.version.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.version.drun"
+            }
+          }
+        },
+        {
+          "name": "keyword.declaration.description.drun",
+          "match": "\\bmeans\\b"
+        }
+      ]
+    },
+    "snippet-definition": {
+      "patterns": [
+        {
+          "name": "meta.definition.snippet.drun",
+          "match": "^(\\s*)(snippet)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.snippet.drun"
+            },
+            "4": {
+              "name": "entity.name.function.snippet.drun"
+            }
+          }
+        }
+      ]
+    },
+    "parameter-definition": {
+      "patterns": [
+        {
+          "name": "meta.definition.parameter.drun",
+          "match": "^(\\s*)(parameter|requires|given|accepts)(?=\\b)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.parameter.drun"
+            }
+          }
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\b(?:defaults\\s+to|as\\s+list\\s+to)\\b"
+        },
+        {
+          "name": "keyword.operator.word.drun",
+          "match": "\\b(?:as|from|matching|between|of|to)\\b"
+        }
+      ]
+    },
+    "dependency-declaration": {
+      "patterns": [
+        {
+          "name": "meta.dependency.declaration.drun",
+          "match": "^(\\s*)(depends)(\\s+)(on)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "keyword.operator.word.drun"
+            }
+          }
+        },
+        {
+          "name": "keyword.operator.word.drun",
+          "match": "\\b(?:then|and)\\b"
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\bin\\s+parallel\\b"
+        },
+        {
+          "name": "entity.name.function.task.drun",
+          "match": "(?<=\\b(?:on|then|and)\\s)([A-Za-z_][A-Za-z0-9_.:-]*)\\b"
+        },
+        {
+          "name": "entity.name.function.task.drun",
+          "match": "(?<=,\\s)([A-Za-z_][A-Za-z0-9_.:-]*)\\b"
+        }
+      ]
+    },
+    "variable-declaration": {
+      "patterns": [
+        {
+          "name": "meta.variable.declaration.drun",
+          "match": "^(\\s*)(let|set|define)(\\s+)(\\$?[A-Za-z_][A-Za-z0-9_\\-]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "variable.other.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.capture.expression.drun",
+          "match": "^(\\s*)(capture)(\\s+)(?!from\\s+shell)([A-Za-z_][A-Za-z0-9_\\-]*)(\\s+)(from)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "variable.other.drun"
+            },
+            "6": {
+              "name": "keyword.operator.word.drun"
+            }
+          }
+        }
+      ]
+    },
+    "include-statement": {
+      "patterns": [
+        {
+          "name": "meta.include.drun",
+          "match": "^(\\s*)(include)(\\s+)(?=\")",
+          "captures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.include.drun",
+          "match": "^(\\s*)(include)(\\s+)(from)(\\s+)(drunhub)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            },
+            "4": {
+              "name": "keyword.control.import.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.include.drun",
+          "match": "^(\\s*)(include)(\\s+)(snippets|templates|tasks)?(?:(\\s*)(,)(\\s*)(snippets|templates|tasks))?(\\s+)(from)?(?:(\\s+)(drunhub))?",
+          "captures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            },
+            "4": {
+              "name": "entity.name.type.import-selector.drun"
+            },
+            "6": {
+              "name": "punctuation.separator.sequence.drun"
+            },
+            "8": {
+              "name": "entity.name.type.import-selector.drun"
+            },
+            "10": {
+              "name": "keyword.control.import.drun"
+            },
+            "12": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.include.alias.drun",
+          "match": "(?:^|\\s)(as)(\\s+)([A-Za-z_][A-Za-z0-9_-]*)$",
+          "captures": {
+            "1": {
+              "name": "keyword.control.import.drun"
+            },
+            "3": {
+              "name": "entity.name.type.namespace.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.use-snippet.drun",
+          "match": "^(\\s*)(use)(\\s+)(snippet)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_.-]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.snippet.drun"
+            },
+            "6": {
+              "name": "entity.name.function.snippet.drun"
+            }
+          }
+        }
+      ]
+    },
+    "capture-shell": {
+      "patterns": [
+        {
+          "name": "meta.shell.inline.drun",
+          "begin": "^(\\s*)(run|exec|shell)(\\s+)(\")",
+          "beginCaptures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "(\")(?:\\s+(attached))?",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.drun"
+            },
+            "2": {
+              "name": "keyword.operator.word.drun"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#shell-command-string"
+            }
+          ]
+        },
+        {
+          "name": "meta.capture.shell.inline.drun",
+          "match": "^(\\s*)(capture)(\\s+)(from)(\\s+)(shell)(\\s+)(as)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "keyword.operator.word.drun"
+            },
+            "6": {
+              "name": "support.type.action.drun"
+            },
+            "8": {
+              "name": "keyword.operator.word.drun"
+            },
+            "10": {
+              "name": "variable.other.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.capture.shell.inline.drun",
+          "match": "^(\\s*)(capture)(\\s+)(from)(\\s+)(shell)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(as)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "keyword.operator.word.drun"
+            },
+            "6": {
+              "name": "support.type.action.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.drun"
+            },
+            "10": {
+              "name": "keyword.operator.word.drun"
+            },
+            "12": {
+              "name": "variable.other.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.shell.block.drun",
+          "match": "^(\\s*)(run|exec|shell)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.workdir.drun",
+          "begin": "^(\\s*)(use)(\\s+)(workdir)(\\s+)(\")",
+          "beginCaptures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            },
+            "4": {
+              "name": "storage.type.workspace.drun"
+            },
+            "5": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "name": "string.quoted.double.path.drun",
+              "match": "[^\"]+"
+            }
+          ]
+        },
+        {
+          "name": "meta.workdir.drun",
+          "match": "^(\\s*)(use)(\\s+)(workdir)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.import.drun"
+            },
+            "4": {
+              "name": "storage.type.workspace.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.service-scoped-shell.drun",
+          "begin": "^(\\s*)(run|exec|shell)(\\s+)(in)(\\s+)(service)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_\\-]*)(\\s+)(\")",
+          "beginCaptures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "keyword.operator.word.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            },
+            "8": {
+              "name": "entity.name.type.service.drun"
+            },
+            "10": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "(\")(?:\\s+(attached))?",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.drun"
+            },
+            "2": {
+              "name": "keyword.operator.word.drun"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#shell-command-string"
+            }
+          ]
+        },
+        {
+          "name": "meta.service-scoped-shell.modifier.drun",
+          "match": "\\b(attached)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.word.drun"
+            }
+          }
+        }
+      ]
+    },
+    "env-conditions": {
+      "patterns": [
+        {
+          "name": "meta.condition.environment.drun",
+          "match": "\\b(if|when)(\\s+)(env)(\\s+)([A-Z_][A-Z0-9_]*)(\\s+)(exists|is)(?:(\\s+)(not)(\\s+)(empty|\"(?:[^\"\\\\]|\\\\.)*\"))?(?:(\\s+)(and)(\\s+)(is)(\\s+)(not)?(\\s+)(empty|\"(?:[^\"\\\\]|\\\\.)*\"))?",
+          "captures": {
+            "1": {
+              "name": "keyword.control.drun"
+            },
+            "3": {
+              "name": "support.function.builtin.drun"
+            },
+            "5": {
+              "name": "support.variable.environment.name.drun"
+            },
+            "7": {
+              "name": "keyword.control.drun"
+            },
+            "10": {
+              "name": "keyword.control.drun"
+            },
+            "12": {
+              "name": "constant.language.boolean.drun"
+            },
+            "15": {
+              "name": "keyword.control.drun"
+            },
+            "17": {
+              "name": "keyword.control.drun"
+            },
+            "19": {
+              "name": "keyword.control.drun"
+            },
+            "21": {
+              "name": "constant.language.boolean.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.condition.runtime-environment.drun",
+          "match": "\\b(when)(\\s+)(running)(\\s+)(in|on)(\\s+)(CI|locally|macOS|Linux)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.drun"
+            },
+            "3": {
+              "name": "support.constant.domain.drun"
+            },
+            "5": {
+              "name": "keyword.operator.word.drun"
+            },
+            "7": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        }
+      ]
+    },
+    "control-flow": {
+      "patterns": [
+        {
+          "name": "meta.control.else-if.drun",
+          "match": "^(\\s*)(else)(\\s+)(if)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            },
+            "4": {
+              "name": "keyword.control.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.control.statement.drun",
+          "match": "^(\\s*)(if|when|otherwise|else|try|catch|finally)(?=\\b)",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.control.match-arm.drun",
+          "match": "^(\\s*)(is)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\$[A-Za-z_][A-Za-z0-9_\\-]*|\\{[^}]+\\}|[A-Za-z_][A-Za-z0-9_\\-]*)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            },
+            "4": {
+              "name": "string.quoted.double.drun"
+            }
+          }
+        }
+      ]
+    },
+    "detection-conditions": {
+      "patterns": [
+        {
+          "name": "meta.condition.tool-availability.drun",
+          "match": "^(\\s*)(if)(\\s+)(.+?)(\\s+)(is|are)(\\s+)(not\\s+(?:available|running)|available|running)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            },
+            "6": {
+              "name": "keyword.control.drun"
+            },
+            "8": {
+              "name": "keyword.control.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.condition.version-check.drun",
+          "match": "\\b(and\\s+version|version)(\\s+)(==|!=|<=|>=|<|>)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.drun"
+            },
+            "3": {
+              "name": "keyword.operator.comparison.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.condition.filesystem.drun",
+          "match": "\\b(file|folder|directory|dir)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_\\-]*)",
+          "captures": {
+            "1": {
+              "name": "support.constant.domain.drun"
+            },
+            "3": {
+              "name": "string.quoted.double.path.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.condition.detected.drun",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_\\-]*)(\\s+)(is\\s+detected|detected)\\b",
+          "captures": {
+            "1": {
+              "name": "support.constant.domain.drun"
+            },
+            "3": {
+              "name": "keyword.control.drun"
+            }
+          }
+        }
+      ]
+    },
+    "http-actions": {
+      "patterns": [
+        {
+          "name": "meta.http.action.drun",
+          "match": "^(\\s*)(get|post|put|delete|patch|head|options)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "string.quoted.double.url.drun"
+            }
+          }
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\b(content\\s+type|with\\s+body|with\\s+header|with\\s+auth|auth\\s+bearer|auth\\s+basic|timeout|retry|download|upload)\\b"
+        }
+      ]
+    },
+    "download-actions": {
+      "patterns": [
+        {
+          "name": "meta.download.action.drun",
+          "match": "^(\\s*)(download)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(to)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "string.quoted.double.url.drun"
+            },
+            "6": {
+              "name": "keyword.operator.word.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.path.drun"
+            }
+          }
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\b(allow\\s+overwrite|allow\\s+permissions|extract\\s+to|remove\\s+archive|with\\s+auth|with\\s+header|timeout|retry)\\b"
+        }
+      ]
+    },
+    "network-actions": {
+      "patterns": [
+        {
+          "name": "meta.network.wait.drun",
+          "match": "^(\\s*)(wait)(\\s+)(for)(\\s+)(service)(\\s+)(at)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(to)(\\s+)(be)(\\s+)(ready)",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "keyword.operator.word.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            },
+            "8": {
+              "name": "keyword.operator.word.drun"
+            },
+            "10": {
+              "name": "string.quoted.double.url.drun"
+            },
+            "12": {
+              "name": "keyword.operator.word.drun"
+            },
+            "14": {
+              "name": "keyword.operator.word.drun"
+            },
+            "16": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.network.test.drun",
+          "match": "^(\\s*)(test)(\\s+)(connection)(\\s+)(to)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(on)(\\s+)(port)(\\s+)(\\d+)",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "keyword.operator.word.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.drun"
+            },
+            "10": {
+              "name": "keyword.operator.word.drun"
+            },
+            "12": {
+              "name": "support.constant.domain.drun"
+            },
+            "14": {
+              "name": "constant.numeric.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.network.ping.drun",
+          "match": "^(\\s*)(ping)(\\s+)(host)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "string.quoted.double.drun"
+            }
+          }
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\btimeout\\b"
+        }
+      ]
+    },
+    "orchestration": {
+      "patterns": [
+        {
+          "name": "meta.service.definition.drun",
+          "match": "^(\\s*)(service)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(in)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "entity.name.type.service.drun"
+            },
+            "6": {
+              "name": "keyword.operator.word.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.path.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.orchestration.definition.drun",
+          "match": "^(\\s*)(orchestrate)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "entity.name.type.orchestration.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.orchestration.action.drun",
+          "match": "^(\\s*)(orchestrate)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(show\\s+endpoints|clone\\s+repositories|update\\s+repositories|list\\s+branches|switch\\s+branch\\s+to\\s+default|set\\s+all\\s+branches\\s+to\\s+default|update|health_check|restart|recreate|status|health|build|pull|down|logs|start|stop|scale|endpoints|up)(?:(\\s+)(starting\\s+from)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*|\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\}))?",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "entity.name.type.orchestration.drun"
+            },
+            "6": {
+              "name": "support.type.action.drun"
+            },
+            "8": {
+              "name": "storage.modifier.drun"
+            },
+            "10": {
+              "name": "entity.name.type.service.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.orchestration.modifier.drun",
+          "match": "\\b(services|service|starting\\s+from|with\\s+cache|with\\s+branch|with\\s+timeout)\\b",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.drun"
+            }
+          }
+        },
+        {
+          "name": "entity.name.type.service.drun",
+          "match": "(?<=\\bservice\\s)(\"(?:[^\"\\\\]|\\\\.)*\"|\\$[A-Za-z_][A-Za-z0-9_\\-]*|\\{[^}]+\\})"
+        },
+        {
+          "name": "meta.property.url.drun",
+          "match": "^(\\s*)(url|endpoint)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            },
+            "4": {
+              "name": "string.quoted.double.url.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.property.command.drun",
+          "begin": "^(\\s*)(command)(\\s+)(\")",
+          "beginCaptures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            },
+            "4": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#shell-command-string"
+            }
+          ]
+        },
+        {
+          "name": "meta.property.type.drun",
+          "match": "^(\\s*)(type)(\\s+)(\"(?:http|https|tcp)\")",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            },
+            "4": {
+              "name": "storage.type.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.property.strategy.drun",
+          "match": "^(\\s*)(strategy)(\\s+)(\"(?:sequential|parallel|dependency-based)\")",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.property.services.drun",
+          "match": "^(\\s*)(services)(\\s+)(\\[)(\\s*)(\"(?:[A-Za-z_][A-Za-z0-9_\\-]*)\")",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            },
+            "4": {
+              "name": "punctuation.section.group.begin.drun"
+            },
+            "6": {
+              "name": "entity.name.type.service.drun"
+            }
+          }
+        },
+        {
+          "name": "support.type.property-name.drun",
+          "match": "^(\\s*)(repository|build|health\\s+check|services|strategy|circuit_breaker|stop_on_failure|health_check_interval|startup_timeout|shutdown_timeout|makefile_order|makefile_timeout|clone_order|clone_timeout|pre_task|post_task|git_ssh_key|dns_checks|url|branch|tag|ssh_key|clone|update_on_start|required|command|allocate_tty|makefile|make_target|make_args|retry_on_failure|max_retries|retry_delay|fallback_command|type|endpoint|timeout|interval|retries|condition|container)(?=\\s*:|\\s+\\[|\\s+\"|\\s+true\\b|\\s+false\\b|\\s+\\d)"
+        }
+      ]
+    },
+    "call-task": {
+      "patterns": [
+        {
+          "name": "meta.call.task.drun",
+          "match": "^(\\s*)(call)(\\s+)(task)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_:.\\-]*)(?:(\\s+)(with))?",
+          "captures": {
+            "2": {
+              "name": "keyword.control.call.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.task.drun"
+            },
+            "6": {
+              "name": "entity.name.function.task.drun"
+            },
+            "8": {
+              "name": "keyword.operator.word.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.call.task.argument.drun",
+          "match": "(?:\\s|^)([A-Za-z_][A-Za-z0-9_\\-]*)(=)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.drun"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.drun"
+            }
+          }
+        }
+      ]
+    },
+    "lifecycle-hooks": {
+      "patterns": [
+        {
+          "name": "meta.lifecycle.hook.drun",
+          "match": "^(\\s*)(before|after)(\\s+)(any)(\\s+)(task)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.control.lifecycle.drun"
+            },
+            "4": {
+              "name": "keyword.control.lifecycle.drun"
+            },
+            "6": {
+              "name": "keyword.declaration.task.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.lifecycle.hook.drun",
+          "match": "^(\\s*)(on)(\\s+)(drun)(\\s+)(setup|teardown)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.control.lifecycle.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "keyword.control.lifecycle.drun"
+            }
+          }
+        }
+      ]
+    },
+    "shell-config": {
+      "patterns": [
+        {
+          "name": "meta.shell-config.drun",
+          "match": "^(\\s*)(shell)(\\s+)(config)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.config.drun"
+            }
+          }
+        },
+        {
+          "name": "entity.name.label.platform.drun",
+          "match": "^(\\s*)(mac|darwin|linux|windows)(?=\\s*:)"
+        },
+        {
+          "name": "entity.other.attribute-name.drun",
+          "match": "^(\\s*)(executable|args|environment)(?=\\s*:)"
+        },
+        {
+          "name": "punctuation.definition.list-item.drun",
+          "match": "^\\s*(-)(?=\\s+\")"
+        }
+      ]
+    },
+    "provisioning-sources": {
+      "patterns": [
+        {
+          "name": "meta.provisioning-sources.drun",
+          "match": "^(\\s*)(provisioning)(\\s+)(sources)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.config.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.config.drun"
+            }
+          }
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "\\bprovision\\b"
+        }
+      ]
+    },
+    "git-policy": {
+      "patterns": [
+        {
+          "name": "meta.git.policy.drun",
+          "match": "^(\\s*)(git)(\\s+)(policy)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.constant.domain.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.config.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git.validate.drun",
+          "match": "^(\\s*)(git)(\\s+)(validate)(\\s+)(branch(?:[_ ]name)?|commit(?:[_ ]message)?|signed(?:[_ ]commits)?|all)\\b",
+          "captures": {
+            "2": {
+              "name": "support.constant.domain.drun"
+            },
+            "4": {
+              "name": "support.type.action.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git.policy.section.drun",
+          "match": "^(\\s*)(branch|commit)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.constant.domain.drun"
+            }
+          }
+        },
+        {
+          "name": "support.type.property-name.drun",
+          "match": "^(\\s*)(default\\s+branches|naming|types|messages|ban|min\\s+length)(?=\\s*:)"
+        },
+        {
+          "name": "storage.modifier.drun",
+          "match": "^(\\s*)(extract\\s+identifier\\s+from\\s+branch|enforce\\s+signed\\s+commits)\\b"
+        }
+      ]
+    },
+    "single-quoted": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.drun",
+          "begin": "'",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "'",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.drun",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "shell-command-string": {
+      "patterns": [
+        {
+          "name": "support.function.command.drun",
+          "match": "\\G[A-Za-z_./-][A-Za-z0-9_./:-]*"
+        },
+        {
+          "name": "constant.character.escape.line-continuation.drun",
+          "match": "\\\\\\n"
+        },
+        {
+          "name": "constant.character.escape.drun",
+          "match": "\\\\."
+        },
+        {
+          "include": "#single-quoted"
+        },
+        {
+          "include": "#interpolation"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.drun",
+          "begin": "\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.drun"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.line-continuation.drun",
+              "match": "\\\\\\n"
+            },
+            {
+              "name": "constant.character.escape.drun",
+              "match": "\\\\."
+            },
+            {
+              "include": "#interpolation"
+            }
+          ]
+        }
+      ]
+    },
+    "interpolation": {
+      "patterns": [
+        {
+          "name": "meta.interpolation.drun",
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.begin.drun"
+            }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.end.drun"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#single-quoted"
+            },
+            {
+              "include": "#variables"
+            },
+            {
+              "include": "#builtins"
+            },
+            {
+              "include": "#functions"
+            },
+            {
+              "include": "#constants"
+            },
+            {
+              "include": "#types"
+            },
+            {
+              "include": "#keywords"
+            },
+            {
+              "include": "#operators"
+            },
+            {
+              "include": "#object-keys"
+            }
+          ]
+        }
+      ]
+    },
+    "object-keys": {
+      "patterns": [
+        {
+          "name": "support.type.property-name.drun",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b(?=\\s*:)"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.language.globals.drun",
+          "match": "\\$globals\\.[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "variable.other.drun",
+          "match": "\\$[A-Za-z_][A-Za-z0-9_\\-]*"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.variable.environment.drun",
+          "match": "\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}"
+        },
+        {
+          "name": "support.function.builtin.drun",
+          "match": "\\b(?:current git commit|current git branch|file exists|dir exists|start progress|update progress|finish progress|start timer|stop timer|show elapsed time|compose_cmd|docker compose command|docker compose status|dns_resolve|dns_check|dns_validate)\\b"
+        },
+        {
+          "name": "support.function.builtin.drun",
+          "match": "\\b(?:now|pwd|hostname|env|secret|current)(?=\\b|\\.)"
+        },
+        {
+          "name": "support.function.builtin.drun",
+          "match": "\\b(?:concat|split|replace|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|basename|dirname|extension|prefix|suffix|filtered|sorted|reversed|unique|first|last)\\b"
+        },
+        {
+          "name": "support.function.builtin.drun",
+          "match": "\\b(?:secret)(?=\\s*\\()"
+        },
+        {
+          "name": "variable.other.member.drun",
+          "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.drun",
+          "match": "\\b(?:true|false|empty)\\b"
+        },
+        {
+          "name": "constant.numeric.drun",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "support.function.drun",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_\\-]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.drun",
+          "match": "\\b(?:string|number|boolean|list|json|xml|http|https|docker|git|kubernetes|namespace|network|directory|file|service|container|image|repository|branch|url|email|uuid|semver|semver_extended|docker_tag)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.drun",
+          "match": "\\b(?:if|else|when|otherwise|for|each|in|parallel|try|catch|finally|throw|rethrow|ignore|break|continue|before|after|on|then|and|or|not|is|are|contains|matches|matching|between|exists|available|running|detected|version)\\b"
+        },
+        {
+          "name": "keyword.declaration.drun",
+          "match": "\\b(?:version|task|means|mode|project|provisioning|sources|set|let|define|parameter|snippet|template|mixin|requires|tools|given|accepts|defaults|from|to|as|of|depends|include|use|uses|includes|call|with|capture|service)\\b"
+        },
+        {
+          "name": "keyword.operator.word.drun",
+          "match": "\\b(?:be|into|at|by|on|off|up|down|with|without|from|to|as|of|range|then|starting|extract|remove|overwrite)\\b"
+        },
+        {
+          "name": "support.type.action.drun",
+          "match": "\\b(?:info|step|warn|error|success|fail|echo|run|exec|shell|output|config|create|copy|move|delete|read|write|append|backup|check|extract|archive|build|push|pull|tag|remove|start|starting|stop|scale|deploy|rollback|wait|open|ping|test|expect|download|upload|send|receive|fetch|clone|init|switch|merge|add|commit|status|log|show|detect|search|update|restart|orchestrate|execute|apply|describe|expose)\\b"
+        },
+        {
+          "name": "support.constant.domain.drun",
+          "match": "\\b(?:drun|drunhub|setup|teardown|docker|image|container|compose|replicas|rollout|pods|pod|ingress|manifest|manifests|namespace|port|registry|git|branch|checkout|repository|remote|changes|message|files|get|post|put|delete|patch|head|options|request|response|body|headers|header|endpoint|api|data|timeout|retry|follow|redirects|verify|ssl|auth|bearer|basic|token|user|password|content|type|accept|health|healthy|service|services|provision|ready|host|connection|strategy|sequential|parallel|dependency-based|circuit|breaker|failure|threshold|recovery|interval|retries|networks|external|required|autoprovision|driver|condition|dns|tcp|domain|record|expected|ip|ips|command|working|workdir|missing|force|recreate|deps|never|always|makefile|target|args|pre|post|jobs|verbose|allocate_tty|ssh|key|fallback|delay|path|startup|shutdown|discovery|metrics|enabled|labels|unavailable|max|min|consul|etcd|server|domains|ttl|cache|memory|cpu|limit|policy|orphans|period|env_file|available|installed|tool|tools|framework|environment|node|npm|yarn|pnpm|bun|python|pip|go|golang|cargo|java|maven|gradle|ruby|gem|php|composer|rust|make|kubectl|helm|terraform|aws|gcp|azure|ci|local|production|staging|development|react|vue|angular|django|rails|express|spring|laravel|line|match|pattern|email|format|concat|split|replace|secret|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|transform|subtract|multiply|divide|modulo|property|filtered|sorted|reversed|unique|first|last|basename|dirname|extension|prefix|suffix|allow|permissions|dir|file|folder|any|running|current|all|exists|locally|attached)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.drun",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.ternary.drun",
+          "match": "\\?|:"
+        },
+        {
+          "name": "keyword.operator.pipe.drun",
+          "match": "\\|"
+        },
+        {
+          "name": "keyword.operator.assignment.drun",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.drun",
+          "match": "\\+|\\-|\\*|/|%"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.key-value.drun",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.separator.sequence.drun",
+          "match": ","
+        },
+        {
+          "name": "punctuation.section.group.begin.drun",
+          "match": "[\\[\\(\\{]"
+        },
+        {
+          "name": "punctuation.section.group.end.drun",
+          "match": "[\\]\\)\\}]"
+        }
+      ]
+    }
+  }
+}

@@ -2,24 +2,24 @@
 
 Welcome to drun v2! This directory contains examples showcasing the new **semantic, English-like language** for defining automation tasks. The v2 language compiles to shell commands while providing intuitive, readable syntax that anyone can understand.
 
-## 🌟 What's New in v2
+## What's New in v2
 
 drun v2 introduces a revolutionary approach to task automation:
 
-- **🗣️ Natural Language Syntax**: Write tasks in English-like sentences
-- **🧠 Smart Detection**: Automatically detect tools, frameworks, and environments  
-- **🔄 Intelligent Compilation**: Compiles to optimized shell commands
-- **📚 Type Safety**: Parameters with validation and constraints
-- **🎯 Intent-Focused**: Describe *what* you want, not *how* to do it
+- ** Natural Language Syntax**: Write tasks in English-like sentences
+- ** Smart Detection**: Automatically detect tools, frameworks, and environments
+- ** Intelligent Compilation**: Compiles to optimized shell commands
+- ** Type Safety**: Parameters with validation and constraints
+- ** Intent-Focused**: Describe *what* you want, not *how* to do it
 
-## 📁 Example Files
+## Example Files
 
 ### Basic Examples
 - **[01-hello-world.drun](01-hello-world.drun)** - Your first drun v2 tasks
 - **[02-parameters.drun](02-parameters.drun)** - Parameters, defaults, and validation
 - **[03-control-flow.drun](03-control-flow.drun)** - If statements, loops, and error handling
 
-### Infrastructure Examples  
+### Infrastructure Examples
 - **[04-docker-basics.drun](04-docker-basics.drun)** - Docker workflows and container management
 - **[05-kubernetes.drun](05-kubernetes.drun)** - Kubernetes deployments and operations
 
@@ -32,15 +32,15 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[35-advanced-parameter-validation.drun](35-advanced-parameter-validation.drun)** - Advanced parameter validation with pattern macros (`semver`, `uuid`, `url`)
 - **[36-advanced-variable-operations.drun](36-advanced-variable-operations.drun)** - Comprehensive showcase of variable operations (`filtered`, `sorted`, `without`, `split`, chaining)
 
-### 🔄 Matrix Execution & Array Literals
+### Matrix Execution & Array Literals
 - **[42-matrix-sequential.drun](42-matrix-sequential.drun)** - Sequential matrix execution patterns (OS × Architecture, Database × Test Suite)
 - **[43-matrix-parallel.drun](43-matrix-parallel.drun)** - Parallel matrix execution (Multi-region deployment, CI/CD parallelization)
 - **[44-array-literals-showcase.drun](44-array-literals-showcase.drun)** - Comprehensive array literal examples and real-world use cases
 
-### 📝 String Features
+### String Features
 - **[64-multiline-strings.drun](63-multiline-strings.drun)** - Multi-line strings with line continuation, escaped quotes, and interpolation
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Running Examples
 
@@ -58,42 +58,42 @@ xdrun -f examples/01-hello-world.drun --list
 **Important:** Task parameters use simple `key=value` syntax without `--` dashes. CLI flags (like `--list`, `--dry-run`) use `--` as they control xdrun behavior, not task parameters.
 
 ### Hello World
-```
+```drun
 task "hello":
-  info "Hello from drun v2! 👋"
+  info "Hello from drun v2! "
 ```
 
 ### With Parameters
-```
+```drun
 task "greet" means "Greet someone by name":
   requires name
   given title defaults to "friend"
-  
+
   info "Hello, {title} {name}!"
 ```
 
 ### Smart Docker Build
-```
+```drun
 task "build" means "Build Docker image":
   given tag defaults to current git commit
-  
+
   build docker image "myapp:{tag}"
   success "Built image: myapp:{tag}"
 ```
 
 ### Kubernetes Deployment
-```
+```drun
 task "deploy" means "Deploy to Kubernetes":
   requires environment from ["dev", "staging", "production"]
-  
+
   deploy myapp:latest to kubernetes namespace {environment}
   wait for rollout to complete
 ```
 
-## 🎯 Key Language Features
+## Key Language Features
 
 ### Natural Parameter Declaration
-```
+```drun
 # Required parameters with validation
 requires environment from ["dev", "staging", "production"]
 requires port as number between 1000 and 9999
@@ -110,7 +110,7 @@ accepts configs as list
 ```
 
 ### Smart Control Flow
-```
+```drun
 # Natural conditionals
 if docker is running:
   build container
@@ -134,7 +134,7 @@ for each $region in ["us-east", "eu-west"] in parallel:
 ```
 
 ### Array Literals & Matrix Execution
-```
+```drun
 # Project-level array definitions
 project "MyApp" version "1.0":
   set platforms as list to ["linux", "darwin", "windows"]
@@ -145,14 +145,14 @@ for each $platform in $platforms:
   for each $arch in $architectures:
     build for {$platform}/{$arch}
 
-# Parallel matrix execution  
+# Parallel matrix execution
 for each $env in ["dev", "staging", "prod"] in parallel:
   for each $service in ["api", "web", "worker"]:
     deploy {$service} to {$env}
 ```
 
 ### Smart Detection
-```
+```drun
 # Framework detection
 when symfony is detected:
   run symfony console commands
@@ -160,7 +160,7 @@ when symfony is detected:
 when laravel is detected:
   run artisan commands
 
-# Tool detection  
+# Tool detection
 if docker is running:
   build containerized app
 
@@ -175,7 +175,7 @@ when package manager:
 ```
 
 ### Tool Provisioning
-```
+```drun
 project "quality":
   provisioning sources:
     "./.drun/provisionings.yaml"
@@ -189,7 +189,7 @@ project "quality":
 Use `xdrun --allow-tool-version-changes <task>` when an already-installed tool must be upgraded or downgraded to satisfy an exact requirement. See [73-tool-provisioning.drun](73-tool-provisioning.drun) for the complete example.
 
 ### Built-in Actions
-```
+```drun
 # Docker operations
 build docker image "myapp:latest"
 push image "myapp:latest" to "ghcr.io"
@@ -218,7 +218,7 @@ error "Connection failed"
 success "Deployment completed"
 ```
 
-## 🛠️ Running Examples
+## Running Examples
 
 *Note: drun v2 compiler is not yet implemented. These examples show the target syntax.*
 
@@ -231,7 +231,7 @@ xdrun -f 02-parameters.drun greet --name=Alice --title=Ms.
 xdrun -f 02-parameters.drun "build docker" image=base dest=local
 xdrun -f 02-parameters.drun "deploy service"  # Uses all defaults (dev, replicas=1)
 
-# Docker examples  
+# Docker examples
 xdrun -f 04-docker-basics.drun build --tag=v1.0.0
 xdrun -f 04-docker-basics.drun "run local" --port=3000
 
@@ -244,13 +244,13 @@ xdrun -f 06-cicd-pipeline.drun "ci pipeline"
 xdrun -f 06-cicd-pipeline.drun "deploy to staging"
 ```
 
-## 📖 Language Reference
+## Language Reference
 
 ### Task Definition
-```
+```drun
 task <name> [means <description>]:
   [parameters]
-  [dependencies] 
+  [dependencies]
   [lifecycle_hooks]
   [variables]
   <statements>
@@ -265,15 +265,15 @@ task <name> [means <description>]:
 - **Pattern**: `requires version matching pattern "v\d+\.\d+\.\d+"`
 
 ### Dependencies
-```
+```drun
 depends on build                    # Single dependency
-depends on build and test          # Multiple dependencies  
+depends on build and test          # Multiple dependencies
 depends on build then deploy       # Sequential dependencies
 depends on lint, test, scan        # Parallel dependencies
 ```
 
 ### Variables
-```
+```drun
 let name be "value"                 # Immutable binding
 set counter to 0                    # Mutable variable
 capture from shell "command" as $variable       # Capture command output
@@ -286,7 +286,7 @@ let config be:
 ```
 
 ### Multi-line Strings
-```
+```drun
 # Basic multi-line strings (preserves line breaks)
 run "echo Line 1
 echo Line 2
@@ -341,12 +341,12 @@ for each $img in $docker_images:
 ```
 
 ### Control Flow
-```
+```drun
 # Conditionals
 if condition:
   statements
 else if other_condition:
-  statements  
+  statements
 else:
   statements
 
@@ -372,10 +372,10 @@ finally:
   cleanup
 ```
 
-## 🎨 Best Practices
+## Best Practices
 
 ### 1. Use Descriptive Task Names
-```
+```drun
 # Good
 task "deploy to production" means "Deploy application to production environment"
 
@@ -384,7 +384,7 @@ task "deploy"
 ```
 
 ### 2. Leverage Smart Detection
-```
+```drun
 # Good - let drun detect the right approach
 when symfony is detected:
   run symfony console commands
@@ -394,22 +394,22 @@ run "php bin/console cache:clear"
 ```
 
 ### 3. Use Natural Parameter Names
-```
+```drun
 # Good
 requires target_environment from ["dev", "staging", "production"]
 given replica_count defaults to 3
 
 # Avoid
-requires env from ["dev", "staging", "production"]  
+requires env from ["dev", "staging", "production"]
 given replicas defaults to 3
 ```
 
 ### 4. Structure Complex Workflows
-```
+```drun
 # Break down complex operations
 task "full deployment":
   depends on "run tests" and "build image" then "deploy to staging"
-  
+
   step "Starting production deployment"
   run "deploy to production"
   run "verify deployment"
@@ -417,7 +417,7 @@ task "full deployment":
 ```
 
 ### 5. Use Meaningful Status Messages
-```
+```drun
 step "Building Docker image for {environment}"
 info "Using configuration: {config_file}"
 warn "No SSL certificate found, using HTTP"
@@ -425,7 +425,7 @@ error "Database connection failed: {error_message}"
 success "Deployment completed in {duration}"
 ```
 
-## 🔮 Future Features
+## Future Features
 
 The v2 language is designed for extensibility. Planned features include:
 
@@ -435,15 +435,15 @@ The v2 language is designed for extensibility. Planned features include:
 - **Visual Editor**: Drag-and-drop task builder
 - **AI Assistant**: Natural language to drun conversion
 
-## 🤝 Contributing
+## Contributing
 
 These examples represent the target syntax for drun v2. As we implement the compiler, examples may evolve. Contributions and feedback are welcome!
 
-## 📚 Learn More
+## Learn More
 
 - **[drun v2 Specification](../reference/language/overview.md)** - Complete language specification
 - **[Language Reference](../reference/language/overview.md)** - Detailed syntax reference
 
 ---
 
-**Ready to revolutionize your automation workflows?** Start with `01-hello-world.drun` and experience the future of task automation! 🚀
+**Ready to revolutionize your automation workflows?** Start with `01-hello-world.drun` and experience the future of task automation!

@@ -191,7 +191,7 @@ If drun derives one exact version but the chosen target omits `install_versioned
 
 The language also automatically detects available tools and uses appropriate commands when you prefer not to use strict requirements:
 
-```
+```drun
 # Automatically uses "docker compose" or "docker-compose"
 start docker compose services
 
@@ -259,7 +259,7 @@ The following tools are recognized as built-in keywords and can be used without 
 - `git` - Git version control system
 
 **Note:** For tools with spaces or tools not in this list, use quoted strings:
-```
+```drun
 if "docker compose" is available:
     info "Using Docker Compose v2"
 
@@ -271,7 +271,7 @@ if "docker-compose" is available:
 
 For maximum flexibility and maintainability, drun supports detecting tool variants and capturing the working one in a variable:
 
-```
+```drun
 # Detect which Docker Compose variant is available and capture it
 detect available "docker compose" or "docker-compose" as $compose_cmd
 
@@ -292,7 +292,7 @@ run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
 
 When you only need the resolved command string inline, use the builtin interpolation macro:
 
-```
+```drun
 run "{compose_cmd} up -d"
 run "{compose_cmd} logs --tail=100"
 run "{docker compose command} up -d"
@@ -308,7 +308,7 @@ run "{docker compose command} logs --tail=100"
 
 ### Project Detection
 
-```
+```drun
 # Detects package.json, yarn.lock, pnpm-lock.yaml
 install dependencies                    # Uses npm, yarn, or pnpm
 
@@ -324,7 +324,7 @@ build containerized application
 
 ### Environment Detection
 
-```
+```drun
 # CI/CD detection
 when running in CI:
   use non-interactive mode
@@ -342,7 +342,7 @@ when running on Linux:
   use system package manager
 ```
 
-### Environment Variable Interpolation ⭐ *New*
+### Environment Variable Interpolation  *New*
 
 Drun supports shell-style environment variable interpolation using `${VAR}` syntax:
 
@@ -359,11 +359,11 @@ task show-config:
 	echo "User: ${USER:-unknown}"
 	echo "Home: ${HOME:-/home/default}"
 	echo "Shell: ${SHELL:-/bin/sh}"
-	
+
 	# Required environment variables (no default - will fail if not set)
 	echo "API URL: ${API_URL}"
 	echo "Database: ${DATABASE_URL}"
-	
+
 	# Combining with Drun variables
 	capture from shell "date" as $timestamp
 	echo "Timestamp: {$timestamp}"
@@ -378,7 +378,7 @@ task show-config:
 - **Safe defaults**: Prevents errors when optional config is missing
 - **Integration**: Works seamlessly with `.env` file loading
 
-### Environment Variable Conditionals ⭐ *New*
+### Environment Variable Conditionals  *New*
 
 Check environment variables with clean, semantic syntax for conditional logic:
 
@@ -406,10 +406,10 @@ if env PATH exists:
 ```drun
 # Check if environment variable equals a specific value
 if env APP_ENV is "production":
-  warn "⚠️  Running in PRODUCTION environment"
+  warn "  Running in PRODUCTION environment"
   info "Extra caution advised!"
 else:
-  info "✅ Not in production environment"
+  info " Not in production environment"
 
 # Check if environment variable is NOT equal to a value
 if env DEBUG_MODE is not "true":
@@ -421,15 +421,15 @@ if env DEBUG_MODE is not "true":
 ```drun
 # Check if environment variable is not empty
 if env DATABASE_URL is not empty:
-  success "✅ DATABASE_URL is configured"
+  success " DATABASE_URL is configured"
   run "python manage.py migrate"
 else:
-  warn "⚠️  DATABASE_URL is not set"
+  warn "  DATABASE_URL is not set"
   info "Set it with: export DATABASE_URL=postgresql://..."
   fail "Missing required database configuration"
 ```
 
-#### Compound Conditions ⭐ *New*
+#### Compound Conditions  *New*
 
 Combine multiple checks with `and` for more precise validation:
 
@@ -437,28 +437,28 @@ Combine multiple checks with `and` for more precise validation:
 # Ensure variable exists AND is not empty (rejects empty strings)
 task "secure-deploy":
   if env API_TOKEN exists and is not empty:
-    success "✅ API_TOKEN is properly configured"
+    success " API_TOKEN is properly configured"
     run "curl -H 'Authorization: Bearer ${API_TOKEN}' https://api.example.com/deploy"
   else:
-    error "❌ API_TOKEN must be set and not empty"
+    error " API_TOKEN must be set and not empty"
     fail "Missing required credentials"
 
 # Ensure variable exists AND equals specific value
 task "production-check":
   if env DEPLOY_ENV exists and is "production":
-    warn "⚠️  Confirmed production deployment"
+    warn "  Confirmed production deployment"
     info "Running extra validation..."
     run "npm run test:integration"
   else:
-    info "✅ Non-production environment"
+    info " Non-production environment"
 
 # Build with optional build arguments
 task "docker-build":
   if env BUILD_TOKEN exists and is not empty:
-    info "🔑 Using authenticated build"
+    info " Using authenticated build"
     run "docker build --build-arg TOKEN='${BUILD_TOKEN}' -t myapp ."
   else:
-    info "🔓 Using public build (no authentication)"
+    info " Using public build (no authentication)"
     run "docker build -t myapp ."
 ```
 
@@ -468,58 +468,58 @@ task "docker-build":
 # Conditional deployment based on environment
 task "deploy":
   if env DEPLOY_ENV is "production":
-    warn "⚠️  Deploying to PRODUCTION"
+    warn "  Deploying to PRODUCTION"
     info "Running production pre-flight checks..."
-    
+
     if env DATABASE_URL exists:
-      success "✅ Database configuration found"
+      success " Database configuration found"
     else:
-      error "❌ DATABASE_URL required for production"
+      error " DATABASE_URL required for production"
       fail "Missing required environment variable"
-    
+
     if env API_KEY exists:
-      success "✅ API key found"
+      success " API key found"
     else:
-      error "❌ API_KEY required for production"
+      error " API_KEY required for production"
       fail "Missing required API credentials"
-    
-    success "✅ All pre-flight checks passed"
+
+    success " All pre-flight checks passed"
     info "Deploying to production..."
   else:
-    info "✅ Deploying to development/staging"
+    info " Deploying to development/staging"
     info "Skipping production pre-flight checks"
 
 # CI/CD detection
 task "build":
   if env CI exists:
-    info "🤖 Running in CI environment"
+    info " Running in CI environment"
     set $ci_mode to "true"
     run "npm run build --ci"
   else:
-    info "💻 Running locally"
+    info " Running locally"
     set $ci_mode to "false"
     run "npm run build"
 
 # Configuration based on environment variables
 task "configure":
   if env LOG_LEVEL is "debug":
-    info "🔧 Using DEBUG log level"
+    info " Using DEBUG log level"
     set $verbose to "true"
   else:
     if env LOG_LEVEL is "info":
-      info "ℹ️  Using INFO log level"
+      info "  Using INFO log level"
       set $verbose to "false"
     else:
-      info "✅ Using default log level"
+      info " Using default log level"
       set $verbose to "false"
 
 # Feature flags
 task "start":
   if env ENABLE_EXPERIMENTAL is "true":
-    info "🧪 Experimental features enabled"
+    info " Experimental features enabled"
     run "npm run start:experimental"
   else:
-    info "✅ Using stable version"
+    info " Using stable version"
     run "npm run start"
 ```
 
@@ -553,7 +553,7 @@ if env HOME exists:
 
 ### Framework Detection
 
-```
+```drun
 # Web frameworks
 when symfony is detected:
   run symfony console commands
@@ -593,11 +593,11 @@ when vite is detected:
 The semantic language executes directly without intermediate compilation:
 
 #### Source (Semantic v2):
-```
+```drun
 task "deploy" means "Deploy to environment":
   requires environment from ["dev", "staging", "production"]
   depends on build and test
-  
+
   deploy myapp:latest to kubernetes namespace {environment}
 ```
 
@@ -611,7 +611,7 @@ task "deploy" means "Deploy to environment":
 
 #### Docker Command Execution
 
-```
+```drun
 # Source
 build docker image "myapp:{version}"
 
@@ -624,7 +624,7 @@ else:
 
 #### Kubernetes Command Execution
 
-```
+```drun
 # Source
 deploy myapp:latest to kubernetes namespace production with 5 replicas
 
@@ -638,7 +638,7 @@ kubectl rollout status deployment/myapp --namespace=production
 
 #### Command Batching
 
-```
+```drun
 # Source
 copy "file1.txt" to "dest/"
 copy "file2.txt" to "dest/"
@@ -650,7 +650,7 @@ cp file1.txt file2.txt file3.txt dest/
 
 #### Conditional Optimization
 
-```
+```drun
 # Source
 if docker is running:
   build docker image
@@ -669,7 +669,7 @@ fi
 
 #### Syntax Errors
 
-```
+```drun
 # Missing colon
 task "example"
   info "Hello"
@@ -682,7 +682,7 @@ requires port as number between "low" and "high"
 
 #### Type Errors
 
-```
+```drun
 # Type mismatch
 let count be "not a number"
 for i from 1 to count:
@@ -691,11 +691,11 @@ for i from 1 to count:
 
 #### Scope Errors
 
-```
+```drun
 task "example":
   if condition:
     let local_var be "value"
-  
+
   info local_var  # Error: Variable not in scope
 ```
 
@@ -703,7 +703,7 @@ task "example":
 
 #### Command Failures
 
-```
+```drun
 # Automatic error handling
 try:
   deploy to production
@@ -714,7 +714,7 @@ catch deployment_error:
 
 #### Resource Not Found
 
-```
+```drun
 # File not found
 if file "config.json" exists:
   load configuration from "config.json"
@@ -725,7 +725,7 @@ else:
 
 #### Network Errors
 
-```
+```drun
 # Network timeout
 try:
   check health of service at "https://api.example.com"
@@ -738,7 +738,7 @@ catch timeout_error:
 
 #### Retry Logic
 
-```
+```drun
 for attempt from 1 to 3:
   try:
     deploy to production
@@ -752,7 +752,7 @@ for attempt from 1 to 3:
 
 #### Graceful Degradation
 
-```
+```drun
 try:
   deploy with blue-green strategy
 catch blue_green_error:

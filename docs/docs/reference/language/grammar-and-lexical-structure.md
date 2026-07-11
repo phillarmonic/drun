@@ -13,7 +13,7 @@ version_statement = "version" ":" number_literal ;
 annotation = "@" identifier "(" [ string_literal { "," string_literal } ] ")" ;
 
 (* Project declaration *)
-project_declaration = "project" string_literal [ "version" string_literal ] ":" 
+project_declaration = "project" string_literal [ "version" string_literal ] ":"
                      { project_setting } ;
 
 project_setting = "set" identifier "to" expression
@@ -130,7 +130,7 @@ logical_expression = comparison_expression
 comparison_expression = additive_expression
                       [ comparison_operator additive_expression ] ;
 
-comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">=" 
+comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">="
                     | "contains" | "matches" | "exists" ;
 
 (* Expressions *)
@@ -350,7 +350,7 @@ The language consists of the following token types:
 
 ### Keywords
 
-```
+```drun
 # Control flow
 if, else, when, for, each, in, try, catch, finally, break, continue
 
@@ -389,7 +389,7 @@ drun v2 supports both single-line and multiline comments for documenting your au
 
 Single-line comments start with `#` and continue to the end of the line:
 
-```
+```drun
 # This is a single-line comment
 task "example":  # End-of-line comment
   info "Hello"
@@ -399,7 +399,7 @@ task "example":  # End-of-line comment
 
 Multiline comments use C-style `/* */` syntax and can span multiple lines:
 
-```
+```drun
 /*
     This is a multiline comment
     that can span several lines
@@ -592,7 +592,7 @@ This keeps the rewrite contract explicit: init only rewrites known placeholders 
 
 Strings support variable interpolation using `{$variable}` syntax for declared variables and `{variable}` for loop variables:
 
-```
+```drun
 let $name = "world"
 info "Hello, {$name}!"  # Outputs: Hello, world!
 
@@ -612,7 +612,7 @@ drun v2 supports multi-line strings enclosed in quotes, allowing you to write co
 
 Strings can span multiple lines, preserving line breaks:
 
-```
+```drun
 task "example":
   run "echo Line 1
 echo Line 2
@@ -625,7 +625,7 @@ This will execute as three separate echo commands, preserving the newlines.
 
 Use a backslash `\` before a newline to continue a command on the next line without inserting a line break:
 
-```
+```drun
 task "docker build":
   run "docker run --rm \
       -v $(pwd):/workspace \
@@ -640,7 +640,7 @@ The backslash-newline combination is removed, joining the lines together.
 
 Use `\"` to include literal quotes within strings:
 
-```
+```drun
 task "with quotes":
   run "echo \"Hello, World!\"
 echo \"Status: \\\"Running\\\"\"
@@ -651,11 +651,11 @@ echo Done"
 
 Interpolation works seamlessly within multi-line strings:
 
-```
+```drun
 task "deploy":
   let $environment = "production"
   let $version = "1.2.3"
-  
+
   run "echo Deploying to: {$environment}
 echo Version: {$version}
 echo Status: Ready
@@ -666,11 +666,11 @@ echo Status: Ready
 
 Combining all features for readable, maintainable scripts:
 
-```
+```drun
 task "test coverage" means "Run tests and generate coverage report":
   let $app_env = "test"
   let $coverage_file = "coverage.xml"
-  
+
   step "Running test suite with coverage"
   run "rm -f {$coverage_file}
 docker compose exec \
@@ -682,7 +682,7 @@ docker compose exec \
     -e APP_ENV={$app_env} \
     -u=www-data \
     php bin/console tests:probe-coverage {$coverage_file}"
-  
+
   success "Coverage report generated: {$coverage_file}"
 ```
 

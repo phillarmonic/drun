@@ -13,7 +13,7 @@ The memory monitor runs in the background during task execution and tracks memor
 - Execution continues normally
 - Warning is logged only once per execution
 
-### Critical Threshold: 500 MB  
+### Critical Threshold: 500 MB
 - When memory usage exceeds 500 MB, execution is immediately terminated
 - Diagnostic information is dumped to files
 - Process exits with code 1
@@ -35,7 +35,7 @@ Contains:
 - Runtime information (Go version, goroutines, CPU, OS/arch)
 - Timestamp of the crash
 
-### 2. Text Summary File  
+### 2. Text Summary File
 **Filename:** `drun-crash-summary-YYYYMMDD-HHMMSS.txt`
 
 Human-readable summary containing:
@@ -58,10 +58,10 @@ task "bad-task":
 ```
 
 When detected:
-```
-⚠️  WARNING: Memory usage is high (100 MB)
+```text
+  WARNING: Memory usage is high (100 MB)
 
-❌ CRITICAL: Memory usage exceeded 500 MB (current: 523 MB)
+ CRITICAL: Memory usage exceeded 500 MB (current: 523 MB)
 Diagnostic information dumped to drun-crash-dump-20250930-143022.json
 This likely indicates an infinite loop or runaway recursion.
 ```

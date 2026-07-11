@@ -60,33 +60,33 @@ orchestrate "full_stack":
 
 # Create tasks to manage the stack
 task "start":
-    info "🚀 Starting full stack..."
+    info " Starting full stack..."
     orchestrate "full_stack" start
     success "All services running!"
 
 task "up":
-    info "📦 Bringing up full stack with fresh build..."
+    info " Bringing up full stack with fresh build..."
     orchestrate "full_stack" up
     success "All services rebuilt and running!"
 
 task "stop":
-    info "🛑 Stopping services..."
+    info " Stopping services..."
     orchestrate "full_stack" stop
 
 task "restart":
-    info "♻️ Restarting services..."
+    info " Restarting services..."
     orchestrate "full_stack" restart
 
 task "status":
-    info "📊 Service status:"
+    info " Service status:"
     orchestrate "full_stack" status
 
 task "endpoints":
-    info "🌐 Service endpoints:"
+    info " Service endpoints:"
     orchestrate "full_stack" show endpoints
 
 task "down":
-    info "🗑️  Removing containers..."
+    info "  Removing containers..."
     orchestrate "full_stack" down
 ```
 
@@ -119,7 +119,7 @@ drun down
 - Checks for repository updates (but doesn't force update)
 - Only rebuilds if `build: required true` is set
 - Skips services that are already running with no updates
-- 🎯 **Use for**: Quick starts when nothing has changed
+-  **Use for**: Quick starts when nothing has changed
 
 #### `orchestrate "stack" up`
 - Updates all repositories on default branches (main/master)
@@ -437,10 +437,10 @@ service "gateway" in "./gateway":
 ```
 
 **When to use `allocate_tty`:**
-- ✅ When your build uses `docker compose exec` to run commands inside containers
-- ✅ When scripts require a TTY (resolves "input device is not a TTY" errors)
-- ✅ When commands need interactive terminal features
-- ❌ Not needed for regular shell commands, docker build, or make
+-  When your build uses `docker compose exec` to run commands inside containers
+-  When scripts require a TTY (resolves "input device is not a TTY" errors)
+-  When commands need interactive terminal features
+-  Not needed for regular shell commands, docker build, or make
 
 ### Build Configuration Options
 
@@ -459,7 +459,7 @@ When `required` is `true`, the engine honours the full configuration:
 
 **Key Features:**
 - **Multiline Support**: Write complex multi-step commands naturally
-- **Line Continuation**: Use `\` to join long single commands  
+- **Line Continuation**: Use `\` to join long single commands
 - **Variable Interpolation**: Use `{$var}` syntax in build commands
 - **Escaped Quotes**: Use `\"` for quotes within commands
 - **TTY Allocation**: Enable for commands requiring terminal access
@@ -681,40 +681,40 @@ The orchestration system features a real-time progress display inspired by Docke
 
 Each service shows its current status with visual feedback:
 
-| Icon | Status   | Description          |
-| ---- | -------- | -------------------- |
-| ⏸️   | Pending  | Waiting to start     |
-| 🔄   | Starting | Service is starting  |
-| ✅    | Healthy  | Started and healthy  |
-| ❌    | Failed   | Failed to start      |
-| 🛑   | Stopping | Being stopped        |
-| ⏹️   | Stopped  | Successfully stopped |
+| Status   | Description          |
+| -------- | -------------------- |
+| Pending  | Waiting to start     |
+| Starting | Service is starting  |
+| Healthy  | Started and healthy  |
+| Failed   | Failed to start      |
+| Stopping | Being stopped        |
+| Stopped  | Successfully stopped |
 
 ### Example Output
 
-```
-🚀 Starting orchestration: full_stack
+```text
+ Starting orchestration: full_stack
    4 services in dependency order
 
-  ⏸️ database     
-  ⏸️ redis        
-  ⏸️ api          
-  ⏸️ frontend     
+   database
+   redis
+   api
+   frontend
 
-  🔄 database     Starting service... [0s]
-  🔄 database     Waiting for health check... [0s]
-  ✅ database     Healthy [2s]
-  🔄 redis        Starting service... [0s]
-  🔄 redis        Waiting for health check... [0s]
-  ✅ redis        Healthy [1s]
-  🔄 api          Starting service... [0s]
-  🔄 api          Waiting for health check... [0s]
-  ✅ api          Healthy [3s]
-  🔄 frontend     Starting service... [0s]
-  🔄 frontend     Waiting for health check... [0s]
-  ✅ frontend     Healthy [2s]
+   database     Starting service... [0s]
+   database     Waiting for health check... [0s]
+   database     Healthy [2s]
+   redis        Starting service... [0s]
+   redis        Waiting for health check... [0s]
+   redis        Healthy [1s]
+   api          Starting service... [0s]
+   api          Waiting for health check... [0s]
+   api          Healthy [3s]
+   frontend     Starting service... [0s]
+   frontend     Waiting for health check... [0s]
+   frontend     Healthy [2s]
 
-✅ 4/4 services completed successfully
+ 4/4 services completed successfully
 ```
 
 ### Timing Information
@@ -740,28 +740,28 @@ orchestrate "critical_stack":
 
 **Example Failure:**
 
-```
-🚀 Starting orchestration: critical_stack
+```text
+ Starting orchestration: critical_stack
    3 services in dependency order
-   🔴 Circuit breaker: ENABLED - will stop all on failure
+    Circuit breaker: ENABLED - will stop all on failure
 
-  ⏸️ database     
-  ⏸️ api          
-  ⏸️ frontend     
+   database
+   api
+   frontend
 
-  🔄 database     Starting service... [0s]
-  🔄 database     Waiting for health check... [0s]
-  ✅ database     Healthy [0s]
-  🔄 api          Starting service... [0s]
-  🔄 api          Waiting for health check... [0s]
-  ❌ api          Waiting for health check...: health check failed after 5 attempts [10s]
+   database     Starting service... [0s]
+   database     Waiting for health check... [0s]
+   database     Healthy [0s]
+   api          Starting service... [0s]
+   api          Waiting for health check... [0s]
+   api          Waiting for health check...: health check failed after 5 attempts [10s]
 
-🔴 Circuit breaker triggered! Rolling back all services...
+ Circuit breaker triggered! Rolling back all services...
 
-  🛑 database     Rolling back... [0s]
-  ⏹️ database     Stopped (rollback) [0s]
+   database     Rolling back... [0s]
+   database     Stopped (rollback) [0s]
 
-❌ 1/3 services failed
+ 1/3 services failed
 Error: circuit breaker: health check failed for 'api', all services stopped
 ```
 
@@ -778,27 +778,27 @@ orchestrate "resilient_stack":
 
 **Example with Degraded Service:**
 
-```
-🚀 Starting orchestration: resilient_stack
+```text
+ Starting orchestration: resilient_stack
    3 services in dependency order
 
-  🔄 database     Starting service... [0s]
-  ✅ database     Healthy [0s]
-  🔄 api          Starting service... [0s]
-  ❌ api          Waiting for health check...: health check failed [5s]
-  🔄 api          ⚠️  Unhealthy: health check failed [5s]
-  🔄 frontend     Starting service... [0s]
-  ✅ frontend     Healthy [2s]
+   database     Starting service... [0s]
+   database     Healthy [0s]
+   api          Starting service... [0s]
+   api          Waiting for health check...: health check failed [5s]
+   api            Unhealthy: health check failed [5s]
+   frontend     Starting service... [0s]
+   frontend     Healthy [2s]
 
-✅ 2/3 services completed successfully
+ 2/3 services completed successfully
 ```
 
 ### Common Error Scenarios
 
 #### 1. Health Check Failure
 
-```
-  ❌ api          Waiting for health check...: health check failed after 5 attempts [10s]
+```text
+   api          Waiting for health check...: health check failed after 5 attempts [10s]
 ```
 
 **Causes:**
@@ -810,8 +810,8 @@ orchestrate "resilient_stack":
 
 #### 2. Missing Docker Compose File
 
-```
-  ❌ service      Starting service...: docker compose failed: chdir /path: no such file or directory
+```text
+   service      Starting service...: docker compose failed: chdir /path: no such file or directory
 ```
 
 **Causes:**
@@ -822,8 +822,8 @@ orchestrate "resilient_stack":
 
 #### 3. Port Conflict
 
-```
-  ❌ redis        Starting service...: docker compose failed: exit status 1
+```text
+   redis        Starting service...: docker compose failed: exit status 1
 Output: Error response from daemon: Bind for 0.0.0.0:6379 failed: port is already allocated
 ```
 
@@ -931,8 +931,8 @@ orchestrate "frontend_stack":
 
 orchestrate "full_platform":
     services [
-        "database", 
-        "cache", 
+        "database",
+        "cache",
         "message_queue",
         "auth_service",
         "product_service",
@@ -1109,38 +1109,38 @@ The orchestration system consists of several components:
 ### Components
 
 1. **AST (Abstract Syntax Tree)**
-   
+
    - `ServiceStatement`: Service declarations
    - `OrchestrateStatement`: Orchestration group declarations
    - `OrchestrationActionStatement`: Actions in task bodies
 
 2. **Parser**
-   
+
    - Parses service and orchestrate blocks
    - Parses orchestration actions within tasks
    - Validates syntax and structure
 
 3. **Domain Models**
-   
+
    - `Service`: Runtime service representation
    - `OrchestrationGroup`: Group of services
    - `HealthCheck`: Health check configuration
 
 4. **Execution Engine**
-   
+
    - `orchestrateStart`: Start services with dependency resolution
    - `orchestrateStop`: Stop services in reverse order
    - `ProgressDisplay`: BuildKit-style visual feedback
    - `waitForHealth`: Health check monitoring
 
 5. **Docker Integration**
-   
+
    - `runDockerCompose`: Execute docker compose commands
    - `buildDockerComposeCmd`: Build command with environment
    - Service status queries
 
 6. **Health Check System**
-   
+
    - HTTP health checks
    - TCP health checks
    - Docker native health checks
@@ -1149,7 +1149,7 @@ The orchestration system consists of several components:
 
 ### Data Flow
 
-```
+```text
 Drunfile
    ↓
 Parser (service & orchestrate declarations)
@@ -1304,7 +1304,7 @@ Circuit breaker is triggered by both startup failures and build failures:
 
 The progress display provides real-time visual feedback similar to Docker BuildKit:
 
-- **Status Icons**: Different icons for each service state (⏸️ pending, 🔨 building, 🔄 starting, ✅ healthy, ❌ failed)
+- **Service states**: Distinct pending, building, starting, healthy, and failed states.
 - **Real-time Updates**: Progress updates are rendered inline without cluttering output
 - **Build Output**: Docker build output is streamed and integrated with progress display
 - **Summary Display**: Final summary shows success/failure counts

@@ -1,7 +1,7 @@
 # drun Architecture Guide
 
-**Version:** 2.1.1  
-**Last Updated:** October 9, 2025  
+**Version:** 2.2.0
+**Last Updated:** July 11, 2026
 **Status:** Production (Pure Domain-Driven Architecture)
 
 ---
@@ -35,13 +35,13 @@ graph LR
     PLAN --> EXEC[Executor]
     EXEC --> G[Shell/Docker/Git/HTTP]
     G --> H[Output]
-    
+
     DOM -.->|Task Registry| DOM1[Tasks]
     DOM -.->|Dependency Resolver| DOM2[Deps]
     DOM -.->|Parameter Validator| DOM3[Params]
     PLAN -.->|Execution Plan| PLAN1[Order]
     EXEC -.->|Domain Statements| EXEC1[Actions]
-    
+
     style A fill:#e1f5ff
     style D fill:#fff4e1
     style DOM fill:#f0e1ff
@@ -73,7 +73,7 @@ graph TB
         CONFIG[app/config.go]
         COMPLETE[app/completion.go]
     end
-    
+
     subgraph "Domain Layer"
         TASK_REG[task/registry.go]
         TASK_DEP[task/dependencies.go]
@@ -81,25 +81,25 @@ graph TB
         PARAM_VAL[parameter/validation.go]
         PROJ[project/project.go]
         STMT[statement/statement.go]
-        
+
         style TASK_REG fill:#f0e1ff
         style TASK_DEP fill:#f0e1ff
         style PARAM_VAL fill:#f0e1ff
         style STMT fill:#f0e1ff
     end
-    
+
     subgraph "Core Engine"
         ENGINE[engine/engine.go]
         CONTEXT[engine/context.go]
         PLANNER[planner/planner.go]
         EXECUTOR[executor/executor.go]
-        
+
         subgraph "Engine Subsystems"
             INTERP[interpolation/]
             HOOKS[hooks/]
             INCLUDES[includes/]
         end
-        
+
         subgraph "Executors"
             EXE_ERROR[executor_error.go]
             EXE_CONTROL[executor_control.go]
@@ -112,7 +112,7 @@ graph TB
             EXE_HTTP[executor_http.go]
             EXE_DETECT[executor_detection.go]
         end
-        
+
         subgraph "Helpers"
             HELP_BUILD[helpers_builders.go]
             HELP_COND[helpers_conditions.go]
@@ -123,12 +123,12 @@ graph TB
             HELP_UTIL[helpers_utilities.go]
         end
     end
-    
+
     CLI --> ENGINE
     ENGINE --> TASK_REG
     ENGINE --> TASK_DEP
     ENGINE --> PARAM_VAL
-    
+
     subgraph "Parser Layer"
         PARSER[parser/parser.go]
         P_PROJECT[parser_project.go]
@@ -147,7 +147,7 @@ graph TB
         P_DETECT[parser_detection.go]
         P_HELPER[parser_helper.go]
     end
-    
+
     subgraph "AST Layer"
         AST[ast/ast.go]
         AST_PROJECT[ast_project.go]
@@ -165,12 +165,12 @@ graph TB
         AST_DETECT[ast_detection.go]
         AST_EXPR[ast_expressions.go]
     end
-    
+
     subgraph "Lexer Layer"
         LEXER[lexer/lexer.go]
         TOKENS[tokens.go]
     end
-    
+
     subgraph "Support Services"
         BUILTINS[builtins/]
         SHELL[shell/]
@@ -180,12 +180,12 @@ graph TB
         ERRORS[errors/]
         TYPES[types/]
     end
-    
+
     CLI --> ENGINE
     UPDATE -.-> CLI
     CONFIG -.-> CLI
     COMPLETE -.-> CLI
-    
+
     ENGINE --> CONTEXT
     ENGINE --> INTERP
     ENGINE --> HOOKS
@@ -200,7 +200,7 @@ graph TB
     ENGINE --> EXE_GIT
     ENGINE --> EXE_HTTP
     ENGINE --> EXE_DETECT
-    
+
     EXE_ERROR --> HELP_COND
     EXE_CONTROL --> HELP_COND
     EXE_VAR --> HELP_EXPR
@@ -211,7 +211,7 @@ graph TB
     EXE_GIT --> HELP_BUILD
     EXE_HTTP --> HELP_BUILD
     EXE_DETECT --> HELP_DETECT
-    
+
     ENGINE --> PARSER
     PARSER --> P_PROJECT
     PARSER --> P_TASK
@@ -219,7 +219,7 @@ graph TB
     PARSER --> P_ACTION
     PARSER --> P_CONTROL
     PARSER --> P_ERROR
-    
+
     P_PROJECT --> AST_PROJECT
     P_TASK --> AST_TASK
     P_PARAM --> AST_PARAM
@@ -234,10 +234,10 @@ graph TB
     P_NET --> AST_NET
     P_VAR --> AST_VAR
     P_DETECT --> AST_DETECT
-    
+
     PARSER --> LEXER
     LEXER --> TOKENS
-    
+
     ENGINE --> BUILTINS
     ENGINE --> SHELL
     ENGINE --> DETECTION
@@ -245,7 +245,7 @@ graph TB
     ENGINE --> CACHE
     ENGINE --> ERRORS
     ENGINE --> TYPES
-    
+
     style CLI fill:#e1f5ff
     style ENGINE fill:#ffe1f5
     style PARSER fill:#fff4e1
@@ -259,7 +259,7 @@ graph TB
 
 ### Directory Structure
 
-```
+```text
 drun/
 ├── cmd/xdrun/             # CLI entry point and commands
 │   ├── main.go            # Minimal entry point (440 lines)
@@ -317,7 +317,7 @@ drun/
 │   │   │   └── project.go         # Project entity
 │   │   └── statement/
 │   │       ├── statement.go       # Domain statement types
-│   │       └── converter.go       # AST↔Domain converters
+│   │       └── converter.go       # ASTDomain converters
 │   │
 │   ├── engine/            # Execution engine
 │   │   ├── engine.go              # Core orchestration
@@ -402,37 +402,37 @@ sequenceDiagram
     participant Hooks
     participant Executor
     participant Shell
-    
+
     User->>CLI: drun build env=prod
     CLI->>Config: FindConfigFile()
     Config-->>CLI: .drun/spec.drun
-    
+
     CLI->>Parser: Parse(file)
     Parser->>Lexer: Tokenize(source)
     Lexer-->>Parser: []Token
-    
+
     loop For each statement
         Parser->>AST: Build statement nodes
     end
     Parser-->>CLI: Program (AST)
-    
+
     CLI->>Engine: NewEngine()
     CLI->>Engine: LoadProject(program)
     Engine->>Hooks: ProcessSetupHooks()
     Hooks-->>Engine: Setup complete
-    
+
     CLI->>Engine: RunTask("build", params)
-    
+
     Engine->>Engine: ResolveTask("build")
     Engine->>Engine: ValidateParameters(params)
     Engine->>Hooks: ExecuteBeforeHooks()
-    
+
     loop For each statement in task
         Engine->>Interpolator: InterpolateVariables(stmt)
         Interpolator-->>Engine: Interpolated statement
-        
+
         Engine->>Executor: ExecuteStatement(stmt)
-        
+
         alt Shell Statement
             Executor->>Shell: Execute(cmd)
             Shell-->>Executor: Output
@@ -443,15 +443,15 @@ sequenceDiagram
             Executor->>Engine: ExecuteConditional()
             Engine-->>Executor: Result
         end
-        
+
         Executor-->>Engine: Statement result
     end
-    
+
     Engine->>Hooks: ExecuteAfterHooks()
     Engine->>Hooks: ExecuteTeardownHooks()
-    
+
     Engine-->>CLI: Execution complete
-    CLI-->>User: Success ✅
+    CLI-->>User: Success
 ```
 
 ### Task Resolution Flow
@@ -462,23 +462,23 @@ flowchart TD
     REG --> B{Task exists in Registry?}
     B -->|No| C[Error: Task not found]
     B -->|Yes| D[Domain: Resolve dependencies]
-    
+
     D --> E{Has dependencies?}
     E -->|No| F[Domain: Validate parameters]
     E -->|Yes| G[Execute dependencies first]
-    
+
     G --> H{Dependency success?}
     H -->|No| I[Stop execution]
     H -->|Yes| F
-    
+
     F --> J{Parameters valid?}
     J -->|No| K[Error: Invalid params]
     J -->|Yes| L[Engine: Execute before hooks]
-    
+
     L --> M[Engine: Execute task statements]
     M --> N[Engine: Execute after hooks]
     N --> O[Return result]
-    
+
     style A fill:#e1f5ff
     style REG fill:#f0e1ff
     style D fill:#f0e1ff
@@ -576,7 +576,7 @@ engine := NewEngineWithOptions(
 
 Export execution plans in multiple formats:
 - **Graphviz DOT** - For rendering dependency graphs
-- **Mermaid** - For markdown diagrams  
+- **Mermaid** - For markdown diagrams
 - **JSON** - For programmatic analysis
 
 **CLI Debug Flags:**
@@ -608,24 +608,24 @@ xdrun --debug --debug-domain \
 ```mermaid
 flowchart LR
     A["Source: &#123;$var&#125;"] --> B[Interpolator]
-    
+
     B --> C{Variable type?}
-    
+
     C -->|Simple| D[Lookup in context]
     C -->|Expression| E[Evaluate expression]
     C -->|Conditional| F[Evaluate condition]
     C -->|Environment| G[Read from env]
-    
+
     D --> H[Apply transformations]
     E --> H
     F --> H
     G --> H
-    
+
     H --> I{Operations?}
     I -->|Yes| J[Apply operations<br/>filter/sort/split]
     I -->|No| K[Return value]
     J --> K
-    
+
     style B fill:#ffe1f5
     style H fill:#fff4e1
 ```
@@ -637,12 +637,12 @@ graph TD
     A[Global Context] --> B[Project Context]
     B --> C[Task Context]
     C --> D[Block Context]
-    
+
     A -.->|Variables| A1[Project-level vars]
     B -.->|Variables| B1[Task parameters]
     C -.->|Variables| C1[Local variables]
     D -.->|Variables| D1[Loop/block vars]
-    
+
     D -->|Lookup| E{Variable exists?}
     E -->|Yes| F[Return value]
     E -->|No| C
@@ -652,7 +652,7 @@ graph TD
     B -->|Lookup| H{Variable exists?}
     H -->|Yes| F
     H -->|No| I[Error or undefined]
-    
+
     style A fill:#e1f5ff
     style B fill:#fff4e1
     style C fill:#ffe1f5
@@ -671,27 +671,27 @@ graph TB
         E[Engine]
         CTX[Context Manager]
     end
-    
+
     subgraph "Interpolation System"
         I[Interpolator]
         IR[Resolvers]
         IC[Conditional Logic]
         IU[Utilities]
     end
-    
+
     subgraph "Hooks System"
         HM[Hook Manager]
         HS[Setup Hooks]
         HB[Before/After Hooks]
         HT[Teardown Hooks]
     end
-    
+
     subgraph "Includes System"
         IN[Include Resolver]
         IC2[Cache Manager]
         IR2[Remote Fetcher]
     end
-    
+
     subgraph "Executors"
         EE[Error Executor]
         EC[Control Executor]
@@ -704,23 +704,23 @@ graph TB
         EH[HTTP Executor]
         EDT[Detection Executor]
     end
-    
+
     E --> CTX
     E --> I
     E --> HM
     E --> IN
-    
+
     I --> IR
     I --> IC
     I --> IU
-    
+
     HM --> HS
     HM --> HB
     HM --> HT
-    
+
     IN --> IC2
     IN --> IR2
-    
+
     E --> EE
     E --> EC
     E --> EV
@@ -731,7 +731,7 @@ graph TB
     E --> EG
     E --> EH
     E --> EDT
-    
+
     EC --> I
     EV --> I
     ES --> I
@@ -740,7 +740,7 @@ graph TB
     ED --> I
     EG --> I
     EH --> I
-    
+
     style E fill:#ffe1f5
     style I fill:#e1f5ff
     style HM fill:#fff4e1
@@ -755,7 +755,7 @@ graph LR
         P[Parser]
         PH[Helper Methods]
     end
-    
+
     subgraph "Statement Parsers"
         PP[Project Parser]
         PT[Task Parser]
@@ -764,7 +764,7 @@ graph LR
         PC[Control Parser]
         PE[Error Parser]
     end
-    
+
     subgraph "Action Parsers"
         PD[Docker Parser]
         PG[Git Parser]
@@ -775,7 +775,7 @@ graph LR
         PV[Variable Parser]
         PDT[Detection Parser]
     end
-    
+
     P --> PH
     P --> PP
     P --> PT
@@ -783,7 +783,7 @@ graph LR
     P --> PA
     P --> PC
     P --> PE
-    
+
     PA --> PD
     PA --> PG
     PA --> PHT
@@ -792,7 +792,7 @@ graph LR
     PA --> PN
     PA --> PV
     PA --> PDT
-    
+
     style P fill:#fff4e1
     style PA fill:#ffe1f5
 ```
@@ -838,7 +838,7 @@ for _, stmt := range task.Statements {
 
 Base execution flow with hooks at specific points:
 
-```
+```text
 1. Setup hooks
 2. Before task hooks
 3. Execute task statements
@@ -945,7 +945,7 @@ graph LR
     D --> E[Parse & validate]
     E --> F[Store in cache]
     F --> C
-    
+
     style C fill:#e1ffe1
 ```
 
@@ -966,7 +966,7 @@ for each item in parallel {
 
 ### Test Pyramid
 
-```
+```text
         /\
        /  \
       /E2E \          62 example files
@@ -1006,7 +1006,7 @@ The secrets management system provides secure storage for sensitive data like AP
 
 **Components:**
 - `internal/secrets/manager.go` - Core Manager interface with namespace support
-- `internal/secrets/fallback.go` - AES-256-GCM encrypted file storage backend  
+- `internal/secrets/fallback.go` - AES-256-GCM encrypted file storage backend
 - `internal/secrets/keychain_darwin.go` - macOS Keychain integration
 - `internal/secrets/credential_windows.go` - Windows Credential Manager integration
 - `internal/secrets/secretservice_linux.go` - Linux Secret Service integration
@@ -1028,22 +1028,22 @@ secret delete "key"
 ```
 
 **Security Features:**
-- ✅ Per-project namespace isolation
-- ✅ Platform-native keychain integration (with encrypted fallback)
-- ✅ AES-256-GCM encryption with PBKDF2 key derivation
-- ✅ Secure memory clearing for sensitive data
-- ✅ Input validation and sanitization
+-  Per-project namespace isolation
+-  Platform-native keychain integration (with encrypted fallback)
+-  AES-256-GCM encryption with PBKDF2 key derivation
+-  Secure memory clearing for sensitive data
+-  Input validation and sanitization
 
 ### Key Architecture Features
 
-✅ **Domain-Driven Design** - Business logic separated from infrastructure  
-✅ **Explicit Planning** - Upfront execution plan eliminates redundant scans  
-✅ **Dependency Injection** - Pluggable infrastructure for testability  
-✅ **Modular Components** - Planner, Executor, and Engine work together cleanly  
-✅ **Debug Diagnostics** - Rich visualization tools for complex workflows  
-✅ **Testable** - Components can be tested in isolation  
-✅ **Extensible** - New features easy to add  
-✅ **Performant** - Optimized execution with caching  
+ **Domain-Driven Design** - Business logic separated from infrastructure
+ **Explicit Planning** - Upfront execution plan eliminates redundant scans
+ **Dependency Injection** - Pluggable infrastructure for testability
+ **Modular Components** - Planner, Executor, and Engine work together cleanly
+ **Debug Diagnostics** - Rich visualization tools for complex workflows
+ **Testable** - Components can be tested in isolation
+ **Extensible** - New features easy to add
+ **Performant** - Optimized execution with caching
 
 ### Architecture Improvements
 
@@ -1059,7 +1059,7 @@ secret delete "key"
 
 **Component Modularity:**
 - Planner handles dependency resolution and planning
-- Executor handles task and hook execution  
+- Executor handles task and hook execution
 - Engine orchestrates the overall flow
 - Options-based configuration for flexibility
 
@@ -1077,5 +1077,5 @@ secret delete "key"
 
 ---
 
-*Last Updated: October 9, 2025*  
+*Last Updated: October 9, 2025*
 *Architecture Version: 2.1 (Modular Architecture with Debug Diagnostics)*
