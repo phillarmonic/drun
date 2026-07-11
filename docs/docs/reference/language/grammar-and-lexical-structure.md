@@ -2,339 +2,6 @@
 
 ## Language Grammar
 
-### EBNF Grammar
-
-```ebnf
-(* Top-level constructs *)
-program = { version_statement | project_declaration | snippet_definition | template_task_definition | task_definition | service_definition | orchestration_definition } ;
-
-version_statement = "version" ":" number_literal ;
-
-annotation = "@" identifier "(" [ string_literal { "," string_literal } ] ")" ;
-
-(* Project declaration *)
-project_declaration = "project" string_literal [ "version" string_literal ] ":"
-                     { project_setting } ;
-
-project_setting = "set" identifier "to" expression
-                | "set" identifier "as" "list" "to" array_literal
-                | "include" string_literal
-                | "before" "any" "task" ":" statement_block
-                | "after" "any" "task" ":" statement_block
-                | "requires" "tools" ":" { tool_requirement }
-                | shell_config ;
-
-(* Reusable declarations *)
-snippet_definition = { annotation } "snippet" string_literal ":" statement_block ;
-
-template_task_definition = { annotation } "template" "task" string_literal ":"
-                         { task_property }
-                         statement_block ;
-
-(* Task definition *)
-task_definition = { annotation } "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
-                 { task_property }
-                 statement_block ;
-
-task_name = string_literal | identifier_like ;
-
-task_property = parameter_declaration
-              | dependency_declaration
-              | lifecycle_hook
-              | variable_declaration ;
-
-(* Parameters *)
-parameter_declaration = "requires" "tools" ":" { tool_requirement }
-                      | "requires" parameter_spec
-                      | "given" parameter_spec
-                      | "accepts" parameter_spec ;
-
-parameter_spec = identifier [ parameter_constraint ] [ parameter_default ] ;
-
-tool_requirement = tool_name { comparison_operator ( string_literal | number ) } ;
-
-parameter_constraint = "from" array_literal
-                     | "matching" "pattern" string_literal
-                     | "matching" "email" "format"
-                     | "as" type_name [ range_constraint ]
-                     | "as" "list" [ "of" type_name ] ;
-
-parameter_default = "defaults" "to" expression ;
-
-range_constraint = "between" number "and" number ;
-
-(* Dependencies *)
-dependency_declaration = "depends" "on" dependency_list ;
-
-dependency_list = dependency_item { ( "," | "and" ) dependency_item } [ "then" dependency_item ] ;
-
-dependency_item = identifier [ "in" "parallel" ] ;
-
-(* Lifecycle hooks *)
-lifecycle_hook = "before" "any" "task" ":" statement_block
-               | "after" "any" "task" ":" statement_block
-               | "on" "drun" "setup" ":" statement_block
-               | "on" "drun" "teardown" ":" statement_block ;
-
-(* Statements *)
-statement_block = { statement } ;
-
-statement = expression_statement
-          | control_statement
-          | declaration_statement
-          | action_statement ;
-
-expression_statement = expression ;
-
-control_statement = if_statement
-                  | conditional_when_statement
-                  | for_statement
-                  | try_statement ;
-
-declaration_statement = variable_declaration
-                      | constant_declaration ;
-
-action_statement = built_in_action
-                 | shell_command
-                 | detection_statement
-                 | task_call_statement ;
-
-(* Control flow *)
-if_statement = "if" condition ":" statement_block
-              { "else" "if" condition ":" statement_block }
-              [ "else" ":" statement_block ] ;
-
-conditional_when_statement = "when" condition ":" statement_block
-                           [ "otherwise" ":" statement_block ] ;
-
-for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
-               statement_block ;
-
-try_statement = "try" ":" statement_block
-               { "catch" identifier ":" statement_block }
-               [ "finally" ":" statement_block ] ;
-
-(* Task calls *)
-task_call_statement = "call" "task" task_name [ "with" parameter_list ] ;
-
-parameter_list = parameter_assignment { parameter_assignment } ;
-
-parameter_assignment = identifier "=" ( string_literal | number ) ;
-
-(* Conditions *)
-condition = logical_expression ;
-
-logical_expression = comparison_expression
-                   { ( "and" | "or" ) comparison_expression } ;
-
-comparison_expression = additive_expression
-                      [ comparison_operator additive_expression ] ;
-
-comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">="
-                    | "contains" | "matches" | "exists" ;
-
-(* Expressions *)
-expression = logical_expression ;
-
-additive_expression = multiplicative_expression
-                    { ( "+" | "-" ) multiplicative_expression } ;
-
-multiplicative_expression = unary_expression
-                          { ( "*" | "/" | "%" ) unary_expression } ;
-
-unary_expression = [ "not" ] primary_expression ;
-
-primary_expression = identifier
-                   | literal
-                   | function_call
-                   | member_access
-                   | interpolated_string
-                   | "(" expression ")" ;
-
-function_call = identifier "(" [ argument_list ] ")" ;
-
-member_access = primary_expression "." identifier ;
-
-argument_list = expression { "," expression } ;
-
-(* Variables *)
-variable_declaration = "let" identifier "be" expression
-                     | "set" identifier "to" expression
-                     | capture_expression_statement
-                     | capture_shell_statement ;
-
-capture_expression_statement = "capture" identifier "from" expression ;
-
-capture_shell_statement = "capture" "from" "shell" string_literal "as" variable
-                        | "capture" "from" "shell" "as" variable ":" statement_block ;
-
-constant_declaration = "define" identifier "as" expression ;
-
-(* Built-in actions *)
-built_in_action = docker_action
-                | kubernetes_action
-                | git_action
-                | file_action
-                | network_action
-                | status_action
-                | deployment_action ;
-
-docker_action = "build" "docker" "image" [ string_literal ]
-              | "push" "image" string_literal [ "to" string_literal ]
-              | "run" "container" string_literal [ container_options ]
-              | "stop" "container" string_literal
-              | "remove" "container" string_literal ;
-
-kubernetes_action = "deploy" string_literal "to" "kubernetes" [ kubernetes_options ]
-                  | "scale" string_literal "to" number "replicas"
-                  | "rollback" string_literal
-                  | "wait" "for" "rollout" [ "of" string_literal ] ;
-
-git_action = "commit" "changes" [ "with" "message" string_literal ]
-           | "push" "to" "branch" string_literal
-           | "create" "tag" string_literal
-           | "checkout" "branch" string_literal ;
-
-file_action = "copy" string_literal "to" string_literal
-            | "move" string_literal "to" string_literal
-            | "remove" string_literal
-            | "create" "directory" string_literal
-            | "backup" string_literal [ "as" string_literal ] ;
-
-status_action = "step" string_literal
-              | "info" string_literal
-              | "warn" string_literal
-              | "error" string_literal
-              | "success" string_literal
-              | "fail" [ "with" string_literal ] ;
-
-(* Shell commands *)
-shell_command = shell_action ( string_literal | ":" statement_block )
-              | "capture" ( string_literal | ":" statement_block ) "as" identifier ;
-
-shell_action = "run" | "exec" | "shell" ;
-
-(* Detection statements *)
-detection_statement = "detect" detection_target
-                    | "detect" "available" tool_alternatives [ "as" variable_name ]
-                    | "if" tool_list availability_verb "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
-                    | "if" tool_list availability_verb "not" "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
-                    | "if" ( tool_name | string_literal ) "version" comparison_operator version_value ":" statement_block [ "else" ":" statement_block ]
-                    | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
-
-tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
-
-availability_verb = "is" | "are" ;
-
-detection_target = "project" "type"
-                 | tool_name [ "version" ] ;
-
-tool_alternatives = ( tool_name | string_literal ) { "or" ( tool_name | string_literal ) } ;
-
-tool_name = identifier ;
-
-environment_name = "ci" | "local" | "production" | "staging" | "development" | identifier ;
-
-variable_name = "$" identifier ;
-version_value = string_literal | number_literal ;
-
-(* Shell configuration *)
-shell_config = "shell" "config" ":" { platform_config } ;
-
-platform_config = identifier ":" platform_settings ;
-
-platform_settings = { platform_setting } ;
-
-platform_setting = "executable" ":" string_literal
-                  | "args" ":" string_array
-                  | "environment" ":" key_value_pairs ;
-
-string_array = { "-" string_literal } ;
-
-key_value_pairs = { identifier ":" string_literal } ;
-
-(* Literals *)
-literal = string_literal
-        | number_literal
-        | boolean_literal
-        | array_literal
-        | object_literal ;
-
-string_literal = '"' { string_character } '"' ;
-interpolated_string = '"' { string_character | interpolation } '"' ;
-interpolation = "{" expression [ pipe_operations ] "}" ;
-pipe_operations = { "|" pipe_operation } ;
-pipe_operation = "replace" string_literal ( "by" | "with" ) string_literal
-               | "without" ( "prefix" | "suffix" ) string_literal
-               | "uppercase" | "lowercase" | "trim" ;
-
-(* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
-variable = "$" identifier ;  (* Declared variables: $name, $environment *)
-loop_variable = identifier ; (* Loop variables: item, i, file *)
-identifier_like = identifier { "-" identifier } ;
-
-number_literal = integer_literal | float_literal ;
-integer_literal = digit { digit } ;
-float_literal = integer_literal "." integer_literal ;
-
-boolean_literal = "true" | "false" ;
-
-array_literal = "[" [ expression { "," expression } ] "]" ;
-
-object_literal = "{" [ object_member { "," object_member } ] "}" ;
-object_member = ( identifier | string_literal ) ":" expression ;
-
-(* Identifiers and keywords *)
-identifier = letter { letter | digit | "_" } ;
-letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
-digit = "0" | "1" | ... | "9" ;
-
-(* Service and orchestration declarations *)
-service_definition = "service" string_literal "in" string_literal ":" statement_block ;
-
-orchestration_definition = "orchestrate" string_literal ":" statement_block ;
-
-orchestration_action_statement = "orchestrate" string_literal orchestration_action
-                               [ service_filter ]
-                               [ orchestration_option_block ]
-                               [ "starting" "from" ( string_literal | variable | interpolation ) ] ;
-
-orchestration_action = "start"
-                     | "up"
-                     | "stop"
-                     | "restart"
-                     | "recreate"
-                     | "status"
-                     | "show" "endpoints"
-                     | "endpoints"
-                     | "health"
-                     | "health_check"
-                     | "build"
-                     | "pull"
-                     | "down"
-                     | "logs"
-                     | "clone" "repositories"
-                     | "update" "repositories"
-                     | "list" "branches" [ string_literal ]
-                     | "switch" "branch" "to" "default"
-                     | "set" "all" "branches" "to" "default" ;
-
-service_filter = "services" array_literal
-               | "service" ( string_literal | variable | interpolation ) ;
-
-orchestration_option_block = "with" orchestration_option { [ "," ] orchestration_option } ;
-
-orchestration_option = "cache" string_literal
-                     | "branch" string_literal
-                     | "timeout" string_literal ;
-
-(* Comments *)
-single_line_comment = "#" { any_character_except_newline } ;
-multiline_comment = "/*" { any_character } "*/" ;
-```
-
----
-
 ## Lexical Structure
 
 ### Tokens
@@ -703,3 +370,335 @@ docker compose exec \
 
 ---
 
+### EBNF Grammar
+
+```ebnf
+(* Top-level constructs *)
+program = { version_statement | project_declaration | snippet_definition | template_task_definition | task_definition | service_definition | orchestration_definition } ;
+
+version_statement = "version" ":" number_literal ;
+
+annotation = "@" identifier "(" [ string_literal { "," string_literal } ] ")" ;
+
+(* Project declaration *)
+project_declaration = "project" string_literal [ "version" string_literal ] ":"
+                     { project_setting } ;
+
+project_setting = "set" identifier "to" expression
+                | "set" identifier "as" "list" "to" array_literal
+                | "include" string_literal
+                | "before" "any" "task" ":" statement_block
+                | "after" "any" "task" ":" statement_block
+                | "requires" "tools" ":" { tool_requirement }
+                | shell_config ;
+
+(* Reusable declarations *)
+snippet_definition = { annotation } "snippet" string_literal ":" statement_block ;
+
+template_task_definition = { annotation } "template" "task" string_literal ":"
+                         { task_property }
+                         statement_block ;
+
+(* Task definition *)
+task_definition = { annotation } "task" task_name [ "mode" string_literal ] [ "means" string_literal ] ":"
+                 { task_property }
+                 statement_block ;
+
+task_name = string_literal | identifier_like ;
+
+task_property = parameter_declaration
+              | dependency_declaration
+              | lifecycle_hook
+              | variable_declaration ;
+
+(* Parameters *)
+parameter_declaration = "requires" "tools" ":" { tool_requirement }
+                      | "requires" parameter_spec
+                      | "given" parameter_spec
+                      | "accepts" parameter_spec ;
+
+parameter_spec = identifier [ parameter_constraint ] [ parameter_default ] ;
+
+tool_requirement = tool_name { comparison_operator ( string_literal | number ) } ;
+
+parameter_constraint = "from" array_literal
+                     | "matching" "pattern" string_literal
+                     | "matching" "email" "format"
+                     | "as" type_name [ range_constraint ]
+                     | "as" "list" [ "of" type_name ] ;
+
+parameter_default = "defaults" "to" expression ;
+
+range_constraint = "between" number "and" number ;
+
+(* Dependencies *)
+dependency_declaration = "depends" "on" dependency_list ;
+
+dependency_list = dependency_item { ( "," | "and" ) dependency_item } [ "then" dependency_item ] ;
+
+dependency_item = identifier [ "in" "parallel" ] ;
+
+(* Lifecycle hooks *)
+lifecycle_hook = "before" "any" "task" ":" statement_block
+               | "after" "any" "task" ":" statement_block
+               | "on" "drun" "setup" ":" statement_block
+               | "on" "drun" "teardown" ":" statement_block ;
+
+(* Statements *)
+statement_block = { statement } ;
+
+statement = expression_statement
+          | control_statement
+          | declaration_statement
+          | action_statement ;
+
+expression_statement = expression ;
+
+control_statement = if_statement
+                  | conditional_when_statement
+                  | for_statement
+                  | try_statement ;
+
+declaration_statement = variable_declaration
+                      | constant_declaration ;
+
+action_statement = built_in_action
+                 | shell_command
+                 | detection_statement
+                 | task_call_statement ;
+
+(* Control flow *)
+if_statement = "if" condition ":" statement_block
+              { "else" "if" condition ":" statement_block }
+              [ "else" ":" statement_block ] ;
+
+conditional_when_statement = "when" condition ":" statement_block
+                           [ "otherwise" ":" statement_block ] ;
+
+for_statement = "for" "each" variable "in" ( expression | array_literal ) [ "in" "parallel" ] ":"
+               statement_block ;
+
+try_statement = "try" ":" statement_block
+               { "catch" identifier ":" statement_block }
+               [ "finally" ":" statement_block ] ;
+
+(* Task calls *)
+task_call_statement = "call" "task" task_name [ "with" parameter_list ] ;
+
+parameter_list = parameter_assignment { parameter_assignment } ;
+
+parameter_assignment = identifier "=" ( string_literal | number ) ;
+
+(* Conditions *)
+condition = logical_expression ;
+
+logical_expression = comparison_expression
+                   { ( "and" | "or" ) comparison_expression } ;
+
+comparison_expression = additive_expression
+                      [ comparison_operator additive_expression ] ;
+
+comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">="
+                    | "contains" | "matches" | "exists" ;
+
+(* Expressions *)
+expression = logical_expression ;
+
+additive_expression = multiplicative_expression
+                    { ( "+" | "-" ) multiplicative_expression } ;
+
+multiplicative_expression = unary_expression
+                          { ( "*" | "/" | "%" ) unary_expression } ;
+
+unary_expression = [ "not" ] primary_expression ;
+
+primary_expression = identifier
+                   | literal
+                   | function_call
+                   | member_access
+                   | interpolated_string
+                   | "(" expression ")" ;
+
+function_call = identifier "(" [ argument_list ] ")" ;
+
+member_access = primary_expression "." identifier ;
+
+argument_list = expression { "," expression } ;
+
+(* Variables *)
+variable_declaration = "let" identifier "be" expression
+                     | "set" identifier "to" expression
+                     | capture_expression_statement
+                     | capture_shell_statement ;
+
+capture_expression_statement = "capture" identifier "from" expression ;
+
+capture_shell_statement = "capture" "from" "shell" string_literal "as" variable
+                        | "capture" "from" "shell" "as" variable ":" statement_block ;
+
+constant_declaration = "define" identifier "as" expression ;
+
+(* Built-in actions *)
+built_in_action = docker_action
+                | kubernetes_action
+                | git_action
+                | file_action
+                | network_action
+                | status_action
+                | deployment_action ;
+
+docker_action = "build" "docker" "image" [ string_literal ]
+              | "push" "image" string_literal [ "to" string_literal ]
+              | "run" "container" string_literal [ container_options ]
+              | "stop" "container" string_literal
+              | "remove" "container" string_literal ;
+
+kubernetes_action = "deploy" string_literal "to" "kubernetes" [ kubernetes_options ]
+                  | "scale" string_literal "to" number "replicas"
+                  | "rollback" string_literal
+                  | "wait" "for" "rollout" [ "of" string_literal ] ;
+
+git_action = "commit" "changes" [ "with" "message" string_literal ]
+           | "push" "to" "branch" string_literal
+           | "create" "tag" string_literal
+           | "checkout" "branch" string_literal ;
+
+file_action = "copy" string_literal "to" string_literal
+            | "move" string_literal "to" string_literal
+            | "remove" string_literal
+            | "create" "directory" string_literal
+            | "backup" string_literal [ "as" string_literal ] ;
+
+status_action = "step" string_literal
+              | "info" string_literal
+              | "warn" string_literal
+              | "error" string_literal
+              | "success" string_literal
+              | "fail" [ "with" string_literal ] ;
+
+(* Shell commands *)
+shell_command = shell_action ( string_literal | ":" statement_block )
+              | "capture" ( string_literal | ":" statement_block ) "as" identifier ;
+
+shell_action = "run" | "exec" | "shell" ;
+
+(* Detection statements *)
+detection_statement = "detect" detection_target
+                    | "detect" "available" tool_alternatives [ "as" variable_name ]
+                    | "if" tool_list availability_verb "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
+                    | "if" tool_list availability_verb "not" "available" [ "and" "version" comparison_operator version_value ] ":" statement_block [ "else" ":" statement_block ]
+                    | "if" ( tool_name | string_literal ) "version" comparison_operator version_value ":" statement_block [ "else" ":" statement_block ]
+                    | "when" "in" environment_name "environment" ":" statement_block [ "else" ":" statement_block ] ;
+
+tool_list = ( tool_name | string_literal ) { "," ( tool_name | string_literal ) } ;
+
+availability_verb = "is" | "are" ;
+
+detection_target = "project" "type"
+                 | tool_name [ "version" ] ;
+
+tool_alternatives = ( tool_name | string_literal ) { "or" ( tool_name | string_literal ) } ;
+
+tool_name = identifier ;
+
+environment_name = "ci" | "local" | "production" | "staging" | "development" | identifier ;
+
+variable_name = "$" identifier ;
+version_value = string_literal | number_literal ;
+
+(* Shell configuration *)
+shell_config = "shell" "config" ":" { platform_config } ;
+
+platform_config = identifier ":" platform_settings ;
+
+platform_settings = { platform_setting } ;
+
+platform_setting = "executable" ":" string_literal
+                  | "args" ":" string_array
+                  | "environment" ":" key_value_pairs ;
+
+string_array = { "-" string_literal } ;
+
+key_value_pairs = { identifier ":" string_literal } ;
+
+(* Literals *)
+literal = string_literal
+        | number_literal
+        | boolean_literal
+        | array_literal
+        | object_literal ;
+
+string_literal = '"' { string_character } '"' ;
+interpolated_string = '"' { string_character | interpolation } '"' ;
+interpolation = "{" expression [ pipe_operations ] "}" ;
+pipe_operations = { "|" pipe_operation } ;
+pipe_operation = "replace" string_literal ( "by" | "with" ) string_literal
+               | "without" ( "prefix" | "suffix" ) string_literal
+               | "uppercase" | "lowercase" | "trim" ;
+
+(* Variable syntax: declared variables use $prefix, loop variables are bare identifiers *)
+variable = "$" identifier ;  (* Declared variables: $name, $environment *)
+loop_variable = identifier ; (* Loop variables: item, i, file *)
+identifier_like = identifier { "-" identifier } ;
+
+number_literal = integer_literal | float_literal ;
+integer_literal = digit { digit } ;
+float_literal = integer_literal "." integer_literal ;
+
+boolean_literal = "true" | "false" ;
+
+array_literal = "[" [ expression { "," expression } ] "]" ;
+
+object_literal = "{" [ object_member { "," object_member } ] "}" ;
+object_member = ( identifier | string_literal ) ":" expression ;
+
+(* Identifiers and keywords *)
+identifier = letter { letter | digit | "_" } ;
+letter = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
+digit = "0" | "1" | ... | "9" ;
+
+(* Service and orchestration declarations *)
+service_definition = "service" string_literal "in" string_literal ":" statement_block ;
+
+orchestration_definition = "orchestrate" string_literal ":" statement_block ;
+
+orchestration_action_statement = "orchestrate" string_literal orchestration_action
+                               [ service_filter ]
+                               [ orchestration_option_block ]
+                               [ "starting" "from" ( string_literal | variable | interpolation ) ] ;
+
+orchestration_action = "start"
+                     | "up"
+                     | "stop"
+                     | "restart"
+                     | "recreate"
+                     | "status"
+                     | "show" "endpoints"
+                     | "endpoints"
+                     | "health"
+                     | "health_check"
+                     | "build"
+                     | "pull"
+                     | "down"
+                     | "logs"
+                     | "clone" "repositories"
+                     | "update" "repositories"
+                     | "list" "branches" [ string_literal ]
+                     | "switch" "branch" "to" "default"
+                     | "set" "all" "branches" "to" "default" ;
+
+service_filter = "services" array_literal
+               | "service" ( string_literal | variable | interpolation ) ;
+
+orchestration_option_block = "with" orchestration_option { [ "," ] orchestration_option } ;
+
+orchestration_option = "cache" string_literal
+                     | "branch" string_literal
+                     | "timeout" string_literal ;
+
+(* Comments *)
+single_line_comment = "#" { any_character_except_newline } ;
+multiline_comment = "/*" { any_character } "*/" ;
+```
+
+---

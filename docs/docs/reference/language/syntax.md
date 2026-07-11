@@ -56,6 +56,7 @@ project "my-app":
 #### Platform Detection
 
 drun automatically detects the current platform using Go's `runtime.GOOS`:
+
 - **mac**: macOS (legacy alias: `darwin`)
 - **linux**: Linux distributions
 - **windows**: Windows
@@ -78,12 +79,14 @@ task "shell" means "Open PowerShell":
 
 #### `@platform(...)`
 
+Platform allows you to have platform-bound specific implementation of tasks. This is especially useful when working with environments that require Windows, since they tend to have completely different workflows than UNIX-like systems, such as Linux and macOS. Directory slashes, for example, are different on Windows (except on Git Bash).
+
 - Accepted values: `linux`, `mac`, `windows`
-- Legacy alias: `darwin` is accepted and normalised to `mac`
+- Legacy alias: `darwin` is accepted and normalized to `mac`
 - A declaration may list one or more platforms
 - Unknown annotations are rejected
 
-For tasks specifically, `@platform(...)` also enables platform-aware duplicate names. A task family may contain any number of disjoint platform-tagged variants plus at most one unannotated fallback variant. drun resolves the correct variant automatically when the task is invoked: exact platform match first, then the unannotated fallback if one exists.
+For **tasks** specifically, `@platform(...)` also enables platform-aware duplicate names. A task family may contain any number of disjoint platform-tagged variants plus at most one unannotated fallback variant. drun resolves the correct variant automatically when the task is invoked: exact platform match first, then the unannotated fallback if one exists.
 
 If no variant matches the current platform, execution fails with a clear error listing the available variants.
 
@@ -98,6 +101,7 @@ Each platform configuration supports:
 #### Default Behavior
 
 If no shell configuration is provided, drun uses sensible defaults:
+
 - **Shell**: `/bin/sh` on Unix-like systems, system default on Windows
 - **Args**: Basic shell invocation (`-c` for command execution)
 - **Environment**: Inherits from parent process
@@ -730,4 +734,3 @@ finally:
 ```
 
 ---
-

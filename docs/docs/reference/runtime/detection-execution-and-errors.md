@@ -267,18 +267,31 @@ if "docker-compose" is available:
     info "Using Docker Compose v1"
 ```
 
-### DRY Tool Detection
+### Docker Compose Command Macro
 
-For maximum flexibility and maintainability, drun supports detecting tool variants and capturing the working one in a variable:
+Use the built-in Docker Compose macro when a task must work with either Compose V2 (`docker compose`) or the standalone Compose V1 command (`docker-compose`):
 
 ```drun
-# Detect which Docker Compose variant is available and capture it
-detect available "docker compose" or "docker-compose" as $compose_cmd
+# Automatically resolves to "docker compose" or "docker-compose"
+run "{docker compose command} up -d"
+run "{docker compose command} ps"
+run "{docker compose command} logs"
+```
 
-# Use the captured variable consistently throughout the task
-run "{$compose_cmd} up -d"
-run "{$compose_cmd} ps"
-run "{$compose_cmd} logs"
+The shorter `{compose_cmd}` alias has the same behavior:
+
+```drun
+run "{compose_cmd} up -d"
+run "{compose_cmd} logs --tail=100"
+```
+
+The macro prefers `docker compose` and falls back to `docker-compose`. Execution fails with a clear error if neither command is available.
+
+### DRY Tool Detection
+
+For other tools with multiple possible commands, detect the available variant and capture it in a variable:
+
+```drun
 
 # Multiple tool alternatives
 detect available "npm" or "yarn" or "pnpm" as $package_manager
@@ -288,15 +301,6 @@ run "{$package_manager} run build"
 # Docker Buildx variants
 detect available "docker buildx" or "docker-buildx" as $buildx_cmd
 run "{$buildx_cmd} build --platform linux/amd64,linux/arm64 ."
-```
-
-When you only need the resolved command string inline, use the builtin interpolation macro:
-
-```drun
-run "{compose_cmd} up -d"
-run "{compose_cmd} logs --tail=100"
-run "{docker compose command} up -d"
-run "{docker compose command} logs --tail=100"
 ```
 
 #### Benefits
@@ -761,4 +765,3 @@ catch blue_green_error:
 ```
 
 ---
-

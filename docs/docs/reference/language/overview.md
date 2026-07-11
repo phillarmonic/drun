@@ -26,7 +26,7 @@ drun v2 uses a **new execution engine** with the following components:
 ### CLI Usage Pattern
 
 ```bash
-xdrun [task_name] [param1=value1] [param2=value2] [--cli-flags]
+xdrun [task_name] [param1=value1]   [param2=value2]   [--cli-flags]
       └─ task     └─ task parameters (no dashes) ─┘ └─ xdrun flags ─┘
 ```
 

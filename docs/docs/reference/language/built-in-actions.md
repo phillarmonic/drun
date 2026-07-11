@@ -32,12 +32,19 @@ task "ci" mode "ci" means "Run noisy checks quietly":
   run "gosec ./..."
 ```
 
-Currently supported modes:
+Currently supported task execution supported modes:
 
 - `normal` is the standard execution behavior. This is the implicit default when a task does not declare a mode. Shell command output streams normally as commands run.
 - `ci` buffers shell command output for the task and only prints the buffered stdout/stderr if a command fails. Action statements like `step`, `info`, and `success` still print normally.
 
 `ci` is the only mode currently declared inside task definitions. Use the normal default behavior by omitting the `mode` clause entirely.
+
+The philosophy behind the CI execute is: 
+> The output values of this execution only matter if something breaks
+
+This is particularly useful in environments where having a lot of garbage in the logs can be costly, such as when monitoring logs with AI Large Language Models (input token cost) or ingesting the logs into tools that generate cost of ingestion, like DataDog, Loki, etc.
+
+You can still see these values when debugging if your logs are accurate by overriding the runtime mode. Let's talk about that.
 
 **Runtime Override**
 
