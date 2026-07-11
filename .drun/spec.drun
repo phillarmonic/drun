@@ -60,6 +60,10 @@ task "install" means "Install xdrun with build info":
 task "skill" means "Show how to install drun AI guidance in a repository":
 	info "Install project AI guidance with: xdrun cmd:skill install drun-basics"
 
+task "docs" means "Runs the local docs server":
+    use workdir "docs"
+    run "uv run zensical serve"
+
 task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
 	step "Linter"
