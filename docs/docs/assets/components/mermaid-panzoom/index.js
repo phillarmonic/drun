@@ -1,5 +1,5 @@
-import { enhanceAllSvgHighlighting } from "./mermaid-panzoom-highlights.js";
-import { installViewer } from "./mermaid-panzoom-viewer.js";
+import { enhanceAllSvgHighlighting } from "./highlights.js";
+import { installViewer } from "./viewer.js";
 
 const ENHANCED_ATTR = "data-mermaid-panzoom-bound";
 const ACTIONS_ATTR = "data-mermaid-panzoom-actions";

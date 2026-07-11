@@ -8,11 +8,11 @@ repo_name = "phillarmonic/drun"
 copyright = "Copyright &copy; 2026 Phillarmonic Software"
 extra_css = [
   "stylesheets/shiki.css",
-  "assets/stylesheets/mermaid-panzoom.css",
+  "assets/components/mermaid-panzoom/styles.css",
 ]
 extra_javascript = [
   "javascripts/shiki.mjs",
-  { path = "assets/javascripts/mermaid-panzoom.js", type = "module" },
+  { path = "assets/components/mermaid-panzoom/index.js", type = "module" },
 ]
 
 nav = [

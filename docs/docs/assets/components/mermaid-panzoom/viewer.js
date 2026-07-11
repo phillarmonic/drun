@@ -1,4 +1,4 @@
-import { enhanceAllSvgHighlighting } from "./mermaid-panzoom-highlights.js";
+import { enhanceAllSvgHighlighting } from "./highlights.js";
 
 const OVERLAY_ID = "mermaid-panzoom-overlay";
 const ENHANCED_ATTR = "data-mermaid-panzoom-bound";
