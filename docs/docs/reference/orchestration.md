@@ -2,7 +2,15 @@
 
 ## Microservices Orchestration
 
-drun v2 includes a comprehensive microservices orchestration system for managing multi-service architectures with Docker Compose integration, health monitoring, and visual progress feedback.
+Developers are lazy people. We all know that. The correct way of running microservices is either having a Swarm, Kubernetes, or other orchestration specification to manage and deploy things.
+
+In some cases, due to retrograde ways of thinking (especially by old school managers), or just general laziness of a burnt out and crunched team, the *quick and dirty* way of starting this process becomes a large collection of isolated docker-compose.yml files in different repositories. This becomes a nightmare to run together, or synchronize, without doing a lot of shellscript sorcery.
+
+As people who had to be through this ourselves several times, we crafted a little SMT (sorcery management tool) within drun to deal with these specific edge cases, where there's no escape but to use compose for microservices.
+
+With the venting out of the way, drun v2 includes a comprehensive microservices orchestration system for managing multi-service architectures with Docker Compose integration, health monitoring, and visual progress feedback.
+
+Go get'em tiger!
 
 ### Overview
 
@@ -194,10 +202,11 @@ service "gateway" in "./gateway":
 ```
 
 **When to use `allocate_tty`:**
--  When your build uses `docker compose exec` to run commands inside containers
--  When scripts require a TTY (check for "input device is not a TTY" errors)
--  When commands need interactive terminal features
--  Not needed for regular shell commands, docker build, or make
+
+- When your build uses `docker compose exec` to run commands inside containers
+- When scripts require a TTY (check for "input device is not a TTY" errors)
+- When commands need interactive terminal features
+- Not needed for regular shell commands, docker build, or make
 
 #### Complex Real-World Example
 
@@ -228,6 +237,7 @@ echo 'Build pipeline complete!'"
 ```
 
 **Key Features:**
+
 - **Multiline Support**: Write complex multi-step commands naturally
 - **Line Continuation**: Use `\` to join long single commands
 - **Variable Interpolation**: Use `{$var}` syntax in build commands
@@ -379,6 +389,7 @@ orchestrate "microservices":
 ```
 
 **Behavior:**
+
 - Services without their own `ssh_key` configuration will use the orchestration's key
 - Services with their own `ssh_key` configuration override the orchestration default
 - Supports path expansion (`~` for home directory)
@@ -400,6 +411,7 @@ orchestrate "local_stack":
 ```
 
 **Behavior:**
+
 - DNS checks run before `start`, `up`, `down`, and `status` actions
 - Each domain has a 500ms timeout for fast failure detection
 - Failures are non-blocking warnings (orchestration continues)
@@ -407,6 +419,7 @@ orchestrate "local_stack":
 - Helpful warning message suggests adding entries to `/etc/hosts`
 
 **Example Output (on failure):**
+
 ```text
  DNS resolution check:
     api.local - not resolvable
@@ -448,19 +461,20 @@ orchestrate "<group_name>" <action> [services ["service1", ...]]
 
 **Difference between `start` and `up`:**
 
-| Feature | `start` | `up` |
-|---------|---------|------|
-| Skip if healthy |  Yes |  No |
-| Check for updates |  Yes |  Yes |
-| Force repo updates on main/master |  No |  Yes |
-| Force rebuild |  No |  Yes |
-| **Use for** | Quick restarts | Development, fresh deploys |
+| Feature                           | `start`        | `up`                       |
+| --------------------------------- | -------------- | -------------------------- |
+| Skip if healthy                   | Yes            | No                         |
+| Check for updates                 | Yes            | Yes                        |
+| Force repo updates on main/master | No             | Yes                        |
+| Force rebuild                     | No             | Yes                        |
+| **Use for**                       | Quick restarts | Development, fresh deploys |
 
 #### Resume from a Specific Service
 
 You can resume an orchestration from a specific service using the `starting from` modifier. This is useful when an orchestration fails partway through and you've fixed the issue. The system will verify that all dependencies before the specified service are running and healthy before starting from that point.
 
 **Syntax:**
+
 ```drun
 orchestrate "<group_name>" <action> starting from "<service_name>"
 orchestrate "<group_name>" <action> starting from {$variable}
@@ -468,6 +482,7 @@ orchestrate "<group_name>" <action> starting from $variable
 ```
 
 **Example:**
+
 ```drun
 task "up" means "Start the stack":
     given $service defaults to empty
@@ -481,11 +496,13 @@ task "up" means "Start the stack":
 ```
 
 **Behavior:**
+
 1. Verifies all dependencies before `$service` are running and healthy
 2. If any dependency is not running or healthy, fails with an error
 3. If all dependencies are satisfied, starts from `$service` onwards in dependency order
 
 **Usage:**
+
 ```bash
 # Start full stack
 xdrun up
@@ -553,16 +570,19 @@ Service filters can be supplied inline (`services ["api"]`, `service "api"`) or 
 The branch management actions help you keep repositories aligned with their default branches:
 
 **`list branches`** - Lists all repositories with their current branch:
+
 - Shows all repositories with their current branch name
 - Lists services without repository configuration
 - Provides a summary count
 
 **`list branches "branch name"`** - Shows repositories on a specific branch:
+
 - Filters to show only repositories checked out on the specified branch
 - Useful for finding which services are on a particular branch
 - Normalizes branch names (main/master are treated as equivalent)
 
 **`switch branch to default`** - Switches repositories to their default branch:
+
 - If a `service` filter is provided, only switches that service
 - If no filter is provided, switches all services
 - Skips repositories with uncommitted changes (safety feature)
@@ -570,15 +590,18 @@ The branch management actions help you keep repositories aligned with their defa
 - The default branch is detected from the remote repository
 
 **`set all branches to default`** - Sets all services to their default branch:
+
 - Same behavior as `switch branch to default` but applies to all services
 - Useful for resetting all repositories to their default state
 
 **Safety Features:**
+
 - Repositories with uncommitted changes are skipped (you must commit or stash changes first)
 - The default branch is automatically detected from `origin/HEAD` or by checking for `main`/`master` branches
 - After switching, the latest changes are pulled from the default branch
 
 **Variable support in service filters:**
+
 ```drun
 task "restart_service":
     given $service defaults to empty
@@ -612,6 +635,7 @@ task "endpoints":
 ```
 
 **Example Output:**
+
 ```text
  Service endpoints for orchestration: my_stack
 
@@ -630,6 +654,7 @@ task "endpoints":
 ```
 
 **Behavior:**
+
 - Shows services grouped by status: running with endpoints, running without, stopped
 - Only displays URLs from HTTP health checks
 - Services without health checks appear in "running without endpoints"
@@ -641,12 +666,12 @@ The orchestration system features a BuildKit-inspired real-time progress display
 
 #### Status Indicators
 
--  **Pending** - Waiting to start
--  **Starting** - Service is starting
--  **Healthy** - Started and passed health checks
--  **Failed** - Failed to start or unhealthy
--  **Stopping** - Being stopped
--  **Stopped** - Successfully stopped
+- **Pending** - Waiting to start
+- **Starting** - Service is starting
+- **Healthy** - Started and passed health checks
+- **Failed** - Failed to start or unhealthy
+- **Stopping** - Being stopped
+- **Stopped** - Successfully stopped
 
 #### Example Output
 
@@ -845,6 +870,7 @@ service "frontend" in "./web":
 ```
 
 **Resolution Order:**
+
 1. `database` and `cache` (parallel - no dependencies)
 2. `api` (after database and cache)
 3. `frontend` (after api)
@@ -852,6 +878,7 @@ service "frontend" in "./web":
 #### Shutdown Order
 
 Shutdown occurs in reverse topological order:
+
 1. `frontend`
 2. `api`
 3. `database` and `cache`
@@ -865,6 +892,7 @@ Shutdown occurs in reverse topological order:
 ```
 
 **Common causes:**
+
 - Service not responding at endpoint
 - Wrong port or URL configuration
 - Service internal error
@@ -878,6 +906,7 @@ Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is alread
 ```
 
 **Common causes:**
+
 - Port conflict with another container
 - Docker Compose file doesn't exist
 - Permission issues
@@ -890,6 +919,7 @@ Output: Error response from daemon: Bind for 0.0.0.0:8080 failed: port is alread
 ```
 
 **Common causes:**
+
 - Incorrect path in service declaration
 - Service directory doesn't exist
 - Docker Compose file not in expected location
@@ -951,22 +981,26 @@ service "api" in "./api":
 #### Components
 
 1. **AST Nodes**
+   
    - `ServiceStatement` - Service declarations
    - `OrchestrateStatement` - Orchestration groups
    - `OrchestrationActionStatement` - Actions in tasks
 
 2. **Domain Models**
+   
    - `Service` - Runtime service representation
    - `OrchestrationGroup` - Group configuration
    - `HealthCheck` - Health check configuration
 
 3. **Execution Engine**
+   
    - Dependency resolution (topological sort)
    - Docker Compose execution
    - Health check monitoring
    - Progress display
 
 4. **Health Check System**
+   
    - HTTP checker
    - TCP checker
    - Docker checker

@@ -21,6 +21,7 @@ This document summarizes the implementation of the microservices orchestration s
 ### 2. Lexer Tokens (`internal/lexer/token.go`)
 
 Added 70+ new tokens for orchestration features:
+
 - `ORCHESTRATE`, `SERVICES`, `STRATEGY`, `SEQUENTIAL`, `CIRCUIT`, `BREAKER`
 - `HEALTH`, `DNS`, `TCP`, `DOMAIN`, `INTERVAL`, `RETRIES`
 - `MAKEFILE`, `TARGET`, `ARGS`, `REPOSITORY`
@@ -29,6 +30,7 @@ Added 70+ new tokens for orchestration features:
 ### 3. Parser (`internal/parser/parser_orchestration.go`)
 
 Comprehensive parser implementation for:
+
 - Service declarations with all options
 - Orchestration group declarations
 - Repository configuration
@@ -41,11 +43,13 @@ Comprehensive parser implementation for:
 ### 4. Domain Types (`internal/domain/orchestration/`)
 
 #### `service.go`
+
 - Service domain model with runtime state
 - ServiceStatus enum (unknown, starting, running, healthy, unhealthy, stopping, stopped, failed)
 - Health check methods (MarkHealthy, MarkUnhealthy, etc.)
 
 #### `orchestration.go`
+
 - Orchestration domain model with strategies
 - OrchestrationStrategy enum (sequential, parallel, dependency-based)
 - UpdateStrategy enum (rolling, recreate, blue-green)
@@ -53,12 +57,14 @@ Comprehensive parser implementation for:
 - Recovery configuration
 
 #### `registry.go`
+
 - ServiceRegistry: Thread-safe service registration and lookup
 - OrchestrationRegistry: Thread-safe orchestration registration and lookup
 
 ### 5. Health Check System (`internal/healthcheck/healthcheck.go`)
 
 Implemented all health check types:
+
 - **HTTP**: Status code validation, custom headers
 - **TCP**: Port connectivity checks
 - **Docker**: Container health status inspection
@@ -66,6 +72,7 @@ Implemented all health check types:
 - **Custom**: Shell command execution
 
 Features:
+
 - Configurable timeouts and intervals
 - Retry logic with configurable attempts
 - Start period support
@@ -74,6 +81,7 @@ Features:
 ### 6. Repository Management (`internal/repository/repository.go`)
 
 Git repository operations:
+
 - Clone with branch/tag selection
 - SSH key support
 - Update/pull operations
@@ -84,6 +92,7 @@ Git repository operations:
 ### 7. Makefile Integration (`internal/makeexec/makeexec.go`)
 
 Makefile execution features:
+
 - Target execution with arguments
 - Parallel job support (-j flag)
 - Pre/post command execution
@@ -96,6 +105,7 @@ Makefile execution features:
 ### 8. Environment File Management (`internal/envfile/envfile.go`)
 
 Environment file operations:
+
 - Automatic .env file creation from templates
 - Key-value parsing and writing
 - Variable replacement
@@ -108,6 +118,7 @@ Environment file operations:
 ### 9. Service Lifecycle Executor (`internal/engine/executor_orchestration.go`)
 
 Service lifecycle management:
+
 - Service registration from AST
 - Start/stop operations
 - Pre-task and post-task execution
@@ -120,11 +131,13 @@ Service lifecycle management:
 ### 10. Orchestration Coordinator (`internal/engine/orchestration_coordinator.go`)
 
 Advanced orchestration features:
+
 - **Sequential Strategy**: Start services one after another
 - **Parallel Strategy**: Start all services simultaneously
 - **Dependency-Based Strategy**: Topological sort with dependency resolution
 
 Key features:
+
 - Dependency graph building
 - Cycle detection
 - Circuit breaker implementation
@@ -137,6 +150,7 @@ Key features:
 ### 11. Built-in Functions (`internal/builtins/builtins_orchestration.go`)
 
 20+ new built-in functions:
+
 - `service_status`, `service_health`, `service_healthy`, `service_running`
 - `orchestrate_status`, `orchestrate_health_status`, `orchestrate_healthy`
 - `dns_resolve`, `dns_check`, `dns_validate`
@@ -148,6 +162,7 @@ Key features:
 ### 12. Example Drunfiles
 
 Created 6 comprehensive examples:
+
 1. **64-microservices-basic.drun**: Basic microservices setup
 2. **65-microservices-repository-cloning.drun**: Repository cloning and management
 3. **66-microservices-env-file-management.drun**: Environment file handling
@@ -158,6 +173,7 @@ Created 6 comprehensive examples:
 ## Features Implemented
 
 ### Core Features
+
 -  Service definitions with dependencies
 -  Orchestration groups with multiple strategies
 -  Health monitoring (HTTP, TCP, Docker, DNS, Custom)
@@ -170,6 +186,7 @@ Created 6 comprehensive examples:
 -  Service-specific pre/post tasks
 
 ### Docker Compose Integration
+
 -  Custom compose file support
 -  Project name configuration
 -  Force recreate option
@@ -180,6 +197,7 @@ Created 6 comprehensive examples:
 -  Timeout settings
 
 ### Health Checks
+
 -  HTTP with status code validation
 -  TCP port connectivity
 -  Docker container health
@@ -189,6 +207,7 @@ Created 6 comprehensive examples:
 -  Start period support
 
 ### Repository Management
+
 -  Clone if missing
 -  Update on start
 -  Branch selection
@@ -197,6 +216,7 @@ Created 6 comprehensive examples:
 -  Status checking
 
 ### Build System
+
 -  Makefile execution
 -  Make targets and arguments
 -  Shell command execution (supports multiline strings)
@@ -209,6 +229,7 @@ Created 6 comprehensive examples:
 -  Dry run support
 
 ### Environment Files
+
 -  Required validation
 -  Template copying
 -  Variable replacement
@@ -217,11 +238,13 @@ Created 6 comprehensive examples:
 -  Validation
 
 ### Orchestration Strategies
+
 -  Sequential: Services start one after another
 -  Parallel: All services start simultaneously
 -  Dependency-based: Topological sort based on dependencies
 
 ### Circuit Breaker
+
 -  Failure threshold tracking
 -  Automatic service stopping on failure
 -  Recovery timeout
@@ -306,6 +329,7 @@ While the core specification is implemented, the following enhancements could be
 ## Integration with Existing Drun
 
 The orchestration system is designed to integrate seamlessly with existing Drun features:
+
 - Task system for pre/post operations
 - Variable interpolation for dynamic configuration
 - Error handling with try/catch
@@ -318,6 +342,7 @@ The orchestration system is designed to integrate seamlessly with existing Drun 
  **Implementation Complete**
 
 All core features from the specification have been implemented:
+
 - AST nodes and parser
 - Domain models
 - Health check system

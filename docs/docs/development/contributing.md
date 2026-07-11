@@ -23,9 +23,9 @@ Thank you for your interest in contributing to drun! This guide will help you ge
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.26 or higher
 - Git
-- Basic understanding of compilers/interpreters (helpful but not required)
+- Basic understanding of compilers/interpreters (highly encouraged, but not required)
 
 ### First Steps
 
