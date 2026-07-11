@@ -496,15 +496,18 @@ flowchart TD
 The domain layer is fully decoupled from the AST, providing clean domain-level representations:
 
 **Domain Statement Types** (`internal/domain/statement/`)
+
 - Action, Shell, Variable, Conditional, Loop, Try/Catch
 - File, Docker, Git, HTTP, Download, Network, Detection
 - Break, Continue, TaskCall, TaskFromTemplate, UseSnippet
 
 **Unidirectional Converter** (`statement/converter.go`)
+
 - `FromAST()` - Converts AST nodes to domain statements (one-way conversion)
 - All execution uses domain statements directly (no AST conversion needed)
 
 **Domain Entities**
+
 - `task.Task` - Task with domain statements instead of AST nodes
 - `project.Project` - Project with domain-level hooks
 - `parameter.Parameter` - Parameter with validation rules
@@ -526,6 +529,7 @@ type ExecutionPlan struct {
 ```
 
 **Benefits:**
+
 - Single AST scan instead of repeated traversals
 - Deterministic execution order
 - Complete dependency resolution upfront
@@ -544,6 +548,7 @@ type Executor struct {
 ```
 
 **Responsibilities:**
+
 - Execute tasks using domain statements
 - Execute lifecycle hooks (setup, before, after, teardown)
 - Delegate statement execution to the engine
@@ -563,6 +568,7 @@ engine := NewEngineWithOptions(
 ```
 
 **Injectable Dependencies:**
+
 - Task Registry
 - Parameter Validator
 - Dependency Resolver
@@ -575,11 +581,13 @@ engine := NewEngineWithOptions(
 **Execution Plan Diagnostics** (`internal/debug/plan.go`)
 
 Export execution plans in multiple formats:
+
 - **Graphviz DOT** - For rendering dependency graphs
 - **Mermaid** - For markdown diagrams
 - **JSON** - For programmatic analysis
 
 **CLI Debug Flags:**
+
 ```bash
 # View execution plan
 xdrun --debug --debug-domain --debug-plan -f myfile.drun
@@ -593,6 +601,7 @@ xdrun --debug --debug-domain \
 ```
 
 **Plan Visualization Features:**
+
 - Execution order with task metadata
 - Dependency relationships
 - Parallel execution opportunities
@@ -1005,6 +1014,7 @@ The drun architecture follows a **modular, domain-driven design** with clear sep
 The secrets management system provides secure storage for sensitive data like API keys, passwords, and tokens:
 
 **Components:**
+
 - `internal/secrets/manager.go` - Core Manager interface with namespace support
 - `internal/secrets/fallback.go` - AES-256-GCM encrypted file storage backend
 - `internal/secrets/keychain_darwin.go` - macOS Keychain integration
@@ -1014,6 +1024,7 @@ The secrets management system provides secure storage for sensitive data like AP
 - `internal/builtins/builtins_secret.go` - `secret()` interpolation function
 
 **Language Integration:**
+
 ```drun
 # Store secrets
 secret set "api_key" to "secret123"
@@ -1028,6 +1039,7 @@ secret delete "key"
 ```
 
 **Security Features:**
+
 -  Per-project namespace isolation
 -  Platform-native keychain integration (with encrypted fallback)
 -  AES-256-GCM encryption with PBKDF2 key derivation
@@ -1048,22 +1060,26 @@ secret delete "key"
 ### Architecture Improvements
 
 **Domain Model:**
+
 - Tasks and projects use domain statements, not AST nodes
 - Clean separation between parsing and business logic
 - Type-safe domain entities with validation
 
 **Execution Planning:**
+
 - Single upfront dependency resolution
 - Comprehensive execution plan with all metadata
 - Deterministic execution order
 
 **Component Modularity:**
+
 - Planner handles dependency resolution and planning
 - Executor handles task and hook execution
 - Engine orchestrates the overall flow
 - Options-based configuration for flexibility
 
 **Debugging Tools:**
+
 - Execution plan visualization (Graphviz, Mermaid, JSON)
 - Domain layer inspection
 - Dependency graph analysis
@@ -1071,6 +1087,7 @@ secret delete "key"
 ---
 
 **For more details:**
+
 - [Language specification](../reference/language/overview.md) - Normative language reference
 - [internal/domain/README.md](packages/domain.md) - Domain layer documentation
 - [internal/engine/README.md](packages/engine.md) - Engine architecture

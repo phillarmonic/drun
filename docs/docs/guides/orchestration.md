@@ -271,6 +271,7 @@ task "update_specific_services":
 ```
 
 The `update repositories` action will:
+
 - Skip services without repository configuration
 - Skip repositories that aren't cloned locally
 - When a branch filter is specified, only update services currently on that branch (main/master are treated as equivalent)
@@ -300,12 +301,14 @@ task "switch_all_branches":
 ```
 
 The branch management actions will:
+
 - **`list branches`**: Lists all repositories with their current branch. Shows services without repository configuration and any errors encountered.
 - **`list branches "branch name"`**: Shows only repositories that are checked out on the specified branch. Useful for finding which services are on a particular branch.
 - **`switch branch to default`**: Switches a specific service (if `service` filter is provided) or all services to their default branch. Skips repositories with uncommitted changes (for safety) and pulls latest changes after switching.
 - **`set all branches to default`**: Sets all services to their default branch. Same safety checks as `switch branch to default`.
 
 **Safety Features:**
+
 - Repositories with uncommitted changes are skipped (you'll need to commit or stash changes first)
 - The default branch is automatically detected from the remote repository (checks `origin/HEAD`, falls back to `main` or `master`)
 - After switching, the latest changes are pulled from the default branch
@@ -437,6 +440,7 @@ service "gateway" in "./gateway":
 ```
 
 **When to use `allocate_tty`:**
+
 -  When your build uses `docker compose exec` to run commands inside containers
 -  When scripts require a TTY (resolves "input device is not a TTY" errors)
 -  When commands need interactive terminal features
@@ -458,6 +462,7 @@ When `required` is `true`, the engine honours the full configuration:
 - **fallback_command**: Command to run if make fails
 
 **Key Features:**
+
 - **Multiline Support**: Write complex multi-step commands naturally
 - **Line Continuation**: Use `\` to join long single commands
 - **Variable Interpolation**: Use `{$var}` syntax in build commands

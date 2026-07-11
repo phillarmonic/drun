@@ -30,6 +30,7 @@ When the critical threshold is exceeded, the monitor creates two files:
 **Filename:** `drun-crash-dump-YYYYMMDD-HHMMSS.json`
 
 Contains:
+
 - Detailed memory statistics (allocation, total allocated, system memory, GC count)
 - Complete AST program structure
 - Runtime information (Go version, goroutines, CPU, OS/arch)
@@ -39,6 +40,7 @@ Contains:
 **Filename:** `drun-crash-summary-YYYYMMDD-HHMMSS.txt`
 
 Human-readable summary containing:
+
 - Memory usage statistics
 - Runtime information
 - Program metadata (version, task count, project name)
@@ -58,6 +60,7 @@ task "bad-task":
 ```
 
 When detected:
+
 ```text
   WARNING: Memory usage is high (100 MB)
 
@@ -68,6 +71,7 @@ This likely indicates an infinite loop or runaway recursion.
 
 ### Normal Execution
 Normal task execution, even with intensive operations, should stay well below the thresholds:
+
 ```drun
 task "intensive":
   for each $i in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]:

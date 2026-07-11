@@ -121,6 +121,7 @@ task "cleanup":
 The `secret()` builtin function allows seamless secret access in interpolations:
 
 **Syntax:**
+
 ```drun
 {secret('key')}                           # Get from current project namespace
 {secret('key', 'default')}                # Get with default value
@@ -128,6 +129,7 @@ The `secret()` builtin function allows seamless secret access in interpolations:
 ```
 
 **Examples:**
+
 ```drun
 # Simple usage
 info "API Key: {secret('api_key')}"

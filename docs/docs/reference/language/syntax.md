@@ -174,11 +174,13 @@ When both types of lifecycle hooks are present, they execute in this order:
 #### Use Cases
 
 **Task-Level Hooks** are ideal for:
+
 - Task-specific logging and timing
 - Setting up task-specific environment
 - Task cleanup operations
 
 **Tool-Level Hooks** are ideal for:
+
 - Global initialization and cleanup
 - Pipeline-wide logging and metrics
 - Tool version reporting
@@ -218,11 +220,13 @@ call task "task_name"
 Task names can be specified with or without quotes, depending on the naming pattern:
 
 **Unquoted task names** (no quotes required):
+
 - Single words: `call task test`, `call task build`
 - Snake_case: `call task run_tests`, `call task hello_world`
 - Keywords: `call task test`, `call task ci`, `call task build`
 
 **Quoted task names** (quotes required):
+
 - Kebab-case: `call task "hello-world"`, `call task "run-tests"`
 - Multi-word: `call task "hello world"`, `call task "run tests"`
 - Names with special characters or spaces
@@ -344,6 +348,7 @@ requires $environment from ["dev", "staging", "production"] defaults to "dev"
 ```
 
 **Key Characteristics:**
+
 - Must be provided by user (if no default)
 - Often used with validation constraints (enums, patterns, ranges)
 - Emphasizes importance and criticality
@@ -377,6 +382,7 @@ given $timestamp defaults to "{now.format('2006-01-02-15-04-05')}"
 ```
 
 **Key Characteristics:**
+
 - Default value is optional (defaults to empty string when omitted)
 - User can override but doesn't have to
 - Used for configuration, feature flags, optional overrides
@@ -410,6 +416,7 @@ task "deploy":
 ```
 
 **CLI Usage:**
+
 ```bash
 # Must provide 'name', others use defaults
 xdrun deploy name=myapp
@@ -444,6 +451,7 @@ given $enabled defaults to false    # boolean parameter (use false, not empty)
 ```
 
 **Key Features:**
+
 - `empty` is semantically equivalent to `""` (empty string)
 - Works as default values for any parameter type
 - Works in conditional expressions (`is empty`, `is not empty`)
@@ -557,6 +565,7 @@ capture from shell as $file_report:
 ```
 
 **Key Features:**
+
 - All commands are executed as a single shell script
 - Output from all commands is captured together
 - Commands can use shell features like pipes, redirections, and command substitution
@@ -564,6 +573,7 @@ capture from shell as $file_report:
 - Each command runs in the same shell session, so environment variables persist
 
 **Key Differences:**
+
 - **Expression capture** uses plain identifiers and supports complex expressions with arithmetic operations
 - **Shell capture** uses `$variable` syntax and executes commands in the system shell
 - **Expression capture** can reference other variables: `capture result from {a} - {b}`
@@ -655,6 +665,7 @@ task "build strategy":
 ```
 
 **Key Features:**
+
 - **Natural syntax**: `else if` reads like natural English
 - **Unlimited chaining**: Support for multiple `else if` conditions
 - **Proper precedence**: Conditions evaluated in order, first match wins

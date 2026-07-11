@@ -8,6 +8,7 @@ The parser follows a **domain-driven design** where each file handles a specific
 
 ### Core Parser (`parser.go`) - 115 lines
 The main orchestration layer containing:
+
 - `Parser` struct definition
 - Constructor functions (`NewParser`, `NewParserWithSource`)
 - Token advancement (`nextToken`)
@@ -23,6 +24,7 @@ This file delegates all actual parsing work to specialized domain files.
 
 #### `parser_project.go` - 807 lines
 Handles project-level declarations and configuration:
+
 - **Version statements** (`version: 2`)
 - **Project statements** (`project "name"`)
 - **Set statements** (global variable declarations)
@@ -38,6 +40,7 @@ Handles project-level declarations and configuration:
 
 #### `parser_task.go` - 432 lines
 Parses task definitions and execution flow:
+
 - **Task statements** (`task "name"`)
 - **Task templates** (`template task "name"`)
 - **Task bodies** (parameters, dependencies, statements)
@@ -46,6 +49,7 @@ Parses task definitions and execution flow:
 
 #### `parser_control.go` - 603 lines
 Control flow constructs:
+
 - **Conditional statements** (`if`, `when`, `otherwise`)
 - **Loop statements** (`for`, `for each`)
 - **Break/continue** statements
@@ -57,6 +61,7 @@ Control flow constructs:
 
 #### `parser_parameter.go` - 311 lines
 Parameter declarations and validation:
+
 - **Parameter statements** (`requires $param as type`)
 - **Advanced constraints** (range, pattern, validation)
 - **Type checking** (string, number, boolean)
@@ -64,6 +69,7 @@ Parameter declarations and validation:
 
 #### `parser_variable.go` - 281 lines
 Variable operations:
+
 - **Variable declarations** (`let $var = value`)
 - **Variable assignment** (`set $var = value`)
 - **Variable transformation** (`transform $var`)
@@ -71,6 +77,7 @@ Variable operations:
 
 #### `parser_expression.go` - 183 lines
 Expression parsing:
+
 - **Binary expressions** (arithmetic, logical)
 - **Literal expressions** (strings, numbers, booleans)
 - **Identifier expressions** (variables, references)
@@ -83,11 +90,13 @@ Expression parsing:
 
 #### `parser_action.go` - 105 lines
 Action statements and task calls:
+
 - **Action statements** (`info`, `step`, `success`, `warning`, `error`)
 - **Task call statements** (`call task-name`, `call task "name" with iterations=100`)
 
 #### `parser_shell.go` - 175 lines
 Shell command execution:
+
 - **Shell statements** (`run "command"`, `run "command" attached`)
 - **Multiline shell commands**
 - **Command capture** (`capture $var from command`)
@@ -98,21 +107,25 @@ Shell command execution:
 
 #### `parser_docker.go` - 101 lines
 Docker operations:
+
 - **Docker commands** (`docker build`, `docker run`, etc.)
 - Container management
 
 #### `parser_git.go` - 256 lines
 Git operations:
+
 - **Git commands** (`git clone`, `git commit`, etc.)
 - Branch and tag management
 
 #### `parser_http.go` - 383 lines
 HTTP operations:
+
 - **HTTP requests** (`get`, `post`, `put`, `delete`, etc.)
 - **Download operations** (`download from URL to path`)
 
 #### `parser_network.go` - 174 lines
 Network operations:
+
 - **Health checks** (`check health`)
 - **Port testing** (`check if port X is open`)
 - **Ping operations**
@@ -123,6 +136,7 @@ Network operations:
 
 #### `parser_file.go` - 295 lines
 File system operations:
+
 - **File creation** (`create file`, `create directory`)
 - **File manipulation** (`copy`, `move`, `delete`)
 - **File I/O** (`read`, `write`, `append`)
@@ -134,12 +148,14 @@ File system operations:
 
 #### `parser_detection.go` - 212 lines
 Smart detection operations:
+
 - **Tool detection** (`detect docker`, `detect kubernetes`)
 - **Environment detection** (`detect os`, `detect platform`)
 - **Context-aware parsing**
 
 #### `parser_error.go` - 111 lines
 Error handling constructs:
+
 - **Try-catch statements** (`try:`, `catch:`)
 - **Throw statements** (`throw "error"`)
 - **Error recovery**
@@ -150,6 +166,7 @@ Error handling constructs:
 
 #### `parser_helpers.go` - 461 lines
 Helper functions and utilities:
+
 - **Token type checking** (`isDockerToken`, `isGitToken`, etc.)
 - **Token expectation** (`expectPeek`, `expectPeekSkipNewlines`)
 - **Error management** (`addError`, `peekError`)

@@ -46,6 +46,7 @@ The `engine` package is the execution engine for drun. It uses a **modular, doma
   - `ProjectContext` - Project-level information for planning
 
 **Benefits:**
+
 - Single upfront dependency resolution
 - Deterministic execution order
 - No redundant AST scans
@@ -180,6 +181,7 @@ Supporting functionality organized by domain:
 
 ### 1. Domain-Driven Design
 Each file is organized around a specific domain or responsibility:
+
 - Executors handle specific statement types
 - Helpers provide supporting functionality
 - Sub-packages encapsulate complex subsystems
@@ -294,6 +296,7 @@ engine := NewEngineWithOptions(
 ### Default Configuration
 
 When options are omitted, sensible defaults are applied via `applyDefaults()`:
+
 - Standard output writer
 - New task registry
 - Default validators and resolvers
@@ -327,11 +330,13 @@ When options are omitted, sensible defaults are applied via `applyDefaults()`:
 The engine supports comprehensive debugging through execution plan exports:
 
 **Available Formats:**
+
 - **Graphviz DOT** - For rendering with `dot` command
 - **Mermaid** - For markdown diagrams
 - **JSON** - For programmatic analysis
 
 **CLI Usage:**
+
 ```bash
 # View plan in terminal
 xdrun --debug --debug-domain --debug-plan -f myfile.drun
@@ -345,6 +350,7 @@ xdrun --debug --debug-domain \
 ```
 
 **Plan Information:**
+
 - Complete execution order
 - Task dependencies
 - Parameter metadata

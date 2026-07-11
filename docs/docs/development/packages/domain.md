@@ -99,16 +99,19 @@ err := validator.Validate(param, value)
 The domain layer is fully integrated with the execution engine:
 
 **Task Execution:**
+
 - Engine uses `task.Registry` for task registration and lookup
 - `task.DependencyResolver` provides dependency ordering
 - Tasks execute using domain statements, not AST nodes
 
 **Parameter Validation:**
+
 - `parameter.Validator` validates all parameter values
 - Supports advanced constraints (patterns, ranges, enums)
 - Type-safe parameter handling throughout execution
 
 **Project Management:**
+
 - `project.Project` manages project-level configuration
 - Lifecycle hooks use domain statements
 - Project settings integration
@@ -118,16 +121,19 @@ The domain layer is fully integrated with the execution engine:
 The statement package (`internal/domain/statement/`) provides:
 
 **Statement Types:**
+
 - Core: Action, Shell, Variable, Parameter
 - Control: Conditional, Loop, Try/Catch, Break, Continue
 - Operations: File, Docker, Git, HTTP, Network, Download
 - Advanced: Detection, TaskCall, TaskFromTemplate, UseSnippet
 
 **Converter:**
+
 - `FromAST()` - Unidirectional converter from AST to domain (one-way only)
 - All execution uses pure domain types (no AST conversion during runtime)
 
 **Benefits:**
+
 - Clean separation from parser internals
 - Type-safe domain entities
 - Easier testing and validation

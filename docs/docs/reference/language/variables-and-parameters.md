@@ -141,6 +141,7 @@ run "npm test {if $coverage then '--coverage' : ''}"
 ##### Real-World Examples
 
 **Docker Build with Optional Flags:**
+
 ```drun
 task "docker-build":
   given $no_cache as boolean defaults to "false"
@@ -151,6 +152,7 @@ task "docker-build":
 ```
 
 **Environment-Specific Configuration:**
+
 ```drun
 task "deploy":
   requires $env from ["dev", "staging", "production"]
@@ -163,6 +165,7 @@ task "deploy":
 ```
 
 **Build Optimization Flags:**
+
 ```drun
 task "compile":
   given $optimize as boolean defaults to "true"
@@ -172,6 +175,7 @@ task "compile":
 ```
 
 **CI/CD Pipeline Flags:**
+
 ```drun
 task "ci-pipeline":
   given $run_tests as boolean defaults to "true"
@@ -199,6 +203,7 @@ project "myapp" version "1.0.0":
 ```
 
 **Accessing Project Settings:**
+
 ```drun
 task "deploy":
   info "Project: {$globals.project}"        # → "myapp"
@@ -228,6 +233,7 @@ task "deploy":
 4. **Built-in Variables**: Special project variables via `$globals.project` and `$globals.version`
 
 **Variable Resolution Order:**
+
 1. Parameters (`$param`)
 2. Task variables (`$variable`)
 3. Loop variables (`$variable`)
@@ -303,6 +309,7 @@ run "kubectl set image deployment/{app_name} {app_name}={image_name}"
 **New in v2.0**: drun now enforces strict variable checking by default to prevent runtime errors from undefined variables.
 
 **Default Behavior (Strict Mode)**:
+
 ```drun
 task "example":
     let $name = "world"
@@ -311,6 +318,7 @@ task "example":
 ```
 
 **Error Messages**:
+
 ```bash
 # Single undefined variable
 Error: task 'example' failed: in info statement: undefined variable: {$undefined}
@@ -334,12 +342,14 @@ drun my-task --allow-undefined-variables
 ```
 
 **Benefits**:
+
 - **Early Error Detection**: Catch typos and missing variables before execution
 - **Clear Error Context**: Precise location (statement type) and variable name
 - **Prevent Silent Failures**: Avoid unexpected behavior from undefined variables
 - **Better Developer Experience**: Forces explicit variable definitions
 
 **Variable Resolution Order**:
+
 1. Task parameters (`accepts $param`)
 2. Local variables (`let $var = "value"`)
 3. Project settings (`$globals.setting`)
@@ -486,11 +496,13 @@ task "loop_with_operations":
 #### Available Operations Reference
 
 **String Operations:**
+
 - `without prefix "text"` - Remove prefix from string
 - `without suffix "text"` - Remove suffix from string
 - `split by "delimiter"` - Split string into space-separated parts
 
 **Array Operations:**
+
 - `filtered by extension "ext"` - Filter by file extension
 - `filtered by prefix "text"` - Filter by prefix
 - `filtered by suffix "text"` - Filter by suffix
@@ -503,6 +515,7 @@ task "loop_with_operations":
 - `last` - Get last item
 
 **Path Operations:**
+
 - `basename` - Extract filename from path
 - `dirname` - Extract directory from path
 - `extension` - Extract file extension (without dot)
@@ -540,6 +553,7 @@ task "build":
 ```
 
 **Important validation rules:**
+
 - The default value MUST be one of the values in the constraint list (if constraints are specified)
 - The parser will validate this at parse time and emit an error if the default value is not in the allowed values
 
@@ -571,6 +585,7 @@ xdrun build --list
 ```
 
 **Why no dashes?**
+
 - Task parameters are part of the drun language (semantic parameters)
 - CLI flags control the xdrun interpreter itself (operational flags)
 - This distinction keeps the language clean and consistent

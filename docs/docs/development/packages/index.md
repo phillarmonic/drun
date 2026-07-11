@@ -34,6 +34,7 @@ This directory contains the internal implementation of the drun execution engine
 **Purpose:** Defines all AST node types representing drun language constructs.
 
 **Key Files:**
+
 - `ast.go` - Core types: `Program`, `Node`, `Statement`, `Expression`
 - `ast_project.go` - Project declarations
 - `ast_task.go` - Task definitions
@@ -43,6 +44,7 @@ This directory contains the internal implementation of the drun execution engine
 - `ast_expressions.go` - Expressions and operators
 
 **Domain-Specific:**
+
 - `ast_shell.go` - Shell commands
 - `ast_file.go` - File operations
 - `ast_docker.go` - Docker actions
@@ -53,6 +55,7 @@ This directory contains the internal implementation of the drun execution engine
 - `ast_detection.go` - Tool detection
 
 **Usage:**
+
 ```go
 import "github.com/phillarmonic/drun/v2/internal/ast"
 
@@ -68,6 +71,7 @@ stmt := &ast.ShellStatement{
 **Purpose:** Parses drun source code into AST.
 
 **Key Files:**
+
 - `parser.go` - Core parser with entry point
 - `parser_project.go` - Parses project declarations
 - `parser_task.go` - Parses task definitions
@@ -78,6 +82,7 @@ stmt := &ast.ShellStatement{
 - `parser_helper.go` - Helper methods
 
 **Domain-Specific Parsers:**
+
 - `parser_shell.go` - Shell command parsing
 - `parser_file.go` - File operation parsing
 - `parser_docker.go` - Docker action parsing
@@ -88,6 +93,7 @@ stmt := &ast.ShellStatement{
 - `parser_detection.go` - Detection statement parsing
 
 **Usage:**
+
 ```go
 import "github.com/phillarmonic/drun/v2/internal/parser"
 
@@ -96,6 +102,7 @@ program, err := p.ParseProgram()
 ```
 
 **Architecture:**
+
 - Each parser file handles one domain
 - All parsers share the core `Parser` struct
 - Parsers build AST nodes from tokens
@@ -110,6 +117,7 @@ program, err := p.ParseProgram()
 **Status:**  Fully integrated with engine
 
 **Key Files:**
+
 - `task/task.go` - Task entity with validation
 - `task/registry.go` - Task management and lookup (thread-safe)
 - `task/dependencies.go` - Dependency resolution with circular detection
@@ -118,6 +126,7 @@ program, err := p.ParseProgram()
 - `project/project.go` - Project configuration
 
 **Architecture:**
+
 ```text
 CLI Layer → Engine Layer → Domain Layer
                  ↓              ↓
@@ -145,6 +154,7 @@ CLI Layer → Engine Layer → Domain Layer
    - Pattern matching (regex, email, semver, etc.)
 
 **Usage in Engine:**
+
 ```go
 // Engine struct holds domain services
 type Engine struct {
@@ -179,18 +189,21 @@ err := e.paramValidator.Validate(domainParam, typedValue)
 ```
 
 **Design Principles:**
+
 - Domain entities are independent of AST
 - Business rules stay in domain layer
 - Engine orchestrates, domain validates
 - Easily testable in isolation
 
 **Test Coverage:**
+
 - `task/task_test.go` - 32 tests
 - `task/registry_test.go` - 16 tests
 - `task/dependencies_test.go` - 21 tests
 - `parameter/validation_test.go` - 17 tests
 
 **When to Use Domain Layer:**
+
 -  Adding new validation rules
 -  Extending task/parameter properties
 -  Adding business logic operations
@@ -211,15 +224,18 @@ err := e.paramValidator.Validate(domainParam, typedValue)
 #### Subsystems
 
 **`interpolation/`** - Variable interpolation
+
 - `interpolator.go` - Main interpolation logic
 - `resolvers.go` - Variable resolution
 - `conditional.go` - Conditional interpolation
 - `utilities.go` - Helper functions
 
 **`hooks/`** - Lifecycle hooks
+
 - `manager.go` - Hook registration and execution
 
 **`includes/`** - Include resolution
+
 - `resolver.go` - Remote/local include handling
 
 #### Executors
@@ -250,6 +266,7 @@ Domain-specific helper functions:
 - `helpers_utilities.go` - General utilities
 
 **Usage:**
+
 ```go
 import "github.com/phillarmonic/drun/v2/internal/engine"
 
@@ -259,6 +276,7 @@ err := eng.RunTask("build", params)
 ```
 
 **Architecture:**
+
 ```text
 Engine (orchestrator)
 ├── Interpolation System (variable resolution)
@@ -284,6 +302,7 @@ Engine (orchestrator)
 **Purpose:** Tokenizes drun source code.
 
 **Key Files:**
+
 - `lexer.go` - Main lexer implementation
 - `tokens.go` - Token type definitions
 - `keywords.go` - Keyword mappings
@@ -292,6 +311,7 @@ Engine (orchestrator)
 - `errors.go` - Lexer error types
 
 **Usage:**
+
 ```go
 import "github.com/phillarmonic/drun/v2/internal/lexer"
 
@@ -382,6 +402,7 @@ value := types.StringValue("hello")
 ### 1. Single Responsibility
 
 Each package/file has ONE clear purpose:
+
 -  `parser_docker.go` - Only Docker parsing
 -  `executor_git.go` - Only Git execution
 -  `helpers_download.go` - Only download helpers
@@ -399,12 +420,14 @@ Higher-level packages depend on lower-level ones, never the reverse.
 ### 3. Domain Organization
 
 Files grouped by domain, not by technical layer:
+
 - All Docker-related code: `ast_docker.go`, `parser_docker.go`, `executor_docker.go`
 - All Git-related code: `ast_git.go`, `parser_git.go`, `executor_git.go`
 
 ### 4. Testability
 
 Every package can be tested independently:
+
 ```go
 // Test parser without engine
 parser := parser.New(lexer.New("task build"))
@@ -479,6 +502,7 @@ After refactoring, we maintain these size limits:
 ### Finding Code by Feature
 
 Looking for Docker support?
+
 1. AST: `internal/ast/ast_docker.go`
 2. Parser: `internal/parser/parser_docker.go`
 3. Executor: `internal/engine/executor_docker.go`
@@ -504,6 +528,7 @@ Looking for Docker support?
 ### Unit Tests
 
 Each package has its own tests:
+
 ```text
 internal/parser/parser_docker_test.go
 internal/engine/executor_docker_test.go
@@ -513,6 +538,7 @@ internal/ast/ast_test.go
 ### Integration Tests
 
 Engine tests in `internal/engine/*_test.go`:
+
 - `strict_variables_test.go`
 - `loop_scoping_test.go`
 - `matrix_execution_test.go`
@@ -529,6 +555,7 @@ All 62 example files in `examples/` must pass.
 ### Hot Paths
 
 Most frequently executed code:
+
 1. Variable interpolation (`interpolation/`)
 2. Statement execution (`executor_*.go`)
 3. Context lookups (`context.go`)
@@ -565,6 +592,7 @@ internal/
 ```
 
 **Improvement:**
+
 -  10x better file sizes
 -  Clear responsibilities
 -  Easier to test

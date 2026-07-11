@@ -15,6 +15,7 @@ Stateless drun allows you to mark directories where drun configurations should b
 ### How It Works
 
 When a directory is marked as stateless:
+
 1. drun stores the configuration in `~/.drun/stateless/<hash>/spec.drun`
 2. The hash is generated from the absolute path of the directory
 3. Multiple developers can have different configs for the same repository
@@ -52,6 +53,7 @@ xdrun cmd:stateless list
 ```
 
 Output:
+
 ```text
 Stateless directories:
   ✓ /tmp/drun-test-stateless
@@ -65,6 +67,7 @@ xdrun cmd:stateless info
 ```
 
 Output for stateless directory:
+
 ```text
  Current directory is marked as STATELESS
    Config location: /home/user/.drun/stateless/909e63477a73559a/spec.drun
@@ -72,6 +75,7 @@ Output for stateless directory:
 ```
 
 Output for normal directory:
+
 ```text
  Current directory is NOT marked as stateless
    Using local configuration (.drun/spec.drun)
@@ -105,6 +109,7 @@ Partial task name matching allows you to run tasks using just the first few char
 ### How It Works
 
 When you provide a partial task name:
+
 1. drun first checks for an exact match
 2. If no exact match, it finds all tasks starting with the partial name
 3. If exactly one match is found, that task is executed
@@ -123,17 +128,20 @@ xdrun bu
 ```
 
 Output:
+
 ```text
   Building the project
 Building project...
 ```
 
 With verbose mode:
+
 ```bash
 xdrun -v bet
 ```
 
 Output:
+
 ```text
  Resolved 'bet' → 'beta'
   Running beta task
@@ -148,6 +156,7 @@ xdrun b
 ```
 
 Output:
+
 ```text
 Error: ambiguous task name 'b' - matches multiple tasks:
   - benchmark (use: xdrun ben)
@@ -167,6 +176,7 @@ xdrun tst
 ```
 
 Output:
+
 ```text
 Error: task 'tst' not found
 
@@ -194,6 +204,7 @@ The error message shows the shortest unique prefix for each matching task:
 ```
 
 This tells you:
+
 - Use `ben` or longer to match `benchmark`
 - Use `bet` or longer to match `beta`
 - Use `bu` or longer to match `build`
@@ -201,6 +212,7 @@ This tells you:
 ### Fuzzy Matching
 
 When no tasks start with the partial name, drun uses fuzzy matching to suggest similar tasks based on:
+
 - Substring matching (contains the partial name)
 - Common prefixes (first 2-3 characters)
 - Levenshtein distance (edit distance ≤ 2)
@@ -212,10 +224,12 @@ This helps catch typos and find tasks you might be looking for.
 ### File Structure
 
 New files added:
+
 - `cmd/drun/app/stateless.go` - Stateless configuration management
 - `cmd/drun/app/task_matcher.go` - Partial task name matching and fuzzy search
 
 Modified files:
+
 - `cmd/drun/app/config.go` - Updated `FindConfigFile` to check stateless directories
 - `cmd/drun/app/runner.go` - Updated `ExecuteTask` to resolve partial names
 - `cmd/drun/app/cli.go` - Added `cmd:stateless` subcommands
@@ -223,6 +237,7 @@ Modified files:
 ### Configuration Storage
 
 Stateless configuration is stored at:
+
 - Config file: `~/.drun/stateless.yml`
 - Format:
   ```yaml
@@ -231,12 +246,14 @@ Stateless configuration is stored at:
   ```
 
 Task configuration files are stored at:
+
 - `~/.drun/stateless/<hash>/spec.drun`
 - Hash: First 16 characters of SHA-256 hash of absolute directory path
 
 ### Algorithm Complexity
 
 Partial task name matching:
+
 - Exact match check: O(n) where n = number of tasks
 - Prefix matching: O(n)
 - Fuzzy matching (when needed): O(n*m) where m = average task name length

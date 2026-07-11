@@ -132,6 +132,7 @@ Add HTTP timeout configuration
 ```
 
 **Format:**
+
 - First line: Short summary (50 chars or less)
 - Blank line
 - Detailed description if needed
@@ -217,6 +218,7 @@ go test -cover ./...
 ### File Organization
 
 **Keep files small and focused:**
+
 - AST definitions: 100-200 lines
 - Parsers: 200-300 lines
 - Executors: 150-250 lines
@@ -226,6 +228,7 @@ go test -cover ./...
 **Group by domain, not layer:**
 
 Good:
+
 ```text
 ast_docker.go
 parser_docker.go
@@ -233,6 +236,7 @@ executor_docker.go
 ```
 
 Bad:
+
 ```text
 all_ast_types.go (5000 lines)
 ```
@@ -446,6 +450,7 @@ case *statement.Slack:
 #### 6. Add Tests
 
 Create tests in:
+
 - `internal/parser/parser_slack_test.go` - Parser tests
 - `internal/domain/statement/slack_test.go` - Domain converter tests
 - `internal/engine/executor_slack_test.go` - Executor tests

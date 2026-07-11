@@ -132,12 +132,14 @@ for each $platform in ["windows", "linux", "mac"]:
 ```
 
 **Supported Condition Types:**
+
 - String equality: `$var is "value"`
 - String inequality: `$var is not "value"`
 - Empty checks: `$var is empty`, `$var is not empty`
 - All condition types supported by `if` statements
 
 **Key Features:**
+
 - Clean, readable syntax for simple conditions
 - Optional `otherwise` clause (equivalent to `else`)
 - Full nesting support

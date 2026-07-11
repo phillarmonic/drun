@@ -85,6 +85,7 @@ project "my-app" version "1.0":
 ```
 
 **Key Features:**
+
 - Multiline comments preserve formatting and indentation
 - They can appear anywhere in the file where whitespace is allowed
 - Unterminated multiline comments are handled gracefully (consume to end of file)
@@ -92,6 +93,7 @@ project "my-app" version "1.0":
 - Useful for file headers, detailed explanations, and temporary code disabling
 
 **Best Practices:**
+
 - Use single-line comments for brief explanations
 - Use multiline comments for file headers, detailed documentation, and block commenting
 - Consider using multiline comments to temporarily disable sections of code during development

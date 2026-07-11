@@ -103,11 +103,13 @@ exec:
 #### Execution Behavior
 
 **Single-line commands**: Execute as individual shell commands
+
 ```drun
 run "echo hello"  # Executes: /bin/sh -c "echo hello"
 ```
 
 **Attached single-line `run` commands**: Stay connected to the current terminal for interactive programs
+
 ```drun
 run "command" attached
 run in service $servicename "npm run dev" attached
@@ -116,6 +118,7 @@ run in service $servicename "npm run dev" attached
 Use `attached` only with single-line `run` statements when the command needs stdin or terminal behavior. Plain `run` remains non-interactive by default.
 
 **Multiline commands**: Execute as a single shell session
+
 ```drun
 run:
   export VAR=value
@@ -471,6 +474,7 @@ if directory "tests/coverage" is empty:
 ```
 
 **Key Features:**
+
 - **Multiple keywords**: Use `folder`, `directory`, or `dir` interchangeably
 - **Path interpolation**: Support for variable interpolation in paths
 - **Non-existent handling**: Non-existent directories are treated as empty
@@ -506,6 +510,7 @@ post "https://api.example.com/upload" upload "local-file.txt"
 The `download` statement provides a native Go HTTP client with advanced features including progress tracking, permission management, and authentication.
 
 **Features:**
+
 - Native Go HTTP client (no external dependencies)
 - Real-time progress bar with speed and ETA
 - Matrix-based permission system
@@ -514,11 +519,13 @@ The `download` statement provides a native Go HTTP client with advanced features
 - Automatic redirect following
 
 **Basic Syntax:**
+
 ```drun
 download "<url>" to "<path>"
 ```
 
 **Advanced Options:**
+
 ```drun
 # Simple download with progress tracking
 download "https://example.com/file.zip" to "downloads/file.zip"
@@ -566,16 +573,19 @@ download "https://example.com/tool" to "bin/tool"
 ```
 
 **Permission Types:**
+
 - `read` - Read permission
 - `write` - Write permission
 - `execute` - Execute permission
 
 **Permission Targets:**
+
 - `user` - File owner
 - `group` - Group members
 - `others` - All other users
 
 **Complete Example:**
+
 ```drun
 task "download_and_install_binary":
   info "Downloading binary with full configuration"
@@ -596,6 +606,7 @@ task "download_and_install_binary":
 **Progress Display:**
 
 The download statement shows real-time progress with:
+
 - Progress bar (visual indicator)
 - Percentage complete
 - Downloaded / Total size
@@ -603,6 +614,7 @@ The download statement shows real-time progress with:
 - Estimated time remaining (ETA)
 
 Example output:
+
 ```drun
   Downloading: https://example.com/large-file.zip
    → downloads/large-file.zip
@@ -630,6 +642,7 @@ download "https://example.com/file.zip" to "file.zip" allow overwrite
 The download statement supports automatic extraction of archives using the pure-Go [github.com/mholt/archives](https://github.com/mholt/archives) library (no external dependencies):
 
 **Supported Formats:**
+
 - **Archives:** ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, 7Z, RAR
 - **Compression:** GZ, BZ2, XZ, ZSTD, BROTLI, LZ4, SNAPPY, LZW
 
@@ -683,6 +696,7 @@ task "parallel_installs":
 ```
 
 **Cross-Platform Benefits:**
+
 - Pure Go implementation (no external tools like `tar`, `unzip`, `7z` required)
 - Works identically on Windows, Linux, and macOS
 - Automatic format detection from file extension and header
@@ -799,11 +813,13 @@ success "Deployment completed successfully"
   └────────────────────────────────┘
   ```
   Multiline strings are supported and each line is rendered inside the same box:
+
   ```drun
   step "Executing semantic fuzz tests against example-based inputs
   Iterations: 50"
   ```
   Produces:
+
   ```text
   ┌─────────────────────────────────────────────────────────────┐
   │ Executing semantic fuzz tests against example-based inputs │
@@ -1034,6 +1050,7 @@ task "build":
 #### Available Pipe Operations
 
 **String Operations:**
+
 - `replace "from" by "to"` - Replace all occurrences of "from" with "to"
 - `replace "from" with "to"` - Alternative syntax for replace
 - `without prefix "text"` - Remove prefix from string
@@ -1086,6 +1103,7 @@ task "parameter defaults with pipes":
 | `{now.format('layout')}` | Formatted current time | `2025-09-22 14:30:00` |
 
 **Key Features:**
+
 - **Interpolation**: All built-in functions use `{function}` syntax
 - **Pipe Operations**: Chain transformations with `|` operator
 - **Parameter Defaults**: Use in parameter default values with full pipe support

@@ -56,6 +56,7 @@ graph LR
 ```
 
 **Reading order:**
+
 1. [ARCHITECTURE.md](architecture.md) - See the big picture with diagrams
 2. [internal/README.md](packages/index.md) - Understand package organization
 3. Pick a package and explore its files
@@ -63,6 +64,7 @@ graph LR
 
 
 **Steps:**
+
 1. Read [ARCHITECTURE.md](architecture.md) - Where does it fit?
 2. Read [internal/README.md](packages/index.md) - Find the right package
 3. Follow the "Adding New Actions" guide in [ARCHITECTURE.md](architecture.md#adding-new-actions)
@@ -72,12 +74,14 @@ graph LR
 ### I want to fix a bug
 
 **Debugging flow:**
+
 1. **Lexer issues** → Check [internal/lexer/](./internal/lexer/)
 2. **Parser errors** → Check [internal/parser/](./internal/parser/)
 3. **Runtime errors** → Check [internal/engine/](./internal/engine/)
 4. **Variable issues** → Check [internal/engine/interpolation/](./internal/engine/interpolation/)
 
 **Resources:**
+
 - [internal/README.md](packages/index.md) - Package guide
 - [ARCHITECTURE.md](architecture.md) - Execution flow diagrams
 
@@ -86,6 +90,7 @@ graph LR
 **How is the code organized?**
 
 Read these in order:
+
 1. [ARCHITECTURE.md](architecture.md) - System architecture with diagrams
 2. [internal/README.md](packages/index.md) - Package organization
 3. [CONTRIBUTING.md](contributing.md) - How to contribute
@@ -202,6 +207,7 @@ func (e *Engine) ExecuteWithParamsAndFile(...) error {
         }
     }
 }
+
 ```text
 **Architectural Benefits:**
 - **Domain-Driven** - Business logic separated from infrastructure
@@ -449,6 +455,7 @@ if a.listByPriority {
 ```
 
 **Benefits:**
+
 -  Easy to test (domain logic isolated)
 -  Reusable (priority logic works anywhere)
 -  Maintainable (change priority rules in one place)
@@ -581,12 +588,14 @@ func TestParseDockerBuild(t *testing.T) {
 ### File Organization
 
 **Keep files small and focused:**
+
 - AST definitions: 100-200 lines
 - Parsers: 200-300 lines
 - Executors: 150-250 lines
 - Helpers: 100-200 lines
 
 **Group by domain:**
+
 ```text
 Good: ast_docker.go, parser_docker.go, executor_docker.go
 Bad: ast.go (all AST in one file)
@@ -732,6 +741,7 @@ case *statement.Slack:
 #### 6. Add Tests
 
 Create:
+
 - `internal/parser/parser_slack_test.go` - Parser tests
 - `internal/domain/statement/slack_test.go` - Domain converter tests
 - `internal/engine/executor_slack_test.go` - Executor tests
@@ -887,6 +897,7 @@ xdrun --debug --debug-domain --debug-export-json plan -f myfile.drun
 ```
 
 **Plan diagnostics show:**
+
 - Complete execution order
 - Task dependencies
 - Parameter metadata
@@ -896,6 +907,7 @@ xdrun --debug --debug-domain --debug-export-json plan -f myfile.drun
 ### Variable Issues
 
 Check interpolation logic in:
+
 - `internal/engine/interpolation/interpolator.go`
 - `internal/engine/interpolation/resolvers.go`
 
@@ -914,6 +926,7 @@ Check interpolation logic in:
 | Code Organization | 100+ focused files | Modular, maintainable structure |
 
 **Current Status:**
+
 -  All unit tests passing
 -  60 examples working
 -  All features functional
@@ -963,6 +976,7 @@ How to contribute                       → CONTRIBUTING.md
 ## Summary
 
 **drun is now:**
+
 - Well-organized (100+ focused files, modular architecture)
 - Well-documented (15+ guides with architecture details)
 - Well-tested (all tests passing, 60 examples verified)
@@ -971,6 +985,7 @@ How to contribute                       → CONTRIBUTING.md
 - Ready for contributions
 
 **Start with:**
+
 1. [ARCHITECTURE.md](architecture.md) for the big picture
 2. [internal/domain/README.md](packages/domain.md) for domain layer
 3. [internal/engine/README.md](packages/engine.md) for engine architecture

@@ -40,6 +40,7 @@ task "security":
 ```
 
 **Key Features:**
+
 - **Fail-Fast By Default**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error unless that specific line ends with `provision`.
 - **Multiple Bounds**: Supports chaining comparison operators (`>=`, `<=`, `>`, `<`) on the same line to define a range.
 - **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the executable must be present on `PATH`, without version checking.
@@ -47,6 +48,7 @@ task "security":
 - **Per-Line Provisioning Intent**: `provision` applies only to the requirement on the same line. Other tools in the block keep their normal fail-fast behavior unless they also opt in.
 
 **Provisioning Semantics:**
+
 - **Missing Tool + `provision`**: If the executable is missing and the requirement line ends with `provision`, drun resolves a provisioning entry for that tool, runs it, and then re-checks the requirement before continuing.
 - **Missing Tool Without `provision`**: If the executable is missing and the line does not end with `provision`, execution fails immediately.
 - **Version Mismatch + `provision`**: If the tool exists but does not satisfy the declared version constraint, drun warns and refuses to mutate the installed version unless the run was started with `--allow-tool-version-changes`.
@@ -225,6 +227,7 @@ if kubectl is not available:
 The following tools are recognized as built-in keywords and can be used without quotes:
 
 **Package Managers & Runtimes:**
+
 - `node` - Node.js runtime
 - `npm` - Node Package Manager
 - `yarn` - Yarn package manager
@@ -245,20 +248,24 @@ The following tools are recognized as built-in keywords and can be used without 
 - `make` - GNU Make build tool
 
 **Container & Orchestration:**
+
 - `docker` - Docker container platform
 - `kubectl` - Kubernetes command-line tool
 - `helm` - Kubernetes package manager
 
 **Infrastructure & Cloud:**
+
 - `terraform` - Infrastructure as Code tool
 - `aws` - AWS CLI
 - `gcp` - Google Cloud CLI
 - `azure` - Azure CLI
 
 **Version Control:**
+
 - `git` - Git version control system
 
 **Note:** For tools with spaces or tools not in this list, use quoted strings:
+
 ```drun
 if "docker compose" is available:
     info "Using Docker Compose v2"
@@ -351,6 +358,7 @@ when running on Linux:
 Drun supports shell-style environment variable interpolation using `${VAR}` syntax:
 
 **Syntax:**
+
 - `{$var}` - Drun variable (from parameters, captures, etc.)
 - `${VAR:-default}` - Environment variable with default value
 - `${VAR}` - Environment variable without default (fails if not set)
@@ -375,6 +383,7 @@ task show-config:
 ```
 
 **Key Features:**
+
 - **Shell-style syntax**: Familiar `${VAR:-default}` pattern from bash/sh
 - **Default values**: Use `:-` syntax to provide fallback values
 - **Required variables**: Variables without defaults will fail if not set
@@ -541,6 +550,7 @@ if env HOME exists:
 ```
 
 **Key Features:**
+
 - **Clean syntax**: `if env VAR exists` is more readable than function-based checks
 - **Value comparison**: Check if env var equals specific values
 - **Empty checks**: Use `is not empty` to validate required configuration
@@ -548,6 +558,7 @@ if env HOME exists:
 - **Integration**: Works seamlessly with `.env` file loading (see `.env` loading section)
 
 **Supported Conditions:**
+
 - `if env VAR exists` - Check if variable is set
 - `if env VAR is "value"` - Check if variable equals value
 - `if env VAR is not "value"` - Check if variable does not equal value

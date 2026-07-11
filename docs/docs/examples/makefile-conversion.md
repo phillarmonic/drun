@@ -22,21 +22,25 @@ Flags:
 ### Examples
 
 Convert the default Makefile in current directory:
+
 ```bash
 xdrun cmd:from makefile
 ```
 
 Convert a specific Makefile:
+
 ```bash
 xdrun cmd:from makefile -i myproject.mk -o myproject.drun
 ```
 
 Convert with explicit paths:
+
 ```bash
 xdrun cmd:from makefile --input Makefile --output tasks.drun
 ```
 
 Convert the example Makefile:
+
 ```bash
 xdrun cmd:from makefile -i examples/makefile-conversion/example.Makefile \
                         -o examples/makefile-conversion/converted.drun
@@ -126,6 +130,7 @@ For complex Makefiles, the converter provides a good starting point that you can
 ## Contributing
 
 If you find conversion patterns that could be improved, please contribute to the converter in:
+
 - `internal/make2drun/parser.go` - Makefile parsing logic
 - `internal/make2drun/generator.go` - drun generation logic
 - `cmd/drun/app/convert.go` - CLI command implementation
