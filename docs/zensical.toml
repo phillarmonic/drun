@@ -6,8 +6,14 @@ site_url = "https://phillarmonic.github.io/drun/"
 repo_url = "https://github.com/phillarmonic/drun"
 repo_name = "phillarmonic/drun"
 copyright = "Copyright &copy; 2026 Phillarmonic Software"
-extra_css = ["stylesheets/shiki.css"]
-extra_javascript = ["javascripts/shiki.mjs"]
+extra_css = [
+  "stylesheets/shiki.css",
+  "assets/stylesheets/mermaid-panzoom.css",
+]
+extra_javascript = [
+  "javascripts/shiki.mjs",
+  { path = "assets/javascripts/mermaid-panzoom.js" },
+]
 
 nav = [
   { "Home" = "index.md" },
