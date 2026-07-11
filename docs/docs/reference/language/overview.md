@@ -44,7 +44,7 @@ xdrun [task_name] [param1=value1]   [param2=value2]   [--cli-flags]
 
 ### Natural Language First
 
-The language prioritizes human readability over machine optimization. Every construct should read like natural English while maintaining precise semantics.
+The language prioritizes human readability over machine optimization. Every construct should read like natural English while **maintaining precise semantics whenever it is possible** technical definitions might get hairy and hard to understand. But, as a north-start, we try to keep things stupid simple.
 
 ```drun
 # Good: Natural and clear
@@ -81,4 +81,3 @@ build docker image "custom-name:v1.0"
 ```
 
 ---
-

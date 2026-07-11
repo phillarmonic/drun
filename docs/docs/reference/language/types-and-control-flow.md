@@ -95,7 +95,7 @@ if dir "{$output_path}" is not empty:
 
 #### When-Otherwise Conditions
 
-The `when-otherwise` syntax provides a clean alternative to `if-else` for simple conditional logic:
+The `when-otherwise` syntax provides a clean alternative to `if-else` for simple conditional logic. There are no meaningful differences between when-otherwise or if-else. Use whatever feels more semantic for your specific use case. 
 
 ```drun
 # Basic when-otherwise

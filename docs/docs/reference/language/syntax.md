@@ -2,13 +2,31 @@
 
 ## Syntax Specification
 
+### Version Statement
+
+Every project must declare the Drun language version. The `version` statement is obligatory and must appear at the top of the project, before the `project` declaration or any other statement. Comments may appear before it.
+
+```drun
+# Eating your own dog food is good practice
+# And we do it here in Drun team too :)
+
+version: 2.0
+
+project "drun" version "2.0.0":
+#...
+```
+
 ### Project Declaration
 
 ```drun
+version: 2.0
+
 project <name> [version <version>]:
   [project_settings]
 
 # Examples:
+version: 2.0
+
 project "myapp"
 project "ecommerce" version "2.1.0"
 
@@ -23,6 +41,8 @@ project "microservices":
 drun v2 supports cross-platform shell configuration with sensible defaults for each operating system. This allows you to specify different shell executables, startup arguments, and environment variables for different platforms.
 
 ```drun
+version: 2.0
+
 project "my-app":
   shell config:
     mac:
@@ -150,6 +170,10 @@ project "myapp":
     info " Starting drun execution pipeline"
     info " Tool version: {$globals.drun_version}"
     capture pipeline_start_time from now
+    info "Checking for env file.."
+    if file ".env" not exists:
+        run "cp .env.example .env"
+        info "A .env file was provisioned"
 
   on drun teardown:
     capture pipeline_end_time from now

@@ -28,7 +28,8 @@ nav = [
     { "Variables and parameters" = "reference/language/variables-and-parameters.md" },
     { "Collections and code reuse" = "reference/language/collections-and-reuse.md" },
     { "Built-in actions" = "reference/language/built-in-actions.md" },
-    { "Secrets and Git policy" = "reference/language/secrets-and-git-policy.md" },
+    { "Secrets" = "reference/language/secrets.md" },
+    { "Git policy and hooks" = "reference/language/git-policy.md" },
     { "Runtime" = [
       { "Detection, execution, and errors" = "reference/runtime/detection-execution-and-errors.md" },
     ] },
