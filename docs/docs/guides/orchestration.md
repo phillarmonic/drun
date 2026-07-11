@@ -1179,8 +1179,8 @@ Planned features for future releases:
 
 ## Related Documentation
 
-- [Drun v2 Specification](../DRUN_V2_SPECIFICATION.md)
-- [Microservices Orchestration Spec](../spec/microservices-orchestration.md)
+- [Drun v2 Specification](../reference/language/overview.md)
+- [Microservices Orchestration Spec](../reference/orchestration.md)
 - [Examples](../examples/)
 
 ## Implementation Details & Minutia

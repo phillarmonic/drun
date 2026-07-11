@@ -331,4 +331,3 @@ All core features from the specification have been implemented:
 - Comprehensive examples
 
 The system is ready for integration testing and real-world usage.
-

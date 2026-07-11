@@ -180,7 +180,7 @@ If you are migrating from Make, use the built-in converter:
 xdrun cmd:from makefile --input Makefile --output tasks.drun
 ```
 
-There is a fuller walkthrough in [examples/makefile-conversion/README.md](../examples/makefile-conversion/README.md).
+There is a fuller walkthrough in [examples/makefile-conversion/README.md](../examples/makefile-conversion.md).
 
 ## Secret Management CLI
 
@@ -259,7 +259,7 @@ xdrun --list
 
 ## Where to Go Next
 
-- Language reference: [../DRUN_V2_SPECIFICATION.md](../DRUN_V2_SPECIFICATION.md)
-- Examples: [../examples/README.md](../examples/README.md)
-- Orchestration: [./ORCHESTRATION.md](./ORCHESTRATION.md)
-- Developer docs: [../DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md)
+- Language reference: [../reference/language/overview.md](../reference/language/overview.md)
+- Examples: [../examples/index.md](../examples/index.md)
+- Orchestration: [../guides/orchestration.md](../guides/orchestration.md)
+- Developer docs: [../development/index.md](../development/index.md)

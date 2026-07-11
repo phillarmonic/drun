@@ -587,9 +587,9 @@ When adding new code:
 
 ## Related Documentation
 
-- **[ARCHITECTURE.md](../ARCHITECTURE.md)** - System architecture overview
+- **[ARCHITECTURE.md](../architecture.md)** - System architecture overview
 - **[spec/](../spec/)** - Refactoring specifications
-- **[DRUN_V2_SPECIFICATION.md](../DRUN_V2_SPECIFICATION.md)** - Language spec
+- **[Language specification](../../reference/language/overview.md)** - Normative language reference
 
 ---
 

@@ -291,4 +291,3 @@ Both features have been tested with:
 - ✅ No match with fuzzy suggestions
 - ✅ Full task names still work
 - ✅ Verbose mode shows resolution
-

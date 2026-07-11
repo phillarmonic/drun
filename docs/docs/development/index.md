@@ -6,9 +6,9 @@ Welcome to the drun developer documentation! This guide will help you understand
 
 ## Quick Start for Developers
 
-1. **Understand the architecture** → Read [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. **Navigate the code** → Read [internal/README.md](./internal/README.md)
-3. **Learn the language** → Read [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
+1. **Understand the architecture** → Read [ARCHITECTURE.md](architecture.md)
+2. **Navigate the code** → Read [internal/README.md](packages/index.md)
+3. **Learn the language** → Read the [language specification](../reference/language/overview.md)
 
 ---
 
@@ -18,15 +18,15 @@ Welcome to the drun developer documentation! This guide will help you understand
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | Complete system architecture with diagrams | Understanding how components work together |
-| **[internal/README.md](./internal/README.md)** | Package-by-package guide | Navigating the codebase |
-| **[CONTRIBUTING.md](./CONTRIBUTING.md)** | How to contribute code | Adding features or fixing bugs |
+| **[ARCHITECTURE.md](architecture.md)** | Complete system architecture with diagrams | Understanding how components work together |
+| **[internal/README.md](packages/index.md)** | Package-by-package guide | Navigating the codebase |
+| **[CONTRIBUTING.md](contributing.md)** | How to contribute code | Adding features or fixing bugs |
 
 ### Language Specification
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| **[DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)** | Complete language specification | Understanding drun syntax |
+| **[Language specification](../reference/language/overview.md)** | Normative language reference | Understanding drun syntax |
 | **[examples/](./examples/)** | 62 working examples | Learning by example |
 
 
@@ -34,9 +34,9 @@ Welcome to the drun developer documentation! This guide will help you understand
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| **[internal/README.md](./internal/README.md)** | Internal packages guide | Working with the codebase |
-| **[internal/parser/README.md](./internal/parser/README.md)** | Parser architecture | Adding parser features |
-| **[internal/engine/README.md](./internal/engine/README.md)** | Engine architecture | Adding execution features |
+| **[internal/README.md](packages/index.md)** | Internal packages guide | Working with the codebase |
+| **[internal/parser/README.md](packages/parser.md)** | Parser architecture | Adding parser features |
+| **[internal/engine/README.md](packages/engine.md)** | Engine architecture | Adding execution features |
 
 ---
 
@@ -56,16 +56,16 @@ graph LR
 ```
 
 **Reading order:**
-1. [ARCHITECTURE.md](./ARCHITECTURE.md) - See the big picture with diagrams
-2. [internal/README.md](./internal/README.md) - Understand package organization
+1. [ARCHITECTURE.md](architecture.md) - See the big picture with diagrams
+2. [internal/README.md](packages/index.md) - Understand package organization
 3. Pick a package and explore its files
 4. Run examples in [examples/](./examples/)
 
 
 **Steps:**
-1. Read [ARCHITECTURE.md](./ARCHITECTURE.md) - Where does it fit?
-2. Read [internal/README.md](./internal/README.md) - Find the right package
-3. Follow the "Adding New Actions" guide in [ARCHITECTURE.md](./ARCHITECTURE.md#adding-new-actions)
+1. Read [ARCHITECTURE.md](architecture.md) - Where does it fit?
+2. Read [internal/README.md](packages/index.md) - Find the right package
+3. Follow the "Adding New Actions" guide in [ARCHITECTURE.md](architecture.md#adding-new-actions)
 4. Add tests in the appropriate `*_test.go` file
 5. Update documentation
 
@@ -78,17 +78,17 @@ graph LR
 4. **Variable issues** → Check [internal/engine/interpolation/](./internal/engine/interpolation/)
 
 **Resources:**
-- [internal/README.md](./internal/README.md) - Package guide
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Execution flow diagrams
+- [internal/README.md](packages/index.md) - Package guide
+- [ARCHITECTURE.md](architecture.md) - Execution flow diagrams
 
 ### I want to understand the architecture
 
 **How is the code organized?**
 
 Read these in order:
-1. [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture with diagrams
-2. [internal/README.md](./internal/README.md) - Package organization
-3. [CONTRIBUTING.md](./CONTRIBUTING.md) - How to contribute
+1. [ARCHITECTURE.md](architecture.md) - System architecture with diagrams
+2. [internal/README.md](packages/index.md) - Package organization
+3. [CONTRIBUTING.md](contributing.md) - How to contribute
 
 
 ---
@@ -123,7 +123,7 @@ Read these in order:
 └─────────────────────────────────────┘
 ```
 
-**For detailed diagrams:** See [ARCHITECTURE.md](./ARCHITECTURE.md)
+**For detailed diagrams:** See [ARCHITECTURE.md](architecture.md)
 
 ### Package Organization
 
@@ -215,7 +215,7 @@ func (e *Engine) ExecuteWithParamsAndFile(...) error {
 └── (support packages) # builtins, shell, detection, etc.
 ```
 
-**For detailed breakdown:** See [internal/README.md](./internal/README.md)
+**For detailed breakdown:** See [internal/README.md](packages/index.md)
 
 ---
 
@@ -519,7 +519,7 @@ When adding any new feature:
 3. **Test Domain Logic**: Unit tests without dependencies
 4. **Integrate with Engine**: Orchestrate domain operations
 5. **Expose via CLI**: User-facing interface
-6. **Update the Language Spec**: If syntax, semantics, or examples changed, update [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md) in the same change
+6. **Update the Language Spec**: If syntax, semantics, or examples changed, update the relevant page in the [language specification](../reference/language/overview.md) in the same change
 7. **Dogfood the Workflow**: If the feature affects project automation, update [.drun/spec.drun](./.drun/spec.drun)
 8. **Finish with Full Validation**: Run targeted tests while iterating, then finish with `xdrun ci`
 
@@ -573,7 +573,7 @@ func TestParseDockerBuild(t *testing.T) {
 }
 ```
 
-**For testing strategy:** See [internal/README.md](./internal/README.md#testing-strategy)
+**For testing strategy:** See [internal/README.md](packages/index.md#testing-strategy)
 
 ---
 
@@ -617,7 +617,7 @@ if err != nil {
 return errors.NewExecutionError("task failed", ctx)
 ```
 
-**For design patterns:** See [ARCHITECTURE.md](./ARCHITECTURE.md#key-design-patterns)
+**For design patterns:** See [ARCHITECTURE.md](architecture.md#key-design-patterns)
 
 ---
 
@@ -740,9 +740,9 @@ Create:
 #### 7. Update Documentation
 
 - Add example to `examples/`
-- Update [ARCHITECTURE.md](./ARCHITECTURE.md) if needed
+- Update [ARCHITECTURE.md](architecture.md) if needed
 
-**For detailed examples:** See [ARCHITECTURE.md](./ARCHITECTURE.md#extension-points)
+**For detailed examples:** See [ARCHITECTURE.md](architecture.md#extension-points)
 
 ---
 
@@ -761,7 +761,7 @@ Program
         └── ShellStatement("npm test")
 ```
 
-**Learn more:** [internal/README.md](./internal/README.md#ast---abstract-syntax-tree)
+**Learn more:** [AST package overview](packages/index.md#ast-abstract-syntax-tree)
 
 ### Execution Context
 
@@ -777,7 +777,7 @@ type ExecutionContext struct {
 }
 ```
 
-**Learn more:** [ARCHITECTURE.md](./ARCHITECTURE.md#context-hierarchy)
+**Learn more:** [ARCHITECTURE.md](architecture.md#context-hierarchy)
 
 ### Interpolation
 
@@ -788,7 +788,7 @@ Variable replacement in strings:
 "{$files} filtered by extension '.js'" → "app.js,test.js"
 ```
 
-**Learn more:** [ARCHITECTURE.md](./ARCHITECTURE.md#variable-resolution-and-interpolation)
+**Learn more:** [ARCHITECTURE.md](architecture.md#variable-resolution-and-interpolation)
 
 ### Executors
 
@@ -799,7 +799,7 @@ Components that execute specific statement types:
 - `executor_git.go` - Git actions
 - etc.
 
-**Learn more:** [internal/README.md](./internal/README.md#executors)
+**Learn more:** [internal/README.md](packages/index.md#executors)
 
 ---
 
@@ -927,8 +927,8 @@ Check interpolation logic in:
 
 ### For New Contributors
 
-1. Read [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. Read [internal/README.md](./internal/README.md)
+1. Read [ARCHITECTURE.md](architecture.md)
+2. Read [internal/README.md](packages/index.md)
 3. Run the examples: `cd examples && xdrun -l`
 4. Open a PR!
 
@@ -948,15 +948,15 @@ Need to understand...                    → Read...
 ─────────────────────────────────────────────────────────────
 How the system works                    → ARCHITECTURE.md
 How to navigate the code                → internal/README.md
-The drun language                       → DRUN_V2_SPECIFICATION.md
+The drun language                       → docs/docs/reference/
 How to contribute                       → CONTRIBUTING.md
 ```
 
 ### Quick Links
 
-- [Architecture Overview](./ARCHITECTURE.md)
-- [Package Guide](./internal/README.md)
-- [Language Spec](./DRUN_V2_SPECIFICATION.md)
+- [Architecture Overview](architecture.md)
+- [Package Guide](packages/index.md)
+- [Language Spec](../reference/language/overview.md)
 - [Examples](./examples/)
 
 ---
@@ -972,9 +972,9 @@ How to contribute                       → CONTRIBUTING.md
 - Ready for contributions
 
 **Start with:**
-1. [ARCHITECTURE.md](./ARCHITECTURE.md) for the big picture
-2. [internal/domain/README.md](./internal/domain/README.md) for domain layer
-3. [internal/engine/README.md](./internal/engine/README.md) for engine architecture
+1. [ARCHITECTURE.md](architecture.md) for the big picture
+2. [internal/domain/README.md](packages/domain.md) for domain layer
+3. [internal/engine/README.md](packages/engine.md) for engine architecture
 4. [examples/](./examples/) to see it in action
 
 Happy coding!

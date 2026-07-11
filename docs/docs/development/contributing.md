@@ -31,8 +31,8 @@ Thank you for your interest in contributing to drun! This guide will help you ge
 
 1. Fork the repository
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/drun.git`
-3. Read the [Architecture Guide](./ARCHITECTURE.md) to understand the system
-4. Read the [Developer Guide](./DEVELOPER_GUIDE.md) for detailed codebase documentation
+3. Read the [Architecture Guide](architecture.md) to understand the system
+4. Read the [Developer Guide](index.md) for detailed codebase documentation
 5. Browse the [examples/](./examples/) directory to see drun in action
 
 ---
@@ -98,7 +98,7 @@ internal/
 └── (support packages) # builtins, shell, detection, etc.
 ```
 
-See [internal/README.md](./internal/README.md) for detailed package documentation.
+See [internal/README.md](packages/index.md) for detailed package documentation.
 
 ---
 
@@ -498,16 +498,16 @@ Register in the builtins map and add tests.
 
 When adding user-facing features:
 
-1. Update [README.md](./README.md)
-2. Update [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
+1. Update the repository `README.md` when the project landing page changes
+2. Update the relevant page in the [language specification](../reference/language/overview.md)
 3. Add examples to [examples/](./examples/)
 
 ### Developer Documentation
 
 When changing architecture:
 
-1. Update [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. Update [internal/README.md](./internal/README.md)
+1. Update [ARCHITECTURE.md](architecture.md)
+2. Update [internal/README.md](packages/index.md)
 3. Update this contributing guide if needed
 
 ---
@@ -516,10 +516,10 @@ When changing architecture:
 
 ### Resources
 
-- **Architecture Guide:** [ARCHITECTURE.md](./ARCHITECTURE.md)
-- **Developer Guide:** [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)
-- **Package Guide:** [internal/README.md](./internal/README.md)
-- **Language Spec:** [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
+- **Architecture Guide:** [ARCHITECTURE.md](architecture.md)
+- **Developer Guide:** [Developer guide](index.md)
+- **Package Guide:** [internal/README.md](packages/index.md)
+- **Language Spec:** [Language specification](../reference/language/overview.md)
 
 ### Questions?
 
@@ -567,7 +567,7 @@ xdrun -f examples/XX-email-test.drun test
 
 # 5. Update documentation
 # - Edit README.md
-# - Edit DRUN_V2_SPECIFICATION.md
+# - Edit the relevant page under docs/docs/reference/
 
 # 6. Commit
 git add .

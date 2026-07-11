@@ -441,8 +441,8 @@ These examples represent the target syntax for drun v2. As we implement the comp
 
 ## 📚 Learn More
 
-- **[drun v2 Specification](../DRUN_V2_SPECIFICATION.md)** - Complete language specification
-- **[Language Reference](../docs/v2-reference.md)** - Detailed syntax reference
+- **[drun v2 Specification](../reference/language/overview.md)** - Complete language specification
+- **[Language Reference](../reference/language/overview.md)** - Detailed syntax reference
 
 ---
 
