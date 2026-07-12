@@ -165,10 +165,11 @@ See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) f
 
 ## Learn More
 
-- Usage and troubleshooting: [docs/USAGE_AND_TROUBLESHOOTING.md](./docs/USAGE_AND_TROUBLESHOOTING.md)
-- Language reference: [DRUN_V2_SPECIFICATION.md](./DRUN_V2_SPECIFICATION.md)
-- Examples: [examples/README.md](./examples/README.md)
-- Orchestration: [docs/ORCHESTRATION.md](./docs/ORCHESTRATION.md)
-- Stateless and partial names: [docs/STATELESS_AND_PARTIAL_NAMES.md](./docs/STATELESS_AND_PARTIAL_NAMES.md)
-- Developer documentation: [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)
-- Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md)
+- Getting started: [installation, initialization, running tasks, and templates](./docs/docs/getting-started/index.md)
+- Troubleshooting: [common installation and usage problems](./docs/docs/getting-started/troubleshooting.md)
+- Language reference: [language specification](./docs/docs/reference/language/overview.md)
+- Examples: [examples](./docs/docs/examples/index.md)
+- Orchestration: [orchestration guide](./docs/docs/guides/orchestration.md)
+- Stateless and partial names: [stateless mode and partial names](./docs/docs/guides/stateless-and-partial-names.md)
+- Developer documentation: [developer guide](./docs/docs/development/index.md)
+- Architecture: [architecture](./docs/docs/development/architecture.md)

@@ -1,0 +1,12 @@
+[project]
+name = "docs"
+version = "0.1.0"
+description = "The Zensical documentation site for drun"
+readme = "docs/index.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "zensical>=0.0.50",
+]

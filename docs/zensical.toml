@@ -1,0 +1,132 @@
+[project]
+site_name = "drun"
+site_description = "Documentation for the drun automation language and xdrun CLI."
+site_author = "Phillarmonic Software"
+site_url = "https://phillarmonic.github.io/drun/"
+repo_url = "https://github.com/phillarmonic/drun"
+repo_name = "phillarmonic/drun"
+copyright = "Copyright &copy; 2026 Phillarmonic Software"
+extra_css = [
+  "stylesheets/shiki.css",
+  "assets/components/mermaid-panzoom/styles.css",
+]
+extra_javascript = [
+  "javascripts/shiki.mjs",
+  { path = "assets/components/mermaid-panzoom/index.js", type = "module" },
+]
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Overview" = "getting-started/index.md" },
+    { "Install" = "getting-started/install.md" },
+    { "Shell autocomplete" = "getting-started/autocomplete.md" },
+    { "Initialize a spec" = "getting-started/initialize.md" },
+    { "Run tasks" = "getting-started/run.md" },
+    { "Project templates" = "getting-started/templates.md" },
+    { "Troubleshooting" = "getting-started/troubleshooting.md" },
+  ] },
+  { "Language specification" = [
+    { "Overview and philosophy" = "reference/language/overview.md" },
+    { "Grammar and lexical structure" = "reference/language/grammar-and-lexical-structure.md" },
+    { "Syntax" = "reference/language/syntax.md" },
+    { "Types and control flow" = "reference/language/types-and-control-flow.md" },
+    { "Variables and parameters" = "reference/language/variables-and-parameters.md" },
+    { "Collections and code reuse" = "reference/language/collections-and-reuse.md" },
+    { "Built-in actions" = "reference/language/built-in-actions.md" },
+    { "Secrets" = "reference/language/secrets.md" },
+    { "Git policy and hooks" = "reference/language/git-policy.md" },
+    { "Runtime" = [
+      { "Detection, execution, and errors" = "reference/runtime/detection-execution-and-errors.md" },
+    ] },
+    { "Examples" = "reference/examples.md" },
+    { "Pattern macros" = "reference/language/pattern-macros.md" },
+    { "Orchestration specification" = "reference/orchestration.md" },
+  ] },
+  { "Guides" = [
+    { "GitHub Actions" = "guides/github-actions.md" },
+    { "Microservices orchestration" = "guides/orchestration.md" },
+    { "Stateless mode and partial names" = "guides/stateless-and-partial-names.md" },
+  ] },
+  { "Examples" = [
+    { "Examples overview" = "examples/index.md" },
+    { "Makefile conversion" = "examples/makefile-conversion.md" },
+  ] },
+  { "Development" = [
+    { "Developer guide" = "development/index.md" },
+    { "Architecture" = "development/architecture.md" },
+    { "Contributing" = "development/contributing.md" },
+    { "Implementation notes" = "development/implementation.md" },
+    { "Orchestration implementation" = "development/orchestration-implementation.md" },
+    { "Packages" = [
+      { "Package map" = "development/packages/index.md" },
+      { "Domain" = "development/packages/domain.md" },
+      { "Engine" = "development/packages/engine.md" },
+      { "Parser" = "development/packages/parser.md" },
+      { "Memory monitor" = "development/packages/memory-monitor.md" },
+    ] },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.code.copy",
+  "content.code.select",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "search.share",
+  "search.suggest",
+]
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/phillarmonic/drun"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+  { name = "drun", class = "language-drun", format = "pymdownx.superfences.fence_code_format" },
+  { name = "bash", class = "language-bash", format = "pymdownx.superfences.fence_code_format" },
+  { name = "sh", class = "language-sh", format = "pymdownx.superfences.fence_code_format" },
+  { name = "shell", class = "language-shell", format = "pymdownx.superfences.fence_code_format" },
+  { name = "go", class = "language-go", format = "pymdownx.superfences.fence_code_format" },
+  { name = "yaml", class = "language-yaml", format = "pymdownx.superfences.fence_code_format" },
+  { name = "yml", class = "language-yml", format = "pymdownx.superfences.fence_code_format" },
+  { name = "json", class = "language-json", format = "pymdownx.superfences.fence_code_format" },
+  { name = "makefile", class = "language-makefile", format = "pymdownx.superfences.fence_code_format" },
+  { name = "ebnf", class = "language-ebnf", format = "pymdownx.superfences.fence_code_format" },
+  { name = "text", class = "language-text", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true

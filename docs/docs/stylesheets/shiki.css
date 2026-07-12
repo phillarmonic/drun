@@ -1,0 +1,61 @@
+.code-block {
+  margin: 1em 0;
+}
+
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 0.2rem;
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.35rem;
+  padding: 0 0.2rem;
+  border: 1px solid transparent;
+  border-radius: 0.2rem;
+  color: #8c959f;
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.code-copy:hover,
+.code-copy:focus-visible {
+  border-color: #484f58;
+  color: #f0f6fc;
+  background: #21262d;
+}
+
+.code-copy.is-copied {
+  color: #3fb950;
+}
+
+.code-copy svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: currentColor;
+}
+
+.shiki {
+  margin: 0;
+  padding: 0.7720588235em 1.1764705882em;
+  overflow: auto;
+  border: 1px solid #30363d;
+  border-radius: 0.3rem;
+}
+
+.shiki code {
+  background: transparent;
+}
+
+/* Plain-text examples have no syntax semantics, so keep every line legible. */
+.shiki.language-text code,
+.shiki.language-text .line span {
+  color: #fff !important;
+}

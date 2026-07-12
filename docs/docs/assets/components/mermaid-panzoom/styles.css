@@ -1,0 +1,331 @@
+.mermaid-zoomable {
+  cursor: zoom-in;
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color--lighter) 40%, transparent);
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.75rem 0.35rem;
+  background: linear-gradient(180deg, rgba(82, 108, 254, 0.04), rgba(82, 108, 254, 0.015));
+}
+
+.mermaid-zoomable svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Edge highlighting on hover ── */
+.mermaid-zoomable svg .edgePath path,
+.mermaid-zoomable svg .edgePaths > path.flowchart-link,
+.mermaid-panzoom-canvas .edgePath path,
+.mermaid-panzoom-canvas .edgePaths > path.flowchart-link,
+.mermaid-panzoom-vector-host .edgePath path,
+.mermaid-panzoom-vector-host .edgePaths > path.flowchart-link {
+  transition: stroke 0.2s, stroke-width 0.2s, stroke-opacity 0.2s;
+}
+
+.mermaid-zoomable svg .edgeLabel,
+.mermaid-panzoom-canvas .edgeLabel,
+.mermaid-panzoom-vector-host .edgeLabel {
+  transition: opacity 0.2s;
+}
+
+/* Allow hover on nodes/edges in inline diagrams */
+.mermaid-zoomable svg .node,
+.mermaid-zoomable svg .edgePath,
+.mermaid-zoomable svg .edge-hit-area {
+  pointer-events: all;
+}
+
+/* When any node is hovered, dim all edges */
+.mermaid-highlight-active .edgePath path {
+  stroke-opacity: 0.15;
+  stroke: #999;
+}
+
+.mermaid-highlight-active .edgePaths > path.flowchart-link {
+  stroke-opacity: 0.15;
+  stroke: #999;
+}
+
+.mermaid-highlight-active .edgeLabel {
+  opacity: 0.2;
+}
+
+/* Keep highlighted edges bright */
+.mermaid-highlight-active .edgePath.edge-highlighted path {
+  stroke-opacity: 1;
+  stroke: #2563eb;
+  stroke-width: 2.5px;
+}
+
+.mermaid-highlight-active .edgePaths > path.flowchart-link.edge-highlighted {
+  stroke-opacity: 1;
+  stroke: #2563eb;
+  stroke-width: 2.5px;
+}
+
+.mermaid-highlight-active .edgeLabel.edge-highlighted {
+  opacity: 1;
+}
+
+/* When hovering a single edge directly */
+.mermaid-highlight-active .edgePath.edge-solo-highlight path {
+  stroke-opacity: 1;
+  stroke: #e63946;
+  stroke-width: 3px;
+}
+
+.mermaid-highlight-active .edgePaths > path.flowchart-link.edge-solo-highlight {
+  stroke-opacity: 1;
+  stroke: #e63946;
+  stroke-width: 3px;
+}
+
+.mermaid-highlight-active .edgeLabel.edge-solo-highlight {
+  opacity: 1;
+}
+
+/* Highlight the hovered node */
+.mermaid-highlight-active .node.node-highlighted rect,
+.mermaid-highlight-active .node.node-highlighted circle,
+.mermaid-highlight-active .node.node-highlighted polygon,
+.mermaid-highlight-active .node.node-highlighted path {
+  stroke: #2563eb;
+  stroke-width: 2.5px;
+}
+
+/* Dim non-highlighted nodes slightly */
+.mermaid-highlight-active .node:not(.node-highlighted) {
+  opacity: 0.45;
+}
+
+.mermaid-zoom-trigger {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.65rem;
+  cursor: pointer;
+  box-shadow: var(--md-shadow-z1);
+}
+
+.mermaid-zoom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.45rem 0 1.25rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(82, 108, 254, 0.06);
+  border: 1px solid rgba(82, 108, 254, 0.14);
+}
+
+.mermaid-zoom-actions__button {
+  border: 0;
+  background: var(--md-primary-fg-color);
+  color: white;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mermaid-zoom-actions__hint {
+  font-size: 0.68rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.mermaid-panzoom-open {
+  overflow: hidden;
+}
+
+.mermaid-panzoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.mermaid-panzoom-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 16, 25, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.mermaid-panzoom-shell {
+  position: absolute;
+  inset: 0.45rem 0.28rem 0.22rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.4rem;
+}
+
+.mermaid-panzoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: white;
+}
+
+.mermaid-panzoom-hint {
+  font-size: 0.58rem;
+  line-height: 1.2;
+  opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mermaid-panzoom-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.mermaid-panzoom-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 999px;
+  padding: 0.24rem 0.62rem;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mermaid-panzoom-actions button[data-action="zoom-out"],
+.mermaid-panzoom-actions button[data-action="zoom-in"] {
+  width: 2rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mermaid-panzoom-viewport {
+  position: relative;
+  overflow: auto;
+  border-radius: 0.35rem;
+  background: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  touch-action: pan-x pan-y;
+  cursor: grab;
+}
+
+.mermaid-panzoom-stage {
+  min-width: 100%;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0.66rem 0.52rem 0.4rem;
+  box-sizing: border-box;
+}
+
+.mermaid-panzoom-content {
+  position: relative;
+  flex: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mermaid-panzoom-canvas {
+  display: inline-block;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mermaid-panzoom-canvas,
+.mermaid-panzoom-canvas * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Allow pointer events on SVG elements for edge hover highlighting */
+.mermaid-panzoom-canvas svg {
+  pointer-events: auto;
+}
+
+.mermaid-panzoom-canvas .node,
+.mermaid-panzoom-canvas .edgePath,
+.mermaid-panzoom-canvas .edge-hit-area {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+/* Block pointer events on non-interactive SVG parts so drag still works */
+.mermaid-panzoom-canvas svg .edgeLabel,
+.mermaid-panzoom-canvas svg text,
+.mermaid-panzoom-canvas svg .label {
+  pointer-events: none;
+}
+
+.mermaid-panzoom-content svg {
+  display: block;
+  width: auto;
+  max-width: none;
+  height: auto;
+  background: white;
+  border-radius: 0.75rem;
+}
+
+.mermaid-panzoom-content .mermaid-panzoom-live-host {
+  display: block;
+  width: max-content;
+  box-sizing: border-box;
+  max-width: none;
+  background: white;
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.58rem 0.44rem;
+}
+
+.mermaid-panzoom-vector-host {
+  display: block;
+  width: max-content;
+  box-sizing: border-box;
+  max-width: none;
+  background: white;
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.58rem 0.44rem;
+}
+
+.mermaid-panzoom-content .mermaid-panzoom-live-host svg,
+.mermaid-panzoom-vector-host svg {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .mermaid-zoom-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mermaid-panzoom-shell {
+    inset: 0.24rem 0.16rem 0.14rem;
+  }
+
+  .mermaid-panzoom-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .mermaid-panzoom-hint {
+    display: none;
+  }
+
+  .mermaid-panzoom-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
