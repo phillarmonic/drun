@@ -4,6 +4,8 @@
 
 `xdrun` is the CLI that executes `.drun` task files. It is designed for automation that reads closer to intent than shell glue, while still running the commands your project needs.
 
+**Drun's full detailed documentation can be found at:** [https://phillarmonic.github.io/drun/](https://phillarmonic.github.io/drun/)
+
 ## Install
 
 Use the install script:
