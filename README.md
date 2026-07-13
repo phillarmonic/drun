@@ -12,6 +12,12 @@
 
 **Check out how to use drun's AI skills at**:  [https://phillarmonic.github.io/drun/getting-started/ai-integration/](https://phillarmonic.github.io/drun/getting-started/ai-integration/)
 
+**Using VS Code**? Install our official extension with LSP support at [The VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=phillarmonic.drun-language-support)
+
+**Using Cursor/Antigravity/other VS-Code forks?** Grab our official extension with LSP support at the [OpenVSX store](https://open-vsx.org/extension/phillarmonic/drun-language-support)!
+
+**Using a Jetbrains IDE**? Coming soon to your IDE!
+
 ## Install
 
 Use the install script:
