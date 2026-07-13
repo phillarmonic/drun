@@ -23,6 +23,7 @@ nav = [
     { "Shell autocomplete" = "getting-started/autocomplete.md" },
     { "Initialize a spec" = "getting-started/initialize.md" },
     { "Run tasks" = "getting-started/run.md" },
+    { "AI Integration" = "getting-started/ai-integration.md" },
     { "Project templates" = "getting-started/templates.md" },
     { "Troubleshooting" = "getting-started/troubleshooting.md" },
   ] },

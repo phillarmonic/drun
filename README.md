@@ -1,10 +1,16 @@
-# drun
+# drun automation language (with AI support)
 
-`drun` is a semantic task automation language for readable project workflows.
+<p align="center">
+  <img src="images/drun_500_transp.png" width="500" alt="Drun" />
+</p>
+
+`drun` is a semantic task automation language for readable project workflows, with AI skills support.
 
 `xdrun` is the CLI that executes `.drun` task files. It is designed for automation that reads closer to intent than shell glue, while still running the commands your project needs.
 
 **Drun's full detailed documentation can be found at:** [https://phillarmonic.github.io/drun/](https://phillarmonic.github.io/drun/)
+
+**Check out how to use drun's AI skills at**:  [https://phillarmonic.github.io/drun/getting-started/ai-integration/](https://phillarmonic.github.io/drun/getting-started/ai-integration/)
 
 ## Install
 
