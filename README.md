@@ -14,9 +14,15 @@
 
 **Using VS Code**? Install our **official extension** with LSP support at [The VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=phillarmonic.drun-language-support)
 
+[![VS Code Marketplace](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fphillarmonic%2Fdrun-vscode%2Fmaster%2Fpackage.json&query=%24.version&prefix=v&label=VS%20Code%20Marketplace&logo=visualstudiocode&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=phillarmonic.drun-language-support)
+
 **Using Cursor/Antigravity/other VS-Code forks?** Grab our **official extension** with LSP support at the [OpenVSX store](https://open-vsx.org/extension/phillarmonic/drun-language-support)!
 
-**Using a Jetbrains IDE**? Coming soon to your IDE!
+[![Open VSX](https://img.shields.io/open-vsx/v/phillarmonic/drun-language-support?label=Open%20VSX&logo=eclipseide)](https://open-vsx.org/extension/phillarmonic/drun-language-support)
+
+**Using a JetBrains IDE?** Install our **official extension** from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/32865-drun-language-support).
+
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/32865?label=JetBrains%20Marketplace&logo=jetbrains)](https://plugins.jetbrains.com/plugin/32865-drun-language-support)
 
 ## Install
 
