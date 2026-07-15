@@ -8,7 +8,8 @@ project "Drun" version "2.0":
 		go >= 1.26
 		golangci-lint provision
 		gosec provision
-	
+	    govulncheck
+
 	git policy:
 		branch:
 			default branches: "master", "develop"
@@ -65,6 +66,9 @@ task "fuzz" means "Runs the fuzzers":
 	step "Executing semantic fuzz tests against example-based inputs\nIterations: {$iterations}"
 	run "./scripts/fuzz-examples.sh {$iterations}"
 
+task "vuln" means "Performs dependencies vulnerability checks":
+    run "govulncheck ./..."
+
 task "install" means "Install xdrun with build info":
 	info "Installing xdrun with embedded build date/time..."
 	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
@@ -79,6 +83,8 @@ task "docs" means "Runs the local docs server":
 
 task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
+	step "Dependency vulnerability checks"
+	call task vuln
 	step "Linter"
 	call task lint
 	step "Unit tests"
