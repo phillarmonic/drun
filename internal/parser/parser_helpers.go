@@ -381,13 +381,7 @@ func (p *Parser) expectPeekSkipNewlines(t lexer.TokenType) bool {
 // expectPeekIndent expects an indented code body while allowing intervening
 // blank and comment-only lines, which are indentation-neutral.
 func (p *Parser) expectPeekIndent() bool {
-	for p.peekToken.Type == lexer.NEWLINE ||
-		p.peekToken.Type == lexer.COMMENT ||
-		p.peekToken.Type == lexer.MULTILINE_COMMENT {
-		p.nextToken()
-	}
-
-	return p.expectPeek(lexer.INDENT)
+	return p.expectPeekSkipNewlines(lexer.INDENT)
 }
 
 // peekError adds an error for unexpected peek token
