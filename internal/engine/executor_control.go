@@ -102,8 +102,15 @@ func (e *Engine) executeConditional(stmt *statement.Conditional, ctx *ExecutionC
 		}
 	}
 
-	// Evaluate the condition
-	conditionResult := e.evaluateCondition(stmt.Condition, ctx)
+	// Version-aware conditions use numeric MAJOR.MINOR.PATCH ordering. Other
+	// condition families continue through the general evaluator.
+	conditionResult, handled, err := e.evaluateSemanticVersionCondition(stmt.Condition, ctx)
+	if err != nil {
+		return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
+	}
+	if !handled {
+		conditionResult = e.evaluateCondition(stmt.Condition, ctx)
+	}
 
 	if conditionResult {
 		// Execute the main body (domain statements)

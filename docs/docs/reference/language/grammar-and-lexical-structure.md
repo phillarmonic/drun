@@ -521,7 +521,10 @@ logical_expression = comparison_expression
                    { ( "and" | "or" ) comparison_expression } ;
 
 comparison_expression = additive_expression
-                      [ comparison_operator additive_expression ] ;
+                      [ comparison_operator additive_expression
+                      | "is" version_order "than" "version" additive_expression ] ;
+
+version_order = "older" | "newer" ;
 
 comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">="
                     | "contains" | "matches" | "exists" ;

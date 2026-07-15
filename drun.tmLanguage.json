@@ -1482,7 +1482,7 @@
       "patterns": [
         {
           "name": "keyword.control.drun",
-          "match": "\\b(?:if|else|when|otherwise|for|each|in|parallel|try|catch|finally|throw|rethrow|ignore|break|continue|before|after|on|then|and|or|not|is|are|contains|matches|matching|using|ordered|between|exists|available|running|detected|version)\\b"
+          "match": "\\b(?:if|else|when|otherwise|for|each|in|parallel|try|catch|finally|throw|rethrow|ignore|break|continue|before|after|on|then|and|or|not|is|are|older|newer|than|contains|matches|matching|using|ordered|between|exists|available|running|detected|version)\\b"
         },
         {
           "name": "keyword.declaration.drun",

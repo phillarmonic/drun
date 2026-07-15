@@ -6,11 +6,69 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/phillarmonic/drun/v2/internal/scm"
 	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
 // Domain: Condition Evaluation Helpers
 // This file contains helper methods for evaluating conditions
+
+var semanticVersionConditionPattern = regexp.MustCompile(`^(.+?)\s+is\s+(older|newer)\s+than\s+version\s+(.+)$`)
+
+// evaluateSemanticVersionCondition handles fluent stable-version comparisons:
+//
+//	$candidate is older than version "{$current}"
+//	$candidate is newer than version "{$current}"
+func (e *Engine) evaluateSemanticVersionCondition(condition string, ctx *ExecutionContext) (bool, bool, error) {
+	match := semanticVersionConditionPattern.FindStringSubmatch(strings.TrimSpace(condition))
+	if match == nil {
+		return false, false, nil
+	}
+
+	left, err := e.resolveVersionConditionOperand(match[1], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving left version: %w", err)
+	}
+	right, err := e.resolveVersionConditionOperand(match[3], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving right version: %w", err)
+	}
+	// Git queries intentionally capture descriptive placeholders during dry-run.
+	// They cannot participate in a real comparison, so keep the condition false
+	// without weakening validation for actual execution values.
+	if e.dryRun && (strings.HasPrefix(left, "[DRY RUN]") || strings.HasPrefix(right, "[DRY RUN]")) {
+		return false, true, nil
+	}
+	leftVersion, err := scm.ParseVersion(left)
+	if err != nil {
+		return false, true, fmt.Errorf("left side of semantic version comparison: %w", err)
+	}
+	rightVersion, err := scm.ParseVersion(right)
+	if err != nil {
+		return false, true, fmt.Errorf("right side of semantic version comparison: %w", err)
+	}
+
+	comparison := leftVersion.Compare(rightVersion)
+	if match[2] == "older" {
+		return comparison < 0, true, nil
+	}
+	return comparison > 0, true, nil
+}
+
+func (e *Engine) resolveVersionConditionOperand(operand string, ctx *ExecutionContext) (string, error) {
+	operand = strings.TrimSpace(operand)
+	if strings.HasPrefix(operand, "$ ") {
+		operand = strings.Replace(operand, "$ ", "$", 1)
+	}
+	if strings.HasPrefix(operand, "$") {
+		operand = "{" + operand + "}"
+	}
+	value, err := e.interpolateVariablesWithError(operand, ctx)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(strings.TrimSpace(value), `"'`), nil
+}
 
 // checkConditionForUndefinedVars checks if a condition contains undefined variables
 func (e *Engine) checkConditionForUndefinedVars(condition string, ctx *ExecutionContext) error {
