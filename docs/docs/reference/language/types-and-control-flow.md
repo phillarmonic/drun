@@ -98,12 +98,26 @@ if directory "/tmp/cache" is empty:
 
 if dir "{$output_path}" is not empty:
   warn "Output directory contains files"
+
+# Exact file-content comparisons
+if file "./generated.json" matches file "./vendored.json":
+  info "The files contain the same bytes"
+
+if file "./generated.json" not matches file "./vendored.json":
+  fail "The vendored file is out of date"
 ```
 
 `older than version` and `newer than version` compare numeric stable
 `MAJOR.MINOR.PATCH` values. Both operands may be parameters, captured variables,
 or interpolated strings. Values such as `v1.2.3`, release candidates, and partial
 versions are rejected; normalize or extract a stable version before comparing.
+
+`file … matches file …` compares the complete contents byte-for-byte. It does
+not normalize line endings, whitespace, text encoding, or structured data.
+`file … not matches file …` negates that result. Both paths support variable
+interpolation, resolve using the task's current workdir, and must be readable;
+an unreadable or missing operand fails condition evaluation with a path-specific
+error.
 
 #### When-Otherwise Conditions
 
@@ -148,6 +162,7 @@ for each $platform in ["windows", "linux", "mac"]:
 - String equality: `$var is "value"`
 - String inequality: `$var is not "value"`
 - Stable version ordering: `$left is older than version "{$right}"`, `$left is newer than version "{$right}"`
+- Exact file comparison: `file "a" matches file "b"`, `file "a" not matches file "b"`
 - Empty checks: `$var is empty`, `$var is not empty`
 - All condition types supported by `if` statements
 

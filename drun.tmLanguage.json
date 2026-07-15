@@ -1482,7 +1482,7 @@
         },
         {
           "name": "support.function.builtin.drun",
-          "match": "\\b(?:current git commit|current git branch|file exists|dir exists|start progress|update progress|finish progress|start timer|stop timer|show elapsed time|compose_cmd|docker compose command|docker compose status|dns_resolve|dns_check|dns_validate)\\b"
+          "match": "\\b(?:current git commit|current git branch|available tasks|file exists|dir exists|start progress|update progress|finish progress|start timer|stop timer|show elapsed time|compose_cmd|docker compose command|docker compose status|dns_resolve|dns_check|dns_validate)\\b"
         },
         {
           "name": "support.function.builtin.drun",
@@ -1546,7 +1546,7 @@
         },
         {
           "name": "support.type.action.drun",
-          "match": "\\b(?:info|step|warn|error|success|fail|echo|run|exec|shell|output|config|create|copy|move|delete|read|write|append|backup|check|ensure|extract|archive|build|push|pull|tag|remove|start|starting|stop|scale|deploy|rollback|wait|open|ping|test|expect|download|upload|send|receive|fetch|clone|init|switch|merge|add|commit|status|log|show|detect|search|update|restart|orchestrate|execute|apply|describe|expose)\\b"
+          "match": "\\b(?:info|step|warn|warning|error|success|fail|echo|run|exec|shell|output|config|create|copy|move|delete|read|write|append|backup|check|ensure|extract|archive|build|push|pull|tag|remove|start|starting|stop|scale|deploy|rollback|wait|open|ping|test|expect|download|upload|send|receive|fetch|clone|init|switch|merge|add|commit|status|log|show|detect|search|update|restart|orchestrate|execute|apply|describe|expose)\\b"
         },
         {
           "name": "support.constant.domain.drun",

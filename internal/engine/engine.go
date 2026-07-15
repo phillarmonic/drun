@@ -986,7 +986,7 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 		if action.LineBreakAfter {
 			_, _ = fmt.Fprintln(e.output)
 		}
-	case "warn":
+	case "warn", "warning":
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
 		_, _ = fmt.Fprintf(e.output, "❌  %s\n", interpolatedMessage)

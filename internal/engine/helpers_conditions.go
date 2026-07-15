@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -14,6 +15,60 @@ import (
 // This file contains helper methods for evaluating conditions
 
 var semanticVersionConditionPattern = regexp.MustCompile(`^(.+?)\s+is\s+(older|newer)\s+than\s+version\s+(.+)$`)
+var fileComparisonConditionPattern = regexp.MustCompile(`^file\s+(.+?)\s+(not\s+)?matches\s+file\s+(.+?)\s*$`)
+
+// evaluateFileComparisonCondition handles exact file-content comparisons:
+//
+//	file ./generated.json matches file ./vendored.json
+//	file ./generated.json not matches file ./vendored.json
+//
+// Paths support interpolation and resolve with the same workdir rules as other
+// filesystem conditions. Matching is byte-for-byte; no text normalization is
+// performed.
+func (e *Engine) evaluateFileComparisonCondition(condition string, ctx *ExecutionContext) (bool, bool, error) {
+	match := fileComparisonConditionPattern.FindStringSubmatch(strings.TrimSpace(condition))
+	if match == nil {
+		return false, false, nil
+	}
+
+	left, err := e.resolveFileComparisonOperand(match[1], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving left file path: %w", err)
+	}
+	right, err := e.resolveFileComparisonOperand(match[3], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving right file path: %w", err)
+	}
+
+	// #nosec G304 -- file comparison explicitly reads the user-declared path.
+	leftData, err := os.ReadFile(e.resolveFilesystemPath(left, ctx))
+	if err != nil {
+		return false, true, fmt.Errorf("reading left file %q: %w", left, err)
+	}
+	// #nosec G304 -- file comparison explicitly reads the user-declared path.
+	rightData, err := os.ReadFile(e.resolveFilesystemPath(right, ctx))
+	if err != nil {
+		return false, true, fmt.Errorf("reading right file %q: %w", right, err)
+	}
+
+	equal := bytes.Equal(leftData, rightData)
+	if strings.TrimSpace(match[2]) == "not" {
+		return !equal, true, nil
+	}
+	return equal, true, nil
+}
+
+func (e *Engine) resolveFileComparisonOperand(operand string, ctx *ExecutionContext) (string, error) {
+	value, err := e.interpolateVariablesWithError(strings.TrimSpace(operand), ctx)
+	if err != nil {
+		return "", err
+	}
+	value = strings.Trim(strings.TrimSpace(value), `"'`)
+	if value == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+	return value, nil
+}
 
 // evaluateSemanticVersionCondition handles fluent stable-version comparisons:
 //

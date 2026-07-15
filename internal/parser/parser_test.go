@@ -458,3 +458,38 @@ task "test":
 		t.Fatalf("expected second condition %q, got %q", "file .env not exists", secondIf.Condition)
 	}
 }
+
+func TestParser_FileComparisonConditions(t *testing.T) {
+	input := `version: 2.0
+
+task "test":
+  if file ./left.bin matches file ./right.bin:
+    info "equal"
+  if file "left file.bin" not matches file "right file.bin":
+    info "different"`
+
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	task := program.Tasks[0]
+	if len(task.Body) != 2 {
+		t.Fatalf("task body should contain 2 statements. got=%d", len(task.Body))
+	}
+
+	want := []string{
+		"file ./left.bin matches file ./right.bin",
+		"file left file.bin not matches file right file.bin",
+	}
+	for i, expected := range want {
+		conditional, ok := task.Body[i].(*ast.ConditionalStatement)
+		if !ok {
+			t.Fatalf("task.Body[%d] is not a ConditionalStatement. got=%T", i, task.Body[i])
+		}
+		if conditional.Condition != expected {
+			t.Errorf("condition %d = %q, want %q", i, conditional.Condition, expected)
+		}
+	}
+}

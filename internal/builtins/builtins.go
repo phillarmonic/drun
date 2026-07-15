@@ -72,9 +72,46 @@ var Registry = map[string]BuiltinFunction{
 	"docker compose command": getDockerComposeCommand,
 	"docker compose status":  checkDockerComposeStatus,
 	"secret":                 getSecret,
+	"available tasks":        getAvailableTasks,
 	"dns_resolve":            getDNSResolve,
 	"dns_check":              getDNSCheck,
 	"dns_validate":           getDNSValidate,
+}
+
+// getAvailableTasks returns the user-defined task names in declaration order.
+// The engine supplies task names through an optional context capability so the
+// builtins package does not need to depend on the task domain.
+func getAvailableTasks(ctx Context, args ...string) (string, error) {
+	provider, ok := ctx.(interface {
+		GetTaskNames() []string
+	})
+	if !ok {
+		return "", fmt.Errorf("available tasks requires task listing support")
+	}
+
+	separator := ", "
+	if len(args) == 1 {
+		separator = strings.NewReplacer(
+			`\n`, "\n",
+			`\r`, "\r",
+			`\t`, "\t",
+		).Replace(args[0])
+	}
+
+	omitted := make(map[string]struct{}, max(0, len(args)-1))
+	for index := 1; index < len(args); index++ {
+		omitted[args[index]] = struct{}{}
+	}
+
+	names := provider.GetTaskNames()
+	filtered := make([]string, 0, len(names))
+	for _, name := range names {
+		if _, omit := omitted[name]; !omit {
+			filtered = append(filtered, name)
+		}
+	}
+
+	return strings.Join(filtered, separator), nil
 }
 
 // getCurrentGitCommit returns the current git commit hash

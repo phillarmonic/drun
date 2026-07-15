@@ -914,7 +914,7 @@ success "Deployment completed successfully"
   └─────────────────────────────────────────────────────────────┘
   ```
 - `info` - Displays an informational message.
-- `warn` - Displays a warning message.
+- `warning` - Displays a warning message (`warn` remains available as a shorter alias).
 - `error` - Displays an error message.
 - `success` - Displays a success message.
 - `fail` - Displays a failure message and exits with an error.
@@ -1113,6 +1113,28 @@ set $api_key to {env('API_KEY')}
 set $timestamp to {now.format('2006-01-02 15:04:05')}
 ```
 
+#### Task Discovery
+
+Use `available tasks` to render the user-defined task names available to the
+current execution and operating system. Names retain declaration order,
+platform variants are shown once, tasks restricted to other operating systems
+are omitted, and namespaced tasks loaded from includes are appended
+deterministically. The separator defaults to `, ` and supports `\n`, `\r`, and
+`\t` escapes. Any task names after the separator are omitted from the result;
+omissions use exact names, including full names such as `tools.release` for
+namespaced tasks.
+
+```drun
+# Comma-separated
+info "Available tasks: {available tasks(', ')}"
+
+# One task per line
+info "Available tasks:\n{available tasks('\\n')}"
+
+# Hide tasks that should not appear in help output
+info "Commands: {available tasks(', ', 'default', 'internal.release')}"
+```
+
 #### Built-in Function Pipe Operations  *New*
 
 Built-in functions support pipe operations for data transformation, allowing you to chain operations together:
@@ -1188,6 +1210,7 @@ task "parameter defaults with pipes":
 | `{hostname}` | System hostname | `dev-machine` |
 | `{env('VAR')}` | Environment variable | `production` |
 | `{now.format('layout')}` | Formatted current time | `2025-09-22 14:30:00` |
+| `{available tasks('separator', 'omit'...)}` | OS-available user tasks joined by a separator, with optional exact-name omissions | `lint, check, build, ci` |
 
 **Key Features:**
 

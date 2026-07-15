@@ -84,7 +84,7 @@ and, or, not, is
 
 # Built-in actions
 build, deploy, push, run, stop, remove, scale, rollback, wait, commit
-copy, move, create, backup, step, info, warn, error, success, fail
+copy, move, create, backup, step, info, warn, warning, error, success, fail
 get, check, update, ensure
 
 # File-value formats and comparisons
@@ -98,7 +98,7 @@ directory, file, exists, running, healthy, available
 true, false, now, current, secret, env
 
 # Built-in functions
-current git commit, current git branch, now.format, pwd, hostname, env
+current git commit, current git branch, now.format, pwd, hostname, env, available tasks
 ```
 
 ### Comments
@@ -553,7 +553,12 @@ logical_expression = comparison_expression
 
 comparison_expression = additive_expression
                       [ comparison_operator additive_expression
-                      | "is" version_order "than" "version" additive_expression ] ;
+                      | "is" version_order "than" "version" additive_expression ]
+                      | file_comparison_expression ;
+
+file_comparison_expression = "file" file_path [ "not" ] "matches" "file" file_path ;
+
+file_path = string_literal | interpolated_string | identifier ;
 
 version_order = "older" | "newer" ;
 
@@ -631,6 +636,7 @@ file_action = "copy" string_literal "to" string_literal
 status_action = "step" string_literal
               | "info" string_literal
               | "warn" string_literal
+              | "warning" string_literal
               | "error" string_literal
               | "success" string_literal
               | "fail" [ "with" string_literal ] ;

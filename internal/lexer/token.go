@@ -1561,6 +1561,7 @@ var keywords = map[string]TokenType{
 	"info":          INFO,
 	"step":          STEP,
 	"warn":          WARN,
+	"warning":       WARN,
 	"error":         ERROR,
 	"success":       SUCCESS,
 	"fail":          FAIL,

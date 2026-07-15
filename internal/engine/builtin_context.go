@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/builtins"
+	"github.com/phillarmonic/drun/v2/internal/platform"
 )
 
 // BuiltinContext implements builtins.Context interface for the engine
@@ -38,6 +41,56 @@ func (bc *BuiltinContext) GetSecretsManager() builtins.SecretsManager {
 // IsDryRun returns whether we're in dry-run mode
 func (bc *BuiltinContext) IsDryRun() bool {
 	return bc.dryRun
+}
+
+// GetTaskNames returns all user-defined tasks available to the current
+// execution. Local tasks retain declaration order; included task names are
+// appended in lexical order because their backing store is a map.
+func (bc *BuiltinContext) GetTaskNames() []string {
+	if bc.execCtx == nil {
+		return nil
+	}
+
+	names := make([]string, 0)
+	seen := make(map[string]struct{})
+	add := func(name string) {
+		if _, exists := seen[name]; exists {
+			return
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+
+	if bc.execCtx.Program != nil {
+		for _, task := range bc.execCtx.Program.Tasks {
+			if taskMatchesCurrentPlatform(task.Name, task.Annotations) {
+				add(task.Name)
+			}
+		}
+	}
+
+	if bc.execCtx.Project != nil {
+		includedNames := make([]string, 0, len(bc.execCtx.Project.IncludedTasks))
+		for name, variants := range bc.execCtx.Project.IncludedTasks {
+			for _, variant := range variants {
+				if taskMatchesCurrentPlatform(name, variant.Annotations) {
+					includedNames = append(includedNames, name)
+					break
+				}
+			}
+		}
+		sort.Strings(includedNames)
+		for _, name := range includedNames {
+			add(name)
+		}
+	}
+
+	return names
+}
+
+func taskMatchesCurrentPlatform(name string, annotations []ast.Annotation) bool {
+	metadata, err := platform.ValidateAnnotations("task", name, annotations)
+	return err == nil && platform.MatchesCurrent(metadata.Platforms)
 }
 
 // DNSResolve resolves a domain for DNS-oriented builtins.

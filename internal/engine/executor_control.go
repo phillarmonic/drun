@@ -102,11 +102,18 @@ func (e *Engine) executeConditional(stmt *statement.Conditional, ctx *ExecutionC
 		}
 	}
 
-	// Version-aware conditions use numeric MAJOR.MINOR.PATCH ordering. Other
-	// condition families continue through the general evaluator.
-	conditionResult, handled, err := e.evaluateSemanticVersionCondition(stmt.Condition, ctx)
+	// File comparisons are exact byte comparisons and may return actionable I/O
+	// errors. Version-aware conditions use numeric MAJOR.MINOR.PATCH ordering.
+	// Other condition families continue through the general evaluator.
+	conditionResult, handled, err := e.evaluateFileComparisonCondition(stmt.Condition, ctx)
 	if err != nil {
 		return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
+	}
+	if !handled {
+		conditionResult, handled, err = e.evaluateSemanticVersionCondition(stmt.Condition, ctx)
+		if err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
+		}
 	}
 	if !handled {
 		conditionResult = e.evaluateCondition(stmt.Condition, ctx)
