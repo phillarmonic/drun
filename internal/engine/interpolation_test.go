@@ -138,6 +138,21 @@ task "simple":
 				"All done!",
 			},
 		},
+		{
+			name: "set from parameter with variable operation",
+			input: `version: 2.0
+
+task "prepare-release":
+  requires $version
+
+  set $release_version to "{$version without prefix 'v'}"
+  info "Release version: {$release_version}"`,
+			taskName: "prepare-release",
+			params:   map[string]string{"version": "1.0.4"},
+			expectedOutput: []string{
+				"Release version: 1.0.4",
+			},
+		},
 	}
 
 	for _, tt := range tests {

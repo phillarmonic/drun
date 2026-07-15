@@ -167,7 +167,12 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	interp.SetResolveVariableOpsCallback(func(expr string, ctx interface{}) string {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
 			if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
-				baseValue := interp.Interpolate(chain.Variable, execCtx)
+				// A variable-operation chain stores its base as `$name` (or a bare
+				// loop identifier), while the interpolator resolves Drun variables
+				// only inside braces. Resolve the base as an interpolation expression
+				// before applying the operation; otherwise operations run against the
+				// literal text "$name".
+				baseValue := interp.Interpolate("{"+chain.Variable+"}", execCtx)
 				if result, err := e.applyVariableOperations(baseValue, chain, execCtx); err == nil {
 					return result
 				}
