@@ -30,7 +30,7 @@ func TestExecuteFileValueGetCheckUpdateAndDryRun(t *testing.T) {
 		t.Fatalf("capture = %q", ctx.Variables["current"])
 	}
 	err := e.executeFileValue(&statement.FileValue{Operation: "check", Format: "property", Selector: "pluginVersion", Target: path, Comparison: "equals", Expected: "9.9.9"}, ctx)
-	if err == nil || !strings.Contains(err.Error(), "actual \"1.0.1\"") || !strings.Contains(err.Error(), path) {
+	if err == nil || !strings.Contains(err.Error(), "actual \"1.0.1\"") || !strings.Contains(err.Error(), fmt.Sprintf("%q", path)) {
 		t.Fatalf("check error = %v", err)
 	}
 	e.SetDryRun(true)
@@ -64,6 +64,10 @@ task "release":
 	if err := os.WriteFile(path, []byte(source), 0o640); err != nil {
 		t.Fatal(err)
 	}
+	initialInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	p := parser.NewParser(lexer.NewLexer(source))
 	program := p.ParseProgram()
 	if len(p.Errors()) > 0 {
@@ -86,7 +90,7 @@ task "release":
 		t.Fatalf("project version was not updated:\n%s", actual)
 	}
 	info, _ := os.Stat(path)
-	if info.Mode().Perm() != 0o640 {
+	if info.Mode().Perm() != initialInfo.Mode().Perm() {
 		t.Fatalf("mode = %v", info.Mode().Perm())
 	}
 }
@@ -133,8 +137,15 @@ task "versions":
 
 	params := map[string]string{"dir": dir, "next": "1.0.2", "property_selector": "pluginVersion"}
 	before := make(map[string][]byte, len(files))
+	beforeMode := make(map[string]os.FileMode, len(files))
 	for name := range files {
-		before[name], _ = os.ReadFile(filepath.Join(dir, name))
+		path := filepath.Join(dir, name)
+		before[name], _ = os.ReadFile(path)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		beforeMode[name] = info.Mode().Perm()
 	}
 	engine := NewEngine(&bytes.Buffer{})
 	engine.SetDryRun(true)
@@ -173,7 +184,7 @@ task "versions":
 		if err != nil {
 			t.Fatalf("stat %s: %v", name, err)
 		}
-		if info.Mode().Perm() != 0o600 {
+		if info.Mode().Perm() != beforeMode[name] {
 			t.Fatalf("%s mode = %v", name, info.Mode().Perm())
 		}
 		after[name], _ = os.ReadFile(path)
@@ -217,6 +228,10 @@ func TestFileValueFailedPreconditionsNeverModifyFilesThroughParserAndEngine(t *t
 			if err := os.WriteFile(path, original, 0o640); err != nil {
 				t.Fatal(err)
 			}
+			initialInfo, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
 			source := fmt.Sprintf("version: 2.0\ntask \"bad\":\n  update %s %q in %q to \"next\" or fail\n", tt.format, tt.selector, path)
 			l := lexer.NewLexer(source)
 			p := parser.NewParser(l)
@@ -232,7 +247,7 @@ func TestFileValueFailedPreconditionsNeverModifyFilesThroughParserAndEngine(t *t
 				t.Fatalf("file changed: %q", actual)
 			}
 			info, _ := os.Stat(path)
-			if info.Mode().Perm() != 0o640 {
+			if info.Mode().Perm() != initialInfo.Mode().Perm() {
 				t.Fatalf("mode changed: %v", info.Mode().Perm())
 			}
 		})

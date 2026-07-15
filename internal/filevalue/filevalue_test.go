@@ -485,6 +485,10 @@ func TestUpdateFileIsAtomicAndPreservesModeOnValidationFailure(t *testing.T) {
 	if err := os.WriteFile(path, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	initialInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := UpdateFile("property", "pluginVersion", path, "2.0.0", "fail", ""); err == nil {
 		t.Fatal("expected duplicate error")
 	}
@@ -493,7 +497,7 @@ func TestUpdateFileIsAtomicAndPreservesModeOnValidationFailure(t *testing.T) {
 		t.Fatal("file changed after validation failure")
 	}
 	info, _ := os.Stat(path)
-	if info.Mode().Perm() != 0o600 {
+	if info.Mode().Perm() != initialInfo.Mode().Perm() {
 		t.Fatalf("mode = %v", info.Mode().Perm())
 	}
 }
