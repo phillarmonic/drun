@@ -2,6 +2,24 @@
 
 ## Language Grammar
 
+### File-value statements
+
+```ebnf
+file-value-statement = file-value-get | file-value-check | file-value-update ;
+file-value-get       = "get", file-value-format, string, "from", string, "as", variable ;
+file-value-check     = "check", file-value-format, string, "in", string,
+                       ("equals" | "differs", "from"), string ;
+file-value-update    = "update", file-value-format, string, "in", string, "to", string,
+                       "or", ("fail" | "add", ["as", scalar-type]) ;
+file-value-format    = "property" | "json" | "yaml" | "toml" | "match" ;
+scalar-type          = "string" | "number" | "boolean" ;
+```
+
+The first string is the format-specific selector and the second is the file
+path. `match` updates cannot use `or add`; JSON, YAML, and TOML additions require
+an explicit scalar type. See [Structured file values](built-in-actions.md#structured-file-values)
+for selector rules and runtime guarantees.
+
 ## Lexical Structure
 
 ### Tokens
@@ -36,6 +54,10 @@ and, or, not, is
 # Built-in actions
 build, deploy, push, run, stop, remove, scale, rollback, wait, commit
 copy, move, create, backup, step, info, warn, error, success, fail
+get, check, update
+
+# File-value formats and comparisons
+property, json, yaml, toml, match, equals, differs
 
 # Smart detection
 docker, kubernetes, git, image, container, replicas, branch, tag

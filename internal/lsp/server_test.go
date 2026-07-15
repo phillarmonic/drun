@@ -92,6 +92,53 @@ func TestServerCompletionIncludesKeywordsAndTasks(t *testing.T) {
 	assertCompletionLabel(t, items, "deploy")
 	assertCompletionLabel(t, items, "attached")
 	assertCompletionLabel(t, items, "conventional commits")
+	assertFileValueCompletions(t, items)
+}
+
+func TestFileValueDiagnosticsAreLocalized(t *testing.T) {
+	tests := []struct {
+		name        string
+		statement   string
+		wantMessage string
+	}{
+		{
+			name:        "check comparison",
+			statement:   `check json "/version" in "package.json" matches "2"`,
+			wantMessage: "expected 'equals' or 'differs from' in file value check",
+		},
+		{
+			name:        "structured addition type",
+			statement:   `update yaml "chart.version" in "Chart.yaml" to "2" or add`,
+			wantMessage: "structured additions require 'as string', 'as number', or 'as boolean'",
+		},
+		{
+			name:        "regex addition",
+			statement:   `update match "(?P<value>.+)" in "VERSION" to "2" or add as string`,
+			wantMessage: "regex match updates do not support 'or add'",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			source := "version: 2.0\n\ntask \"invalid\":\n  " + test.statement + "\n"
+			diagnostics := diagnosticsForSource("file:///workspace/spec.drun", source)
+			if len(diagnostics) == 0 {
+				t.Fatal("expected a diagnostic")
+			}
+			if diagnostics[0].Message != test.wantMessage {
+				t.Fatalf("diagnostic message = %q, want %q", diagnostics[0].Message, test.wantMessage)
+			}
+			if diagnostics[0].Range.Start.Line != 3 {
+				t.Fatalf("diagnostic line = %d, want 3", diagnostics[0].Range.Start.Line)
+			}
+			if diagnostics[0].Range.Start.Character < 2 {
+				t.Fatalf("diagnostic character = %d, want a location within the statement", diagnostics[0].Range.Start.Character)
+			}
+			if diagnostics[0].Range.End.Character <= diagnostics[0].Range.Start.Character {
+				t.Fatalf("diagnostic range is empty: %#v", diagnostics[0].Range)
+			}
+		})
+	}
 }
 
 func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {
@@ -106,7 +153,7 @@ func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {
 
 	templatePath := filepath.Join(templateDir, "go-cli.drun")
 	templateURI := "file://" + filepath.ToSlash(templatePath)
-	templateText := "version: 2.0\n\nproject \"{{project_name}}\" version \"1.0\":\ntemplate task \"build-template\":\n  run \"go build -o ./bin/{{binary_name}} {{cmd_path}}\"\n"
+	templateText := "version: 2.0\n\nproject \"{{project_name}}\" version \"1.0\":\ntemplate task \"build-template\":\n  get property \"{{project_name}}.version\" from \"gradle.properties\" as $version\n  run \"go build -o ./bin/{{binary_name}} {{cmd_path}}\"\n"
 
 	input := joinFrames(
 		frame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`),
@@ -150,6 +197,16 @@ func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {
 
 	assertCompletionLabel(t, items, "template task")
 	assertCompletionLabel(t, items, "build-template")
+	assertFileValueCompletions(t, items)
+}
+
+func assertFileValueCompletions(t *testing.T, items []completionItem) {
+	t.Helper()
+	for _, operation := range []string{"get", "check", "update"} {
+		for _, format := range []string{"property", "json", "yaml", "toml", "match"} {
+			assertCompletionLabel(t, items, operation+" "+format)
+		}
+	}
 }
 
 func assertCompletionLabel(t *testing.T, items []completionItem, label string) {

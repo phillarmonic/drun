@@ -457,6 +457,20 @@ update <format> <selector> in <file> to <value>
        (or fail | or add [as string|number|boolean])
 ```
 
+Every format supports all three operations:
+
+| Format | Selector | Read | Check | Update and missing-value behavior |
+| --- | --- | --- | --- | --- |
+| `property` | Exact, unescaped property key | `get property` | `check property` | `or fail`, or `or add`; additions are strings |
+| `json` | RFC 6901 object-member pointer | `get json` | `check json` | `or fail`, or typed `or add as ...` |
+| `yaml` | Dot-separated mapping path | `get yaml` | `check yaml` | `or fail`, or typed `or add as ...` |
+| `toml` | TOML dotted-key path | `get toml` | `check toml` | `or fail`, or typed `or add as ...` |
+| `match` | Go regular expression with one `value` capture | `get match` | `check match` | `or fail` only; `or add` is unsupported |
+
+`check` supports both `equals` and `differs from` for every format. The
+complete executable example is
+[`examples/74-file-values.drun`](https://github.com/phillarmonic/drun/blob/master/examples/74-file-values.drun).
+
 `<format>` is `property`, `json`, `yaml`, `toml`, or `match`. Property
 selectors are exact keys. JSON selectors are RFC 6901 pointers and select
 object members only. YAML selectors are dot-separated mapping paths. TOML
@@ -478,6 +492,12 @@ same-directory replacement.
 Property, JSON, and regex updates preserve surrounding source layout. YAML and
 TOML updates use deterministic parser serialization and can normalize formatting
 and comments. For source shapes outside these v1 rules, use the regex adapter.
+
+These are Drun language-version 2 statements. Version 1 specs do not recognize
+them. The initial format adapters intentionally do not support JSON array
+elements, YAML sequences, TOML arrays/tables as selected values, escaped dots in
+YAML paths, or dotted property-key traversal. Selectors must resolve to a scalar;
+use `match` or an explicit shell command when a file falls outside these rules.
 
 The existing literal `replace in` action remains unchanged and independent of
 structured file-value operations.
