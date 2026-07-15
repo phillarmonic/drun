@@ -222,24 +222,8 @@ func (l *Lexer) NextToken() Token {
 func (l *Lexer) handleIndentation() Token {
 	l.atLineStart = false
 
-	// Skip empty lines (just continue to next token)
-	if l.ch == '\n' {
-		l.readChar()
-		l.atLineStart = true
-		return l.NextToken()
-	}
-
-	// Handle comment lines - don't process indentation for comments
-	if l.ch == '#' {
-		return l.NextToken()
-	}
-
-	// Handle multiline comment start - don't process indentation for multiline comments
-	if l.ch == '/' && l.peekChar() == '*' {
-		return l.NextToken()
-	}
-
-	// Count indentation (spaces and tabs)
+	// Inspect leading whitespace before deciding whether the line contains code.
+	// Blank and comment-only lines must not establish or change indentation levels.
 	indent := 0
 	pos := l.position
 	indentChars := 0 // count of actual characters to skip
@@ -255,9 +239,32 @@ func (l *Lexer) handleIndentation() Token {
 		pos++
 	}
 
+	firstContent := byte(0)
+	if pos < len(l.input) {
+		firstContent = l.input[pos]
+	}
+
 	// Skip the indentation characters
 	for i := 0; i < indentChars; i++ {
 		l.readChar()
+	}
+
+	// Skip blank lines, including whitespace-only lines and CRLF input.
+	isCRLF := firstContent == '\r' && pos+1 < len(l.input) && l.input[pos+1] == '\n'
+	if firstContent == '\n' || isCRLF || firstContent == 0 {
+		if l.ch == '\r' {
+			l.readChar()
+		}
+		if l.ch == '\n' {
+			l.readChar()
+			l.atLineStart = true
+		}
+		return l.NextToken()
+	}
+
+	// Comments are tokens, but their leading whitespace is indentation-neutral.
+	if firstContent == '#' || (firstContent == '/' && pos+1 < len(l.input) && l.input[pos+1] == '*') {
+		return l.NextToken()
 	}
 
 	currentIndent := l.indentStack[len(l.indentStack)-1]

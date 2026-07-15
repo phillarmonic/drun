@@ -11,6 +11,7 @@ func TestParser_PatternMacros(t *testing.T) {
 
 task "pattern_macros":
   requires $version as string matching semver
+  requires $release_version as string matching semver_optional_v
   requires $id as string matching uuid
   requires $endpoint as string matching url
   requires $ip as string matching ipv4
@@ -32,8 +33,8 @@ task "pattern_macros":
 	}
 
 	task := program.Tasks[0]
-	if len(task.Parameters) != 8 {
-		t.Fatalf("Expected 8 parameters, got %d", len(task.Parameters))
+	if len(task.Parameters) != 9 {
+		t.Fatalf("Expected 9 parameters, got %d", len(task.Parameters))
 	}
 
 	// Test each pattern macro parameter
@@ -42,6 +43,7 @@ task "pattern_macros":
 		macro string
 	}{
 		{"version", "semver"},
+		{"release_version", "semver_optional_v"},
 		{"id", "uuid"},
 		{"endpoint", "url"},
 		{"ip", "ipv4"},

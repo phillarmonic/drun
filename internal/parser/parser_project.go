@@ -507,6 +507,9 @@ func (p *Parser) parseSnippetStatement() *ast.SnippetStatement {
 	}
 
 	// Parse snippet body - expect INDENT and parse statements (similar to lifecycle hooks)
+	for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.COMMENT || p.peekToken.Type == lexer.MULTILINE_COMMENT {
+		p.nextToken()
+	}
 	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 
@@ -799,6 +802,9 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 	}
 
 	// Parse hook body - expect INDENT and parse statements
+	for p.peekToken.Type == lexer.NEWLINE || p.peekToken.Type == lexer.COMMENT || p.peekToken.Type == lexer.MULTILINE_COMMENT {
+		p.nextToken()
+	}
 	if p.peekToken.Type == lexer.INDENT {
 		p.nextToken() // consume INDENT
 

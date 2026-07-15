@@ -431,7 +431,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 	var body []ast.Statement
 
 	// Expect INDENT
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		return body
 	}
 

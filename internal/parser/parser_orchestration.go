@@ -210,7 +210,7 @@ func (p *Parser) parseRepositoryConfig() *ast.RepositoryConfig {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'repository:'")
 		return nil
 	}
@@ -302,7 +302,7 @@ func (p *Parser) parseHealthCheckConfig() *ast.HealthCheckConfig {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'health check:'")
 		return nil
 	}
@@ -445,7 +445,7 @@ func (p *Parser) parseBuildConfig() *ast.BuildConfig {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'build:'")
 		return nil
 	}
@@ -591,7 +591,7 @@ func (p *Parser) parseComposeConfig() *ast.ComposeConfig {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'compose:'")
 		return nil
 	}
@@ -642,7 +642,7 @@ func (p *Parser) parseComposeOptions() *ast.ComposeOptions {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'options:'")
 		return nil
 	}
@@ -743,7 +743,7 @@ func (p *Parser) parseEnvFileConfig() *ast.EnvFileConfig {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'env_file:'")
 		return nil
 	}
@@ -814,7 +814,7 @@ func (p *Parser) parseOrchestrateStatement() *ast.OrchestrateStatement {
 	}
 
 	// Expect indent
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after orchestrate declaration")
 		return nil
 	}
@@ -1149,7 +1149,7 @@ func (p *Parser) parseEnvironmentMap() map[string]string {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'environment:'")
 		return nil
 	}
@@ -1197,7 +1197,7 @@ func (p *Parser) parseHeadersMap() map[string]string {
 		return nil
 	}
 
-	if !p.expectPeek(lexer.INDENT) {
+	if !p.expectPeekIndent() {
 		p.addError("expected indent after 'headers:'")
 		return nil
 	}

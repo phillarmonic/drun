@@ -273,8 +273,11 @@ func (p *Parser) parseReplaceStatement(stmt *ast.FileStatement) *ast.FileStateme
 	p.nextToken()
 
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
-		// Skip blank lines
-		for p.curToken.Type == lexer.NEWLINE {
+		// Non-code lines do not belong to the replacement entry list and may
+		// appear immediately before the DEDENT produced by the next code line.
+		for p.curToken.Type == lexer.NEWLINE ||
+			p.curToken.Type == lexer.COMMENT ||
+			p.curToken.Type == lexer.MULTILINE_COMMENT {
 			p.nextToken()
 		}
 
@@ -300,10 +303,6 @@ func (p *Parser) parseReplaceStatement(stmt *ast.FileStatement) *ast.FileStateme
 		stmt.Replacements[oldValue] = p.curToken.Literal
 
 		// Move to next potential entry
-		p.nextToken()
-	}
-
-	if p.curToken.Type == lexer.DEDENT {
 		p.nextToken()
 	}
 

@@ -151,6 +151,7 @@ task "tabs-example":
 3. **Block Structure**: Indentation defines code blocks (similar to Python)
 4. **Nesting**: Deeper indentation creates nested blocks
 5. **Dedentation**: Returning to a previous indentation level closes blocks
+6. **Non-code lines**: Blank lines and comment-only lines do not establish or change indentation, regardless of their leading spaces or tabs
 
 #### Mixed Indentation
 

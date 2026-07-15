@@ -20,6 +20,11 @@ var builtinMacros = map[string]PatternMacro{
 		Pattern:     `^v\d+\.\d+\.\d+$`,
 		Description: "Basic semantic versioning (e.g., v1.2.3)",
 	},
+	"semver_optional_v": {
+		Name:        "semver_optional_v",
+		Pattern:     `^v?\d+\.\d+\.\d+$`,
+		Description: "Basic semantic versioning with an optional v prefix (e.g., 1.2.3 or v1.2.3)",
+	},
 	"semver_extended": {
 		Name:        "semver_extended",
 		Pattern:     `^v\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$`,

@@ -68,8 +68,10 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	}
 
 	if p.peekToken.Type != lexer.INDENT {
-		// Skip newlines first
-		for p.peekToken.Type == lexer.NEWLINE {
+		// Blank and comment-only lines do not establish the body indentation.
+		for p.peekToken.Type == lexer.NEWLINE ||
+			p.peekToken.Type == lexer.COMMENT ||
+			p.peekToken.Type == lexer.MULTILINE_COMMENT {
 			p.nextToken()
 		}
 
