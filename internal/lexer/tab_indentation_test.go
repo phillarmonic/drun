@@ -87,3 +87,53 @@ func TestLexer_MixedIndentation(t *testing.T) {
 		}
 	}
 }
+
+func TestLexer_IndentedCommentDoesNotEstablishBlockIndentation(t *testing.T) {
+	input := "task \"test\":\n\t  \t# deliberately irregular comment indentation\n    info \"level 1\""
+
+	expectedTokens := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TASK, "task"},
+		{STRING, "test"},
+		{COLON, ":"},
+		{COMMENT, "# deliberately irregular comment indentation"},
+		{INDENT, ""},
+		{INFO, "info"},
+		{STRING, "level 1"},
+		{DEDENT, ""},
+		{EOF, ""},
+	}
+
+	lexer := NewLexer(input)
+
+	for i, tt := range expectedTokens {
+		tok := lexer.NextToken()
+		if tok.Type != tt.expectedType || tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - expected=(%q, %q), got=(%q, %q)",
+				i, tt.expectedType, tt.expectedLiteral, tok.Type, tok.Literal)
+		}
+	}
+}
+
+func TestLexer_IndentedNonCodeLinesDoNotChangeExistingBlockIndentation(t *testing.T) {
+	input := "task \"test\":\n    info \"before\"\n\t\t  # irregular comment indentation\n\t \t  \n    info \"after\""
+
+	expectedTypes := []TokenType{
+		TASK, STRING, COLON,
+		INDENT, INFO, STRING,
+		COMMENT,
+		INFO, STRING,
+		DEDENT, EOF,
+	}
+
+	lexer := NewLexer(input)
+	for i, expectedType := range expectedTypes {
+		tok := lexer.NextToken()
+		if tok.Type != expectedType {
+			t.Fatalf("tests[%d] - expected=%q, got=%q (literal: %q)",
+				i, expectedType, tok.Type, tok.Literal)
+		}
+	}
+}

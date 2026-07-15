@@ -27,6 +27,7 @@ drun v2 introduces a revolutionary approach to task automation:
 - **[06-cicd-pipeline.drun](06-cicd-pipeline.drun)** - Complete CI/CD pipeline with blue-green deployment
 - **[07-smart-detection.drun](07-smart-detection.drun)** - Intelligent project and framework detection
 - **[73-tool-provisioning.drun](73-tool-provisioning.drun)** - Project overrides, implicit fallback catalogs, and exact-version tool provisioning
+- **[74-file-values.drun](74-file-values.drun)** - Read, compare, and safely update scalar values in properties, JSON, YAML, TOML, and text files
 - **[33-semantic-actions-showcase.drun](33-semantic-actions-showcase.drun)** - Comprehensive showcase of all semantic actions
 - **[34-working-semantic-actions.drun](34-working-semantic-actions.drun)** - Working examples of implemented semantic actions
 - **[35-advanced-parameter-validation.drun](35-advanced-parameter-validation.drun)** - Advanced parameter validation with pattern macros (`semver`, `uuid`, `url`)

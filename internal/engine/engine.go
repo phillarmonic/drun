@@ -167,7 +167,12 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	interp.SetResolveVariableOpsCallback(func(expr string, ctx interface{}) string {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
 			if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
-				baseValue := interp.Interpolate(chain.Variable, execCtx)
+				// A variable-operation chain stores its base as `$name` (or a bare
+				// loop identifier), while the interpolator resolves Drun variables
+				// only inside braces. Resolve the base as an interpolation expression
+				// before applying the operation; otherwise operations run against the
+				// literal text "$name".
+				baseValue := interp.Interpolate("{"+chain.Variable+"}", execCtx)
 				if result, err := e.applyVariableOperations(baseValue, chain, execCtx); err == nil {
 					return result
 				}
@@ -792,6 +797,8 @@ func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile 
 					ctx.GitPolicy = policy
 				}
 			}
+		case *ast.SCMRegistryStatement:
+			ctx.SCMRegistry = s
 		}
 	}
 
@@ -895,6 +902,10 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeDocker(s, ctx)
 	case *statement.Git:
 		return e.executeGit(s, ctx)
+	case *statement.GitQuery:
+		return e.executeGitQuery(s, ctx)
+	case *statement.GitEnsureVersion:
+		return e.executeGitEnsureVersion(s, ctx)
 	case *statement.HTTP:
 		return e.executeHTTP(s, ctx)
 	case *statement.Download:
@@ -903,6 +914,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeNetwork(s, ctx)
 	case *statement.File:
 		return e.executeFile(s, ctx)
+	case *statement.FileValue:
+		return e.executeFileValue(s, ctx)
 	case *statement.Detection:
 		return e.executeDetection(s, ctx)
 	case *statement.TaskCall:
@@ -973,7 +986,7 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 		if action.LineBreakAfter {
 			_, _ = fmt.Fprintln(e.output)
 		}
-	case "warn":
+	case "warn", "warning":
 		_, _ = fmt.Fprintf(e.output, "⚠️  %s\n", interpolatedMessage)
 	case "error":
 		_, _ = fmt.Fprintf(e.output, "❌  %s\n", interpolatedMessage)

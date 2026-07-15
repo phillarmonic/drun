@@ -100,8 +100,18 @@ func (p *Parser) parseMultilineShellStatement(stmt *ast.ShellStatement) *ast.She
 		return nil
 	}
 
-	// Expect INDENT (skip any newlines first)
-	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+	// Comments do not establish indentation. A comment-only multiline shell is
+	// still a valid empty command list, so it may end at the surrounding DEDENT.
+	for p.peekToken.Type == lexer.NEWLINE ||
+		p.peekToken.Type == lexer.COMMENT ||
+		p.peekToken.Type == lexer.MULTILINE_COMMENT {
+		p.nextToken()
+	}
+	if p.peekToken.Type == lexer.DEDENT || p.peekToken.Type == lexer.EOF {
+		return stmt
+	}
+
+	if !p.expectPeek(lexer.INDENT) {
 		return nil
 	}
 

@@ -158,6 +158,33 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Options:   s.Options,
 		}, nil
 
+	case *ast.GitQueryStatement:
+		return &GitQuery{
+			Result:         s.Result,
+			Source:         s.Source,
+			AccessMethod:   s.AccessMethod,
+			TagPreset:      s.TagPreset,
+			TagFormat:      s.TagFormat,
+			TagPattern:     s.TagPattern,
+			Series:         s.Series,
+			VersionMatcher: s.VersionMatcher,
+			OrderBy:        s.OrderBy,
+			AllowFetch:     s.AllowFetch,
+			CaptureVar:     s.CaptureVar,
+		}, nil
+
+	case *ast.GitEnsureVersionStatement:
+		return &GitEnsureVersion{
+			Candidate:           s.Candidate,
+			CandidateIsVariable: s.CandidateIsVariable,
+			Source:              s.Source,
+			AccessMethod:        s.AccessMethod,
+			TagPreset:           s.TagPreset,
+			TagFormat:           s.TagFormat,
+			TagPattern:          s.TagPattern,
+			CaptureVar:          s.CaptureVar,
+		}, nil
+
 	case *ast.HTTPStatement:
 		return &HTTP{
 			Method:  s.Method,
@@ -206,6 +233,14 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			IsDir:        s.IsDir,
 			CaptureVar:   s.CaptureVar,
 			Replacements: s.Replacements,
+		}, nil
+
+	case *ast.FileValueStatement:
+		return &FileValue{
+			Operation: s.Operation, Format: s.Format, Selector: s.Selector,
+			Target: s.Target, CaptureVar: s.CaptureVar, Comparison: s.Comparison,
+			Expected: s.Expected, Value: s.Value, MissingPolicy: s.MissingPolicy,
+			ValueType: s.ValueType,
 		}, nil
 
 	case *ast.DetectionStatement:

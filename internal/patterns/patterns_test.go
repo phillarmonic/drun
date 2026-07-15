@@ -11,6 +11,7 @@ func TestGetMacro(t *testing.T) {
 		expected string
 	}{
 		{"semver", true, `^v\d+\.\d+\.\d+$`},
+		{"semver_optional_v", true, `^v?\d+\.\d+\.\d+$`},
 		{"semver_extended", true, `^v\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$`},
 		{"uuid", true, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
 		{"url", true, `https?://[^\s/$.?#].[^\s]*`},
@@ -53,6 +54,30 @@ func TestValidatePattern_Semver(t *testing.T) {
 			err := ValidatePattern(tt.value, "semver")
 			if (err != nil) != tt.wantError {
 				t.Errorf("ValidatePattern(%q, \"semver\") error = %v, wantError %v", tt.value, err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestValidatePattern_SemverOptionalV(t *testing.T) {
+	tests := []struct {
+		value     string
+		wantError bool
+	}{
+		{"1.0.0", false},
+		{"v1.0.0", false},
+		{"10.20.30", false},
+		{"v10.20.30", false},
+		{"1.0", true},
+		{"vv1.0.0", true},
+		{"release-1.0.0", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			err := ValidatePattern(tt.value, "semver_optional_v")
+			if (err != nil) != tt.wantError {
+				t.Errorf("ValidatePattern(%q, \"semver_optional_v\") error = %v, wantError %v", tt.value, err, tt.wantError)
 			}
 		})
 	}
@@ -237,6 +262,7 @@ func TestExpandMacro(t *testing.T) {
 		expected  string
 	}{
 		{"semver", false, `^v\d+\.\d+\.\d+$`},
+		{"semver_optional_v", false, `^v?\d+\.\d+\.\d+$`},
 		{"uuid", false, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
 		{"nonexistent", true, ""},
 	}

@@ -45,6 +45,15 @@ task "test":
 			condition: "$version is not 1.0",
 			hasElse:   true,
 		},
+		{
+			name: "semantic version condition",
+			input: `version: 2.0
+task "test":
+	when $release_version is older than version "{$last_tag}":
+		fail "release is stale"`,
+			condition: "$release_version is older than version {$last_tag}",
+			hasElse:   false,
+		},
 	}
 
 	for _, tt := range tests {

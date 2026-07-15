@@ -2,6 +2,55 @@
 
 ## Language Grammar
 
+### File-value statements
+
+```ebnf
+file-value-statement = file-value-get | file-value-check | file-value-update ;
+file-value-get       = "get", file-value-format, string, "from", string, "as", variable ;
+file-value-check     = "check", file-value-format, string, "in", string,
+                       ("equals" | "differs", "from"), string ;
+file-value-update    = "update", file-value-format, string, "in", string, "to", string,
+                       "or", ("fail" | "add", ["as", scalar-type]) ;
+project-version-check  = "check", "project", "version",
+                         ("equals" | "differs", "from"), string ;
+project-version-update = "update", "project", "version", "to", string ;
+file-value-format    = "property" | "json" | "yaml" | "toml" | "match" ;
+scalar-type          = "string" | "number" | "boolean" ;
+```
+
+The first string is the format-specific selector and the second is the file
+path. `match` updates cannot use `or add`; JSON, YAML, and TOML additions require
+an explicit scalar type. See [Structured file values](built-in-actions.md#structured-file-values)
+for selector rules and runtime guarantees.
+
+`check project version` and `update project version` are selector-free forms
+that operate on the project declaration in the currently executing Drun file.
+They honor custom `--file` paths and use the same dry-run and atomic-write
+guarantees as other structured file-value statements.
+
+### Composite Git version guard
+
+```ebnf
+git-version-ensure  = "git", "ensure", value,
+                      "is", "newer", "than", "latest", "version", "from", source,
+                      [ "using", access-method ],
+                      [ inline-tag-contract ],
+                      [ "as", variable ] ;
+access-method       = "https" | "ssh" | "cli" | "remote" | "filesystem" ;
+inline-tag-contract = "matching", "tags",
+                      ( tag-preset | string | "pattern", string ) ;
+tag-preset          = "semver" | "semver_optional_v" ;
+source              = identifier ;
+value               = variable | string ;
+```
+
+The modifiers have a fixed order and may occur at most once. The candidate is
+validated after interpolation as stable `MAJOR.MINOR.PATCH`. `in series`,
+`matching version`, `ordered by`, `allow fetch`, and `latest tag` belong to the
+primitive Git query grammar and are not part of this guard. See
+[Ensuring a release version is newer](built-in-actions.md#ensuring-a-release-version-is-newer)
+for atomic outcomes and dry-run behavior.
+
 ## Lexical Structure
 
 ### Tokens
@@ -35,7 +84,11 @@ and, or, not, is
 
 # Built-in actions
 build, deploy, push, run, stop, remove, scale, rollback, wait, commit
-copy, move, create, backup, step, info, warn, error, success, fail
+copy, move, create, backup, step, info, warn, warning, error, success, fail
+get, check, update, ensure
+
+# File-value formats and comparisons
+property, json, yaml, toml, match, equals, differs
 
 # Smart detection
 docker, kubernetes, git, image, container, replicas, branch, tag
@@ -45,7 +98,7 @@ directory, file, exists, running, healthy, available
 true, false, now, current, secret, env
 
 # Built-in functions
-current git commit, current git branch, now.format, pwd, hostname, env
+current git commit, current git branch, now.format, pwd, hostname, env, available tasks
 ```
 
 ### Comments
@@ -129,6 +182,7 @@ task "tabs-example":
 3. **Block Structure**: Indentation defines code blocks (similar to Python)
 4. **Nesting**: Deeper indentation creates nested blocks
 5. **Dedentation**: Returning to a previous indentation level closes blocks
+6. **Non-code lines**: Blank lines and comment-only lines do not establish or change indentation, regardless of their leading spaces or tabs
 
 #### Mixed Indentation
 
@@ -498,7 +552,15 @@ logical_expression = comparison_expression
                    { ( "and" | "or" ) comparison_expression } ;
 
 comparison_expression = additive_expression
-                      [ comparison_operator additive_expression ] ;
+                      [ comparison_operator additive_expression
+                      | "is" version_order "than" "version" additive_expression ]
+                      | file_comparison_expression ;
+
+file_comparison_expression = "file" file_path [ "not" ] "matches" "file" file_path ;
+
+file_path = string_literal | interpolated_string | identifier ;
+
+version_order = "older" | "newer" ;
 
 comparison_operator = "is" | "is" "not" | "==" | "!=" | "<" | ">" | "<=" | ">="
                     | "contains" | "matches" | "exists" ;
@@ -574,6 +636,7 @@ file_action = "copy" string_literal "to" string_literal
 status_action = "step" string_literal
               | "info" string_literal
               | "warn" string_literal
+              | "warning" string_literal
               | "error" string_literal
               | "success" string_literal
               | "fail" [ "with" string_literal ] ;

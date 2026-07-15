@@ -5,10 +5,11 @@ version: 2.0
 
 project "Drun" version "2.0":
 	requires tools:
-		go >= 1.26
+		go >= "1.26.5"
 		golangci-lint provision
 		gosec provision
-	
+	    govulncheck
+
 	git policy:
 		branch:
 			default branches: "master", "develop"
@@ -19,21 +20,34 @@ project "Drun" version "2.0":
 			ban: "WIP", "wip"
 			min length: 10
 			extract identifier from branch
+    scm: # Declare a specific SCM implementation for easier manipulation
+        git: # Technology
+            github: # Provider
+                drun-main: # Repo alias (can be potato if you want to, just for convenience when referencing in git commands)
+                    default: https
+                    https: "https://github.com/phillarmonic/drun.git"
+                    ssh: "git@github.com:phillarmonic/drun.git"
+                    cli:
+                        repository: "phillarmonic/drun"
+                        host: "github.com"
 
 @platform("linux")
 task "default" means "Welcome to drun v2":
 	echo "Drun CI file (penguin flavor)"
 	info "Welcome to drun v2! 🚀"
+	info "Available tasks: {available tasks(', ')}"
 
 @platform("mac")
 task "default" means "Welcome to drun v2":
 	echo "Drun CI file (Mac flavor)"
 	info "Welcome to drun v2! 🚀"
+	info "Available tasks: {available tasks(', ')}"
 
 @platform("windows")
 task "default" means "Welcome to drun v2":
 	echo "Drun CI file (Windows flavor)"
 	info "Welcome to drun v2! 🚀"
+	info "Available tasks: {available tasks(', ')}"
 
 task "test" means "Runs unit tests":
 	info "Running PHPUnit"
@@ -52,6 +66,9 @@ task "fuzz" means "Runs the fuzzers":
 	step "Executing semantic fuzz tests against example-based inputs\nIterations: {$iterations}"
 	run "./scripts/fuzz-examples.sh {$iterations}"
 
+task "vuln" means "Performs dependencies vulnerability checks":
+    run "govulncheck ./..."
+
 task "install" means "Install xdrun with build info":
 	info "Installing xdrun with embedded build date/time..."
 	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
@@ -66,6 +83,8 @@ task "docs" means "Runs the local docs server":
 
 task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
+	step "Dependency vulnerability checks"
+	call task vuln
 	step "Linter"
 	call task lint
 	step "Unit tests"
@@ -77,3 +96,16 @@ task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Semantic fuzzing"
 	call task fuzz with iterations=50
 	success "CI executed successfully end-to-end"
+
+task "prepare-release" means "Runs checks related to going to a next release":
+    requires $release_version as string matching semver_optional_v
+    step "Preflight. Proposed version: v{$release_version}"
+    # Byte for byte comparison
+    if file "./drun.tmLanguage.json" not matches file "./docs/docs/assets/languages/drun.tmLanguage.json":
+        fail "There are different vendored versions of the TextMate grammar in the repo.\nPlease make sure they match each other before merging."
+    # Magic method for comparison (you can do this manually if you want to)
+    git ensure $release_version is newer than latest version from drun-main
+    step "Preflight checks have passed. Will now run the CI."
+    call task ci
+    success "According to the current spec, you should be good to go."
+    warning "But be mindful, with great power, comes great responsibility."

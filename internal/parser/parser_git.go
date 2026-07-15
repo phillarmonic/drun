@@ -6,7 +6,13 @@ import (
 )
 
 // parseGitStatement parses Git operations
-func (p *Parser) parseGitStatement() *ast.GitStatement {
+func (p *Parser) parseGitStatement() ast.Statement {
+	if p.peekToken.Type == lexer.GET {
+		return p.parseGitQueryStatement()
+	}
+	if p.peekToken.Type == lexer.ENSURE {
+		return p.parseGitEnsureVersionStatement()
+	}
 	// Check for "git validate ..." — delegate to the git policy parser
 	if p.peekToken.Type == lexer.VALIDATE {
 		return nil // signal to caller to try parseGitValidateStatement instead

@@ -4,6 +4,12 @@ import (
 	"testing"
 )
 
+func TestLexer_GitEnsureKeyword(t *testing.T) {
+	if token := LookupIdent("ensure"); token != ENSURE {
+		t.Fatalf("LookupIdent(ensure) = %s, want ENSURE", token)
+	}
+}
+
 func TestLexer_HelloWorld(t *testing.T) {
 	input := `# Hello World - Your First drun v2 Task
 # This demonstrates the most basic semantic syntax

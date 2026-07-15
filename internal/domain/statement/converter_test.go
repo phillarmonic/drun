@@ -70,6 +70,23 @@ func TestFromAST_Shell(t *testing.T) {
 	}
 }
 
+func TestFromAST_GitEnsureVersion(t *testing.T) {
+	domainStmt, err := FromAST(&ast.GitEnsureVersionStatement{
+		Candidate: "$release_version", CandidateIsVariable: true, Source: "runtime",
+		AccessMethod: "ssh", TagFormat: "runtime-{version}", CaptureVar: "latest_version",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, ok := domainStmt.(*GitEnsureVersion)
+	if !ok {
+		t.Fatalf("statement = %T", domainStmt)
+	}
+	if guard.Type() != TypeGitEnsureVersion || guard.Candidate != "$release_version" || guard.Source != "runtime" || guard.TagFormat != "runtime-{version}" || guard.CaptureVar != "latest_version" {
+		t.Fatalf("guard = %#v", guard)
+	}
+}
+
 func TestFromAST_Conditional(t *testing.T) {
 	astCond := &ast.ConditionalStatement{
 		Type:      "when",

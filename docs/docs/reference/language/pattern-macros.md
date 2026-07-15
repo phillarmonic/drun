@@ -5,6 +5,7 @@ drun v2 includes a comprehensive set of built-in pattern macros that provide com
 ## Available pattern macros
 
 - **`semver`**: Basic semantic versioning (e.g., `v1.2.3`)
+- **`semver_optional_v`**: Basic semantic versioning with an optional `v` prefix (e.g., `1.2.3` or `v1.2.3`)
 - **`semver_extended`**: Extended semantic versioning with pre-release and build metadata (e.g., `v2.0.1-RC2`, `v1.0.0-alpha.1+build.123`)
 - **`uuid`**: UUID format (e.g., `550e8400-e29b-41d4-a716-446655440000`)
 - **`url`**: HTTP/HTTPS URL format
@@ -13,12 +14,19 @@ drun v2 includes a comprehensive set of built-in pattern macros that provide com
 - **`docker_tag`**: Docker image tag format
 - **`git_branch`**: Git branch name format
 
+`semver` remains strict and requires the `v` prefix for backward compatibility.
+Use `semver_optional_v` when an input boundary should accept either spelling;
+validation does not remove the prefix from the captured value.
+
 ## Usage examples
 
 ```drun
 task "deploy" means "Deploy with validation":
   # Basic semantic versioning
   requires $version as string matching semver
+
+  # Basic semantic versioning with or without a Git-style v prefix
+  requires $release_version as string matching semver_optional_v
 
   # Extended semantic versioning
   requires $release as string matching semver_extended

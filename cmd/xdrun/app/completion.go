@@ -1,9 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/engine"
 	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/spf13/cobra"
@@ -22,14 +24,10 @@ var defaultBuiltinCmdNames = map[string]struct{}{
 // Domain: Shell Completion
 // This file contains logic for shell completion
 
-// CompleteTaskNames provides autocompletion for task names
+// CompleteTaskNames provides autocompletion for task names and their parameters.
 func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
 	builtins := builtinCmdCompletions(cmd, toComplete, shouldIncludeBuiltinByDefault)
-	if isCmdNamespacePrefix(toComplete) {
+	if len(args) == 0 && isCmdNamespacePrefix(toComplete) {
 		return builtinCmdCompletions(cmd, toComplete, includeAllBuiltins), cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 	}
 
@@ -39,6 +37,9 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	// Try to find and parse the drun file
 	actualConfigFile, err := FindConfigFile(configFile)
 	if err != nil {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+		}
 		return builtins, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 	}
 
@@ -51,6 +52,9 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 	program, err := engine.ParseStringWithFilename(string(content), actualConfigFile)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	if len(args) != 0 {
+		return completeTaskParameters(program, args, toComplete)
 	}
 
 	// Create engine to get task list
@@ -97,6 +101,81 @@ func CompleteTaskNames(cmd *cobra.Command, args []string, toComplete string) ([]
 
 	// KeepOrder ensures zsh/fish respect the order we provide (tasks before builtins)
 	return completions, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+}
+
+func completeTaskParameters(program *ast.Program, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	directive := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	if len(args) == 0 || strings.Contains(toComplete, "=") {
+		return nil, directive
+	}
+
+	taskName, err := ResolvePartialTaskName(args[0], program)
+	if err != nil {
+		return nil, directive
+	}
+
+	used := make(map[string]struct{}, len(args)-1)
+	for _, arg := range args[1:] {
+		name, _, ok := strings.Cut(arg, "=")
+		if ok && name != "" {
+			used[name] = struct{}{}
+		}
+	}
+
+	seen := make(map[string]struct{})
+	var completions []string
+	for _, task := range program.Tasks {
+		if task.Name != taskName {
+			continue
+		}
+		for _, parameter := range task.Parameters {
+			if !strings.HasPrefix(parameter.Name, toComplete) {
+				continue
+			}
+			if _, exists := used[parameter.Name]; exists {
+				continue
+			}
+			if _, exists := seen[parameter.Name]; exists {
+				continue
+			}
+			seen[parameter.Name] = struct{}{}
+			completions = append(completions, parameter.Name+"=\t"+parameterCompletionDescription(parameter))
+		}
+	}
+
+	if len(completions) != 0 {
+		directive |= cobra.ShellCompDirectiveNoSpace
+	}
+	return completions, directive
+}
+
+func parameterCompletionDescription(parameter ast.ParameterStatement) string {
+	requirement := "optional"
+	if parameter.Required {
+		requirement = "required"
+	}
+
+	description := "[parameter] " + requirement
+	if parameter.DataType != "" {
+		description += " " + parameter.DataType
+	}
+	if parameter.HasDefault {
+		description += ", default: " + parameter.DefaultValue
+	}
+	if len(parameter.Constraints) != 0 {
+		description += ", one of: " + strings.Join(parameter.Constraints, ", ")
+	}
+	if parameter.MinValue != nil && parameter.MaxValue != nil {
+		description += fmt.Sprintf(", range: %v-%v", *parameter.MinValue, *parameter.MaxValue)
+	}
+	if parameter.PatternMacro != "" {
+		description += ", pattern: " + parameter.PatternMacro
+	} else if parameter.Pattern != "" {
+		description += ", pattern: " + parameter.Pattern
+	} else if parameter.EmailFormat {
+		description += ", format: email"
+	}
+	return description
 }
 
 // builtinCmdCompletions returns the cmd:* subcommand completions in a consistent order.

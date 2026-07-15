@@ -359,11 +359,13 @@ func (p *Parser) expectPeekOneOf(types ...lexer.TokenType) bool {
 	return false
 }
 
-// expectPeekSkipNewlines expects a token type but skips any NEWLINE tokens first
+// expectPeekSkipNewlines expects a token type but skips non-code lines first.
+// The historical name is retained because all callers use it for indented bodies.
 func (p *Parser) expectPeekSkipNewlines(t lexer.TokenType) bool {
-	// Skip any NEWLINE tokens
-	for p.peekToken.Type == lexer.NEWLINE {
-		p.nextToken() // consume the NEWLINE
+	for p.peekToken.Type == lexer.NEWLINE ||
+		p.peekToken.Type == lexer.COMMENT ||
+		p.peekToken.Type == lexer.MULTILINE_COMMENT {
+		p.nextToken()
 	}
 
 	// Now check for the expected token
@@ -374,6 +376,12 @@ func (p *Parser) expectPeekSkipNewlines(t lexer.TokenType) bool {
 		p.peekError(t)
 		return false
 	}
+}
+
+// expectPeekIndent expects an indented code body while allowing intervening
+// blank and comment-only lines, which are indentation-neutral.
+func (p *Parser) expectPeekIndent() bool {
+	return p.expectPeekSkipNewlines(lexer.INDENT)
 }
 
 // peekError adds an error for unexpected peek token

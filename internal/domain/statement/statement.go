@@ -24,10 +24,13 @@ const (
 	TypeTaskFromTemplate StatementType = "task_from_template"
 	TypeDocker           StatementType = "docker"
 	TypeGit              StatementType = "git"
+	TypeGitQuery         StatementType = "git_query"
+	TypeGitEnsureVersion StatementType = "git_ensure_version"
 	TypeHTTP             StatementType = "http"
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
 	TypeFile             StatementType = "file"
+	TypeFileValue        StatementType = "file_value"
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
@@ -187,6 +190,37 @@ type Git struct {
 
 func (g *Git) Type() StatementType { return TypeGit }
 
+// GitQuery resolves a versioned tag from a registered project-level Git source.
+type GitQuery struct {
+	Result         string
+	Source         string
+	AccessMethod   string
+	TagPreset      string
+	TagFormat      string
+	TagPattern     string
+	Series         string
+	VersionMatcher string
+	OrderBy        string
+	AllowFetch     bool
+	CaptureVar     string
+}
+
+func (g *GitQuery) Type() StatementType { return TypeGitQuery }
+
+// GitEnsureVersion guards a candidate against a source's latest stable version.
+type GitEnsureVersion struct {
+	Candidate           string
+	CandidateIsVariable bool
+	Source              string
+	AccessMethod        string
+	TagPreset           string
+	TagFormat           string
+	TagPattern          string
+	CaptureVar          string
+}
+
+func (g *GitEnsureVersion) Type() StatementType { return TypeGitEnsureVersion }
+
 // HTTP represents HTTP operations
 type HTTP struct {
 	Method  string
@@ -243,6 +277,22 @@ type File struct {
 }
 
 func (f *File) Type() StatementType { return TypeFile }
+
+// FileValue represents a format-aware scalar operation on a text file.
+type FileValue struct {
+	Operation     string
+	Format        string
+	Selector      string
+	Target        string
+	CaptureVar    string
+	Comparison    string
+	Expected      string
+	Value         string
+	MissingPolicy string
+	ValueType     string
+}
+
+func (f *FileValue) Type() StatementType { return TypeFileValue }
 
 // Detection represents tool detection operations
 type Detection struct {

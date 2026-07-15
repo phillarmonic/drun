@@ -427,6 +427,93 @@ copy directory "src" to "backup/src"
 The `replace` action accepts an indented list of `"old" with "new"` clauses, performing multiple replacements within the target file in a single operation.
 ```
 
+#### Structured file values
+
+Drun can read, validate, and update scalar values without delegating common
+manifest edits to framework-specific shell commands:
+
+```drun
+get property "pluginVersion" from "gradle.properties" as $plugin_version
+check property "pluginVersion" in "gradle.properties" equals "{$globals.version}"
+check property "pluginVersion" in "gradle.properties" differs from "{$previous_version}"
+update property "pluginVersion" in "gradle.properties" to "{$version}" or fail
+
+get json "/version" from "package.json" as $package_version
+update json "/version" in "package.json" to "{$version}" or add as string
+
+get yaml "chart.appVersion" from "Chart.yaml" as $chart_version
+get toml "package.version" from "Cargo.toml" as $crate_version
+
+get match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" from "VERSION.txt" as $version
+update match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" in "VERSION.txt" to "{$version}" or fail
+
+check project version equals "{$version}"
+update project version to "{$version}"
+```
+
+The grammar is:
+
+```text
+get <format> <selector> from <file> as <variable>
+check <format> <selector> in <file> (equals <value> | differs from <value>)
+update <format> <selector> in <file> to <value>
+       (or fail | or add [as string|number|boolean])
+check project version (equals <value> | differs from <value>)
+update project version to <value>
+```
+
+Every format supports all three operations:
+
+| Format | Selector | Read | Check | Update and missing-value behavior |
+| --- | --- | --- | --- | --- |
+| `property` | Exact, unescaped property key | `get property` | `check property` | `or fail`, or `or add`; additions are strings |
+| `json` | RFC 6901 object-member pointer | `get json` | `check json` | `or fail`, or typed `or add as ...` |
+| `yaml` | Dot-separated mapping path | `get yaml` | `check yaml` | `or fail`, or typed `or add as ...` |
+| `toml` | TOML dotted-key path | `get toml` | `check toml` | `or fail`, or typed `or add as ...` |
+| `match` | Go regular expression with one `value` capture | `get match` | `check match` | `or fail` only; `or add` is unsupported |
+
+`check` supports both `equals` and `differs from` for every format. The
+complete executable example is
+[`examples/74-file-values.drun`](https://github.com/phillarmonic/drun/blob/master/examples/74-file-values.drun).
+
+The project-version forms target the project declaration in the Drun file that
+is currently executing, including a custom path supplied through `--file`.
+They require exactly one versioned project declaration, preserve its surrounding
+layout and comments, and never need `or fail`: a missing or ambiguous declaration
+is already an error. `update project version` participates in dry runs and uses
+the same permission-preserving atomic replacement as other structured updates.
+
+`<format>` is `property`, `json`, `yaml`, `toml`, or `match`. Property
+selectors are exact keys. JSON selectors are RFC 6901 pointers and select
+object members only. YAML selectors are dot-separated mapping paths. TOML
+selectors use TOML dotted-key syntax. A `match` selector is a Go regular
+expression containing exactly one named capture called `value`; the expression
+itself must match exactly once.
+
+Structured operations accept scalar strings, numbers, and booleans. Reads
+capture the scalar's textual value. Updates preserve the existing scalar type,
+and an added JSON, YAML, or TOML value must state its type. `or add` creates only
+the missing leaf below an existing parent. It is invalid for `match`.
+
+Missing, duplicate, ambiguous, collection-valued, or type-invalid selections
+fail before a write. Checks read real files during dry runs. Updates interpolate
+their file, selector, and value, but only report the prospective change during a
+dry run. Successful writes preserve file permissions and use an atomic
+same-directory replacement.
+
+Property, Drun project-version, JSON, and regex updates preserve surrounding source layout. YAML and
+TOML updates use deterministic parser serialization and can normalize formatting
+and comments. For source shapes outside these v1 rules, use the regex adapter.
+
+These are Drun language-version 2 statements. Version 1 specs do not recognize
+them. The initial format adapters intentionally do not support JSON array
+elements, YAML sequences, TOML arrays/tables as selected values, escaped dots in
+YAML paths, or dotted property-key traversal. Selectors must resolve to a scalar;
+use `match` or an explicit shell command when a file falls outside these rules.
+
+The existing literal `replace in` action remains unchanged and independent of
+structured file-value operations.
+
 #### File Inspection
 
 ```drun
@@ -827,7 +914,7 @@ success "Deployment completed successfully"
   └─────────────────────────────────────────────────────────────┘
   ```
 - `info` - Displays an informational message.
-- `warn` - Displays a warning message.
+- `warning` - Displays a warning message (`warn` remains available as a shorter alias).
 - `error` - Displays an error message.
 - `success` - Displays a success message.
 - `fail` - Displays a failure message and exits with an error.
@@ -1026,6 +1113,28 @@ set $api_key to {env('API_KEY')}
 set $timestamp to {now.format('2006-01-02 15:04:05')}
 ```
 
+#### Task Discovery
+
+Use `available tasks` to render the user-defined task names available to the
+current execution and operating system. Names retain declaration order,
+platform variants are shown once, tasks restricted to other operating systems
+are omitted, and namespaced tasks loaded from includes are appended
+deterministically. The separator defaults to `, ` and supports `\n`, `\r`, and
+`\t` escapes. Any task names after the separator are omitted from the result;
+omissions use exact names, including full names such as `tools.release` for
+namespaced tasks.
+
+```drun
+# Comma-separated
+info "Available tasks: {available tasks(', ')}"
+
+# One task per line
+info "Available tasks:\n{available tasks('\\n')}"
+
+# Hide tasks that should not appear in help output
+info "Commands: {available tasks(', ', 'default', 'internal.release')}"
+```
+
 #### Built-in Function Pipe Operations  *New*
 
 Built-in functions support pipe operations for data transformation, allowing you to chain operations together:
@@ -1101,6 +1210,7 @@ task "parameter defaults with pipes":
 | `{hostname}` | System hostname | `dev-machine` |
 | `{env('VAR')}` | Environment variable | `production` |
 | `{now.format('layout')}` | Formatted current time | `2025-09-22 14:30:00` |
+| `{available tasks('separator', 'omit'...)}` | OS-available user tasks joined by a separator, with optional exact-name omissions | `lint, check, build, ci` |
 
 **Key Features:**
 
@@ -1111,3 +1221,180 @@ task "parameter defaults with pipes":
 - **Expression Context**: Work in any expression context (info messages, conditions, etc.)
 
 ---
+## SCM registries and Git version queries
+
+Projects may register source-control repositories once and refer to them by a
+readable alias from tasks. Registries are grouped by SCM technology, then by
+provider, so future technologies can be added without changing Git sources:
+
+```drun
+project "my-project":
+  scm:
+    git:
+      github:
+        app:
+          default: https
+          https: "https://github.com/example/app.git"
+          ssh: "git@github.com:example/app.git"
+          cli:
+            repository: "example/app"
+            host: "github.com"
+
+      generic:
+        local-library:
+          filesystem: "../library"
+```
+
+Git source aliases must be unique within the `git` technology. GitHub and
+GitLab sources support `https`, `ssh`, and `cli`; generic sources support
+`https`, `ssh`, an opaque `remote`, and `filesystem` paths to worktrees or bare
+repositories. One declared access method is the implicit default. Sources with
+multiple methods must declare `default`, and Drun never silently falls back to
+a different method.
+
+Expanded HTTPS profiles accept `url` and optional `authentication: ambient`.
+Expanded SSH profiles accept `url` and an optional `key` path. CLI profiles
+accept `repository` and an optional `host`. Values are interpolated at runtime;
+filesystem and key paths expand `~`. Credentials and private-key contents are
+never stored in the Drunfile.
+
+Generic remote sources normally read refs without fetching objects. A source
+may declare `metadata: fetch`, but a task must still say `allow fetch` before a
+date-ordered query may create temporary bare storage and fetch tag objects.
+Both permissions are required. Filesystem sources inspect local objects
+directly, and GitHub/GitLab CLI profiles use their authenticated provider APIs.
+
+The registry describes reusable repository access rather than one operation.
+The same source contract can support future branch, release, clone, archive,
+mirror, and inspection statements.
+
+### Version tags
+
+Conventional stable tags (`1.2.3` and `v1.2.3`) need no configuration. For a
+readable custom convention, use a format template:
+
+```drun
+version tags: "php-{version}"
+```
+
+`{version}` matches and captures exactly `MAJOR.MINOR.PATCH`; surrounding text
+is treated literally and the complete tag is matched. `{{` and `}}` escape
+literal braces. The presets `semver` and `semver_optional_v` mean
+`"v{version}"` and the pair `"{version}"`, `"v{version}"` respectively.
+Repositories that changed conventions can declare several templates:
+
+```drun
+version tags:
+  formats:
+    "php-{version}"
+    "legacy-php-{version}"
+```
+
+Raw regular expressions are the advanced escape hatch. They must contain
+exactly one Go-style named capture called `version`:
+
+```drun
+version tags:
+  pattern: "^php-(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"
+```
+
+### Latest tag and version queries
+
+```drun
+git get latest tag from app as $latest_tag
+git get latest version from app as $latest_version
+git get latest version from php in series "8.4" as $php_version
+git get latest version from php matching version ">=8.4.0 <8.5.0" as $php_version
+```
+
+`latest tag` returns the original tag; `latest version` returns its extracted
+stable version. `in series "8"` selects `>=8.0.0 <9.0.0`, while `in series
+"8.4"` selects `>=8.4.0 <8.5.0`. General constraints accept whitespace-joined
+`>`, `>=`, `<`, `<=`, and `=` clauses. Series and general constraints are
+mutually exclusive.
+
+An inline contract overrides the source contract for one query. Prefer a
+template, using a raw pattern only when necessary:
+
+```drun
+git get latest version from monorepo matching tags "runtime-{version}" in series "8.4" as $runtime_version
+git get latest version from monorepo matching tags pattern "^runtime-(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$" in series "8.4" as $runtime_version
+```
+
+Queries order numerically by version unless they say `ordered by date`.
+Annotated tags use tagger time and lightweight tags use their target commit
+time. Access can be overridden with `using https|ssh|cli|remote|filesystem`.
+Remote generic date queries must also say `allow fetch` and use a source that
+declares `metadata: fetch`.
+
+For PHP tags, `"php-{version}"` excludes `php-8.4.24RC` and
+`php-8.6.0-alpha2`. A query `in series "8.4"` also excludes stable releases in
+other series, selecting `php-8.4.23` as tag or `8.4.23` as version. Dry-run
+performs no network, filesystem, CLI, or temporary-fetch work; it reports the
+resolved source, method, ordering, and capture variable.
+
+### Ensuring a release version is newer
+
+Use the composite guard when a release may proceed only if its candidate is
+strictly newer than the latest stable version published by a registered source:
+
+```drun
+git ensure $release_version is newer than latest version from drun-vscode
+
+git ensure $release_version is newer than latest version from drun-vscode
+  as $latest_version
+```
+
+The optional capture receives the extracted latest version after the guard
+succeeds. The statement is atomic: source resolution, stable-tag selection,
+numeric comparison, and capture are one operation, so a failed guard never
+writes the capture variable.
+
+The guard accepts the query modifiers that affect repository access and the
+version-tag contract. They appear after the source in the order shown, with the
+optional capture last:
+
+```drun
+git ensure $release_version is newer than latest version from runtime
+  using ssh
+  matching tags "runtime-{version}"
+  as $latest_version
+```
+
+`using https|ssh|cli|remote|filesystem` overrides the source's default access
+method. `matching tags` accepts the same preset, format, and advanced `pattern`
+forms as a latest-version query and overrides the source's reusable version-tag
+contract for this statement. Without an inline contract, the source contract or
+the conventional `semver_optional_v` default is used.
+
+The candidate is interpolated at execution time and must be exactly a stable
+`MAJOR.MINOR.PATCH` value. A leading `v`, a partial version, a prerelease, and
+build metadata are rejected. Matching tags are reduced to extracted stable
+versions and ordered numerically; tag spelling and enumeration order do not
+affect the result.
+
+The outcomes are deliberately distinct:
+
+- If the source, selected access method, or stable-tag set cannot be resolved,
+  the statement fails with a credential-safe source-resolution error. A source
+  with no tags matching the effective stable version contract is in this case.
+- If the candidate equals the latest version, it fails as already tagged and
+  reports that version.
+- If the candidate is older, it fails and reports the latest version.
+- If the candidate is newer, it succeeds and then assigns the optional capture.
+
+Diagnostics may identify the provider, source alias, selected access method,
+and effective tag contract, but never include token, password, private-key, or
+credential-bearing URL contents.
+
+Dry-run interpolates and validates the candidate, then reports the planned
+source, access method, effective tag contract, comparison, and capture. It
+performs no network, filesystem, provider-CLI, fetch, or temporary-repository
+work, does not claim that the invariant passed, and does not assign the capture.
+
+The guard intentionally does not accept `latest tag`, `in series`, `matching
+version`, `ordered by date`, or `allow fetch`. Those change the meaning away
+from the latest stable numeric release or are unnecessary for numeric remote-ref
+queries. Use `git get latest version` followed by the existing `older than
+version` and `newer than version` conditions for custom workflows. Those
+primitive statements and conditions remain supported and unchanged.
