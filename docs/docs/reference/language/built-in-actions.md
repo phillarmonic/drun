@@ -427,6 +427,61 @@ copy directory "src" to "backup/src"
 The `replace` action accepts an indented list of `"old" with "new"` clauses, performing multiple replacements within the target file in a single operation.
 ```
 
+#### Structured file values
+
+Drun can read, validate, and update scalar values without delegating common
+manifest edits to framework-specific shell commands:
+
+```drun
+get property "pluginVersion" from "gradle.properties" as $plugin_version
+check property "pluginVersion" in "gradle.properties" equals "{$globals.version}"
+check property "pluginVersion" in "gradle.properties" differs from "{$previous_version}"
+update property "pluginVersion" in "gradle.properties" to "{$version}" or fail
+
+get json "/version" from "package.json" as $package_version
+update json "/version" in "package.json" to "{$version}" or add as string
+
+get yaml "chart.appVersion" from "Chart.yaml" as $chart_version
+get toml "package.version" from "Cargo.toml" as $crate_version
+
+get match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" from "VERSION.txt" as $version
+update match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" in "VERSION.txt" to "{$version}" or fail
+```
+
+The grammar is:
+
+```text
+get <format> <selector> from <file> as <variable>
+check <format> <selector> in <file> (equals <value> | differs from <value>)
+update <format> <selector> in <file> to <value>
+       (or fail | or add [as string|number|boolean])
+```
+
+`<format>` is `property`, `json`, `yaml`, `toml`, or `match`. Property
+selectors are exact keys. JSON selectors are RFC 6901 pointers and select
+object members only. YAML selectors are dot-separated mapping paths. TOML
+selectors use TOML dotted-key syntax. A `match` selector is a Go regular
+expression containing exactly one named capture called `value`; the expression
+itself must match exactly once.
+
+Structured operations accept scalar strings, numbers, and booleans. Reads
+capture the scalar's textual value. Updates preserve the existing scalar type,
+and an added JSON, YAML, or TOML value must state its type. `or add` creates only
+the missing leaf below an existing parent. It is invalid for `match`.
+
+Missing, duplicate, ambiguous, collection-valued, or type-invalid selections
+fail before a write. Checks read real files during dry runs. Updates interpolate
+their file, selector, and value, but only report the prospective change during a
+dry run. Successful writes preserve file permissions and use an atomic
+same-directory replacement.
+
+Property, JSON, and regex updates preserve surrounding source layout. YAML and
+TOML updates use deterministic parser serialization and can normalize formatting
+and comments. For source shapes outside these v1 rules, use the regex adapter.
+
+The existing literal `replace in` action remains unchanged and independent of
+structured file-value operations.
+
 #### File Inspection
 
 ```drun

@@ -196,6 +196,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					}
 				}
 			}
+		} else if p.isFileValueStatementStart() {
+			fileValue := p.parseFileValueStatement()
+			if fileValue != nil {
+				stmt.Body = append(stmt.Body, fileValue)
+			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()
 			if http != nil {

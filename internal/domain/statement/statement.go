@@ -28,6 +28,7 @@ const (
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
 	TypeFile             StatementType = "file"
+	TypeFileValue        StatementType = "file_value"
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
@@ -243,6 +244,22 @@ type File struct {
 }
 
 func (f *File) Type() StatementType { return TypeFile }
+
+// FileValue represents a format-aware scalar operation on a text file.
+type FileValue struct {
+	Operation     string
+	Format        string
+	Selector      string
+	Target        string
+	CaptureVar    string
+	Comparison    string
+	Expected      string
+	Value         string
+	MissingPolicy string
+	ValueType     string
+}
+
+func (f *FileValue) Type() StatementType { return TypeFileValue }
 
 // Detection represents tool detection operations
 type Detection struct {

@@ -208,6 +208,14 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Replacements: s.Replacements,
 		}, nil
 
+	case *ast.FileValueStatement:
+		return &FileValue{
+			Operation: s.Operation, Format: s.Format, Selector: s.Selector,
+			Target: s.Target, CaptureVar: s.CaptureVar, Comparison: s.Comparison,
+			Expected: s.Expected, Value: s.Value, MissingPolicy: s.MissingPolicy,
+			ValueType: s.ValueType,
+		}, nil
+
 	case *ast.DetectionStatement:
 		body, err := FromASTList(s.Body)
 		if err != nil {
