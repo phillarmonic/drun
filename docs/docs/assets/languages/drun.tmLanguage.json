@@ -1474,7 +1474,7 @@
       "patterns": [
         {
           "name": "storage.type.drun",
-          "match": "\\b(?:string|number|boolean|list|json|xml|http|https|docker|git|kubernetes|namespace|network|directory|file|service|container|image|repository|branch|url|email|uuid|semver|semver_extended|docker_tag)\\b"
+          "match": "\\b(?:string|number|boolean|list|json|xml|http|https|docker|git|kubernetes|namespace|network|directory|file|service|container|image|repository|branch|url|email|uuid|semver|semver_optional_v|semver_extended|docker_tag)\\b"
         }
       ]
     },
