@@ -132,6 +132,7 @@ xdrun deploy environment=production version=v1.2.3
 ## Highlights
 
 - English-like task syntax.
+- Context-aware shell completion for tasks and declared `key=value` parameter names.
 - `key=value` task parameters with CLI flags kept separate.
 - Built-in validation, defaults, and control flow.
 - Dry-run support for inspecting execution.
