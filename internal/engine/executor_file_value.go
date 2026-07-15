@@ -12,6 +12,12 @@ func (e *Engine) executeFileValue(stmt *statement.FileValue, ctx *ExecutionConte
 	format := stmt.Format
 	selector := e.interpolateVariables(stmt.Selector, ctx)
 	target := e.interpolateVariables(stmt.Target, ctx)
+	if format == "drun" && target == "" {
+		if ctx == nil || ctx.CurrentFile == "" {
+			return fmt.Errorf("%s project version requires the current drun file path", stmt.Operation)
+		}
+		target = ctx.CurrentFile
+	}
 
 	switch stmt.Operation {
 	case "get":

@@ -52,6 +52,7 @@ func (a adapterFuncs) Update(selector string, data []byte, value, policy, valueT
 
 var adapters = map[string]Adapter{
 	"property": adapterFuncs{read: readProperty, update: func(s string, d []byte, v, p, _ string) ([]byte, Scalar, error) { return updateProperty(s, d, v, p) }},
+	"drun":     adapterFuncs{read: readDrun, update: updateDrun},
 	"match": adapterFuncs{read: readMatch, update: func(s string, d []byte, v, p, _ string) ([]byte, Scalar, error) {
 		if p == "add" {
 			return nil, Scalar{}, fmt.Errorf("regex match updates do not support additions")
@@ -61,6 +62,50 @@ var adapters = map[string]Adapter{
 	"json": adapterFuncs{read: func(s string, d []byte) (Scalar, error) { _, v, e := findJSONScalar(d, s); return v, e }, update: updateJSON},
 	"yaml": adapterFuncs{read: readYAML, update: updateYAML},
 	"toml": adapterFuncs{read: readTOML, update: updateTOML},
+}
+
+var drunProjectDeclarationPattern = regexp.MustCompile(`(?m)^[\t ]*project[\t ]+"(?:\\.|[^"\\\r\n])*"[\t ]+version[\t ]+"((?:\\.|[^"\\\r\n])*)"[\t ]*:[^\r\n]*\r?$`)
+
+func drunProjectVersionSpan(selector string, data []byte) (int, int, Scalar, error) {
+	if selector != "project.version" {
+		return 0, 0, Scalar{}, fmt.Errorf("unsupported drun selector %q; expected %q", selector, "project.version")
+	}
+	matches := drunProjectDeclarationPattern.FindAllSubmatchIndex(data, -1)
+	if len(matches) == 0 {
+		return 0, 0, Scalar{}, fmt.Errorf("drun project declaration with a version was not found")
+	}
+	if len(matches) != 1 {
+		return 0, 0, Scalar{}, fmt.Errorf("drun project version is ambiguous: found %d project declarations", len(matches))
+	}
+	match := matches[0]
+	start, end := match[2], match[3]
+	return start, end, Scalar{Text: string(data[start:end]), Kind: String}, nil
+}
+
+func readDrun(selector string, data []byte) (Scalar, error) {
+	_, _, value, err := drunProjectVersionSpan(selector, data)
+	return value, err
+}
+
+func updateDrun(selector string, data []byte, value, missingPolicy, valueType string) ([]byte, Scalar, error) {
+	if missingPolicy != "" && missingPolicy != "fail" {
+		return nil, Scalar{}, fmt.Errorf("drun project version updates do not support %q", missingPolicy)
+	}
+	if valueType != "" {
+		return nil, Scalar{}, fmt.Errorf("drun project versions do not accept an explicit scalar type")
+	}
+	if strings.ContainsAny(value, "\"\r\n") {
+		return nil, Scalar{}, fmt.Errorf("drun project version cannot contain quotes or newlines")
+	}
+	start, end, _, err := drunProjectVersionSpan(selector, data)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	updated := make([]byte, 0, len(data)-end+start+len(value))
+	updated = append(updated, data[:start]...)
+	updated = append(updated, value...)
+	updated = append(updated, data[end:]...)
+	return updated, Scalar{Text: value, Kind: String}, nil
 }
 
 // ReadFile resolves one scalar from path.

@@ -51,6 +51,46 @@ func TestExecuteFileValueGetCheckUpdateAndDryRun(t *testing.T) {
 	}
 }
 
+func TestProjectVersionCheckAndUpdateUseCurrentDrunFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "release.drun")
+	source := `version: 2.0
+project "demo" version "1.0.1":
+task "release":
+  requires $next
+  check project version equals "1.0.1"
+  update project version to "{$next}"
+`
+	if err := os.WriteFile(path, []byte(source), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	p := parser.NewParser(lexer.NewLexer(source))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parser errors: %v", p.Errors())
+	}
+	engine := NewEngine(&bytes.Buffer{})
+	engine.SetDryRun(true)
+	if err := engine.ExecuteWithParamsAndFile(program, "release", map[string]string{"next": "1.0.2"}, path); err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	if actual, _ := os.ReadFile(path); string(actual) != source {
+		t.Fatalf("dry run changed spec:\n%s", actual)
+	}
+	engine.SetDryRun(false)
+	if err := engine.ExecuteWithParamsAndFile(program, "release", map[string]string{"next": "1.0.2"}, path); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	actual, _ := os.ReadFile(path)
+	if !strings.Contains(string(actual), `project "demo" version "1.0.2":`) {
+		t.Fatalf("project version was not updated:\n%s", actual)
+	}
+	info, _ := os.Stat(path)
+	if info.Mode().Perm() != 0o640 {
+		t.Fatalf("mode = %v", info.Mode().Perm())
+	}
+}
+
 func TestFileValueDocumentedFormatsThroughParserAndEngine(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{

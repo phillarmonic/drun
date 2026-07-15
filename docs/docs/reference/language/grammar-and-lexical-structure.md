@@ -11,6 +11,9 @@ file-value-check     = "check", file-value-format, string, "in", string,
                        ("equals" | "differs", "from"), string ;
 file-value-update    = "update", file-value-format, string, "in", string, "to", string,
                        "or", ("fail" | "add", ["as", scalar-type]) ;
+project-version-check  = "check", "project", "version",
+                         ("equals" | "differs", "from"), string ;
+project-version-update = "update", "project", "version", "to", string ;
 file-value-format    = "property" | "json" | "yaml" | "toml" | "match" ;
 scalar-type          = "string" | "number" | "boolean" ;
 ```
@@ -19,6 +22,11 @@ The first string is the format-specific selector and the second is the file
 path. `match` updates cannot use `or add`; JSON, YAML, and TOML additions require
 an explicit scalar type. See [Structured file values](built-in-actions.md#structured-file-values)
 for selector rules and runtime guarantees.
+
+`check project version` and `update project version` are selector-free forms
+that operate on the project declaration in the currently executing Drun file.
+They honor custom `--file` paths and use the same dry-run and atomic-write
+guarantees as other structured file-value statements.
 
 ### Composite Git version guard
 

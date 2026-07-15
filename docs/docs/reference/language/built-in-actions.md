@@ -446,6 +446,9 @@ get toml "package.version" from "Cargo.toml" as $crate_version
 
 get match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" from "VERSION.txt" as $version
 update match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" in "VERSION.txt" to "{$version}" or fail
+
+check project version equals "{$version}"
+update project version to "{$version}"
 ```
 
 The grammar is:
@@ -455,6 +458,8 @@ get <format> <selector> from <file> as <variable>
 check <format> <selector> in <file> (equals <value> | differs from <value>)
 update <format> <selector> in <file> to <value>
        (or fail | or add [as string|number|boolean])
+check project version (equals <value> | differs from <value>)
+update project version to <value>
 ```
 
 Every format supports all three operations:
@@ -470,6 +475,13 @@ Every format supports all three operations:
 `check` supports both `equals` and `differs from` for every format. The
 complete executable example is
 [`examples/74-file-values.drun`](https://github.com/phillarmonic/drun/blob/master/examples/74-file-values.drun).
+
+The project-version forms target the project declaration in the Drun file that
+is currently executing, including a custom path supplied through `--file`.
+They require exactly one versioned project declaration, preserve its surrounding
+layout and comments, and never need `or fail`: a missing or ambiguous declaration
+is already an error. `update project version` participates in dry runs and uses
+the same permission-preserving atomic replacement as other structured updates.
 
 `<format>` is `property`, `json`, `yaml`, `toml`, or `match`. Property
 selectors are exact keys. JSON selectors are RFC 6901 pointers and select
@@ -489,7 +501,7 @@ their file, selector, and value, but only report the prospective change during a
 dry run. Successful writes preserve file permissions and use an atomic
 same-directory replacement.
 
-Property, JSON, and regex updates preserve surrounding source layout. YAML and
+Property, Drun project-version, JSON, and regex updates preserve surrounding source layout. YAML and
 TOML updates use deterministic parser serialization and can normalize formatting
 and comments. For source shapes outside these v1 rules, use the regex adapter.
 

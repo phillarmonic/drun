@@ -497,3 +497,43 @@ func TestUpdateFileIsAtomicAndPreservesModeOnValidationFailure(t *testing.T) {
 		t.Fatalf("mode = %v", info.Mode().Perm())
 	}
 }
+
+func TestDrunProjectVersionReadAndUpdatePreserveSpecLayout(t *testing.T) {
+	data := []byte("# release metadata\r\nproject \"demo\"  version \"1.0.1\": # keep this comment\r\n  info \"ready\"\r\n")
+	value, err := Read("drun", "project.version", data)
+	if err != nil || value != (Scalar{Text: "1.0.1", Kind: String}) {
+		t.Fatalf("read = %#v, %v", value, err)
+	}
+	updated, scalar, err := Update("drun", "project.version", data, "1.0.2", "fail", "")
+	if err != nil || scalar != (Scalar{Text: "1.0.2", Kind: String}) {
+		t.Fatalf("update = %#v, %v", scalar, err)
+	}
+	want := []byte("# release metadata\r\nproject \"demo\"  version \"1.0.2\": # keep this comment\r\n  info \"ready\"\r\n")
+	if !bytes.Equal(updated, want) {
+		t.Fatalf("layout changed:\n%s", updated)
+	}
+}
+
+func TestDrunProjectVersionRejectsMissingAmbiguousAndUnsafeUpdates(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{name: "missing", data: "version: 2.0\n"},
+		{name: "ambiguous", data: "project \"one\" version \"1\":\nproject \"two\" version \"2\":\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := Read("drun", "project.version", []byte(tt.data)); err == nil {
+				t.Fatal("expected read error")
+			}
+		})
+	}
+	data := []byte("project \"demo\" version \"1\":\n")
+	if updated, _, err := Update("drun", "project.version", data, "2", "add", ""); err == nil || updated != nil {
+		t.Fatalf("add update = %q, %v", updated, err)
+	}
+	if updated, _, err := Update("drun", "project.version", data, "bad\"version", "fail", ""); err == nil || updated != nil {
+		t.Fatalf("unsafe update = %q, %v", updated, err)
+	}
+}

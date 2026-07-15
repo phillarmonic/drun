@@ -46,3 +46,30 @@ task "bad":
 		t.Fatal("expected regex add error")
 	}
 }
+
+func TestParser_ProjectVersionCheckAndUpdate(t *testing.T) {
+	source := `version: 2.0
+project "test" version "1.0.0":
+task "versions":
+  check project version equals "{$expected}"
+  check project version differs from "0.9.0"
+  update project version to "{$next}"
+`
+	p := NewParser(lexer.NewLexer(source))
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+	if len(program.Tasks) != 1 || len(program.Tasks[0].Body) != 3 {
+		t.Fatalf("unexpected project version statements: %#v", program.Tasks)
+	}
+	check := program.Tasks[0].Body[0].(*ast.FileValueStatement)
+	if check.Format != "drun" || check.Selector != "project.version" || check.Comparison != "equals" || check.Expected != "{$expected}" {
+		t.Fatalf("unexpected project version check: %#v", check)
+	}
+	update := program.Tasks[0].Body[2].(*ast.FileValueStatement)
+	if update.Format != "drun" || update.Selector != "project.version" || update.Value != "{$next}" || update.MissingPolicy != "fail" {
+		t.Fatalf("unexpected project version update: %#v", update)
+	}
+	if got := update.String(); got != `update project version to "{$next}"` {
+		t.Fatalf("String() = %q", got)
+	}
+}

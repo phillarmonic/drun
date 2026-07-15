@@ -11,6 +11,9 @@ func (p *Parser) isFileValueStatementStart() bool {
 	if p.curToken.Type != lexer.GET && p.curToken.Type != lexer.CHECK && p.curToken.Type != lexer.UPDATE {
 		return false
 	}
+	if (p.curToken.Type == lexer.CHECK || p.curToken.Type == lexer.UPDATE) && p.peekToken.Type == lexer.PROJECT {
+		return true
+	}
 	return fileValueFormat(p.peekToken)
 }
 
@@ -27,6 +30,9 @@ func fileValueFormat(token lexer.Token) bool {
 
 func (p *Parser) parseFileValueStatement() *ast.FileValueStatement {
 	stmt := &ast.FileValueStatement{Token: p.curToken, Operation: p.curToken.Literal}
+	if p.peekToken.Type == lexer.PROJECT {
+		return p.parseProjectVersionStatement(stmt)
+	}
 	p.nextToken()
 	if !fileValueFormat(p.curToken) {
 		p.addError(fmt.Sprintf("expected file value format after %q", stmt.Operation))
@@ -113,6 +119,48 @@ func (p *Parser) parseFileValueStatement() *ast.FileValueStatement {
 			p.addError("structured additions require 'as string', 'as number', or 'as boolean'")
 			return nil
 		}
+	}
+	return stmt
+}
+
+func (p *Parser) parseProjectVersionStatement(stmt *ast.FileValueStatement) *ast.FileValueStatement {
+	p.nextToken()
+	if !p.expectPeek(lexer.VERSION) {
+		return nil
+	}
+	stmt.Format = "drun"
+	stmt.Selector = "project.version"
+
+	switch stmt.Operation {
+	case "check":
+		p.nextToken()
+		switch p.curToken.Literal {
+		case "equals":
+			stmt.Comparison = "equals"
+		case "differs":
+			stmt.Comparison = "differs"
+			if p.peekToken.Type != lexer.FROM {
+				p.addError("expected 'from' after 'differs'")
+				return nil
+			}
+			p.nextToken()
+		default:
+			p.addError("expected 'equals' or 'differs from' in project version check")
+			return nil
+		}
+		if !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Expected = p.curToken.Literal
+	case "update":
+		if !p.expectPeek(lexer.TO) || !p.expectPeek(lexer.STRING) {
+			return nil
+		}
+		stmt.Value = p.curToken.Literal
+		stmt.MissingPolicy = "fail"
+	default:
+		p.addError(fmt.Sprintf("unsupported project version operation %q", stmt.Operation))
+		return nil
 	}
 	return stmt
 }

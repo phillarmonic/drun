@@ -1,5 +1,7 @@
 version: 2.0
 
+project "file-values" version "2.0.0":
+
 task "default" means "Describe the file-value examples without touching local files":
   info "Run inspect versions, check versions, or update versions against matching project files"
 
@@ -13,6 +15,7 @@ task "inspect versions" means "Read one scalar from every supported file format"
   info "properties={$plugin_version}, json={$package_version}, yaml={$chart_version}, toml={$crate_version}, text={$text_version}"
 
 task "check versions" means "Compare values without changing files":
+  check project version equals "2.0.0"
   check property "pluginVersion" in "gradle.properties" equals "2.0.0"
   check json "/version" in "package.json" differs from "1.0.0"
   check yaml "chart.appVersion" in "Chart.yaml" equals "2.0.0"
@@ -20,6 +23,7 @@ task "check versions" means "Compare values without changing files":
   check match "(?m)^VERSION=(?P<value>[^\\r\\n]+)$" in "VERSION.txt" equals "2.0.0"
 
 task "update versions" means "Update existing values or add supported missing leaves":
+  update project version to "2.0.0"
   update property "pluginVersion" in "gradle.properties" to "2.0.0" or add
   update json "/version" in "package.json" to "2.0.0" or add as string
   update yaml "chart.appVersion" in "Chart.yaml" to "2" or add as number

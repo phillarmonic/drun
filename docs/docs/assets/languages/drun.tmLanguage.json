@@ -765,6 +765,48 @@
     "file-value-actions": {
       "patterns": [
         {
+          "name": "meta.project-version.check.drun",
+          "match": "^(\\s*)(check)(\\s+)(project)(\\s+)(version)(\\s+)(equals|differs\\s+from)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "storage.type.file-value.drun"
+            },
+            "8": {
+              "name": "keyword.operator.comparison.drun"
+            },
+            "10": {
+              "name": "string.quoted.double.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.project-version.update.drun",
+          "match": "^(\\s*)(update)(\\s+)(project)(\\s+)(version)(\\s+)(to)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "storage.type.file-value.drun"
+            },
+            "8": {
+              "name": "keyword.operator.word.drun"
+            },
+            "10": {
+              "name": "string.quoted.double.drun"
+            }
+          }
+        },
+        {
           "name": "meta.file-value.get.drun",
           "match": "^(\\s*)(get)(\\s+)(property|json|yaml|toml|match)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(from)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(as)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*)",
           "captures": {

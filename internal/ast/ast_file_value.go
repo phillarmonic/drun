@@ -24,6 +24,18 @@ type FileValueStatement struct {
 func (fs *FileValueStatement) statementNode() {}
 
 func (fs *FileValueStatement) String() string {
+	if fs.Format == "drun" && fs.Selector == "project.version" {
+		switch fs.Operation {
+		case "check":
+			operator := fs.Comparison
+			if operator == "differs" {
+				operator = "differs from"
+			}
+			return fmt.Sprintf("check project version %s %q", operator, fs.Expected)
+		case "update":
+			return fmt.Sprintf("update project version to %q", fs.Value)
+		}
+	}
 	switch fs.Operation {
 	case "get":
 		return fmt.Sprintf("get %s %q from %q as $%s", fs.Format, fs.Selector, fs.Target, fs.CaptureVar)

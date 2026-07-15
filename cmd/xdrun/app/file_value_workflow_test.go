@@ -16,11 +16,10 @@ project "drun-intellij" version "%s":
 task "set-version" means "Synchronize the IntelliJ plugin release version":
     requires $version as string matching pattern "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
     get property "pluginVersion" from "gradle.properties" as $plugin_version
-    get match "(?m)^project \"drun-intellij\" version \"(?P<value>[^\"\\r\\n]+)\":$" from ".drun/spec.drun" as $spec_version
-    check match "(?m)^project \"drun-intellij\" version \"(?P<value>[^\"\\r\\n]+)\":$" in ".drun/spec.drun" equals "{$plugin_version}"
+    check project version equals "{$plugin_version}"
 
     update property "pluginVersion" in "gradle.properties" to "{$version}" or fail
-    update match "(?m)^project \"drun-intellij\" version \"(?P<value>[^\"\\r\\n]+)\":$" in ".drun/spec.drun" to "{$version}" or fail
+    update project version to "{$version}"
 
 task "package" means "Create the production plugin distribution":
     given $version defaults to ""
@@ -44,7 +43,7 @@ task "package" means "Create the production plugin distribution":
             fail "Could not resolve the previous Marketplace version; pass previous_version or use first_release=true"
 
     check property "pluginVersion" in "gradle.properties" equals "{$release_version}"
-    check match "(?m)^project \"drun-intellij\" version \"(?P<value>[^\"\\r\\n]+)\":$" in ".drun/spec.drun" equals "{$plugin_version}"
+    check project version equals "{$plugin_version}"
     check property "pluginVersion" in "gradle.properties" differs from "{$resolved_previous_version}"
 
     run "./gradlew buildPlugin"
