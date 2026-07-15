@@ -25,6 +25,7 @@ const (
 	TypeDocker           StatementType = "docker"
 	TypeGit              StatementType = "git"
 	TypeGitQuery         StatementType = "git_query"
+	TypeGitEnsureVersion StatementType = "git_ensure_version"
 	TypeHTTP             StatementType = "http"
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
@@ -205,6 +206,20 @@ type GitQuery struct {
 }
 
 func (g *GitQuery) Type() StatementType { return TypeGitQuery }
+
+// GitEnsureVersion guards a candidate against a source's latest stable version.
+type GitEnsureVersion struct {
+	Candidate           string
+	CandidateIsVariable bool
+	Source              string
+	AccessMethod        string
+	TagPreset           string
+	TagFormat           string
+	TagPattern          string
+	CaptureVar          string
+}
+
+func (g *GitEnsureVersion) Type() StatementType { return TypeGitEnsureVersion }
 
 // HTTP represents HTTP operations
 type HTTP struct {

@@ -98,6 +98,7 @@ const (
 	HTTP      // http
 	HTTPS     // https
 	GET       // get
+	ENSURE    // ensure
 	POST      // post
 	PUT       // put
 	PATCH     // patch
@@ -622,6 +623,8 @@ func (t TokenType) String() string {
 		return "HTTPS"
 	case GET:
 		return "GET"
+	case ENSURE:
+		return "ENSURE"
 	case POST:
 		return "POST"
 	case PUT:
@@ -1332,6 +1335,7 @@ var keywords = map[string]TokenType{
 	"http":          HTTP,
 	"https":         HTTPS,
 	"get":           GET,
+	"ensure":        ENSURE,
 	"post":          POST,
 	"put":           PUT,
 	"patch":         PATCH,

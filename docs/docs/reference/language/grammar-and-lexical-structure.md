@@ -20,6 +20,29 @@ path. `match` updates cannot use `or add`; JSON, YAML, and TOML additions requir
 an explicit scalar type. See [Structured file values](built-in-actions.md#structured-file-values)
 for selector rules and runtime guarantees.
 
+### Composite Git version guard
+
+```ebnf
+git-version-ensure  = "git", "ensure", value,
+                      "is", "newer", "than", "latest", "version", "from", source,
+                      [ "using", access-method ],
+                      [ inline-tag-contract ],
+                      [ "as", variable ] ;
+access-method       = "https" | "ssh" | "cli" | "remote" | "filesystem" ;
+inline-tag-contract = "matching", "tags",
+                      ( tag-preset | string | "pattern", string ) ;
+tag-preset          = "semver" | "semver_optional_v" ;
+source              = identifier ;
+value               = variable | string ;
+```
+
+The modifiers have a fixed order and may occur at most once. The candidate is
+validated after interpolation as stable `MAJOR.MINOR.PATCH`. `in series`,
+`matching version`, `ordered by`, `allow fetch`, and `latest tag` belong to the
+primitive Git query grammar and are not part of this guard. See
+[Ensuring a release version is newer](built-in-actions.md#ensuring-a-release-version-is-newer)
+for atomic outcomes and dry-run behavior.
+
 ## Lexical Structure
 
 ### Tokens
@@ -54,7 +77,7 @@ and, or, not, is
 # Built-in actions
 build, deploy, push, run, stop, remove, scale, rollback, wait, commit
 copy, move, create, backup, step, info, warn, error, success, fail
-get, check, update
+get, check, update, ensure
 
 # File-value formats and comparisons
 property, json, yaml, toml, match, equals, differs

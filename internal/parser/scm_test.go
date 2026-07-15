@@ -205,6 +205,86 @@ task "latest":
 	}
 }
 
+func TestParseGitEnsureVersion(t *testing.T) {
+	program := parseSCMTestProgram(t, `version: 2.0
+project "app":
+  scm:
+    git:
+      generic:
+        runtime:
+          default: https
+          https: "https://example.test/runtime.git"
+          ssh: "git@example.test:runtime.git"
+task "release":
+  git ensure $release_version is newer than latest version from runtime
+    using ssh
+    matching tags "runtime-{version}"
+    as $latest_version
+`)
+	guard, ok := program.Tasks[0].Body[0].(*ast.GitEnsureVersionStatement)
+	if !ok {
+		t.Fatalf("statement = %T", program.Tasks[0].Body[0])
+	}
+	if guard.Candidate != "$release_version" || !guard.CandidateIsVariable || guard.Source != "runtime" || guard.AccessMethod != "ssh" || guard.TagFormat != "runtime-{version}" || guard.CaptureVar != "latest_version" {
+		t.Fatalf("guard = %#v", guard)
+	}
+	if got := guard.String(); got != `git ensure $release_version is newer than latest version from runtime using ssh matching tags "runtime-{version}" as $latest_version` {
+		t.Fatalf("String() = %q", got)
+	}
+}
+
+func TestParseMinimalGitEnsureVersionWithoutCapture(t *testing.T) {
+	program := parseSCMTestProgram(t, `version: 2.0
+project "app":
+  scm:
+    git:
+      generic:
+        app:
+          filesystem: "."
+task "release":
+  git ensure "2.0.0" is newer than latest version from app
+  info "continues"
+`)
+	if len(program.Tasks[0].Body) != 2 {
+		t.Fatalf("body length = %d, want 2", len(program.Tasks[0].Body))
+	}
+	guard := program.Tasks[0].Body[0].(*ast.GitEnsureVersionStatement)
+	if guard.Candidate != "2.0.0" || guard.CandidateIsVariable || guard.CaptureVar != "" {
+		t.Fatalf("guard = %#v", guard)
+	}
+}
+
+func TestGitEnsureVersionValidationErrors(t *testing.T) {
+	base := `version: 2.0
+project "app":
+  scm:
+    git:
+      generic:
+        app:
+          filesystem: "."
+task "release":
+  %s
+`
+	tests := []struct {
+		statement string
+		message   string
+	}{
+		{`git ensure 2.0 is newer than latest version from app`, "variable or string"},
+		{`git ensure "2.0.0" is newer than latest tag from app`, `expected "version"`},
+		{`git ensure "2.0.0" is newer than latest version from app in series "2"`, "unexpected git ensure modifier"},
+		{`git ensure "2.0.0" is newer than latest version from app matching version ">1.0.0"`, `expected "tags"`},
+		{`git ensure "2.0.0" is newer than latest version from app matching tags unknown`, "unknown version tag preset"},
+		{`git ensure "2.0.0" is newer than latest version from app matching tags pattern "^v[0-9]+$"`, "named capture called version"},
+		{`git ensure "2.0.0" is newer than latest version from app matching tags semver using filesystem`, "must appear once before"},
+	}
+	for _, test := range tests {
+		errors := strings.Join(parseSCMTestErrors(fmt.Sprintf(base, test.statement)), "\n")
+		if !strings.Contains(errors, test.message) {
+			t.Errorf("%s: errors = %q, want %q", test.statement, errors, test.message)
+		}
+	}
+}
+
 func TestSCMAliasesAreUniqueWithinTechnology(t *testing.T) {
 	errors := strings.Join(parseSCMTestErrors(`version: 2.0
 project "app":

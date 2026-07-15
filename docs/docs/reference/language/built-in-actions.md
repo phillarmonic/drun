@@ -1297,3 +1297,69 @@ For PHP tags, `"php-{version}"` excludes `php-8.4.24RC` and
 other series, selecting `php-8.4.23` as tag or `8.4.23` as version. Dry-run
 performs no network, filesystem, CLI, or temporary-fetch work; it reports the
 resolved source, method, ordering, and capture variable.
+
+### Ensuring a release version is newer
+
+Use the composite guard when a release may proceed only if its candidate is
+strictly newer than the latest stable version published by a registered source:
+
+```drun
+git ensure $release_version is newer than latest version from drun-vscode
+
+git ensure $release_version is newer than latest version from drun-vscode
+  as $latest_version
+```
+
+The optional capture receives the extracted latest version after the guard
+succeeds. The statement is atomic: source resolution, stable-tag selection,
+numeric comparison, and capture are one operation, so a failed guard never
+writes the capture variable.
+
+The guard accepts the query modifiers that affect repository access and the
+version-tag contract. They appear after the source in the order shown, with the
+optional capture last:
+
+```drun
+git ensure $release_version is newer than latest version from runtime
+  using ssh
+  matching tags "runtime-{version}"
+  as $latest_version
+```
+
+`using https|ssh|cli|remote|filesystem` overrides the source's default access
+method. `matching tags` accepts the same preset, format, and advanced `pattern`
+forms as a latest-version query and overrides the source's reusable version-tag
+contract for this statement. Without an inline contract, the source contract or
+the conventional `semver_optional_v` default is used.
+
+The candidate is interpolated at execution time and must be exactly a stable
+`MAJOR.MINOR.PATCH` value. A leading `v`, a partial version, a prerelease, and
+build metadata are rejected. Matching tags are reduced to extracted stable
+versions and ordered numerically; tag spelling and enumeration order do not
+affect the result.
+
+The outcomes are deliberately distinct:
+
+- If the source, selected access method, or stable-tag set cannot be resolved,
+  the statement fails with a credential-safe source-resolution error. A source
+  with no tags matching the effective stable version contract is in this case.
+- If the candidate equals the latest version, it fails as already tagged and
+  reports that version.
+- If the candidate is older, it fails and reports the latest version.
+- If the candidate is newer, it succeeds and then assigns the optional capture.
+
+Diagnostics may identify the provider, source alias, selected access method,
+and effective tag contract, but never include token, password, private-key, or
+credential-bearing URL contents.
+
+Dry-run interpolates and validates the candidate, then reports the planned
+source, access method, effective tag contract, comparison, and capture. It
+performs no network, filesystem, provider-CLI, fetch, or temporary-repository
+work, does not claim that the invariant passed, and does not assign the capture.
+
+The guard intentionally does not accept `latest tag`, `in series`, `matching
+version`, `ordered by date`, or `allow fetch`. Those change the meaning away
+from the latest stable numeric release or are unnecessary for numeric remote-ref
+queries. Use `git get latest version` followed by the existing `older than
+version` and `newer than version` conditions for custom workflows. Those
+primitive statements and conditions remain supported and unchanged.

@@ -120,3 +120,40 @@ func (s *GitQueryStatement) String() string {
 	}
 	return out + " as $" + s.CaptureVar
 }
+
+// GitEnsureVersionStatement atomically guards a candidate against the latest
+// stable version published by a registered Git source.
+type GitEnsureVersionStatement struct {
+	Token               lexer.Token
+	Candidate           string
+	CandidateIsVariable bool
+	Source              string
+	AccessMethod        string
+	TagPreset           string
+	TagFormat           string
+	TagPattern          string
+	CaptureVar          string
+}
+
+func (s *GitEnsureVersionStatement) statementNode() {}
+func (s *GitEnsureVersionStatement) String() string {
+	candidate := s.Candidate
+	if !s.CandidateIsVariable {
+		candidate = fmt.Sprintf("%q", candidate)
+	}
+	out := fmt.Sprintf("git ensure %s is newer than latest version from %s", candidate, s.Source)
+	if s.AccessMethod != "" {
+		out += " using " + s.AccessMethod
+	}
+	if s.TagPattern != "" {
+		out += fmt.Sprintf(" matching tags pattern %q", s.TagPattern)
+	} else if s.TagFormat != "" {
+		out += fmt.Sprintf(" matching tags %q", s.TagFormat)
+	} else if s.TagPreset != "" {
+		out += " matching tags " + s.TagPreset
+	}
+	if s.CaptureVar != "" {
+		out += " as $" + s.CaptureVar
+	}
+	return out
+}

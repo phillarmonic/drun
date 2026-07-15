@@ -173,6 +173,18 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			CaptureVar:     s.CaptureVar,
 		}, nil
 
+	case *ast.GitEnsureVersionStatement:
+		return &GitEnsureVersion{
+			Candidate:           s.Candidate,
+			CandidateIsVariable: s.CandidateIsVariable,
+			Source:              s.Source,
+			AccessMethod:        s.AccessMethod,
+			TagPreset:           s.TagPreset,
+			TagFormat:           s.TagFormat,
+			TagPattern:          s.TagPattern,
+			CaptureVar:          s.CaptureVar,
+		}, nil
+
 	case *ast.HTTPStatement:
 		return &HTTP{
 			Method:  s.Method,

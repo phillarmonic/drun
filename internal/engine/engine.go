@@ -904,6 +904,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeGit(s, ctx)
 	case *statement.GitQuery:
 		return e.executeGitQuery(s, ctx)
+	case *statement.GitEnsureVersion:
+		return e.executeGitEnsureVersion(s, ctx)
 	case *statement.HTTP:
 		return e.executeHTTP(s, ctx)
 	case *statement.Download:
