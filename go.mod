@@ -1,6 +1,6 @@
 module github.com/phillarmonic/drun/v2
 
-go 1.26
+go 1.26.5
 
 require (
 	github.com/danieljoos/wincred v1.2.3
