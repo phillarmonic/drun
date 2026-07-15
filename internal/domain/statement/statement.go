@@ -24,6 +24,7 @@ const (
 	TypeTaskFromTemplate StatementType = "task_from_template"
 	TypeDocker           StatementType = "docker"
 	TypeGit              StatementType = "git"
+	TypeGitQuery         StatementType = "git_query"
 	TypeHTTP             StatementType = "http"
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
@@ -187,6 +188,23 @@ type Git struct {
 }
 
 func (g *Git) Type() StatementType { return TypeGit }
+
+// GitQuery resolves a versioned tag from a registered project-level Git source.
+type GitQuery struct {
+	Result         string
+	Source         string
+	AccessMethod   string
+	TagPreset      string
+	TagFormat      string
+	TagPattern     string
+	Series         string
+	VersionMatcher string
+	OrderBy        string
+	AllowFetch     bool
+	CaptureVar     string
+}
+
+func (g *GitQuery) Type() StatementType { return TypeGitQuery }
 
 // HTTP represents HTTP operations
 type HTTP struct {

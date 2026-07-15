@@ -1186,3 +1186,114 @@ task "parameter defaults with pipes":
 - **Expression Context**: Work in any expression context (info messages, conditions, etc.)
 
 ---
+## SCM registries and Git version queries
+
+Projects may register source-control repositories once and refer to them by a
+readable alias from tasks. Registries are grouped by SCM technology, then by
+provider, so future technologies can be added without changing Git sources:
+
+```drun
+project "my-project":
+  scm:
+    git:
+      github:
+        app:
+          default: https
+          https: "https://github.com/example/app.git"
+          ssh: "git@github.com:example/app.git"
+          cli:
+            repository: "example/app"
+            host: "github.com"
+
+      generic:
+        local-library:
+          filesystem: "../library"
+```
+
+Git source aliases must be unique within the `git` technology. GitHub and
+GitLab sources support `https`, `ssh`, and `cli`; generic sources support
+`https`, `ssh`, an opaque `remote`, and `filesystem` paths to worktrees or bare
+repositories. One declared access method is the implicit default. Sources with
+multiple methods must declare `default`, and Drun never silently falls back to
+a different method.
+
+Expanded HTTPS profiles accept `url` and optional `authentication: ambient`.
+Expanded SSH profiles accept `url` and an optional `key` path. CLI profiles
+accept `repository` and an optional `host`. Values are interpolated at runtime;
+filesystem and key paths expand `~`. Credentials and private-key contents are
+never stored in the Drunfile.
+
+Generic remote sources normally read refs without fetching objects. A source
+may declare `metadata: fetch`, but a task must still say `allow fetch` before a
+date-ordered query may create temporary bare storage and fetch tag objects.
+Both permissions are required. Filesystem sources inspect local objects
+directly, and GitHub/GitLab CLI profiles use their authenticated provider APIs.
+
+The registry describes reusable repository access rather than one operation.
+The same source contract can support future branch, release, clone, archive,
+mirror, and inspection statements.
+
+### Version tags
+
+Conventional stable tags (`1.2.3` and `v1.2.3`) need no configuration. For a
+readable custom convention, use a format template:
+
+```drun
+version tags: "php-{version}"
+```
+
+`{version}` matches and captures exactly `MAJOR.MINOR.PATCH`; surrounding text
+is treated literally and the complete tag is matched. `{{` and `}}` escape
+literal braces. The presets `semver` and `semver_optional_v` mean
+`"v{version}"` and the pair `"{version}"`, `"v{version}"` respectively.
+Repositories that changed conventions can declare several templates:
+
+```drun
+version tags:
+  formats:
+    "php-{version}"
+    "legacy-php-{version}"
+```
+
+Raw regular expressions are the advanced escape hatch. They must contain
+exactly one Go-style named capture called `version`:
+
+```drun
+version tags:
+  pattern: "^php-(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"
+```
+
+### Latest tag and version queries
+
+```drun
+git get latest tag from app as $latest_tag
+git get latest version from app as $latest_version
+git get latest version from php in series "8.4" as $php_version
+git get latest version from php matching version ">=8.4.0 <8.5.0" as $php_version
+```
+
+`latest tag` returns the original tag; `latest version` returns its extracted
+stable version. `in series "8"` selects `>=8.0.0 <9.0.0`, while `in series
+"8.4"` selects `>=8.4.0 <8.5.0`. General constraints accept whitespace-joined
+`>`, `>=`, `<`, `<=`, and `=` clauses. Series and general constraints are
+mutually exclusive.
+
+An inline contract overrides the source contract for one query. Prefer a
+template, using a raw pattern only when necessary:
+
+```drun
+git get latest version from monorepo matching tags "runtime-{version}" in series "8.4" as $runtime_version
+git get latest version from monorepo matching tags pattern "^runtime-(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$" in series "8.4" as $runtime_version
+```
+
+Queries order numerically by version unless they say `ordered by date`.
+Annotated tags use tagger time and lightweight tags use their target commit
+time. Access can be overridden with `using https|ssh|cli|remote|filesystem`.
+Remote generic date queries must also say `allow fetch` and use a source that
+declares `metadata: fetch`.
+
+For PHP tags, `"php-{version}"` excludes `php-8.4.24RC` and
+`php-8.6.0-alpha2`. A query `in series "8.4"` also excludes stable releases in
+other series, selecting `php-8.4.23` as tag or `8.4.23` as version. Dry-run
+performs no network, filesystem, CLI, or temporary-fetch work; it reports the
+resolved source, method, ordering, and capture variable.

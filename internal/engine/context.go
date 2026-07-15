@@ -76,6 +76,7 @@ type ProjectContext struct {
 	RequiredTools       []statement.ToolRequirement               // project-level required tools
 	ProvisioningSources []string                                  // ordered project-level provisioning catalogs
 	GitPolicy           *statement.GitPolicy                      // project-level git policy
+	SCMRegistry         *ast.SCMRegistryStatement                 // project-level technology-oriented SCM registry
 }
 
 // Implement interpolation.ProjectContext interface

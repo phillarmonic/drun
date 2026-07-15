@@ -158,6 +158,21 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Options:   s.Options,
 		}, nil
 
+	case *ast.GitQueryStatement:
+		return &GitQuery{
+			Result:         s.Result,
+			Source:         s.Source,
+			AccessMethod:   s.AccessMethod,
+			TagPreset:      s.TagPreset,
+			TagFormat:      s.TagFormat,
+			TagPattern:     s.TagPattern,
+			Series:         s.Series,
+			VersionMatcher: s.VersionMatcher,
+			OrderBy:        s.OrderBy,
+			AllowFetch:     s.AllowFetch,
+			CaptureVar:     s.CaptureVar,
+		}, nil
+
 	case *ast.HTTPStatement:
 		return &HTTP{
 			Method:  s.Method,

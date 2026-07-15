@@ -162,7 +162,19 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					p.nextToken()
 				}
 			case lexer.IDENT:
-				if p.curToken.Literal == "provisioning" {
+				switch p.curToken.Literal {
+				case "scm":
+					if len(p.pendingAnnotations) > 0 {
+						p.addError("annotation(s) in project body must be followed by a snippet declaration")
+						p.pendingAnnotations = nil
+					}
+					scm := p.parseSCMRegistryStatement()
+					if scm != nil {
+						stmt.Settings = append(stmt.Settings, scm)
+					} else {
+						p.nextToken()
+					}
+				case "provisioning":
 					if len(p.pendingAnnotations) > 0 {
 						p.addError("annotation(s) in project body must be followed by a snippet declaration")
 						p.pendingAnnotations = nil
@@ -176,7 +188,7 @@ func (p *Parser) parseProjectStatement() *ast.ProjectStatement {
 					if p.curToken.Type == lexer.DEDENT {
 						p.nextToken()
 					}
-				} else {
+				default:
 					if len(p.pendingAnnotations) > 0 {
 						p.addError("annotation(s) in project body must be followed by a snippet declaration")
 						p.pendingAnnotations = nil

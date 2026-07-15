@@ -792,6 +792,8 @@ func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile 
 					ctx.GitPolicy = policy
 				}
 			}
+		case *ast.SCMRegistryStatement:
+			ctx.SCMRegistry = s
 		}
 	}
 
@@ -895,6 +897,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeDocker(s, ctx)
 	case *statement.Git:
 		return e.executeGit(s, ctx)
+	case *statement.GitQuery:
+		return e.executeGitQuery(s, ctx)
 	case *statement.HTTP:
 		return e.executeHTTP(s, ctx)
 	case *statement.Download:
