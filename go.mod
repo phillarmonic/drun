@@ -6,6 +6,7 @@ require (
 	github.com/danieljoos/wincred v1.2.3
 	github.com/keybase/go-keychain v0.0.1
 	github.com/mholt/archives v0.1.5
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/phillarmonic/SoloDB v1.0.2
 	github.com/phillarmonic/figlet v1.2.0
 	github.com/spf13/cobra v1.8.1

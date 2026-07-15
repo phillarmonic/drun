@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
+	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,6 +29,8 @@ type Scalar struct {
 	Text string
 	Kind Kind
 }
+
+var decimalNumberPattern = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$`)
 
 // Adapter is the internal contract implemented by every supported file format.
 type Adapter interface {
@@ -50,7 +54,7 @@ var adapters = map[string]Adapter{
 	"property": adapterFuncs{read: readProperty, update: func(s string, d []byte, v, p, _ string) ([]byte, Scalar, error) { return updateProperty(s, d, v, p) }},
 	"match": adapterFuncs{read: readMatch, update: func(s string, d []byte, v, p, _ string) ([]byte, Scalar, error) {
 		if p == "add" {
-			return nil, Scalar{}, fmt.Errorf("regex match updates do not support or add")
+			return nil, Scalar{}, fmt.Errorf("regex match updates do not support additions")
 		}
 		return updateMatch(s, d, v)
 	}},
@@ -136,7 +140,7 @@ func scalarFromText(value, kind string) (Scalar, error) {
 	case String, "":
 		return Scalar{Text: value, Kind: String}, nil
 	case Number:
-		if _, err := strconv.ParseFloat(value, 64); err != nil {
+		if !decimalNumberPattern.MatchString(value) {
 			return Scalar{}, fmt.Errorf("%q is not a number", value)
 		}
 		return Scalar{Text: value, Kind: Number}, nil
@@ -168,6 +172,93 @@ func encodedScalar(s Scalar, format string) string {
 
 type lineSpan struct{ start, end, valueStart, valueEnd int }
 
+func isPropertySpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\f'
+}
+
+func decodePropertyKey(raw string) (string, bool) {
+	var decoded strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '\\' {
+			decoded.WriteByte(raw[i])
+			continue
+		}
+		i++
+		if i == len(raw) {
+			return "", false
+		}
+		switch raw[i] {
+		case 't':
+			decoded.WriteByte('\t')
+		case 'n':
+			decoded.WriteByte('\n')
+		case 'r':
+			decoded.WriteByte('\r')
+		case 'f':
+			decoded.WriteByte('\f')
+		case 'u':
+			if i+4 >= len(raw) {
+				return "", false
+			}
+			value, err := strconv.ParseUint(raw[i+1:i+5], 16, 16)
+			if err != nil {
+				return "", false
+			}
+			decoded.WriteRune(rune(value))
+			i += 4
+		default:
+			decoded.WriteByte(raw[i])
+		}
+	}
+	return decoded.String(), true
+}
+
+func propertyValueSpan(key, line string) (int, int, bool) {
+	lineEnd := len(strings.TrimSuffix(line, "\r"))
+	i := 0
+	for i < lineEnd && isPropertySpace(line[i]) {
+		i++
+	}
+	if i == lineEnd || line[i] == '#' || line[i] == '!' {
+		return 0, 0, false
+	}
+
+	keyStart := i
+	escaped := false
+	for i < lineEnd {
+		b := line[i]
+		if escaped {
+			escaped = false
+			i++
+			continue
+		}
+		if b == '\\' {
+			escaped = true
+			i++
+			continue
+		}
+		if b == '=' || b == ':' || isPropertySpace(b) {
+			break
+		}
+		i++
+	}
+	decodedKey, valid := decodePropertyKey(line[keyStart:i])
+	if !valid || decodedKey != key {
+		return 0, 0, false
+	}
+
+	for i < lineEnd && isPropertySpace(line[i]) {
+		i++
+	}
+	if i < lineEnd && (line[i] == '=' || line[i] == ':') {
+		i++
+	}
+	for i < lineEnd && isPropertySpace(line[i]) {
+		i++
+	}
+	return i, lineEnd, true
+}
+
 func propertySpans(key string, data []byte) []lineSpan {
 	var spans []lineSpan
 	for start := 0; start <= len(data); {
@@ -178,17 +269,8 @@ func propertySpans(key string, data []byte) []lineSpan {
 			end += start
 		}
 		line := string(data[start:end])
-		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
-		if trimmed != "" && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "!") {
-			idx := strings.IndexAny(line, "=:")
-			if idx >= 0 && strings.TrimSpace(line[:idx]) == key {
-				vs := idx + 1
-				for vs < len(line) && (line[vs] == ' ' || line[vs] == '\t') {
-					vs++
-				}
-				ve := len(strings.TrimSuffix(line, "\r"))
-				spans = append(spans, lineSpan{start: start, end: end, valueStart: start + vs, valueEnd: start + ve})
-			}
+		if valueStart, valueEnd, ok := propertyValueSpan(key, line); ok {
+			spans = append(spans, lineSpan{start: start, end: end, valueStart: start + valueStart, valueEnd: start + valueEnd})
 		}
 		if end == len(data) {
 			break
@@ -280,10 +362,25 @@ func updateMatch(pattern string, data []byte, value string) ([]byte, Scalar, err
 	return out, Scalar{Text: value, Kind: String}, nil
 }
 
-type jsonSpan struct {
+type jsonNodeKind int
+
+const (
+	jsonObject jsonNodeKind = iota
+	jsonArray
+	jsonString
+	jsonNumber
+	jsonBoolean
+	jsonNull
+)
+
+type jsonNode struct {
 	start, end int
-	kind       Kind
+	kind       jsonNodeKind
+	close      int
+	firstKey   int
+	members    map[string][]*jsonNode
 }
+
 type jsonScanner struct {
 	data []byte
 	pos  int
@@ -323,20 +420,20 @@ func (s *jsonScanner) stringToken() (string, int, int, error) {
 	}
 	return "", 0, 0, fmt.Errorf("unterminated JSON string")
 }
-func (s *jsonScanner) value(path []string) (jsonSpan, error) {
+func (s *jsonScanner) value() (*jsonNode, error) {
 	s.ws()
 	start := s.pos
 	if start >= len(s.data) {
-		return jsonSpan{}, fmt.Errorf("missing JSON value")
+		return nil, fmt.Errorf("missing JSON value")
 	}
 	switch s.data[s.pos] {
 	case '{':
-		return s.object(path)
+		return s.object()
 	case '[':
-		return jsonSpan{}, fmt.Errorf("JSON arrays are not supported")
+		return s.array()
 	case '"':
-		_, a, b, e := s.stringToken()
-		return jsonSpan{a, b, String}, e
+		_, a, b, err := s.stringToken()
+		return &jsonNode{start: a, end: b, kind: jsonString, firstKey: -1}, err
 	default:
 		s.pos++
 		for s.pos < len(s.data) && !strings.ContainsRune(",}] \t\r\n", rune(s.data[s.pos])) {
@@ -344,160 +441,206 @@ func (s *jsonScanner) value(path []string) (jsonSpan, error) {
 		}
 		raw := string(s.data[start:s.pos])
 		if raw == "true" || raw == "false" {
-			return jsonSpan{start, s.pos, Boolean}, nil
+			return &jsonNode{start: start, end: s.pos, kind: jsonBoolean, firstKey: -1}, nil
 		}
-		if _, e := strconv.ParseFloat(raw, 64); e == nil {
-			return jsonSpan{start, s.pos, Number}, nil
+		if raw == "null" {
+			return &jsonNode{start: start, end: s.pos, kind: jsonNull, firstKey: -1}, nil
 		}
-		return jsonSpan{}, fmt.Errorf("unsupported JSON scalar %q", raw)
+		return &jsonNode{start: start, end: s.pos, kind: jsonNumber, firstKey: -1}, nil
 	}
 }
-func (s *jsonScanner) skipValue() error {
-	s.ws()
-	if s.pos >= len(s.data) {
-		return fmt.Errorf("missing value")
-	}
-	switch s.data[s.pos] {
-	case '"':
-		_, _, _, e := s.stringToken()
-		return e
-	case '{':
-		s.pos++
-		s.ws()
-		if s.pos < len(s.data) && s.data[s.pos] == '}' {
-			s.pos++
-			return nil
-		}
-		for {
-			if _, _, _, e := s.stringToken(); e != nil {
-				return e
-			}
-			s.ws()
-			if s.pos >= len(s.data) || s.data[s.pos] != ':' {
-				return fmt.Errorf("expected colon")
-			}
-			s.pos++
-			if e := s.skipValue(); e != nil {
-				return e
-			}
-			s.ws()
-			if s.data[s.pos] == '}' {
-				s.pos++
-				return nil
-			}
-			if s.data[s.pos] != ',' {
-				return fmt.Errorf("expected comma")
-			}
-			s.pos++
-		}
-	case '[':
-		s.pos++
-		s.ws()
-		if s.pos < len(s.data) && s.data[s.pos] == ']' {
-			s.pos++
-			return nil
-		}
-		for {
-			if e := s.skipValue(); e != nil {
-				return e
-			}
-			s.ws()
-			if s.data[s.pos] == ']' {
-				s.pos++
-				return nil
-			}
-			if s.data[s.pos] != ',' {
-				return fmt.Errorf("expected comma")
-			}
-			s.pos++
-		}
-	default:
-		s.pos++
-		for s.pos < len(s.data) && !strings.ContainsRune(",}] \t\r\n", rune(s.data[s.pos])) {
-			s.pos++
-		}
-		return nil
-	}
-}
-func (s *jsonScanner) object(path []string) (jsonSpan, error) {
+
+func (s *jsonScanner) object() (*jsonNode, error) {
+	start := s.pos
 	s.pos++
 	s.ws()
-	if len(path) == 0 {
-		return jsonSpan{}, fmt.Errorf("JSON objects are not scalar")
+	node := &jsonNode{start: start, kind: jsonObject, firstKey: -1, members: map[string][]*jsonNode{}}
+	if s.pos < len(s.data) && s.data[s.pos] == '}' {
+		node.close = s.pos
+		s.pos++
+		node.end = s.pos
+		return node, nil
 	}
 	for {
 		s.ws()
-		if s.pos >= len(s.data) || s.data[s.pos] == '}' {
-			return jsonSpan{}, fmt.Errorf("JSON pointer segment %q not found", path[0])
-		}
-		key, _, _, err := s.stringToken()
+		key, keyStart, _, err := s.stringToken()
 		if err != nil {
-			return jsonSpan{}, err
+			return nil, err
+		}
+		if node.firstKey < 0 {
+			node.firstKey = keyStart
 		}
 		s.ws()
 		if s.pos >= len(s.data) || s.data[s.pos] != ':' {
-			return jsonSpan{}, fmt.Errorf("expected colon")
+			return nil, fmt.Errorf("expected colon")
 		}
 		s.pos++
-		if key == path[0] {
-			if len(path) == 1 {
-				return s.value(nil)
-			}
-			s.ws()
-			if s.pos >= len(s.data) || s.data[s.pos] != '{' {
-				return jsonSpan{}, fmt.Errorf("JSON pointer parent %q is not an object", key)
-			}
-			return s.object(path[1:])
+		value, err := s.value()
+		if err != nil {
+			return nil, err
 		}
-		if err := s.skipValue(); err != nil {
-			return jsonSpan{}, err
-		}
+		node.members[key] = append(node.members[key], value)
 		s.ws()
 		if s.pos < len(s.data) && s.data[s.pos] == ',' {
 			s.pos++
 			continue
 		}
 		if s.pos < len(s.data) && s.data[s.pos] == '}' {
-			return jsonSpan{}, fmt.Errorf("JSON pointer segment %q not found", path[0])
+			node.close = s.pos
+			s.pos++
+			node.end = s.pos
+			return node, nil
 		}
-		return jsonSpan{}, fmt.Errorf("invalid JSON object")
+		return nil, fmt.Errorf("invalid JSON object")
 	}
 }
+
+func (s *jsonScanner) array() (*jsonNode, error) {
+	start := s.pos
+	s.pos++
+	s.ws()
+	if s.pos < len(s.data) && s.data[s.pos] == ']' {
+		s.pos++
+		return &jsonNode{start: start, end: s.pos, kind: jsonArray, firstKey: -1}, nil
+	}
+	for {
+		if _, err := s.value(); err != nil {
+			return nil, err
+		}
+		s.ws()
+		if s.pos < len(s.data) && s.data[s.pos] == ',' {
+			s.pos++
+			continue
+		}
+		if s.pos < len(s.data) && s.data[s.pos] == ']' {
+			s.pos++
+			return &jsonNode{start: start, end: s.pos, kind: jsonArray, firstKey: -1}, nil
+		}
+		return nil, fmt.Errorf("invalid JSON array")
+	}
+}
+
 func decodePointer(pointer string) ([]string, error) {
 	if pointer == "" || pointer[0] != '/' {
 		return nil, fmt.Errorf("JSON selector must be an RFC 6901 pointer")
 	}
 	parts := strings.Split(pointer[1:], "/")
 	for i, p := range parts {
-		p = strings.ReplaceAll(p, "~1", "/")
-		p = strings.ReplaceAll(p, "~0", "~")
-		parts[i] = p
+		var decoded strings.Builder
+		for j := 0; j < len(p); j++ {
+			if p[j] != '~' {
+				decoded.WriteByte(p[j])
+				continue
+			}
+			if j+1 >= len(p) || (p[j+1] != '0' && p[j+1] != '1') {
+				return nil, fmt.Errorf("invalid RFC 6901 escape in JSON selector")
+			}
+			j++
+			if p[j] == '0' {
+				decoded.WriteByte('~')
+			} else {
+				decoded.WriteByte('/')
+			}
+		}
+		parts[i] = decoded.String()
 	}
 	return parts, nil
 }
-func findJSONScalar(data []byte, pointer string) (jsonSpan, Scalar, error) {
-	parts, err := decodePointer(pointer)
-	if err != nil {
-		return jsonSpan{}, Scalar{}, err
+
+func parseJSON(data []byte) (*jsonNode, error) {
+	if !json.Valid(data) {
+		return nil, fmt.Errorf("invalid JSON document")
 	}
 	s := jsonScanner{data: data}
-	sp, err := s.value(parts)
+	root, err := s.value()
 	if err != nil {
-		return jsonSpan{}, Scalar{}, err
+		return nil, err
+	}
+	s.ws()
+	if s.pos != len(data) {
+		return nil, fmt.Errorf("invalid trailing JSON content")
+	}
+	return root, nil
+}
+
+func jsonMember(object *jsonNode, key string) (*jsonNode, bool, error) {
+	if object.kind != jsonObject {
+		return nil, false, fmt.Errorf("JSON pointer parent is not an object")
+	}
+	values := object.members[key]
+	if len(values) > 1 {
+		return nil, false, fmt.Errorf("JSON pointer member %q is duplicated", key)
+	}
+	if len(values) == 0 {
+		return nil, false, nil
+	}
+	return values[0], true, nil
+}
+
+func findJSONNode(data []byte, pointer string) (*jsonNode, error) {
+	parts, err := decodePointer(pointer)
+	if err != nil {
+		return nil, err
+	}
+	node, err := parseJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if node.kind != jsonObject {
+		return nil, fmt.Errorf("JSON pointer root is not an object")
+	}
+	for _, part := range parts {
+		next, found, err := jsonMember(node, part)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("JSON pointer segment %q not found", part)
+		}
+		node = next
+	}
+	return node, nil
+}
+
+func scalarFromJSONNode(data []byte, node *jsonNode) (Scalar, error) {
+	var kind Kind
+	switch node.kind {
+	case jsonString:
+		kind = String
+	case jsonNumber:
+		kind = Number
+	case jsonBoolean:
+		kind = Boolean
+	case jsonObject:
+		return Scalar{}, fmt.Errorf("JSON objects are not scalar")
+	case jsonArray:
+		return Scalar{}, fmt.Errorf("JSON arrays are not supported")
+	default:
+		return Scalar{}, fmt.Errorf("JSON null is not a supported scalar")
 	}
 	var text string
-	switch sp.kind {
+	switch kind {
 	case String:
-		if err := json.Unmarshal(data[sp.start:sp.end], &text); err != nil {
-			return jsonSpan{}, Scalar{}, err
+		if err := json.Unmarshal(data[node.start:node.end], &text); err != nil {
+			return Scalar{}, err
 		}
 	default:
-		text = string(data[sp.start:sp.end])
+		text = string(data[node.start:node.end])
 	}
-	return sp, Scalar{Text: text, Kind: sp.kind}, nil
+	return Scalar{Text: text, Kind: kind}, nil
 }
+
+func findJSONScalar(data []byte, pointer string) (*jsonNode, Scalar, error) {
+	node, err := findJSONNode(data, pointer)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	scalar, err := scalarFromJSONNode(data, node)
+	return node, scalar, err
+}
+
 func updateJSON(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
-	sp, current, err := findJSONScalar(data, selector)
+	node, current, err := findJSONScalar(data, selector)
 	if err != nil {
 		if policy != "add" {
 			return nil, Scalar{}, err
@@ -509,133 +652,230 @@ func updateJSON(selector string, data []byte, value, policy, valueType string) (
 		return nil, Scalar{}, err
 	}
 	enc := encodedScalar(next, "json")
-	out := append([]byte(nil), data[:sp.start]...)
+	out := append([]byte(nil), data[:node.start]...)
 	out = append(out, enc...)
-	out = append(out, data[sp.end:]...)
+	out = append(out, data[node.end:]...)
 	if !json.Valid(out) {
 		return nil, Scalar{}, fmt.Errorf("updated JSON is invalid")
 	}
 	return out, next, nil
 }
+
 func addJSON(selector string, data []byte, value, valueType string) ([]byte, Scalar, error) {
 	parts, err := decodePointer(selector)
-	if err != nil || len(parts) == 0 {
+	if err != nil {
 		return nil, Scalar{}, err
 	}
-	var root map[string]any
-	if err := json.Unmarshal(data, &root); err != nil {
+	if valueType == "" {
+		return nil, Scalar{}, fmt.Errorf("added JSON values require an explicit scalar type")
+	}
+	root, err := parseJSON(data)
+	if err != nil {
 		return nil, Scalar{}, err
+	}
+	if root.kind != jsonObject {
+		return nil, Scalar{}, fmt.Errorf("JSON pointer root is not an object")
 	}
 	parent := root
 	for _, p := range parts[:len(parts)-1] {
-		v, ok := parent[p]
-		if !ok {
+		child, found, err := jsonMember(parent, p)
+		if err != nil {
+			return nil, Scalar{}, err
+		}
+		if !found {
 			return nil, Scalar{}, fmt.Errorf("JSON parent %q does not exist", p)
 		}
-		m, ok := v.(map[string]any)
-		if !ok {
+		if child.kind != jsonObject {
 			return nil, Scalar{}, fmt.Errorf("JSON parent %q is not an object", p)
 		}
-		parent = m
+		parent = child
 	}
 	leaf := parts[len(parts)-1]
-	if _, ok := parent[leaf]; ok {
+	if _, found, err := jsonMember(parent, leaf); err != nil {
+		return nil, Scalar{}, err
+	} else if found {
 		return nil, Scalar{}, fmt.Errorf("JSON value already exists")
 	}
-	s, err := scalarFromText(value, valueType)
+	scalar, err := scalarFromText(value, valueType)
 	if err != nil {
 		return nil, Scalar{}, err
 	}
-	switch s.Kind {
-	case String:
-		parent[leaf] = s.Text
-	case Boolean:
-		parent[leaf] = s.Text == "true"
-	case Number:
-		n, _ := strconv.ParseFloat(s.Text, 64)
-		parent[leaf] = n
+	encoded := encodedScalar(scalar, "json")
+	if !json.Valid([]byte(encoded)) {
+		return nil, Scalar{}, fmt.Errorf("invalid JSON scalar %q", value)
 	}
-	out, err := json.MarshalIndent(root, "", "  ")
-	if err != nil {
-		return nil, Scalar{}, err
+	encodedKey, _ := json.Marshal(leaf)
+
+	triviaStart := parent.close
+	for triviaStart > parent.start+1 && unicode.IsSpace(rune(data[triviaStart-1])) {
+		triviaStart--
 	}
-	if bytes.HasSuffix(data, []byte("\n")) {
-		out = append(out, '\n')
+	closingTrivia := data[triviaStart:parent.close]
+	pretty := bytes.Contains(closingTrivia, []byte("\n")) || bytes.Contains(closingTrivia, []byte("\r"))
+	newline := []byte("\n")
+	if bytes.Contains(data, []byte("\r\n")) {
+		newline = []byte("\r\n")
 	}
-	return out, s, nil
+	memberIndent := []byte("  ")
+	if parent.firstKey >= 0 {
+		lineStart := bytes.LastIndexByte(data[:parent.firstKey], '\n') + 1
+		if indent := data[lineStart:parent.firstKey]; len(indent) > 0 {
+			memberIndent = indent
+		}
+	} else if pretty {
+		lineStart := bytes.LastIndexByte(data[:parent.close], '\n') + 1
+		memberIndent = append(append([]byte(nil), data[lineStart:parent.close]...), ' ', ' ')
+	}
+
+	insertion := make([]byte, 0, len(encodedKey)+len(encoded)+len(memberIndent)+8)
+	if parent.firstKey >= 0 {
+		insertion = append(insertion, ',')
+	}
+	if pretty {
+		insertion = append(insertion, newline...)
+		insertion = append(insertion, memberIndent...)
+	}
+	insertion = append(insertion, encodedKey...)
+	if pretty {
+		insertion = append(insertion, ':', ' ')
+	} else {
+		insertion = append(insertion, ':')
+	}
+	insertion = append(insertion, encoded...)
+
+	out := append([]byte(nil), data[:triviaStart]...)
+	out = append(out, insertion...)
+	out = append(out, data[triviaStart:]...)
+	if _, err := parseJSON(out); err != nil {
+		return nil, Scalar{}, fmt.Errorf("updated JSON is invalid: %w", err)
+	}
+	return out, scalar, nil
 }
 
-func yamlPath(selector string) []string {
-	if selector == "" {
-		return nil
+func unsupportedSelector(format, selector, reason string) error {
+	return fmt.Errorf("unsupported %s selector %q (%s); use match for this source shape", format, selector, reason)
+}
+
+func yamlPath(selector string) ([]string, error) {
+	parts := strings.Split(selector, ".")
+	for _, part := range parts {
+		if part == "" {
+			return nil, unsupportedSelector("YAML", selector, "selectors must be non-empty dot-separated mapping keys")
+		}
 	}
-	return strings.Split(selector, ".")
+	return parts, nil
 }
 func yamlRoot(data []byte) (*yaml.Node, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
-	if len(doc.Content) == 0 {
+	if len(doc.Content) != 1 {
 		return nil, fmt.Errorf("empty YAML document")
+	}
+	if doc.Content[0].Kind != yaml.MappingNode {
+		return nil, unsupportedSelector("YAML", "", "the document root is not a mapping")
 	}
 	return &doc, nil
 }
-func yamlNodeAt(doc *yaml.Node, parts []string) (*yaml.Node, *yaml.Node, error) {
+func yamlNodeAt(doc *yaml.Node, parts []string) (*yaml.Node, bool, error) {
 	node := doc.Content[0]
-	var parent *yaml.Node
 	for _, part := range parts {
 		if node.Kind != yaml.MappingNode {
-			return nil, nil, fmt.Errorf("YAML parent %q is not a mapping", part)
+			return nil, false, unsupportedSelector("YAML", strings.Join(parts, "."), fmt.Sprintf("parent of %q is not a mapping", part))
 		}
-		parent = node
-		var next *yaml.Node
+		var matches []*yaml.Node
 		for i := 0; i < len(node.Content); i += 2 {
-			if node.Content[i].Value == part {
-				next = node.Content[i+1]
-				break
+			key := node.Content[i]
+			if key.Kind != yaml.ScalarNode || key.Tag != "!!str" {
+				return nil, false, unsupportedSelector("YAML", strings.Join(parts, "."), "complex or non-string mapping keys are not supported")
+			}
+			if key.Value == part {
+				matches = append(matches, node.Content[i+1])
 			}
 		}
-		if next == nil {
-			return nil, parent, fmt.Errorf("YAML key %q does not exist", part)
+		if len(matches) > 1 {
+			return nil, false, fmt.Errorf("YAML key %q is duplicated", part)
 		}
-		node = next
+		if len(matches) == 0 {
+			return node, false, nil
+		}
+		node = matches[0]
 	}
-	return node, parent, nil
+	return node, true, nil
 }
 func scalarFromYAML(n *yaml.Node) (Scalar, error) {
 	if n.Kind != yaml.ScalarNode {
-		return Scalar{}, fmt.Errorf("YAML selection is not scalar")
+		return Scalar{}, unsupportedSelector("YAML", "", "selection is not a scalar string, number, or boolean")
 	}
 	switch n.Tag {
 	case "!!bool":
-		return Scalar{n.Value, Boolean}, nil
+		if n.Value != "true" && n.Value != "false" {
+			return Scalar{}, fmt.Errorf("unsupported YAML boolean %q", n.Value)
+		}
+		return Scalar{Text: n.Value, Kind: Boolean}, nil
 	case "!!int", "!!float":
-		return Scalar{n.Value, Number}, nil
+		if _, err := scalarFromText(n.Value, string(Number)); err != nil {
+			return Scalar{}, fmt.Errorf("unsupported YAML number %q", n.Value)
+		}
+		return Scalar{Text: n.Value, Kind: Number}, nil
+	case "!!str":
+		return Scalar{Text: n.Value, Kind: String}, nil
 	default:
-		return Scalar{n.Value, String}, nil
+		return Scalar{}, unsupportedSelector("YAML", "", fmt.Sprintf("tag %s is not a scalar string, number, or boolean", n.Tag))
 	}
 }
+
+func setYAMLScalar(node *yaml.Node, scalar Scalar) {
+	node.Kind = yaml.ScalarNode
+	node.Style = 0
+	node.Value = scalar.Text
+	switch scalar.Kind {
+	case String:
+		node.Tag = "!!str"
+	case Boolean:
+		node.Tag = "!!bool"
+	case Number:
+		node.Tag = "!!float"
+		if !strings.ContainsAny(scalar.Text, ".eE") {
+			node.Tag = "!!int"
+		}
+	}
+}
+
 func readYAML(selector string, data []byte) (Scalar, error) {
+	parts, err := yamlPath(selector)
+	if err != nil {
+		return Scalar{}, err
+	}
 	doc, err := yamlRoot(data)
 	if err != nil {
 		return Scalar{}, err
 	}
-	n, _, err := yamlNodeAt(doc, yamlPath(selector))
+	n, found, err := yamlNodeAt(doc, parts)
 	if err != nil {
 		return Scalar{}, err
+	}
+	if !found {
+		return Scalar{}, fmt.Errorf("YAML key %q does not exist", selector)
 	}
 	return scalarFromYAML(n)
 }
 func updateYAML(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
+	parts, err := yamlPath(selector)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
 	doc, err := yamlRoot(data)
 	if err != nil {
 		return nil, Scalar{}, err
 	}
-	parts := yamlPath(selector)
-	n, _, findErr := yamlNodeAt(doc, parts)
+	n, found, findErr := yamlNodeAt(doc, parts)
+	if findErr != nil {
+		return nil, Scalar{}, findErr
+	}
 	var s Scalar
-	if findErr == nil {
+	if found {
 		cur, e := scalarFromYAML(n)
 		if e != nil {
 			return nil, Scalar{}, e
@@ -644,133 +884,208 @@ func updateYAML(selector string, data []byte, value, policy, valueType string) (
 		if e != nil {
 			return nil, Scalar{}, e
 		}
-		n.Value = s.Text
-		n.Tag = map[Kind]string{String: "!!str", Number: "!!float", Boolean: "!!bool"}[s.Kind]
+		setYAMLScalar(n, s)
 	} else {
 		if policy != "add" {
-			return nil, Scalar{}, findErr
+			return nil, Scalar{}, fmt.Errorf("YAML key %q does not exist", selector)
 		}
-		if len(parts) < 1 {
-			return nil, Scalar{}, findErr
-		}
-		parent, _, e := yamlNodeAt(doc, parts[:len(parts)-1])
+		parent, parentFound, e := yamlNodeAt(doc, parts[:len(parts)-1])
 		if e != nil {
 			return nil, Scalar{}, e
 		}
-		if parent.Kind != yaml.MappingNode {
-			return nil, Scalar{}, fmt.Errorf("YAML parent is not a mapping")
+		if !parentFound || parent.Kind != yaml.MappingNode {
+			return nil, Scalar{}, fmt.Errorf("YAML parent for %q does not exist", selector)
+		}
+		if valueType == "" {
+			return nil, Scalar{}, fmt.Errorf("added YAML values require an explicit scalar type")
 		}
 		s, e = scalarFromText(value, valueType)
 		if e != nil {
 			return nil, Scalar{}, e
 		}
 		key := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: parts[len(parts)-1]}
-		val := &yaml.Node{Kind: yaml.ScalarNode, Tag: map[Kind]string{String: "!!str", Number: "!!float", Boolean: "!!bool"}[s.Kind], Value: s.Text}
+		val := &yaml.Node{}
+		setYAMLScalar(val, s)
 		parent.Content = append(parent.Content, key, val)
 	}
 	out, err := yaml.Marshal(doc)
-	return out, s, err
-}
-
-func tomlParts(selector string) []string { return strings.Split(selector, ".") }
-func tomlFind(selector string, data []byte) (lineSpan, Scalar, error) {
-	parts := tomlParts(selector)
-	key := parts[len(parts)-1]
-	wantSection := strings.Join(parts[:len(parts)-1], ".")
-	section := ""
-	var found []lineSpan
-	var scalar Scalar
-	offset := 0
-	for _, lineBytes := range bytes.SplitAfter(data, []byte("\n")) {
-		line := strings.TrimSuffix(strings.TrimSuffix(string(lineBytes), "\n"), "\r")
-		trim := strings.TrimSpace(line)
-		if strings.HasPrefix(trim, "[") && strings.HasSuffix(trim, "]") {
-			section = strings.TrimSpace(trim[1 : len(trim)-1])
-			offset += len(lineBytes)
-			continue
-		}
-		if trim == "" || strings.HasPrefix(trim, "#") || section != wantSection {
-			offset += len(lineBytes)
-			continue
-		}
-		idx := strings.Index(line, "=")
-		if idx < 0 || strings.TrimSpace(line[:idx]) != key {
-			offset += len(lineBytes)
-			continue
-		}
-		vs := idx + 1
-		for vs < len(line) && (line[vs] == ' ' || line[vs] == '\t') {
-			vs++
-		}
-		ve := len(line)
-		if c := strings.Index(line[vs:], " #"); c >= 0 {
-			ve = vs + c
-		}
-		raw := strings.TrimSpace(line[vs:ve])
-		start := vs
-		end := vs + len(strings.TrimRight(line[vs:ve], " \t"))
-		kind := String
-		text := raw
-		if strings.HasPrefix(raw, "\"") {
-			if decoded, e := strconv.Unquote(raw); e == nil {
-				text = decoded
-			} else {
-				return lineSpan{}, Scalar{}, e
-			}
-		} else if raw == "true" || raw == "false" {
-			kind = Boolean
-		} else if _, e := strconv.ParseFloat(raw, 64); e == nil {
-			kind = Number
-		} else {
-			return lineSpan{}, Scalar{}, fmt.Errorf("unsupported TOML scalar %q", raw)
-		}
-		found = append(found, lineSpan{valueStart: offset + start, valueEnd: offset + end})
-		scalar = Scalar{text, kind}
-		offset += len(lineBytes)
-	}
-	if len(found) != 1 {
-		return lineSpan{}, Scalar{}, fmt.Errorf("TOML key %q matched %d times", selector, len(found))
-	}
-	return found[0], scalar, nil
-}
-func readTOML(selector string, data []byte) (Scalar, error) {
-	_, s, e := tomlFind(selector, data)
-	return s, e
-}
-func updateTOML(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
-	sp, cur, err := tomlFind(selector, data)
-	if err == nil {
-		s, e := scalarFromText(value, string(cur.Kind))
-		if e != nil {
-			return nil, Scalar{}, e
-		}
-		enc := encodedScalar(s, "toml")
-		out := append([]byte(nil), data[:sp.valueStart]...)
-		out = append(out, enc...)
-		out = append(out, data[sp.valueEnd:]...)
-		return out, s, nil
-	}
-	if policy != "add" {
+	if err != nil {
 		return nil, Scalar{}, err
 	}
-	parts := tomlParts(selector)
-	section := strings.Join(parts[:len(parts)-1], ".")
-	key := parts[len(parts)-1]
-	if section != "" && !bytes.Contains(data, []byte("["+section+"]")) {
-		return nil, Scalar{}, fmt.Errorf("TOML parent %q does not exist", section)
+	if _, err := yamlRoot(out); err != nil {
+		return nil, Scalar{}, fmt.Errorf("updated YAML is invalid: %w", err)
 	}
-	s, e := scalarFromText(value, valueType)
-	if e != nil {
-		return nil, Scalar{}, e
-	}
-	newline := "\n"
-	if bytes.Contains(data, []byte("\r\n")) {
-		newline = "\r\n"
-	}
-	out := append([]byte(nil), data...)
-	if len(out) > 0 && !bytes.HasSuffix(out, []byte("\n")) {
-		out = append(out, []byte(newline)...)
-	}
-	out = append(out, []byte(key+" = "+encodedScalar(s, "toml")+newline)...)
 	return out, s, nil
+}
+
+func tomlParts(selector string) ([]string, error) {
+	var parsed map[string]any
+	if strings.TrimSpace(selector) == "" || strings.ContainsAny(selector, "\r\n") {
+		return nil, unsupportedSelector("TOML", selector, "selector is not a dotted key")
+	}
+	if err := toml.Unmarshal([]byte(selector+" = true\n"), &parsed); err != nil {
+		return nil, unsupportedSelector("TOML", selector, "selector is not valid TOML dotted-key syntax")
+	}
+	var parts []string
+	var current any = parsed
+	for {
+		mapping, ok := current.(map[string]any)
+		if !ok || len(mapping) != 1 {
+			break
+		}
+		for key, value := range mapping {
+			parts = append(parts, key)
+			current = value
+		}
+	}
+	if value, ok := current.(bool); !ok || !value || len(parts) == 0 {
+		return nil, unsupportedSelector("TOML", selector, "selector is not a dotted key")
+	}
+	return parts, nil
+}
+
+func scalarFromTOML(value any) (Scalar, error) {
+	switch value := value.(type) {
+	case string:
+		return Scalar{Text: value, Kind: String}, nil
+	case bool:
+		return Scalar{Text: strconv.FormatBool(value), Kind: Boolean}, nil
+	case int64:
+		return Scalar{Text: strconv.FormatInt(value, 10), Kind: Number}, nil
+	case uint64:
+		return Scalar{Text: strconv.FormatUint(value, 10), Kind: Number}, nil
+	case float64:
+		text := strconv.FormatFloat(value, 'g', -1, 64)
+		if _, err := scalarFromText(text, string(Number)); err != nil {
+			return Scalar{}, unsupportedSelector("TOML", "", "non-finite numbers are not supported")
+		}
+		return Scalar{Text: text, Kind: Number}, nil
+	case time.Time, time.Duration:
+		return Scalar{}, unsupportedSelector("TOML", "", "date and time values are not supported")
+	default:
+		return Scalar{}, unsupportedSelector("TOML", "", "selection is not a scalar string, number, or boolean")
+	}
+}
+
+func tomlDocument(data []byte) (map[string]any, error) {
+	var document map[string]any
+	if err := toml.Unmarshal(data, &document); err != nil {
+		return nil, err
+	}
+	return document, nil
+}
+
+func tomlLookup(document map[string]any, parts []string) (any, bool, error) {
+	current := document
+	for i, part := range parts {
+		value, found := current[part]
+		if !found {
+			return current, false, nil
+		}
+		if i == len(parts)-1 {
+			return value, true, nil
+		}
+		next, ok := value.(map[string]any)
+		if !ok {
+			return nil, false, unsupportedSelector("TOML", strings.Join(parts, "."), fmt.Sprintf("parent %q is not a table", part))
+		}
+		current = next
+	}
+	return nil, false, nil
+}
+
+func readTOML(selector string, data []byte) (Scalar, error) {
+	parts, err := tomlParts(selector)
+	if err != nil {
+		return Scalar{}, err
+	}
+	document, err := tomlDocument(data)
+	if err != nil {
+		return Scalar{}, err
+	}
+	value, found, err := tomlLookup(document, parts)
+	if err != nil {
+		return Scalar{}, err
+	}
+	if !found {
+		return Scalar{}, fmt.Errorf("TOML key %q does not exist", selector)
+	}
+	return scalarFromTOML(value)
+}
+func updateTOML(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
+	parts, err := tomlParts(selector)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	document, err := tomlDocument(data)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	current, found, err := tomlLookup(document, parts)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	var scalar Scalar
+	if found {
+		existing, err := scalarFromTOML(current)
+		if err != nil {
+			return nil, Scalar{}, err
+		}
+		scalar, err = scalarFromText(value, string(existing.Kind))
+		if err != nil {
+			return nil, Scalar{}, err
+		}
+	} else {
+		if policy != "add" {
+			return nil, Scalar{}, fmt.Errorf("TOML key %q does not exist", selector)
+		}
+		if valueType == "" {
+			return nil, Scalar{}, fmt.Errorf("added TOML values require an explicit scalar type")
+		}
+		scalar, err = scalarFromText(value, valueType)
+		if err != nil {
+			return nil, Scalar{}, err
+		}
+	}
+	parentValue, parentFound, err := tomlLookup(document, parts[:len(parts)-1])
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	var parent map[string]any
+	if len(parts) == 1 {
+		parent = document
+	} else if !parentFound {
+		return nil, Scalar{}, fmt.Errorf("TOML parent for %q does not exist", selector)
+	} else {
+		var ok bool
+		parent, ok = parentValue.(map[string]any)
+		if !ok {
+			return nil, Scalar{}, unsupportedSelector("TOML", selector, "parent is not a table")
+		}
+	}
+	switch scalar.Kind {
+	case String:
+		parent[parts[len(parts)-1]] = scalar.Text
+	case Boolean:
+		parent[parts[len(parts)-1]] = scalar.Text == "true"
+	case Number:
+		if strings.ContainsAny(scalar.Text, ".eE") {
+			number, _ := strconv.ParseFloat(scalar.Text, 64)
+			parent[parts[len(parts)-1]] = number
+		} else {
+			number, parseErr := strconv.ParseInt(scalar.Text, 10, 64)
+			if parseErr != nil {
+				return nil, Scalar{}, fmt.Errorf("TOML integer %q is out of range", scalar.Text)
+			}
+			parent[parts[len(parts)-1]] = number
+		}
+	}
+	out, err := toml.Marshal(document)
+	if err != nil {
+		return nil, Scalar{}, err
+	}
+	if _, err := tomlDocument(out); err != nil {
+		return nil, Scalar{}, fmt.Errorf("updated TOML is invalid: %w", err)
+	}
+	return out, scalar, nil
 }
