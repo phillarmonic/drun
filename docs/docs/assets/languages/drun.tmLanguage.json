@@ -1319,7 +1319,7 @@
         },
         {
           "name": "support.type.property-name.drun",
-          "match": "^(\\s*)(default\\s+branches|naming|types|messages|ban|min\\s+length)(?=\\s*:)"
+          "match": "^(\\s*)(default\\s+branches|protected\\s+branches|naming|types|messages|ban|min\\s+length)(?=\\s*:)"
         },
         {
           "name": "storage.modifier.drun",

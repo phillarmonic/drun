@@ -340,6 +340,7 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 	case *ast.GitPolicyStatement:
 		return &GitPolicy{
 			DefaultBranches:      s.DefaultBranches,
+			ProtectedBranches:    s.ProtectedBranches,
 			BranchPattern:        s.BranchPattern,
 			BranchTypes:          s.BranchTypes,
 			CommitPattern:        s.CommitPattern,

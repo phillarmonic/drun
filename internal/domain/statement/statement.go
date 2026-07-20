@@ -361,6 +361,7 @@ func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }
 // GitPolicy represents a project-level setting for git conventions.
 type GitPolicy struct {
 	DefaultBranches      []string
+	ProtectedBranches    []string
 	BranchPattern        string
 	BranchTypes          []string
 	CommitPattern        string

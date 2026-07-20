@@ -13,6 +13,7 @@ import (
 type GitPolicyStatement struct {
 	Token                lexer.Token
 	DefaultBranches      []string
+	ProtectedBranches    []string
 	BranchPattern        string   // e.g. "{type}/{identifier}-{description}"
 	BranchTypes          []string // e.g. ["feat", "fix", "hotfix", "chore"]
 	CommitPattern        string   // e.g. "{identifier}: {message}"
@@ -28,11 +29,20 @@ func (gp *GitPolicyStatement) String() string {
 	var out strings.Builder
 	out.WriteString("git policy:")
 
-	if gp.BranchPattern != "" || len(gp.DefaultBranches) > 0 || len(gp.BranchTypes) > 0 {
+	if gp.BranchPattern != "" || len(gp.DefaultBranches) > 0 || len(gp.ProtectedBranches) > 0 || len(gp.BranchTypes) > 0 {
 		out.WriteString("\n  branch:")
 		if len(gp.DefaultBranches) > 0 {
 			out.WriteString("\n    default branches: ")
 			for i, b := range gp.DefaultBranches {
+				if i > 0 {
+					out.WriteString(", ")
+				}
+				fmt.Fprintf(&out, "\"%s\"", b)
+			}
+		}
+		if len(gp.ProtectedBranches) > 0 {
+			out.WriteString("\n    protected branches: ")
+			for i, b := range gp.ProtectedBranches {
 				if i > 0 {
 					out.WriteString(", ")
 				}

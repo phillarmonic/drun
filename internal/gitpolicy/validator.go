@@ -12,6 +12,7 @@ var conventionalCommitHeaderPattern = regexp.MustCompile(`^[a-z]+(?:-[a-z]+)*(?:
 // Policy represents the project's git conventions.
 type Policy struct {
 	DefaultBranches      []string
+	ProtectedBranches    []string
 	BranchPattern        string
 	BranchTypes          []string
 	CommitPattern        string

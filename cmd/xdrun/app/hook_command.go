@@ -129,10 +129,10 @@ func createHookListCommand() *cobra.Command {
 
 func createHookRunCommand(a *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "run <hook-name> [args...]",
-		Short: "Run a git hook validation manually",
+		Use:    "run <hook-name> [args...]",
+		Short:  "Run a git hook validation manually",
 		Hidden: true, // Typically invoked by the git hook script itself
-		Args: cobra.MinimumNArgs(1),
+		Args:   cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			hookName := args[0]
 			hookArgs := args[1:]
@@ -156,7 +156,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 			}
 
 			eng := engine.NewEngine(os.Stdout)
-			
+
 			// Extract project settings
 			ctx, err := eng.BuildProjectContext(program.Project, specPath)
 			if err != nil {
@@ -170,6 +170,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 			policyStmt := ctx.GitPolicy
 			policy := &gitpolicy.Policy{
 				DefaultBranches:      policyStmt.DefaultBranches,
+				ProtectedBranches:    policyStmt.ProtectedBranches,
 				BranchPattern:        policyStmt.BranchPattern,
 				BranchTypes:          policyStmt.BranchTypes,
 				CommitPattern:        policyStmt.CommitPattern,
@@ -189,7 +190,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("failed to read commit message file: %w", err)
 				}
-				
+
 				// Validate branch name first
 				branchName, err := eng.RunGitCommandOutput("rev-parse", "--abbrev-ref", "HEAD")
 				if err != nil {
@@ -236,7 +237,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 
 func installHook(gitDir, hookName string) error {
 	path := filepath.Join(gitDir, hookName)
-	
+
 	// Check if exists and not managed by drun
 	if content, err := os.ReadFile(path); err == nil {
 		if !strings.Contains(string(content), "# managed by drun") {
@@ -255,7 +256,7 @@ xdrun cmd:hook run %s "$@"
 
 func uninstallHook(gitDir, hookName string) error {
 	path := filepath.Join(gitDir, hookName)
-	
+
 	if content, err := os.ReadFile(path); err == nil {
 		if strings.Contains(string(content), "# managed by drun") {
 			err = os.Remove(path)

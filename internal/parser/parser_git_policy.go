@@ -14,18 +14,17 @@ import (
 // Syntax:
 //
 //	git policy:
-//	    default branches:
-//	        master
-//	        develop
-//	    branch naming:
-//	        pattern "{type}/{identifier}-{description}"
-//	        types: feat, fix, hotfix, chore
-//	    commit messages:
-//	        pattern "{identifier}: {message}"
+//	    branch:
+//	        default branches: "master", "develop"
+//	        protected branches: "master", "develop"
+//	        naming: "{type}/{identifier}-{description}"
+//	        types: "feat", "fix", "hotfix", "chore"
+//	    commit:
+//	        messages: "{identifier}: {message}"
 //	        extract identifier from branch
-//	        min length 10
-//	        ban "WIP"
-//	    enforce signed commits
+//	        min length: 10
+//	        ban: "WIP"
+//	        enforce signed commits
 func (p *Parser) parseGitPolicyStatement() *ast.GitPolicyStatement {
 	stmt := &ast.GitPolicyStatement{Token: p.curToken}
 
@@ -85,6 +84,20 @@ func (p *Parser) parseGitPolicyStatement() *ast.GitPolicyStatement {
 						stmt.DefaultBranches = append(stmt.DefaultBranches, p.parseCommaSeparatedStrings()...)
 					} else {
 						p.addError(fmt.Sprintf("expected 'branches' after 'default', got %s", p.peekToken.Type))
+						p.nextToken()
+					}
+
+				case lexer.PROTECTED:
+					// "protected branches:"
+					if p.peekToken.Type == lexer.BRANCHES {
+						p.nextToken() // consume BRANCHES
+						if !p.expectPeek(lexer.COLON) {
+							p.nextToken()
+							continue
+						}
+						stmt.ProtectedBranches = append(stmt.ProtectedBranches, p.parseCommaSeparatedStrings()...)
+					} else {
+						p.addError(fmt.Sprintf("expected 'branches' after 'protected', got %s", p.peekToken.Type))
 						p.nextToken()
 					}
 

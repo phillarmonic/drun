@@ -69,6 +69,7 @@ var keywordCompletions = []completionItem{
 	{Label: "git policy", Kind: completionItemKindKeyword, Detail: "Git conventions policy block"},
 	{Label: "git validate", Kind: completionItemKindKeyword, Detail: "Validate git conventions"},
 	{Label: "default branches", Kind: completionItemKindKeyword, Detail: "Default branch list (inside git policy)"},
+	{Label: "protected branches", Kind: completionItemKindKeyword, Detail: "Branches protected from local commits by git hooks"},
 	{Label: "branch naming", Kind: completionItemKindKeyword, Detail: "Branch naming convention (inside git policy)"},
 	{Label: "commit messages", Kind: completionItemKindKeyword, Detail: "Commit message convention (inside git policy)"},
 	{Label: "conventional commits", Kind: completionItemKindKeyword, Detail: "Built-in commit message policy mode"},

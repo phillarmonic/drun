@@ -383,6 +383,7 @@ const (
 	SIGNED     // signed
 	COMMITS    // commits
 	DEFAULT_KW // default
+	PROTECTED  // protected
 	BAN        // ban
 	VALIDATE   // validate
 	NAME_KW    // name (keyword for git validate branch name)
@@ -1139,6 +1140,8 @@ func (t TokenType) String() string {
 		return "COMMITS"
 	case DEFAULT_KW:
 		return "DEFAULT_KW"
+	case PROTECTED:
+		return "PROTECTED"
 	case BAN:
 		return "BAN"
 	case VALIDATE:
@@ -1595,6 +1598,7 @@ var keywords = map[string]TokenType{
 	"signed":        SIGNED,
 	"commits":       COMMITS,
 	"default":       DEFAULT_KW,
+	"protected":     PROTECTED,
 	"ban":           BAN,
 	"validate":      VALIDATE,
 	"name":          NAME_KW,

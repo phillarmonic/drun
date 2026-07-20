@@ -11,6 +11,7 @@ project "myapp":
   git policy:
     branch:
       default branches: "master", "main"
+      protected branches: "master", "main", "release"
       naming: "{type}/{identifier}-{description}"
       types: "feat", "fix", "chore"
     commit:
@@ -25,6 +26,7 @@ project "myapp":
 
 - `branch`: Block for branch-specific rules.
     - `default branches`: Branches that are exempt from the naming rules (for example, `main` and `develop`).
+    - `protected branches`: Branches where drun-managed hooks should reject local commits while still allowing remote updates such as pulls.
     - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
     - `types`: Allowed values for the `{type}` placeholder.
 - `commit`: Block for commit-specific rules.
