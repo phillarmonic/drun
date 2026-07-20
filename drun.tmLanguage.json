@@ -47,9 +47,6 @@
           "include": "#version"
         },
         {
-          "include": "#annotation"
-        },
-        {
           "include": "#task-template"
         },
         {
@@ -59,7 +56,13 @@
           "include": "#snippet-definition"
         },
         {
+          "include": "#requires-tools"
+        },
+        {
           "include": "#parameter-definition"
+        },
+        {
+          "include": "#git-policy"
         },
         {
           "include": "#dependency-declaration"
@@ -83,12 +86,6 @@
           "include": "#lifecycle-hooks"
         },
         {
-          "include": "#git-policy"
-        },
-        {
-          "include": "#provisioning-sources"
-        },
-        {
           "include": "#shell-config"
         },
         {
@@ -96,9 +93,6 @@
         },
         {
           "include": "#env-conditions"
-        },
-        {
-          "include": "#file-value-actions"
         },
         {
           "include": "#http-actions"
@@ -138,28 +132,6 @@
             },
             "4": {
               "name": "constant.numeric.version.drun"
-            }
-          }
-        }
-      ]
-    },
-    "annotation": {
-      "patterns": [
-        {
-          "name": "meta.annotation.drun",
-          "match": "^(\\s*)(@)([A-Za-z_][A-Za-z0-9_]*)(\\()(.*?)(\\))\\s*$",
-          "captures": {
-            "2": {
-              "name": "punctuation.definition.annotation.drun"
-            },
-            "3": {
-              "name": "entity.name.annotation.drun"
-            },
-            "4": {
-              "name": "punctuation.section.group.begin.drun"
-            },
-            "6": {
-              "name": "punctuation.section.group.end.drun"
             }
           }
         }
@@ -280,6 +252,95 @@
         {
           "name": "keyword.operator.word.drun",
           "match": "\\b(?:as|from|matching|between|of|to)\\b"
+        }
+      ]
+    },
+    "requires-tools": {
+      "patterns": [
+        {
+          "name": "meta.requires-tools.header.drun",
+          "match": "^(\\s*)(requires)(\\s+)(tools)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.declaration.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.requires-tools.source.drun",
+          "match": "^(\\s*)(from)(\\s+)(tasks)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "keyword.operator.word.drun"
+            },
+            "4": {
+              "name": "entity.name.type.import-selector.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.requires-tools.task-ref.drun",
+          "match": "^(\\s{6,})(\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_.:-]*)\\s*$",
+          "captures": {
+            "2": {
+              "name": "entity.name.function.task.drun"
+            }
+          }
+        }
+      ]
+    },
+    "git-policy": {
+      "patterns": [
+        {
+          "name": "meta.git-policy.header.drun",
+          "match": "^(\\s*)(git)(\\s+)(policy)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.constant.domain.drun"
+            },
+            "4": {
+              "name": "keyword.declaration.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git-policy.branch-block.drun",
+          "match": "^(\\s*)(branch)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git-policy.branch-property.drun",
+          "match": "^(\\s*)(default\\s+branches|protected\\s+branches|naming|types)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git-policy.commit-block.drun",
+          "match": "^(\\s*)(commit)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.git-policy.commit-property.drun",
+          "match": "^(\\s*)(messages|ban|min\\s+length)(?=\\s*:)",
+          "captures": {
+            "2": {
+              "name": "support.type.property-name.drun"
+            }
+          }
         }
       ]
     },
@@ -762,155 +823,6 @@
         }
       ]
     },
-    "file-value-actions": {
-      "patterns": [
-        {
-          "name": "meta.project-version.check.drun",
-          "match": "^(\\s*)(check)(\\s+)(project)(\\s+)(version)(\\s+)(equals|differs\\s+from)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "support.constant.domain.drun"
-            },
-            "6": {
-              "name": "storage.type.file-value.drun"
-            },
-            "8": {
-              "name": "keyword.operator.comparison.drun"
-            },
-            "10": {
-              "name": "string.quoted.double.drun",
-              "patterns": [
-                {
-                  "include": "#interpolation"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "meta.project-version.update.drun",
-          "match": "^(\\s*)(update)(\\s+)(project)(\\s+)(version)(\\s+)(to)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "support.constant.domain.drun"
-            },
-            "6": {
-              "name": "storage.type.file-value.drun"
-            },
-            "8": {
-              "name": "keyword.operator.word.drun"
-            },
-            "10": {
-              "name": "string.quoted.double.drun",
-              "patterns": [
-                {
-                  "include": "#interpolation"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "meta.file-value.get.drun",
-          "match": "^(\\s*)(get)(\\s+)(property|json|yaml|toml|match)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(from)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(as)(\\s+)(\\$[A-Za-z_][A-Za-z0-9_\\-]*)",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "storage.type.file-value.drun"
-            },
-            "6": {
-              "name": "string.quoted.double.selector.drun"
-            },
-            "8": {
-              "name": "keyword.operator.word.drun"
-            },
-            "10": {
-              "name": "string.quoted.double.path.drun"
-            },
-            "12": {
-              "name": "keyword.operator.word.drun"
-            },
-            "14": {
-              "name": "variable.other.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.file-value.check.drun",
-          "match": "^(\\s*)(check)(\\s+)(property|json|yaml|toml|match)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(in)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(equals|differs\\s+from)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "storage.type.file-value.drun"
-            },
-            "6": {
-              "name": "string.quoted.double.selector.drun"
-            },
-            "8": {
-              "name": "keyword.operator.word.drun"
-            },
-            "10": {
-              "name": "string.quoted.double.path.drun"
-            },
-            "12": {
-              "name": "keyword.operator.comparison.drun"
-            },
-            "14": {
-              "name": "string.quoted.double.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.file-value.update.drun",
-          "match": "^(\\s*)(update)(\\s+)(property|json|yaml|toml|match)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(in)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(to)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(or)(\\s+)(fail|add)(?:(\\s+)(as)(\\s+)(string|number|boolean))?",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "storage.type.file-value.drun"
-            },
-            "6": {
-              "name": "string.quoted.double.selector.drun"
-            },
-            "8": {
-              "name": "keyword.operator.word.drun"
-            },
-            "10": {
-              "name": "string.quoted.double.path.drun"
-            },
-            "12": {
-              "name": "keyword.operator.word.drun"
-            },
-            "14": {
-              "name": "string.quoted.double.drun"
-            },
-            "16": {
-              "name": "keyword.operator.word.drun"
-            },
-            "18": {
-              "name": "storage.modifier.drun"
-            },
-            "20": {
-              "name": "keyword.operator.word.drun"
-            },
-            "22": {
-              "name": "storage.type.drun"
-            }
-          }
-        }
-      ]
-    },
     "download-actions": {
       "patterns": [
         {
@@ -1247,7 +1159,7 @@
         },
         {
           "name": "entity.name.label.platform.drun",
-          "match": "^(\\s*)(mac|darwin|linux|windows)(?=\\s*:)"
+          "match": "^(\\s*)(darwin|linux|windows)(?=\\s*:)"
         },
         {
           "name": "entity.other.attribute-name.drun",
@@ -1256,74 +1168,6 @@
         {
           "name": "punctuation.definition.list-item.drun",
           "match": "^\\s*(-)(?=\\s+\")"
-        }
-      ]
-    },
-    "provisioning-sources": {
-      "patterns": [
-        {
-          "name": "meta.provisioning-sources.drun",
-          "match": "^(\\s*)(provisioning)(\\s+)(sources)(?=\\s*:)",
-          "captures": {
-            "2": {
-              "name": "keyword.declaration.config.drun"
-            },
-            "4": {
-              "name": "keyword.declaration.config.drun"
-            }
-          }
-        },
-        {
-          "name": "storage.modifier.drun",
-          "match": "\\bprovision\\b"
-        }
-      ]
-    },
-    "git-policy": {
-      "patterns": [
-        {
-          "name": "meta.git.policy.drun",
-          "match": "^(\\s*)(git)(\\s+)(policy)(?=\\s*:)",
-          "captures": {
-            "2": {
-              "name": "support.constant.domain.drun"
-            },
-            "4": {
-              "name": "keyword.declaration.config.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.git.validate.drun",
-          "match": "^(\\s*)(git)(\\s+)(validate)(\\s+)(branch(?:[_ ]name)?|commit(?:[_ ]message)?|signed(?:[_ ]commits)?|all)\\b",
-          "captures": {
-            "2": {
-              "name": "support.constant.domain.drun"
-            },
-            "4": {
-              "name": "support.type.action.drun"
-            },
-            "6": {
-              "name": "support.constant.domain.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.git.policy.section.drun",
-          "match": "^(\\s*)(branch|commit)(?=\\s*:)",
-          "captures": {
-            "2": {
-              "name": "support.constant.domain.drun"
-            }
-          }
-        },
-        {
-          "name": "support.type.property-name.drun",
-          "match": "^(\\s*)(default\\s+branches|protected\\s+branches|naming|types|messages|ban|min\\s+length)(?=\\s*:)"
-        },
-        {
-          "name": "storage.modifier.drun",
-          "match": "^(\\s*)(extract\\s+identifier\\s+from\\s+branch|enforce\\s+signed\\s+commits)\\b"
         }
       ]
     },
@@ -1482,10 +1326,6 @@
         },
         {
           "name": "support.function.builtin.drun",
-          "match": "\\b(?:current git commit|current git branch|available tasks|file exists|dir exists|start progress|update progress|finish progress|start timer|stop timer|show elapsed time|compose_cmd|docker compose command|docker compose status|dns_resolve|dns_check|dns_validate)\\b"
-        },
-        {
-          "name": "support.function.builtin.drun",
           "match": "\\b(?:now|pwd|hostname|env|secret|current)(?=\\b|\\.)"
         },
         {
@@ -1526,7 +1366,7 @@
       "patterns": [
         {
           "name": "storage.type.drun",
-          "match": "\\b(?:string|number|boolean|list|json|xml|http|https|docker|git|kubernetes|namespace|network|directory|file|service|container|image|repository|branch|url|email|uuid|semver|semver_optional_v|semver_extended|docker_tag)\\b"
+          "match": "\\b(?:string|number|boolean|list|json|xml|http|https|docker|git|kubernetes|namespace|network|directory|file|service|container|image|repository|branch|url|email|uuid|semver|semver_extended|docker_tag)\\b"
         }
       ]
     },
@@ -1534,11 +1374,11 @@
       "patterns": [
         {
           "name": "keyword.control.drun",
-          "match": "\\b(?:if|else|when|otherwise|for|each|in|parallel|try|catch|finally|throw|rethrow|ignore|break|continue|before|after|on|then|and|or|not|is|are|older|newer|than|contains|matches|matching|using|ordered|between|exists|available|running|detected|version)\\b"
+          "match": "\\b(?:if|else|when|otherwise|for|each|in|parallel|try|catch|finally|throw|rethrow|ignore|break|continue|before|after|on|then|and|or|not|is|are|contains|matches|matching|between|exists|available|running|detected|version)\\b"
         },
         {
           "name": "keyword.declaration.drun",
-          "match": "\\b(?:version|task|means|mode|project|scm|provisioning|sources|set|let|define|parameter|snippet|template|mixin|requires|tools|given|accepts|defaults|from|to|as|of|depends|include|use|uses|includes|call|with|capture|service)\\b"
+          "match": "\\b(?:version|task|means|mode|project|set|let|define|parameter|snippet|template|mixin|requires|tools|given|accepts|defaults|from|to|as|of|depends|include|use|uses|includes|call|with|capture|service)\\b"
         },
         {
           "name": "keyword.operator.word.drun",
@@ -1546,11 +1386,11 @@
         },
         {
           "name": "support.type.action.drun",
-          "match": "\\b(?:info|step|warn|warning|error|success|fail|echo|run|exec|shell|output|config|create|copy|move|delete|read|write|append|backup|check|ensure|extract|archive|build|push|pull|tag|remove|start|starting|stop|scale|deploy|rollback|wait|open|ping|test|expect|download|upload|send|receive|fetch|clone|init|switch|merge|add|commit|status|log|show|detect|search|update|restart|orchestrate|execute|apply|describe|expose)\\b"
+          "match": "\\b(?:info|step|warn|error|success|fail|echo|run|exec|shell|output|config|create|copy|move|delete|read|write|append|backup|check|extract|archive|build|push|pull|tag|remove|start|starting|stop|scale|deploy|rollback|wait|open|ping|test|expect|download|upload|send|receive|fetch|clone|init|switch|merge|add|commit|status|log|show|detect|search|update|restart|orchestrate|execute|apply|describe|expose)\\b"
         },
         {
           "name": "support.constant.domain.drun",
-          "match": "\\b(?:drun|drunhub|setup|teardown|docker|image|container|compose|replicas|rollout|pods|pod|ingress|manifest|manifests|namespace|port|registry|git|github|gitlab|generic|cli|filesystem|latest|tags|series|formats|metadata|authentication|ambient|refs|date|branch|checkout|repository|remote|changes|message|files|get|post|put|delete|patch|head|options|request|response|body|headers|header|endpoint|api|data|timeout|retry|follow|redirects|verify|ssl|auth|bearer|basic|token|user|password|content|type|accept|health|healthy|service|services|provision|ready|host|connection|strategy|sequential|parallel|dependency-based|circuit|breaker|failure|threshold|recovery|interval|retries|networks|external|required|autoprovision|driver|condition|dns|tcp|domain|record|expected|ip|ips|command|working|workdir|missing|force|recreate|deps|never|always|makefile|target|args|pre|post|jobs|verbose|allocate_tty|ssh|key|fallback|delay|path|startup|shutdown|discovery|metrics|enabled|labels|unavailable|max|min|consul|etcd|server|domains|ttl|cache|memory|cpu|limit|policy|orphans|period|env_file|available|installed|tool|tools|framework|environment|node|npm|yarn|pnpm|bun|python|pip|go|golang|cargo|java|maven|gradle|ruby|gem|php|composer|rust|make|kubectl|helm|terraform|aws|gcp|azure|ci|local|production|staging|development|react|vue|angular|django|rails|express|spring|laravel|line|match|pattern|email|format|concat|split|replace|secret|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|transform|subtract|multiply|divide|modulo|property|filtered|sorted|reversed|unique|first|last|basename|dirname|extension|prefix|suffix|allow|permissions|dir|file|folder|any|running|current|all|exists|locally|attached)\\b"
+          "match": "\\b(?:drun|drunhub|setup|teardown|docker|image|container|compose|replicas|rollout|pods|pod|ingress|manifest|manifests|namespace|port|registry|git|branch|checkout|repository|remote|changes|message|files|get|post|put|delete|patch|head|options|request|response|body|headers|header|endpoint|api|data|timeout|retry|follow|redirects|verify|ssl|auth|bearer|basic|token|user|password|content|type|accept|health|healthy|service|services|ready|host|connection|strategy|sequential|parallel|dependency-based|circuit|breaker|failure|threshold|recovery|interval|retries|networks|external|required|autoprovision|driver|condition|dns|tcp|domain|record|expected|ip|ips|command|working|workdir|missing|force|recreate|deps|never|always|makefile|target|args|pre|post|jobs|verbose|allocate_tty|ssh|key|fallback|delay|path|startup|shutdown|discovery|metrics|enabled|labels|unavailable|max|min|consul|etcd|server|domains|ttl|cache|memory|cpu|limit|policy|orphans|period|env_file|available|installed|tool|tools|framework|environment|node|npm|yarn|pnpm|bun|python|pip|go|golang|cargo|java|maven|gradle|ruby|gem|php|composer|rust|make|kubectl|helm|terraform|aws|gcp|azure|ci|local|production|staging|development|react|vue|angular|django|rails|express|spring|laravel|line|match|pattern|email|format|concat|split|replace|secret|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|transform|subtract|multiply|divide|modulo|property|filtered|sorted|reversed|unique|first|last|basename|dirname|extension|prefix|suffix|allow|permissions|dir|file|folder|any|running|current|all|exists|locally|attached)\\b"
         }
       ]
     },
