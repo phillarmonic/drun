@@ -183,19 +183,47 @@ project "quality":
 
   requires tools:
     from tasks:
-      lint
-    golangci-lint >= "1.64" provision
-    gosec >= "2.22" <= "2.22" provision
+      ci
     dummy-tool >= "1.2.3" <= "1.2.3" provision
 
 task "lint":
   requires tools:
     go >= "1.21"
-    docker
+    golangci-lint >= "1.64" provision
   run "go test ./..."
+
+task "security":
+  requires tools:
+    gosec >= "2.22" <= "2.22" provision
+  run "gosec ./..."
+
+task "ci" mode "ci":
+  requires tools:
+    from tasks:
+      lint
+      security
+  call task lint
+  call task security
 ```
 
-Use `from tasks:` inside `requires tools:` when a project or task should inherit another task's direct and inherited tool requirements. Use `xdrun --allow-tool-version-changes <task>` when an already-installed tool must be upgraded or downgraded to satisfy an exact requirement. See [73-tool-provisioning.drun](73-tool-provisioning.drun) for the complete example.
+Use `from tasks:` inside `requires tools:` when a project or task should inherit another task's direct and inherited tool requirements. The `ci` task above inherits the requirements from `lint` and `security`, and the project inherits from `ci`, so startup validation and CI runs share the same tool contract. Use `xdrun --allow-tool-version-changes <task>` when an already-installed tool must be upgraded or downgraded to satisfy an exact requirement. See [73-tool-provisioning.drun](73-tool-provisioning.drun) for the complete example.
+
+### Protected Branch Hooks
+```drun
+project "guarded":
+  git policy:
+    branch:
+      default branches: "main", "develop"
+      protected branches: "main", "release"
+      naming: "{type}/{identifier}-{description}"
+      types: "feat", "fix", "chore"
+    commit:
+      messages: "conventional commits"
+      ban: "WIP", "fixup"
+      min length: 10
+```
+
+Run `xdrun cmd:hook install` to install drun-managed `pre-commit`, `commit-msg`, and `pre-push` hooks. A direct local commit on `main` or `release` is rejected with `branch '<name>' is protected`; commit on a feature branch and merge through review instead.
 
 ### Built-in Actions
 ```drun

@@ -63,6 +63,36 @@ project "myapp":
 
 In that example, `lint` checks `golangci-lint`, `go`, and `docker` before it runs. The project-level block inherits the already-flattened requirements from `lint`, so startup validation checks the same three tools before planning or executing any task.
 
+For CI workflows, inheritance lets the task that people run describe the complete tool contract once, while keeping each leaf task responsible for its own tools:
+
+```drun
+project "drun-language-support":
+  requires tools:
+    from tasks:
+      ci
+
+task "lint" means "Run LSP linters":
+  requires tools:
+    go >= "1.21"
+    golangci-lint >= "1.64" provision
+  run "golangci-lint run ./..."
+
+task "security" means "Run security checks":
+  requires tools:
+    gosec >= "2.22" provision
+  run "gosec ./..."
+
+task "ci" mode "ci" means "Run the language-server CI pipeline":
+  requires tools:
+    from tasks:
+      lint
+      security
+  call task lint
+  call task security
+```
+
+Running `xdrun ci` checks `golangci-lint`, `gosec`, and the inherited `go` requirement before the CI steps begin. Because the task uses `mode "ci"`, successful shell output stays buffered and only failures print the captured command output.
+
 **Key Features:**
 
 - **Fail-Fast By Default**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error unless that specific line ends with `provision`.

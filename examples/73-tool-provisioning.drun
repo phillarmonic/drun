@@ -6,16 +6,36 @@ project "tooling-demo" version "1.0":
 		"github:acme/platform-tooling/catalog/provisionings.yaml@stable"
 
 	requires tools:
-		golangci-lint >= "1.64" provision
-		gosec >= "2.22" <= "2.22" provision
+		from tasks:
+			ci
 		dummy-tool >= "1.2.3" <= "1.2.3" provision
 
 task "lint" means "Run linters with automatic provisioning":
+	requires tools:
+		go >= "1.21"
+		golangci-lint >= "1.64" provision
 	info "Project sources override the implicit first-party catalog when they define the same tool."
 	info "If neither project nor user sources define dummy-tool, drun falls back to the embedded catalog."
 	info "Run with --allow-tool-version-changes if an installed tool must be changed to satisfy an exact version."
 	run "golangci-lint run ./..."
 
 task "security" means "Run an exact-version security tool":
+	requires tools:
+		gosec >= "2.22" <= "2.22" provision
 	info "The closed range on gosec forwards 2.22 to install_versioned when the chosen target supports it."
 	run "gosec ./..."
+
+task "vulnerability" means "Check Go dependencies for known vulnerabilities":
+	requires tools:
+		govulncheck provision
+	run "govulncheck ./..."
+
+task "ci" mode "ci" means "Run quiet CI checks":
+	requires tools:
+		from tasks:
+			lint
+			security
+			vulnerability
+	call task lint
+	call task security
+	call task vulnerability

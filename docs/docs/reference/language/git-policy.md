@@ -74,3 +74,35 @@ xdrun cmd:hook uninstall
 ```
 
 When installed, drun blocks local commits on protected branches with `branch '<name>' is protected`, checks commit messages against your policy, and blocks pushes if commits are unsigned when `enforce signed commits` is enabled.
+
+### Direct-Commit Prevention
+
+Use `protected branches:` for branches that should only receive changes through review and merge workflows:
+
+```drun
+project "guarded":
+  git policy:
+    branch:
+      default branches: "main", "develop"
+      protected branches: "main", "release"
+      naming: "{type}/{identifier}-{description}"
+      types: "feat", "fix", "chore"
+    commit:
+      messages: "conventional commits"
+      ban: "WIP", "fixup"
+      min length: 10
+```
+
+Install the hooks once per clone:
+
+```bash
+xdrun cmd:hook install
+```
+
+The installed `pre-commit` hook rejects a local commit made while the current branch is `main` or `release`:
+
+```text
+branch 'main' is protected; commit on a feature branch and merge through your normal review flow
+```
+
+Remote updates such as `git pull` are still allowed. The guard only blocks local commit creation on the protected branch, so the normal workflow is to commit on a feature branch and merge through your repository host.

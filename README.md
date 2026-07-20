@@ -194,6 +194,20 @@ Use `from tasks:` inside `requires tools:` to inherit another task's direct and 
 
 See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) for a fuller example covering project overrides, the implicit first-party catalog, the embedded fallback, and exact-version requests.
 
+## Git Policy Hooks
+
+Project git policies can protect branches from direct local commits:
+
+```drun
+project "myapp":
+  git policy:
+    branch:
+      default branches: "main", "develop"
+      protected branches: "main", "release"
+```
+
+After `xdrun cmd:hook install`, the drun-managed `pre-commit` hook rejects commits made directly on a protected branch with `branch '<name>' is protected; commit on a feature branch and merge through your normal review flow`. Pulls and other remote updates are still allowed.
+
 ## Learn More
 
 - Getting started: [installation, initialization, running tasks, and templates](./docs/docs/getting-started/index.md)
