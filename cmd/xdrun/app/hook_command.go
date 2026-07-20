@@ -35,14 +35,14 @@ Note: The 'cmd:' prefix is reserved for built-in commands to avoid conflicts wit
 	return cmd
 }
 
-var supportedHooks = []string{"commit-msg", "pre-push"}
+var supportedHooks = []string{"pre-commit", "commit-msg", "pre-push"}
 
 func createHookInstallCommand(a *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "install [hook-name]",
 		Short: "Install drun-managed git hooks",
 		Long: `Install git hooks that enforce the project's git policy.
-If no hook-name is specified, all supported hooks (commit-msg, pre-push) are installed.`,
+If no hook-name is specified, all supported hooks (pre-commit, commit-msg, pre-push) are installed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			hooksToInstall := supportedHooks
@@ -181,6 +181,21 @@ func createHookRunCommand(a *App) *cobra.Command {
 			}
 
 			switch hookName {
+			case "pre-commit":
+				branchName, err := eng.RunGitCommandOutput("rev-parse", "--abbrev-ref", "HEAD")
+				if err != nil {
+					return fmt.Errorf("failed to get current branch: %w", err)
+				}
+				branchName = strings.TrimSpace(branchName)
+
+				if err := policy.ValidateProtectedBranchCommit(branchName); err != nil {
+					fmt.Printf("❌ Protected branch commit blocked: %v\n", err)
+					return err
+				}
+
+				fmt.Println("✅ Protected branch check passed.")
+				return nil
+
 			case "commit-msg":
 				if len(hookArgs) < 1 {
 					return fmt.Errorf("commit-msg hook requires the commit message file path as argument")

@@ -463,7 +463,7 @@ func buildDrunBasicsGuide(projectName string) string {
 		"## Git Policy and Hooks",
 		"",
 		"Projects can define git conventions in the project body using the `git policy:` block.",
-		"When a git policy is defined, use `xdrun cmd:hook install` to install drun-managed git hooks (like commit-msg, pre-push) that enforce these conventions.",
+		"When a git policy is defined, use `xdrun cmd:hook install` to install drun-managed git hooks (like pre-commit, commit-msg, pre-push) that enforce these conventions.",
 		"",
 		"```drun",
 		`project "%s" version "1.0":`,

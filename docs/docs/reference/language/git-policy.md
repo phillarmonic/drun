@@ -26,7 +26,7 @@ project "myapp":
 
 - `branch`: Block for branch-specific rules.
     - `default branches`: Branches that are exempt from the naming rules (for example, `main` and `develop`).
-    - `protected branches`: Branches where drun-managed hooks should reject local commits while still allowing remote updates such as pulls.
+    - `protected branches`: Exact branch names where the drun-managed `pre-commit` hook rejects local commits while still allowing remote updates such as pulls.
     - `naming`: The required pattern for feature branches. Supports `{type}`, `{identifier}`, and `{description}` placeholders.
     - `types`: Allowed values for the `{type}` placeholder.
 - `commit`: Block for commit-specific rules.
@@ -63,7 +63,7 @@ task "pre-flight" means "Run checks before push":
 Instead of manually running checks in tasks, you can use drun to manage and enforce Git hooks on developer machines:
 
 ```bash
-# Install drun Git hooks (commit-msg and pre-push) to enforce the policy
+# Install drun Git hooks (pre-commit, commit-msg, and pre-push) to enforce the policy
 xdrun cmd:hook install
 
 # List installed hooks and their status
@@ -73,4 +73,4 @@ xdrun cmd:hook list
 xdrun cmd:hook uninstall
 ```
 
-When installed, drun automatically checks commit messages against your policy and blocks pushes if commits are unsigned when `enforce signed commits` is enabled.
+When installed, drun blocks local commits on protected branches with `branch '<name>' is protected`, checks commit messages against your policy, and blocks pushes if commits are unsigned when `enforce signed commits` is enabled.

@@ -38,6 +38,29 @@ func (p *Policy) IsDefaultBranch(branchName string) bool {
 	return false
 }
 
+// IsProtectedBranch returns true if the branch is explicitly protected.
+func (p *Policy) IsProtectedBranch(branchName string) bool {
+	for _, b := range p.ProtectedBranches {
+		if b == branchName {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateProtectedBranchCommit rejects local commits on explicitly protected branches.
+func (p *Policy) ValidateProtectedBranchCommit(branchName string) error {
+	if branchName == "" {
+		return errors.New("current branch is unknown")
+	}
+
+	if p.IsProtectedBranch(branchName) {
+		return fmt.Errorf("branch '%s' is protected; commit on a feature branch and merge through your normal review flow", branchName)
+	}
+
+	return nil
+}
+
 // ValidateBranchName checks if a branch name conforms to the policy.
 func (p *Policy) ValidateBranchName(branchName string) error {
 	if p.IsDefaultBranch(branchName) {
