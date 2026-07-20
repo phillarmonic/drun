@@ -177,10 +177,20 @@ project "api":
     "./.drun/provisionings.yaml"
 
   requires tools:
+    from tasks:
+      lint
     golangci-lint >= "1.64" provision
     gosec >= "2.22" <= "2.22" provision
     govulncheck provision
+
+task "lint":
+  requires tools:
+    go >= "1.21"
+    docker
+  run "go test ./..."
 ```
+
+Use `from tasks:` inside `requires tools:` to inherit another task's direct and inherited tool requirements. Missing task refs and circular inheritance fail before tool detection runs.
 
 See [examples/73-tool-provisioning.drun](./examples/73-tool-provisioning.drun) for a fuller example covering project overrides, the implicit first-party catalog, the embedded fallback, and exact-version requests.
 

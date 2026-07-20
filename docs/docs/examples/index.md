@@ -182,12 +182,20 @@ project "quality":
     "./.drun/provisionings.yaml"
 
   requires tools:
+    from tasks:
+      lint
     golangci-lint >= "1.64" provision
     gosec >= "2.22" <= "2.22" provision
     dummy-tool >= "1.2.3" <= "1.2.3" provision
+
+task "lint":
+  requires tools:
+    go >= "1.21"
+    docker
+  run "go test ./..."
 ```
 
-Use `xdrun --allow-tool-version-changes <task>` when an already-installed tool must be upgraded or downgraded to satisfy an exact requirement. See [73-tool-provisioning.drun](73-tool-provisioning.drun) for the complete example.
+Use `from tasks:` inside `requires tools:` when a project or task should inherit another task's direct and inherited tool requirements. Use `xdrun --allow-tool-version-changes <task>` when an already-installed tool must be upgraded or downgraded to satisfy an exact requirement. See [73-tool-provisioning.drun](73-tool-provisioning.drun) for the complete example.
 
 ### Built-in Actions
 ```drun

@@ -285,6 +285,9 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	if err := e.registerTasks(program.Tasks, currentFile); err != nil {
 		return fmt.Errorf("task registration failed: %v", err)
 	}
+	if err := task.ResolveInheritedToolRequirements(e.taskRegistry); err != nil {
+		return fmt.Errorf("resolving task tool requirements: %w", err)
+	}
 
 	// Create project context for planning
 	projectCtx, err := e.BuildProjectContext(program.Project, currentFile)
@@ -786,6 +789,9 @@ func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile 
 					Constraints:   constraints,
 					AutoProvision: astTool.AutoProvision,
 				})
+			}
+			for _, source := range s.TaskSources {
+				ctx.RequiredToolTaskRefs = append(ctx.RequiredToolTaskRefs, source.Tasks...)
 			}
 		case *ast.ProvisioningSourcesStatement:
 			ctx.ProvisioningSources = append(ctx.ProvisioningSources, s.Sources...)

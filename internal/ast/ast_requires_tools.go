@@ -32,11 +32,28 @@ func (tr *ToolRequirement) String() string {
 	return out.String()
 }
 
+// TaskToolSources represents a "from tasks:" source clause inside a
+// "requires tools:" block.
+type TaskToolSources struct {
+	Token lexer.Token
+	Tasks []string
+}
+
+func (tts *TaskToolSources) String() string {
+	var out strings.Builder
+	out.WriteString("from tasks:")
+	for _, task := range tts.Tasks {
+		fmt.Fprintf(&out, "\n  %s", task)
+	}
+	return out.String()
+}
+
 // RequiresToolsStatement represents a "requires tools:" block
 // This can appear in both project settings and task bodies.
 type RequiresToolsStatement struct {
-	Token lexer.Token
-	Tools []ToolRequirement
+	Token       lexer.Token
+	Tools       []ToolRequirement
+	TaskSources []TaskToolSources
 }
 
 func (rts *RequiresToolsStatement) statementNode()      {}
@@ -47,6 +64,11 @@ func (rts *RequiresToolsStatement) String() string {
 	for _, tool := range rts.Tools {
 		out.WriteString("\n  ")
 		out.WriteString(tool.String())
+	}
+	for _, source := range rts.TaskSources {
+		sourceString := strings.ReplaceAll(source.String(), "\n", "\n  ")
+		out.WriteString("\n  ")
+		out.WriteString(sourceString)
 	}
 	return out.String()
 }
