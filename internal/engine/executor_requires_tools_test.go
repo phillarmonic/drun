@@ -1,8 +1,11 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -208,6 +211,240 @@ func TestEngine_checkToolRequirements_PostProvisionRecheckFailure(t *testing.T) 
 	}
 }
 
+func TestEngine_ExecuteTaskRequiresToolsInheritanceChecksInheritedTools(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+task "build":
+  requires tools:
+    go >= "1.21"
+
+task "lint":
+  requires tools:
+    golangci-lint
+    from tasks:
+      build
+
+task "security":
+  requires tools:
+    gosec
+    from tasks:
+      lint
+  info "security ok"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var checked []string
+	engine := NewEngine(&bytes.Buffer{})
+	engine.newToolDetector = func() toolDetector {
+		return &recordingToolDetector{
+			available: map[string]bool{
+				"go":            true,
+				"golangci-lint": true,
+				"gosec":         true,
+			},
+			versions: map[string]string{"go": "1.22.0"},
+			checked:  &checked,
+		}
+	}
+
+	if err := engine.Execute(program, "security"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	assertCheckedTools(t, checked, []string{"gosec", "golangci-lint", "go"})
+}
+
+func TestEngine_ProjectRequiresToolsInheritanceChecksDirectThenMultipleTaskSources(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+project "quality":
+  requires tools:
+    project-tool
+    from tasks:
+      build
+    from tasks:
+      lint
+
+task "build":
+  requires tools:
+    go
+
+task "lint":
+  requires tools:
+    golangci-lint
+
+task "default":
+  info "ok"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var checked []string
+	engine := NewEngine(&bytes.Buffer{})
+	engine.newToolDetector = func() toolDetector {
+		return &recordingToolDetector{
+			available: map[string]bool{
+				"project-tool":  true,
+				"go":            true,
+				"golangci-lint": true,
+			},
+			checked: &checked,
+		}
+	}
+
+	if err := engine.Execute(program, "default"); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	assertCheckedTools(t, checked, []string{"project-tool", "go", "golangci-lint"})
+}
+
+func TestEngine_ProjectRequiresToolsDirectRequirementOverridesInheritedConstraint(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+project "quality":
+  requires tools:
+    shared-tool >= "2.0"
+    from tasks:
+      lint
+
+task "lint":
+  requires tools:
+    shared-tool >= "1.0"
+
+task "default":
+  info "ok"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var checked []string
+	engine := NewEngine(&bytes.Buffer{})
+	engine.newToolDetector = func() toolDetector {
+		return &recordingToolDetector{
+			available: map[string]bool{"shared-tool": true},
+			versions:  map[string]string{"shared-tool": "1.5.0"},
+			checked:   &checked,
+		}
+	}
+
+	err = engine.Execute(program, "default")
+	if err == nil {
+		t.Fatal("Execute() error = nil, want direct constraint failure")
+	}
+	if !strings.Contains(err.Error(), "constraint >= 2.0") {
+		t.Fatalf("expected direct constraint failure, got %v", err)
+	}
+	assertCheckedTools(t, checked, []string{"shared-tool"})
+}
+
+func TestEngine_ProjectRequiresToolsInheritanceUsesIncludedPlatformVariant(t *testing.T) {
+	current := currentPlatformLabel()
+	other := "linux"
+	if current == other {
+		other = "mac"
+	}
+
+	dir := t.TempDir()
+	mainPath := filepath.Join(dir, "main.drun")
+	sharedPath := filepath.Join(dir, "shared.drun")
+
+	if err := os.WriteFile(sharedPath, []byte(`version: 2.0
+
+project "shared":
+  set label to "shared"
+
+@platform("`+current+`")
+task "lint":
+  requires tools:
+    current-platform-tool
+
+@platform("`+other+`")
+task "lint":
+  requires tools:
+    other-platform-tool
+`), 0o600); err != nil {
+		t.Fatalf("WriteFile(shared) error = %v", err)
+	}
+
+	mainSource := `version: 2.0
+
+project "app":
+  include "shared.drun"
+  requires tools:
+    from tasks:
+      "shared.lint"
+
+task "default":
+  info "ok"
+`
+	if err := os.WriteFile(mainPath, []byte(mainSource), 0o600); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	program, err := ParseStringWithFilename(mainSource, mainPath)
+	if err != nil {
+		t.Fatalf("ParseStringWithFilename() error = %v", err)
+	}
+
+	var checked []string
+	var out bytes.Buffer
+	engine := NewEngineWithOptions(WithOutput(&out), WithVerbose(true))
+	engine.newToolDetector = func() toolDetector {
+		return &recordingToolDetector{
+			available: map[string]bool{
+				"current-platform-tool": true,
+				"other-platform-tool":   false,
+			},
+			checked: &checked,
+		}
+	}
+
+	if err := engine.ExecuteWithParamsAndFile(program, "default", nil, mainPath); err != nil {
+		t.Fatalf("ExecuteWithParamsAndFile() error = %v\noutput:\n%s", err, out.String())
+	}
+
+	assertCheckedTools(t, checked, []string{"current-platform-tool"})
+}
+
+func TestEngine_RequiresToolsInheritanceCycleFailsBeforeToolDetection(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+task "a":
+  requires tools:
+    from tasks:
+      b
+
+task "b":
+  requires tools:
+    from tasks:
+      a
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var checked []string
+	engine := NewEngine(&bytes.Buffer{})
+	engine.newToolDetector = func() toolDetector {
+		return &recordingToolDetector{checked: &checked}
+	}
+
+	err = engine.Execute(program, "a")
+	if err == nil {
+		t.Fatal("Execute() error = nil, want cycle failure")
+	}
+	if !strings.Contains(err.Error(), "circular requires-tools inheritance detected") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(checked) != 0 {
+		t.Fatalf("tool detection ran before cycle failure: %#v", checked)
+	}
+}
+
 func TestFormatConstraints(t *testing.T) {
 	constraints := []statement.VersionConstraint{
 		{Operator: ">=", Version: "1.0"},
@@ -254,5 +491,38 @@ func sequenceDetectorFactory(detectors ...toolDetector) func() toolDetector {
 		detector := detectors[index]
 		index++
 		return detector
+	}
+}
+
+type recordingToolDetector struct {
+	available map[string]bool
+	versions  map[string]string
+	checked   *[]string
+}
+
+func (r *recordingToolDetector) IsToolAvailable(tool string) bool {
+	if r.checked != nil {
+		*r.checked = append(*r.checked, tool)
+	}
+	return r.available[tool]
+}
+
+func (r *recordingToolDetector) GetToolVersion(tool string) string {
+	return r.versions[tool]
+}
+
+func (r *recordingToolDetector) CompareVersion(version1, operator, version2 string) bool {
+	return detection.NewDetector().CompareVersion(version1, operator, version2)
+}
+
+func assertCheckedTools(t *testing.T, got, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("checked tools = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("checked tools = %#v, want %#v", got, want)
+		}
 	}
 }
