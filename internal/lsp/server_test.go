@@ -91,6 +91,10 @@ func TestServerCompletionIncludesKeywordsAndTasks(t *testing.T) {
 	assertCompletionLabel(t, items, "task")
 	assertCompletionLabel(t, items, "deploy")
 	assertCompletionLabel(t, items, "attached")
+	assertCompletionLabel(t, items, "requires tools")
+	assertCompletionLabel(t, items, "from tasks")
+	assertCompletionLabel(t, items, "branch")
+	assertCompletionLabel(t, items, "protected branches")
 	assertCompletionLabel(t, items, "conventional commits")
 	assertFileValueCompletions(t, items)
 }

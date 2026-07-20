@@ -196,7 +196,7 @@ The current implementation is intentionally small and focused on editor essentia
 - `initialize`, `shutdown`, and `exit`
 - Full text-document sync
 - Parser-backed diagnostics
-- Simple keyword and task-name completions
+- Simple keyword and task-name completions, including tool-requirement inheritance and Git policy branch keywords
 
 #### Syntax Highlighting
 
