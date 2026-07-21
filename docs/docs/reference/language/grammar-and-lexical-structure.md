@@ -445,7 +445,7 @@ project_setting = "set" identifier "to" expression
                 | "include" string_literal
                 | "before" "any" "task" ":" statement_block
                 | "after" "any" "task" ":" statement_block
-                | "requires" "tools" ":" { tool_requirement }
+                | "requires" "tools" ":" { tool_requirement | tool_task_source }
                 | shell_config ;
 
 (* Reusable declarations *)
@@ -468,7 +468,7 @@ task_property = parameter_declaration
               | variable_declaration ;
 
 (* Parameters *)
-parameter_declaration = "requires" "tools" ":" { tool_requirement }
+parameter_declaration = "requires" "tools" ":" { tool_requirement | tool_task_source }
                       | "requires" parameter_spec
                       | "given" parameter_spec
                       | "accepts" parameter_spec ;
@@ -476,6 +476,8 @@ parameter_declaration = "requires" "tools" ":" { tool_requirement }
 parameter_spec = identifier [ parameter_constraint ] [ parameter_default ] ;
 
 tool_requirement = tool_name { comparison_operator ( string_literal | number ) } ;
+
+tool_task_source = "from" "tasks" ":" { task_name } ;
 
 parameter_constraint = "from" array_literal
                      | "matching" "pattern" string_literal

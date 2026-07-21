@@ -35,6 +35,32 @@ func TestPolicy_ValidateBranchName(t *testing.T) {
 	}
 }
 
+func TestPolicy_ValidateProtectedBranchCommit(t *testing.T) {
+	policy := &Policy{
+		ProtectedBranches: []string{"main", "release"},
+	}
+
+	tests := []struct {
+		name       string
+		branchName string
+		wantErr    bool
+	}{
+		{"protected main", "main", true},
+		{"protected release", "release", true},
+		{"feature branch", "feat/PHIL-01-work", false},
+		{"prefix is not explicit match", "release/1.2.3", false},
+		{"unknown branch", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := policy.ValidateProtectedBranchCommit(tt.branchName); (err != nil) != tt.wantErr {
+				t.Errorf("ValidateProtectedBranchCommit() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestPolicy_ExtractIdentifier(t *testing.T) {
 	policy := &Policy{
 		DefaultBranches: []string{"master", "develop"},

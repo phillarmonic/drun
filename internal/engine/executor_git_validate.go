@@ -55,6 +55,7 @@ func (e *Engine) executeGitValidate(stmt *statement.GitValidate, ctx *ExecutionC
 func toGitPolicyModel(s *statement.GitPolicy) *gitpolicy.Policy {
 	return &gitpolicy.Policy{
 		DefaultBranches:      s.DefaultBranches,
+		ProtectedBranches:    s.ProtectedBranches,
 		BranchPattern:        s.BranchPattern,
 		BranchTypes:          s.BranchTypes,
 		CommitPattern:        s.CommitPattern,
@@ -132,7 +133,7 @@ func (e *Engine) validateSignedCommits() error {
 // RunGitCommandOutput runs a git command and gets its output
 func (e *Engine) RunGitCommandOutput(args ...string) (string, error) {
 	cmdArgs := append([]string{}, args...)
-	
+
 	// Create command
 	cmd := exec.Command("git", cmdArgs...)
 

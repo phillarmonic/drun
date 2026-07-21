@@ -323,8 +323,13 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 				AutoProvision: astTool.AutoProvision,
 			})
 		}
+		var taskRefs []string
+		for _, source := range s.TaskSources {
+			taskRefs = append(taskRefs, source.Tasks...)
+		}
 		return &RequiresTools{
-			Tools: tools,
+			Tools:    tools,
+			TaskRefs: taskRefs,
 		}, nil
 
 	case *ast.ChangeWorkdirStatement:
@@ -335,6 +340,7 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 	case *ast.GitPolicyStatement:
 		return &GitPolicy{
 			DefaultBranches:      s.DefaultBranches,
+			ProtectedBranches:    s.ProtectedBranches,
 			BranchPattern:        s.BranchPattern,
 			BranchTypes:          s.BranchTypes,
 			CommitPattern:        s.CommitPattern,

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -285,11 +286,17 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	if err := e.registerTasks(program.Tasks, currentFile); err != nil {
 		return fmt.Errorf("task registration failed: %v", err)
 	}
+	if err := task.ResolveInheritedToolRequirements(e.taskRegistry); err != nil {
+		return fmt.Errorf("resolving task tool requirements: %w", err)
+	}
 
 	// Create project context for planning
 	projectCtx, err := e.BuildProjectContext(program.Project, currentFile)
 	if err != nil {
 		return fmt.Errorf("creating project context: %w", err)
+	}
+	if err := e.registerIncludedTasks(projectCtx, currentFile); err != nil {
+		return fmt.Errorf("included task registration failed: %w", err)
 	}
 
 	// Check project-level tool requirements before planning/execution starts
@@ -429,6 +436,36 @@ func (e *Engine) registerTasks(tasks []*ast.TaskStatement, currentFile string) e
 			return err
 		}
 	}
+	return nil
+}
+
+func (e *Engine) registerIncludedTasks(projectCtx *ProjectContext, currentFile string) error {
+	if projectCtx == nil || len(projectCtx.IncludedTasks) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(projectCtx.IncludedTasks))
+	for name := range projectCtx.IncludedTasks {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, namespacedName := range names {
+		namespace, _, ok := strings.Cut(namespacedName, ".")
+		if !ok || namespace == "" {
+			return fmt.Errorf("included task %q is missing namespace", namespacedName)
+		}
+		for _, astTask := range projectCtx.IncludedTasks[namespacedName] {
+			domainTask, err := task.NewTask(astTask, namespace, currentFile)
+			if err != nil {
+				return fmt.Errorf("converting included task %s: %w", namespacedName, err)
+			}
+			if err := e.taskRegistry.RegisterNamespaced(domainTask); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -786,6 +823,9 @@ func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile 
 					Constraints:   constraints,
 					AutoProvision: astTool.AutoProvision,
 				})
+			}
+			for _, source := range s.TaskSources {
+				ctx.RequiredToolTaskRefs = append(ctx.RequiredToolTaskRefs, source.Tasks...)
 			}
 		case *ast.ProvisioningSourcesStatement:
 			ctx.ProvisioningSources = append(ctx.ProvisioningSources, s.Sources...)

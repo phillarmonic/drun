@@ -1,9 +1,11 @@
 package task
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
 func TestTask_Validate(t *testing.T) {
@@ -210,5 +212,154 @@ func TestNewTask(t *testing.T) {
 	}
 	if len(task.Dependencies) != 1 {
 		t.Errorf("Dependencies length = %v, want 1", len(task.Dependencies))
+	}
+}
+
+func TestResolveInheritedToolRequirements_FlattensNestedTaskRefs(t *testing.T) {
+	registry := NewRegistry()
+	for _, task := range []*Task{
+		{
+			Name: "build",
+			Body: []statement.Statement{
+				&statement.RequiresTools{Tools: []statement.ToolRequirement{{Name: "go"}}},
+			},
+		},
+		{
+			Name: "lint",
+			Body: []statement.Statement{
+				&statement.RequiresTools{
+					Tools:    []statement.ToolRequirement{{Name: "golangci-lint"}},
+					TaskRefs: []string{"build"},
+				},
+			},
+		},
+		{
+			Name: "security",
+			Body: []statement.Statement{
+				&statement.RequiresTools{
+					Tools:    []statement.ToolRequirement{{Name: "gosec"}},
+					TaskRefs: []string{"lint"},
+				},
+			},
+		},
+	} {
+		if err := registry.Register(task); err != nil {
+			t.Fatalf("Register(%s) error = %v", task.Name, err)
+		}
+	}
+
+	if err := ResolveInheritedToolRequirements(registry); err != nil {
+		t.Fatalf("ResolveInheritedToolRequirements() error = %v", err)
+	}
+
+	security, err := registry.Get("security")
+	if err != nil {
+		t.Fatalf("Get(security) error = %v", err)
+	}
+	requiresTools := security.Body[0].(*statement.RequiresTools)
+	wantTools := []string{"gosec", "golangci-lint", "go"}
+	if len(requiresTools.Tools) != len(wantTools) {
+		t.Fatalf("Tools length = %d, want %d: %#v", len(requiresTools.Tools), len(wantTools), requiresTools.Tools)
+	}
+	for i, want := range wantTools {
+		if got := requiresTools.Tools[i].Name; got != want {
+			t.Fatalf("Tools[%d] = %q, want %q", i, got, want)
+		}
+	}
+	if len(requiresTools.TaskRefs) != 0 {
+		t.Fatalf("TaskRefs = %#v, want flattened refs to be cleared", requiresTools.TaskRefs)
+	}
+}
+
+func TestResolveInheritedProjectToolRequirements_AfterTaskFlattenDoesNotDuplicate(t *testing.T) {
+	registry := NewRegistry()
+	for _, task := range []*Task{
+		{
+			Name: "build",
+			Body: []statement.Statement{
+				&statement.RequiresTools{Tools: []statement.ToolRequirement{{Name: "go"}}},
+			},
+		},
+		{
+			Name: "lint",
+			Body: []statement.Statement{
+				&statement.RequiresTools{
+					Tools:    []statement.ToolRequirement{{Name: "golangci-lint"}},
+					TaskRefs: []string{"build"},
+				},
+			},
+		},
+	} {
+		if err := registry.Register(task); err != nil {
+			t.Fatalf("Register(%s) error = %v", task.Name, err)
+		}
+	}
+	if err := ResolveInheritedToolRequirements(registry); err != nil {
+		t.Fatalf("ResolveInheritedToolRequirements() error = %v", err)
+	}
+
+	tools, err := ResolveInheritedProjectToolRequirements(registry, []string{"lint"})
+	if err != nil {
+		t.Fatalf("ResolveInheritedProjectToolRequirements() error = %v", err)
+	}
+
+	wantTools := []string{"golangci-lint", "go"}
+	if len(tools) != len(wantTools) {
+		t.Fatalf("Tools length = %d, want %d: %#v", len(tools), len(wantTools), tools)
+	}
+	for i, want := range wantTools {
+		if got := tools[i].Name; got != want {
+			t.Fatalf("Tools[%d] = %q, want %q", i, got, want)
+		}
+	}
+}
+
+func TestResolveInheritedToolRequirements_MissingRef(t *testing.T) {
+	registry := NewRegistry()
+	if err := registry.Register(&Task{
+		Name: "security",
+		Body: []statement.Statement{
+			&statement.RequiresTools{TaskRefs: []string{"missing"}},
+		},
+	}); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	err := ResolveInheritedToolRequirements(registry)
+	if err == nil {
+		t.Fatal("ResolveInheritedToolRequirements() error = nil, want missing ref error")
+	}
+	if !strings.Contains(err.Error(), `requires tools from task "missing" not found`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveInheritedToolRequirements_Cycle(t *testing.T) {
+	registry := NewRegistry()
+	for _, task := range []*Task{
+		{
+			Name: "a",
+			Body: []statement.Statement{
+				&statement.RequiresTools{TaskRefs: []string{"b"}},
+			},
+		},
+		{
+			Name: "b",
+			Body: []statement.Statement{
+				&statement.RequiresTools{TaskRefs: []string{"a"}},
+			},
+		},
+	} {
+		if err := registry.Register(task); err != nil {
+			t.Fatalf("Register(%s) error = %v", task.Name, err)
+		}
+	}
+
+	err := ResolveInheritedToolRequirements(registry)
+	if err == nil {
+		t.Fatal("ResolveInheritedToolRequirements() error = nil, want cycle error")
+	}
+	if !strings.Contains(err.Error(), "circular requires-tools inheritance detected") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

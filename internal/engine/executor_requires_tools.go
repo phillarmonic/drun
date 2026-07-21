@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/domain/task"
 	"github.com/phillarmonic/drun/v2/internal/provisioning"
 	"github.com/phillarmonic/drun/v2/internal/shell"
 )
@@ -33,7 +34,15 @@ type versionMismatch struct {
 
 // executeRequiresTools checks that all required tools are available and meet version constraints.
 func (e *Engine) executeRequiresTools(stmt *statement.RequiresTools, ctx *ExecutionContext) error {
-	return e.checkToolRequirements(e.newToolDetector(), stmt.Tools, ctx.Project, ctx)
+	tools := append([]statement.ToolRequirement(nil), stmt.Tools...)
+	if len(stmt.TaskRefs) > 0 {
+		inherited, err := task.ResolveInheritedProjectToolRequirements(e.taskRegistry, stmt.TaskRefs)
+		if err != nil {
+			return err
+		}
+		tools = append(tools, inherited...)
+	}
+	return e.checkToolRequirements(e.newToolDetector(), tools, ctx.Project, ctx)
 }
 
 // checkToolRequirements validates a list of tool requirements against the system.
@@ -50,8 +59,16 @@ func (e *Engine) checkToolRequirements(detector toolDetector, tools []statement.
 
 // checkProjectToolRequirements checks project-level tool requirements at startup.
 func (e *Engine) checkProjectToolRequirements(projectCtx *ProjectContext) error {
-	if projectCtx == nil || len(projectCtx.RequiredTools) == 0 {
+	if projectCtx == nil || (len(projectCtx.RequiredTools) == 0 && len(projectCtx.RequiredToolTaskRefs) == 0) {
 		return nil
+	}
+	if len(projectCtx.RequiredToolTaskRefs) > 0 {
+		inherited, err := task.ResolveInheritedProjectToolRequirements(e.taskRegistry, projectCtx.RequiredToolTaskRefs)
+		if err != nil {
+			return err
+		}
+		projectCtx.RequiredTools = append(projectCtx.RequiredTools, inherited...)
+		projectCtx.RequiredToolTaskRefs = nil
 	}
 
 	return e.checkToolRequirements(e.newToolDetector(), projectCtx.RequiredTools, projectCtx, nil)

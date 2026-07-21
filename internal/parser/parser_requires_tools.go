@@ -45,6 +45,20 @@ func (p *Parser) parseRequiresToolsStatement() *ast.RequiresToolsStatement {
 			continue
 		}
 
+		if p.curToken.Type == lexer.FROM && p.peekToken.Type == lexer.TASKS {
+			taskSources := p.parseTaskToolSources()
+			if taskSources != nil {
+				stmt.TaskSources = append(stmt.TaskSources, *taskSources)
+			} else {
+				p.nextToken()
+				continue
+			}
+			if p.curToken.Type == lexer.DEDENT {
+				p.nextToken()
+			}
+			continue
+		}
+
 		// Parse a tool requirement line
 		toolReq := p.parseToolRequirement()
 		if toolReq != nil {
@@ -58,12 +72,74 @@ func (p *Parser) parseRequiresToolsStatement() *ast.RequiresToolsStatement {
 	// Do not advance past DEDENT here. The task parser expects to be left on the last token of the statement.
 	// The project parser will manually advance past DEDENT.
 
-	if len(stmt.Tools) == 0 {
-		p.addError("requires tools: block must contain at least one tool requirement")
+	if len(stmt.Tools) == 0 && len(stmt.TaskSources) == 0 {
+		p.addError("requires tools: block must contain at least one tool requirement or task source")
 		return nil
 	}
 
 	return stmt
+}
+
+// parseTaskToolSources parses a "from tasks:" source clause inside a
+// "requires tools:" block.
+func (p *Parser) parseTaskToolSources() *ast.TaskToolSources {
+	sources := &ast.TaskToolSources{Token: p.curToken}
+
+	if !p.expectPeek(lexer.TASKS) {
+		return nil
+	}
+	if !p.expectPeek(lexer.COLON) {
+		return nil
+	}
+	if !p.expectPeekSkipNewlines(lexer.INDENT) {
+		return nil
+	}
+
+	p.nextToken()
+
+	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
+		switch p.curToken.Type {
+		case lexer.NEWLINE, lexer.COMMENT, lexer.MULTILINE_COMMENT:
+			p.nextToken()
+			continue
+		}
+
+		taskName, ok := p.parseTaskToolSourceName()
+		if !ok {
+			p.nextToken()
+			continue
+		}
+		sources.Tasks = append(sources.Tasks, taskName)
+	}
+
+	if len(sources.Tasks) == 0 {
+		p.addError("from tasks: clause must contain at least one task name")
+		return nil
+	}
+
+	return sources
+}
+
+func (p *Parser) parseTaskToolSourceName() (string, bool) {
+	switch p.curToken.Type {
+	case lexer.STRING:
+		name := p.curToken.Literal
+		p.nextToken()
+		return name, true
+	default:
+		if !p.isTaskNamePartToken(p.curToken) {
+			p.addError(fmt.Sprintf("expected task name in from tasks: clause, got %s instead", p.curToken.Type))
+			return "", false
+		}
+	}
+
+	name := p.curToken.Literal
+	combined, ok := p.collectDashedName(name)
+	if !ok {
+		return "", false
+	}
+	p.nextToken()
+	return combined, true
 }
 
 // parseProvisioningSourcesStatement parses a "provisioning sources:" block.

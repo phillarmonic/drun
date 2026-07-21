@@ -352,7 +352,8 @@ type ToolRequirement struct {
 // RequiresTools represents a "requires tools:" block that validates tool
 // availability and version constraints before execution proceeds.
 type RequiresTools struct {
-	Tools []ToolRequirement
+	Tools    []ToolRequirement
+	TaskRefs []string
 }
 
 func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }
@@ -360,6 +361,7 @@ func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }
 // GitPolicy represents a project-level setting for git conventions.
 type GitPolicy struct {
 	DefaultBranches      []string
+	ProtectedBranches    []string
 	BranchPattern        string
 	BranchTypes          []string
 	CommitPattern        string

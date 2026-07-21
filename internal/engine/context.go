@@ -60,23 +60,24 @@ func (ctx *ExecutionContext) GetCurrentTask() string {
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name                string                                    // project name
-	Version             string                                    // project version
-	Settings            map[string]string                         // project settings (set key to value) - accessible via $globals.key
-	Parameters          map[string]*ast.ProjectParameterStatement // project-level shared parameters - accessible via $params.key
-	Snippets            map[string]*ast.SnippetStatement          // reusable code snippets
-	HookManager         *hooks.Manager                            // lifecycle hooks manager
-	ShellConfigs        map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
-	IncludedSnippets    map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
-	IncludedTemplates   map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
-	IncludedTasks       map[string][]*ast.TaskStatement           // namespaced tasks: "docker.deploy"
-	IncludedSettings    map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
-	IncludedParams      map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
-	IncludedFiles       map[string]bool                           // track included files to prevent circular includes
-	RequiredTools       []statement.ToolRequirement               // project-level required tools
-	ProvisioningSources []string                                  // ordered project-level provisioning catalogs
-	GitPolicy           *statement.GitPolicy                      // project-level git policy
-	SCMRegistry         *ast.SCMRegistryStatement                 // project-level technology-oriented SCM registry
+	Name                 string                                    // project name
+	Version              string                                    // project version
+	Settings             map[string]string                         // project settings (set key to value) - accessible via $globals.key
+	Parameters           map[string]*ast.ProjectParameterStatement // project-level shared parameters - accessible via $params.key
+	Snippets             map[string]*ast.SnippetStatement          // reusable code snippets
+	HookManager          *hooks.Manager                            // lifecycle hooks manager
+	ShellConfigs         map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
+	IncludedSnippets     map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
+	IncludedTemplates    map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
+	IncludedTasks        map[string][]*ast.TaskStatement           // namespaced tasks: "docker.deploy"
+	IncludedSettings     map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
+	IncludedParams       map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
+	IncludedFiles        map[string]bool                           // track included files to prevent circular includes
+	RequiredTools        []statement.ToolRequirement               // project-level required tools
+	RequiredToolTaskRefs []string                                  // project-level task refs for inherited required tools
+	ProvisioningSources  []string                                  // ordered project-level provisioning catalogs
+	GitPolicy            *statement.GitPolicy                      // project-level git policy
+	SCMRegistry          *ast.SCMRegistryStatement                 // project-level technology-oriented SCM registry
 }
 
 // Implement interpolation.ProjectContext interface

@@ -70,6 +70,38 @@ func TestFromAST_Shell(t *testing.T) {
 	}
 }
 
+func TestFromAST_RequiresToolsPreservesTaskRefs(t *testing.T) {
+	domainStmt, err := FromAST(&ast.RequiresToolsStatement{
+		Tools: []ast.ToolRequirement{{Name: "gosec"}},
+		TaskSources: []ast.TaskToolSources{
+			{Tasks: []string{"build", "lint"}},
+			{Tasks: []string{"integration"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromAST() error = %v", err)
+	}
+
+	requiresTools, ok := domainStmt.(*RequiresTools)
+	if !ok {
+		t.Fatalf("Expected *RequiresTools, got %T", domainStmt)
+	}
+
+	if len(requiresTools.Tools) != 1 || requiresTools.Tools[0].Name != "gosec" {
+		t.Fatalf("unexpected direct tools: %#v", requiresTools.Tools)
+	}
+
+	wantRefs := []string{"build", "lint", "integration"}
+	if len(requiresTools.TaskRefs) != len(wantRefs) {
+		t.Fatalf("TaskRefs length = %d, want %d", len(requiresTools.TaskRefs), len(wantRefs))
+	}
+	for i, want := range wantRefs {
+		if got := requiresTools.TaskRefs[i]; got != want {
+			t.Fatalf("TaskRefs[%d] = %q, want %q", i, got, want)
+		}
+	}
+}
+
 func TestFromAST_GitEnsureVersion(t *testing.T) {
 	domainStmt, err := FromAST(&ast.GitEnsureVersionStatement{
 		Candidate: "$release_version", CandidateIsVariable: true, Source: "runtime",

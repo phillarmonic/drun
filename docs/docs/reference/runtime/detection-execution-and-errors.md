@@ -39,6 +39,60 @@ task "security":
   run "gosec ./..."
 ```
 
+Task and project blocks can also inherit tool requirements from tasks. Use a nested `from tasks:` clause when one task should enforce the same tool contract as another task without copying every requirement line:
+
+```drun
+task "build":
+  requires tools:
+    go >= "1.21"
+    docker
+  run "go build ./..."
+
+task "lint":
+  requires tools:
+    golangci-lint >= "1.64" provision
+    from tasks:
+      build
+  run "golangci-lint run ./..."
+
+project "myapp":
+  requires tools:
+    from tasks:
+      lint
+```
+
+In that example, `lint` checks `golangci-lint`, `go`, and `docker` before it runs. The project-level block inherits the already-flattened requirements from `lint`, so startup validation checks the same three tools before planning or executing any task.
+
+For CI workflows, inheritance lets the task that people run describe the complete tool contract once, while keeping each leaf task responsible for its own tools:
+
+```drun
+project "drun-language-support":
+  requires tools:
+    from tasks:
+      ci
+
+task "lint" means "Run LSP linters":
+  requires tools:
+    go >= "1.21"
+    golangci-lint >= "1.64" provision
+  run "golangci-lint run ./..."
+
+task "security" means "Run security checks":
+  requires tools:
+    gosec >= "2.22" provision
+  run "gosec ./..."
+
+task "ci" mode "ci" means "Run the language-server CI pipeline":
+  requires tools:
+    from tasks:
+      lint
+      security
+  call task lint
+  call task security
+```
+
+Running `xdrun ci` checks `golangci-lint`, `gosec`, and the inherited `go` requirement before the CI steps begin. Because the task uses `mode "ci"`, successful shell output stays buffered and only failures print the captured command output.
+
 **Key Features:**
 
 - **Fail-Fast By Default**: Missing tools or unsatisfied versions cause execution to halt immediately with a clear error unless that specific line ends with `provision`.
@@ -46,6 +100,7 @@ task "security":
 - **Bare Tool Names**: Writing just the tool name (e.g., `docker`) asserts that the executable must be present on `PATH`, without version checking.
 - **Unquoted Versions**: Supports both quoted (`"1.21"`) and unquoted (`1.21`) version numbers.
 - **Per-Line Provisioning Intent**: `provision` applies only to the requirement on the same line. Other tools in the block keep their normal fail-fast behavior unless they also opt in.
+- **Inherited Task Requirements**: `from tasks:` copies the named tasks' direct and inherited tool requirements into the current block before execution. Missing task refs and circular inheritance are reported before tool detection runs.
 
 **Provisioning Semantics:**
 
@@ -56,6 +111,18 @@ task "security":
 - **Provisioning Failure**: If no provisioning entry exists, provisioning exits non-zero, or the post-provision re-check still fails, the enclosing project/task fails before any dependent work runs.
 
 `requires tools:` validates installation and version only. Even with `provision`, it does not verify that background services or daemons are currently reachable. For runtime health checks, use detection conditions such as `if docker is running:`.
+
+#### Inherited Requirement Resolution
+
+`from tasks:` entries are resolved against the registered task set after task parsing and before execution. References may be bare task names such as `build`, quoted names such as `"integration test"`, or namespaced task names such as `docker.build` when the task registry contains that name.
+
+Resolution is recursive. If task `release` inherits from `lint`, and `lint` inherits from `build`, then `release` receives the tool requirements from both `lint` and `build`. Direct tools listed in the current block stay first, followed by inherited tools in declaration order.
+
+drun validates inheritance before checking tool availability:
+
+- A missing source task fails with an error naming the unresolved task reference.
+- Circular inheritance such as `a -> b -> a` fails with a circular `requires-tools` inheritance error.
+- Once a task block is flattened, execution uses only concrete tool requirements; later runtime checks do not need to understand the inheritance syntax.
 
 #### Provisioning Sources
 

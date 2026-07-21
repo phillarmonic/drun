@@ -252,6 +252,7 @@ project "myapp":
   git policy:
     branch:
       default branches: "main"
+      protected branches: "main", "release"
       naming: "{type}/{identifier}-{description}"
       types: "feat", "fix"
     commit:
@@ -285,6 +286,12 @@ task "deploy":
 
 	if gitPolicy.CommitPattern != "conventional commits" {
 		t.Errorf("gitPolicy.CommitPattern not %q. got=%q", "conventional commits", gitPolicy.CommitPattern)
+	}
+	if len(gitPolicy.DefaultBranches) != 1 || gitPolicy.DefaultBranches[0] != "main" {
+		t.Errorf("gitPolicy.DefaultBranches unexpected: %#v", gitPolicy.DefaultBranches)
+	}
+	if len(gitPolicy.ProtectedBranches) != 2 || gitPolicy.ProtectedBranches[0] != "main" || gitPolicy.ProtectedBranches[1] != "release" {
+		t.Errorf("gitPolicy.ProtectedBranches unexpected: %#v", gitPolicy.ProtectedBranches)
 	}
 	if !gitPolicy.ExtractIdentifier {
 		t.Error("gitPolicy.ExtractIdentifier should be true")

@@ -127,6 +127,95 @@ task "security":
 	}
 }
 
+func TestParser_RequiresTools_FromTasksClause(t *testing.T) {
+	input := `version: 2.0
+
+task "security":
+  requires tools:
+    from tasks:
+      build
+      "integration test"
+      lint-check
+`
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	if len(program.Tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(program.Tasks))
+	}
+
+	task := program.Tasks[0]
+	if len(task.Body) != 1 {
+		t.Fatalf("expected 1 statement in task body, got %d", len(task.Body))
+	}
+
+	stmt, ok := task.Body[0].(*ast.RequiresToolsStatement)
+	if !ok {
+		t.Fatalf("expected RequiresToolsStatement, got %T", task.Body[0])
+	}
+
+	if len(stmt.Tools) != 0 {
+		t.Fatalf("expected no direct tools, got %d", len(stmt.Tools))
+	}
+	if len(stmt.TaskSources) != 1 {
+		t.Fatalf("expected 1 task source clause, got %d", len(stmt.TaskSources))
+	}
+
+	expectedTasks := []string{"build", "integration test", "lint-check"}
+	if len(stmt.TaskSources[0].Tasks) != len(expectedTasks) {
+		t.Fatalf("expected %d task sources, got %d", len(expectedTasks), len(stmt.TaskSources[0].Tasks))
+	}
+	for i, expected := range expectedTasks {
+		if got := stmt.TaskSources[0].Tasks[i]; got != expected {
+			t.Fatalf("task source %d wrong: expected %q, got %q", i, expected, got)
+		}
+	}
+}
+
+func TestParser_RequiresTools_DirectToolsAndFromTasksClause(t *testing.T) {
+	input := `version: 2.0
+
+task "security":
+  requires tools:
+    gosec >= "2.27" provision
+    from tasks:
+      lint
+      test-unit
+    docker
+`
+	lexer := lexer.NewLexer(input)
+	parser := NewParser(lexer)
+	program := parser.ParseProgram()
+
+	checkParserErrors(t, parser)
+
+	task := program.Tasks[0]
+	stmt, ok := task.Body[0].(*ast.RequiresToolsStatement)
+	if !ok {
+		t.Fatalf("expected RequiresToolsStatement, got %T", task.Body[0])
+	}
+
+	if len(stmt.Tools) != 2 {
+		t.Fatalf("expected 2 direct tools, got %d", len(stmt.Tools))
+	}
+	if stmt.Tools[0].Name != "gosec" || !stmt.Tools[0].AutoProvision {
+		t.Fatalf("unexpected first tool: %#v", stmt.Tools[0])
+	}
+	if stmt.Tools[1].Name != "docker" {
+		t.Fatalf("unexpected second tool: %#v", stmt.Tools[1])
+	}
+
+	if len(stmt.TaskSources) != 1 {
+		t.Fatalf("expected 1 task source clause, got %d", len(stmt.TaskSources))
+	}
+	if got := stmt.TaskSources[0].Tasks; len(got) != 2 || got[0] != "lint" || got[1] != "test-unit" {
+		t.Fatalf("unexpected task sources: %#v", got)
+	}
+}
+
 func TestParser_RequiresTools_ProjectLevel_CRLF(t *testing.T) {
 	input := "# comment\r\n" +
 		"version: 2.0\r\n" +

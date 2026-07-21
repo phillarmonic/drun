@@ -64,6 +64,30 @@ func (r *Registry) Register(task *Task) error {
 	return nil
 }
 
+// RegisterNamespaced registers a task only by its fully qualified namespace.
+func (r *Registry) RegisterNamespaced(task *Task) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if task.Namespace == "" {
+		return fmt.Errorf("namespaced task %q must have a namespace", task.Name)
+	}
+	if err := task.Validate(); err != nil {
+		return err
+	}
+
+	fullName := task.FullName()
+	family := r.namespacedTasks[fullName]
+	if err := validateTaskVariantFamily(fullName, family, task); err != nil {
+		return err
+	}
+
+	r.namespacedTasks[fullName] = append(r.namespacedTasks[fullName], task)
+	r.taskOrder = append(r.taskOrder, task)
+
+	return nil
+}
+
 // Get retrieves a task by name
 func (r *Registry) Get(name string) (*Task, error) {
 	return r.GetForPlatform(name, r.currentPlatform)
