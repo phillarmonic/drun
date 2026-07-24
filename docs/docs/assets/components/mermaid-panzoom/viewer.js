@@ -18,6 +18,55 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+// Reads an intrinsic pixel size for a mermaid SVG. Different diagram types emit
+// different root attributes: flowcharts (with useMaxWidth:false) carry explicit
+// width/height in pixels, while others (timeline, gantt, journey, mindmap, ...)
+// emit width="100%" plus an inline max-width and rely on the viewBox. We need a
+// concrete pixel size so the panzoom container does not collapse to zero.
+function readMermaidSvgSize(svg, fallbackRect) {
+  const viewBox = svg.getAttribute("viewBox");
+  if (viewBox) {
+    const parts = viewBox.split(/[\s,]+/).map(Number).filter((n) => !Number.isNaN(n));
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+
+  const maxWidth = Number.parseFloat(svg.style.maxWidth);
+  const heightAttr = Number.parseFloat(svg.getAttribute("height") || "");
+  if (maxWidth > 0 && heightAttr > 0) {
+    return { width: maxWidth, height: heightAttr };
+  }
+
+  if (fallbackRect && fallbackRect.width > 0 && fallbackRect.height > 0) {
+    return { width: fallbackRect.width, height: fallbackRect.height };
+  }
+
+  return null;
+}
+
+// Forces a mermaid SVG to expose a deterministic pixel size so it renders
+// consistently regardless of diagram type. Without this, diagrams that only
+// declare a percentage width (no intrinsic pixels) collapse inside the
+// max-content sized viewer host and show up blank.
+function normalizeMermaidSvg(svg, fallbackRect) {
+  if (!svg) return;
+
+  const size = readMermaidSvgSize(svg, fallbackRect);
+
+  svg.style.removeProperty("max-width");
+  svg.style.removeProperty("width");
+  svg.style.removeProperty("height");
+
+  if (size) {
+    if (!svg.getAttribute("viewBox")) {
+      svg.setAttribute("viewBox", `0 0 ${size.width} ${size.height}`);
+    }
+    svg.setAttribute("width", String(size.width));
+    svg.setAttribute("height", String(size.height));
+  }
+}
+
 async function loadMermaidApi() {
   if (!mermaidApiPromise) {
     mermaidApiPromise = import(MERMAID_MODULE_URL).then((module) => {
@@ -59,6 +108,7 @@ async function renderVectorDiagram(source) {
   wrapper.className = "mermaid-panzoom-vector-host";
   wrapper.innerHTML = svg;
   bindFunctions?.(wrapper);
+  normalizeMermaidSvg(wrapper.querySelector("svg"));
   return wrapper;
 }
 
@@ -248,9 +298,9 @@ export function installViewer() {
   }
 
   function open(svgSource) {
+    const fallbackRect = svgSource.getBoundingClientRect();
     const clone = svgSource.cloneNode(true);
-    clone.removeAttribute("width");
-    clone.removeAttribute("height");
+    normalizeMermaidSvg(clone, fallbackRect);
     canvas.replaceChildren(clone);
     overlay.hidden = false;
     document.body.classList.add("mermaid-panzoom-open");
