@@ -1,0 +1,12 @@
+version: 2.0
+
+task "select path":
+  requires $environment
+  when $environment is "production":
+    info "Production path"
+  otherwise:
+    info "Non-production path"
+
+task "iterate":
+  for each $item in ["one", "two"]:
+    info "Item {$item}"

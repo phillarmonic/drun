@@ -57,6 +57,7 @@ nav = [
     { "Developer guide" = "development/index.md" },
     { "Architecture" = "development/architecture.md" },
     { "Contributing" = "development/contributing.md" },
+    { "Compatibility and language governance" = "development/compatibility-governance.md" },
     { "Implementation notes" = "development/implementation.md" },
     { "Orchestration implementation" = "development/orchestration-implementation.md" },
     { "Packages" = [

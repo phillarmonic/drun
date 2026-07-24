@@ -1,0 +1,8 @@
+version: 2.0
+
+task "hello" means "Exercise task discovery and interpolation":
+  requires $name
+  info "Hello, {$name}!"
+
+task "second task":
+  info "The second task remains selectable"

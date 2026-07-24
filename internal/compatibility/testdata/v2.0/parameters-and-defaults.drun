@@ -1,0 +1,6 @@
+version: 2.0
+
+task "deploy":
+  requires $environment from ["dev", "staging", "production"]
+  given $version defaults to "latest"
+  info "Deploying {$version} to {$environment}"

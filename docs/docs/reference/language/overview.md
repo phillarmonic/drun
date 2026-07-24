@@ -4,6 +4,19 @@
 
 drun v2 introduces a semantic, English-like domain-specific language (DSL) for defining automation tasks. It features a **completely new execution engine** that directly interprets and executes the semantic language without compilation to intermediate formats.
 
+## Compatibility within v2
+
+Language behavior is backwards compatible within a major version. A script
+accepted by an earlier stable v2 release remains accepted by later v2.x.x
+releases with the same documented parsing, validation, task-selection,
+parameter, control-flow, interpolation, dry-run, and runtime semantics.
+
+Additive features may arrive in minor releases. Deprecations remain functional
+for the rest of v2, and incompatible changes normally wait for v3. The
+[compatibility and language governance policy](../../development/compatibility-governance.md)
+defines the executable compatibility corpus and the narrowly scoped exception
+process.
+
 ### Key Features
 
 - **Natural Language Syntax**: Write automation in English-like sentences

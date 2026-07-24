@@ -10,6 +10,10 @@
 
 Full documentation lives at [phillarmonic.github.io/drun](https://phillarmonic.github.io/drun/), including the [AI integration guide](https://phillarmonic.github.io/drun/getting-started/ai-integration/).
 
+**Backwards compatibility:** a script accepted by a stable drun v2 release will
+continue to work with the same documented language behavior throughout v2.x.x.
+See the [compatibility and language governance policy](./docs/docs/development/compatibility-governance.md).
+
 Official editor extensions are available for [VS Code](https://marketplace.visualstudio.com/items?itemName=phillarmonic.drun-language-support), [Open VSX](https://open-vsx.org/extension/phillarmonic/drun-language-support), and [JetBrains IDEs](https://plugins.jetbrains.com/plugin/32865-drun-language-support).
 
 ## Why drun?
