@@ -24,7 +24,9 @@ As drun evolves, in the future, the contents of this specific block in your `AGE
 
 The instruction set surface on `AGENTS.md` is very light on purpose, considering this affects the amount of input tokens your tools consume. Then, if drun specific actions are required, the skill is red from the actual folder.
 
-## Saving money (and context) on AI agent usage (input tokens) with the drun CI execution mode
+## Saving money on AI usage with drun
+
+**How to save money (and context) on AI agent usage (input tokens) with the drun CI execution mode**
 
 Drun is designed for speed and efficiency. When running tasks that have a lot of noisy logs, but which the logs don't matter for Large Language Model usage when an error isn't thrown, you can use the **CI execution mode**.
 
@@ -38,20 +40,20 @@ Take, for example, drun's [CI pipeline](https://github.com/phillarmonic/drun/blo
 
 ```drun
 task "ci" mode "ci" means "Runs the whole CI pipeline":
-	info "Executing the local CI pipeline..."
-	step "Dependency vulnerability checks"
-	call task vuln
-	step "Linter"
-	call task lint
-	step "Unit tests"
-	call task test
-	step "Checking for regressions"
-	run "./scripts/test-regressions.sh"
-	step "Security checks"
-	call task sec
-	info "Semantic fuzzing"
-	call task fuzz with iterations=50
-	success "CI executed successfully end-to-end"
+    info "Executing the local CI pipeline..."
+    step "Dependency vulnerability checks"
+    call task vuln
+    step "Linter"
+    call task lint
+    step "Unit tests"
+    call task test
+    step "Checking for regressions"
+    run "./scripts/test-regressions.sh"
+    step "Security checks"
+    call task sec
+    info "Semantic fuzzing"
+    call task fuzz with iterations=50
+    success "CI executed successfully end-to-end"
 ```
 
 The the statement `mode "ci"` hints at the drun interpreter this supposed to be executed in the CI silent mode by default.
