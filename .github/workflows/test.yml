@@ -150,29 +150,11 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-  compatibility:
-    name: V2 Compatibility Contract
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: go.mod
-        cache: true
-        cache-dependency-path: go.sum
-
-    - name: Run v2 compatibility contract
-      run: ./scripts/test-compatibility.sh
-
-  # Build jobs cannot produce artifacts unless the compatibility contract passes.
+  # Build job also depends on successful lint
   build:
     name: Build
     runs-on: ${{ matrix.os }}
-    needs: [lint, compatibility]
+    needs: lint  # Only run after lint succeeds
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]

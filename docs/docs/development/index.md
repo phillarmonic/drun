@@ -1,7 +1,6 @@
 # Developer Guide
 
-Welcome to the drun developer documentation! This guide will help you understand the codebase, contribute features, and
-navigate the architecture.
+Welcome to the drun developer documentation! This guide will help you understand the codebase, contribute features, and navigate the architecture.
 
 ---
 
@@ -17,27 +16,27 @@ navigate the architecture.
 
 ### Architecture & Design
 
-| Document                                                                 | Purpose                                          | When to Read                               |
-|--------------------------------------------------------------------------|--------------------------------------------------|--------------------------------------------|
-| **[ARCHITECTURE.md](architecture.md)**                                   | Complete system architecture with diagrams       | Understanding how components work together |
-| **[internal/README.md](packages/index.md)**                              | Package-by-package guide                         | Navigating the codebase                    |
-| **[CONTRIBUTING.md](contributing.md)**                                   | How to contribute code                           | Adding features or fixing bugs             |
-| **[Compatibility and language governance](compatibility-governance.md)** | The v2 compatibility contract and change process | Changing user-visible language behavior    |
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
+| **[ARCHITECTURE.md](architecture.md)** | Complete system architecture with diagrams | Understanding how components work together |
+| **[internal/README.md](packages/index.md)** | Package-by-package guide | Navigating the codebase |
+| **[CONTRIBUTING.md](contributing.md)** | How to contribute code | Adding features or fixing bugs |
 
 ### Language Specification
 
-| Document                                                        | Purpose                      | When to Read              |
-|-----------------------------------------------------------------|------------------------------|---------------------------|
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
 | **[Language specification](../reference/language/overview.md)** | Normative language reference | Understanding drun syntax |
-| **[examples/](./examples/)**                                    | 62 working examples          | Learning by example       |
+| **[examples/](./examples/)** | 62 working examples | Learning by example |
+
 
 ### Package Documentation
 
-| Document                                            | Purpose                 | When to Read              |
-|-----------------------------------------------------|-------------------------|---------------------------|
-| **[internal/README.md](packages/index.md)**         | Internal packages guide | Working with the codebase |
-| **[internal/parser/README.md](packages/parser.md)** | Parser architecture     | Adding parser features    |
-| **[internal/engine/README.md](packages/engine.md)** | Engine architecture     | Adding execution features |
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
+| **[internal/README.md](packages/index.md)** | Internal packages guide | Working with the codebase |
+| **[internal/parser/README.md](packages/parser.md)** | Parser architecture | Adding parser features |
+| **[internal/engine/README.md](packages/engine.md)** | Engine architecture | Adding execution features |
 
 ---
 
@@ -51,8 +50,9 @@ graph LR
     B --> C[Read internal/README.md]
     C --> D[Explore specific packages]
     D --> E[Run examples]
-    style A fill: #e1f5ff
-    style E fill: #e1ffe1
+
+    style A fill:#e1f5ff
+    style E fill:#e1ffe1
 ```
 
 **Reading order:**
@@ -61,6 +61,7 @@ graph LR
 2. [internal/README.md](packages/index.md) - Understand package organization
 3. Pick a package and explore its files
 4. Run examples in [examples/](./examples/)
+
 
 **Steps:**
 
@@ -93,6 +94,7 @@ Read these in order:
 1. [ARCHITECTURE.md](architecture.md) - System architecture with diagrams
 2. [internal/README.md](packages/index.md) - Package organization
 3. [CONTRIBUTING.md](contributing.md) - How to contribute
+
 
 ---
 
@@ -240,21 +242,21 @@ Let's add a priority system to tasks (low, medium, high) with validation and sor
 ```go
 // Task represents a domain task entity
 type Task struct {
-Name         string
-Description  string
-Priority     string // NEW: Add priority field
-Parameters   []Parameter
-Dependencies []Dependency
-Body         []ast.Statement
-Namespace    string
-Source       string
+    Name         string
+    Description  string
+    Priority     string      // NEW: Add priority field
+    Parameters   []Parameter
+    Dependencies []Dependency
+    Body         []ast.Statement
+    Namespace    string
+    Source       string
 }
 
 // Priority constants
 const (
-PriorityLow = "low"
-PriorityMedium = "medium"
-PriorityHigh = "high"
+    PriorityLow    = "low"
+    PriorityMedium = "medium"
+    PriorityHigh   = "high"
 )
 
 // ValidPriorities lists all valid priority values
@@ -268,33 +270,33 @@ var ValidPriorities = []string{PriorityLow, PriorityMedium, PriorityHigh}
 ```go
 // Validate validates the task
 func (t *Task) Validate() error {
-if t.Name == "" {
-return &TaskError{
-Task:    t.Name,
-Message: "task name cannot be empty",
-}
-}
+    if t.Name == "" {
+        return &TaskError{
+            Task:    t.Name,
+            Message: "task name cannot be empty",
+        }
+    }
 
-// NEW: Validate priority
-if t.Priority != "" {
-valid := false
-for _, p := range ValidPriorities {
-if t.Priority == p {
-valid = true
-break
-}
-}
-if !valid {
-return &TaskError{
-Task:    t.Name,
-Message: fmt.Sprintf("invalid priority '%s', must be one of: %v",
-t.Priority, ValidPriorities),
-}
-}
-}
+    // NEW: Validate priority
+    if t.Priority != "" {
+        valid := false
+        for _, p := range ValidPriorities {
+            if t.Priority == p {
+                valid = true
+                break
+            }
+        }
+        if !valid {
+            return &TaskError{
+                Task:    t.Name,
+                Message: fmt.Sprintf("invalid priority '%s', must be one of: %v",
+                    t.Priority, ValidPriorities),
+            }
+        }
+    }
 
-// ... existing validation
-return nil
+    // ... existing validation
+    return nil
 }
 ```
 
@@ -305,38 +307,38 @@ return nil
 ```go
 // ListByPriority returns tasks sorted by priority (high -> medium -> low)
 func (r *Registry) ListByPriority() []*Task {
-r.mu.RLock()
-defer r.mu.RUnlock()
+    r.mu.RLock()
+    defer r.mu.RUnlock()
 
-// Group by priority
-high := make([]*Task, 0)
-medium := make([]*Task, 0)
-low := make([]*Task, 0)
-unspecified := make([]*Task, 0)
+    // Group by priority
+    high := make([]*Task, 0)
+    medium := make([]*Task, 0)
+    low := make([]*Task, 0)
+    unspecified := make([]*Task, 0)
 
-for _, name := range r.taskOrder {
-if task, exists := r.tasks[name]; exists {
-switch task.Priority {
-case PriorityHigh:
-high = append(high, task)
-case PriorityMedium:
-medium = append(medium, task)
-case PriorityLow:
-low = append(low, task)
-default:
-unspecified = append(unspecified, task)
-}
-}
-}
+    for _, name := range r.taskOrder {
+        if task, exists := r.tasks[name]; exists {
+            switch task.Priority {
+            case PriorityHigh:
+                high = append(high, task)
+            case PriorityMedium:
+                medium = append(medium, task)
+            case PriorityLow:
+                low = append(low, task)
+            default:
+                unspecified = append(unspecified, task)
+            }
+        }
+    }
 
-// Combine in priority order
-result := make([]*Task, 0, len(r.taskOrder))
-result = append(result, high...)
-result = append(result, medium...)
-result = append(result, low...)
-result = append(result, unspecified...)
+    // Combine in priority order
+    result := make([]*Task, 0, len(r.taskOrder))
+    result = append(result, high...)
+    result = append(result, medium...)
+    result = append(result, low...)
+    result = append(result, unspecified...)
 
-return result
+    return result
 }
 ```
 
@@ -347,17 +349,17 @@ return result
 ```go
 // NewTask creates a new task from AST
 func NewTask(stmt *ast.TaskStatement, namespace, source string) *Task {
-task := &Task{
-Name:        stmt.Name,
-Description: stmt.Description,
-Priority:    stmt.Priority, // NEW: Read from AST
-Namespace:   namespace,
-Source:      source,
-Body:        stmt.Body,
-}
+    task := &Task{
+        Name:        stmt.Name,
+        Description: stmt.Description,
+        Priority:    stmt.Priority, // NEW: Read from AST
+        Namespace:   namespace,
+        Source:      source,
+        Body:        stmt.Body,
+    }
 
-// ... rest of conversion
-return task
+    // ... rest of conversion
+    return task
 }
 ```
 
@@ -367,13 +369,13 @@ return task
 
 ```go
 type TaskStatement struct {
-Token        lexer.Token
-Name         string
-Description  string
-Priority     string // NEW: Add priority field
-Parameters   []ParameterStatement
-Dependencies []DependencyGroup
-Body         []ast.Statement
+    Token        lexer.Token
+    Name         string
+    Description  string
+    Priority     string      // NEW: Add priority field
+    Parameters   []ParameterStatement
+    Dependencies []DependencyGroup
+    Body         []ast.Statement
 }
 ```
 
@@ -384,26 +386,26 @@ Body         []ast.Statement
 ```go
 // ListTasksByPriority returns tasks ordered by priority
 func (e *Engine) ListTasksByPriority(program *ast.Program) []TaskInfo {
-// Register tasks with domain registry
-e.taskRegistry.Clear()
-_ = e.registerTasks(program.Tasks, "")
+    // Register tasks with domain registry
+    e.taskRegistry.Clear()
+    _ = e.registerTasks(program.Tasks, "")
 
-// Get tasks from domain registry sorted by priority
-domainTasks := e.taskRegistry.ListByPriority()
+    // Get tasks from domain registry sorted by priority
+    domainTasks := e.taskRegistry.ListByPriority()
 
-tasks := make([]TaskInfo, 0, len(domainTasks))
-for _, domainTask := range domainTasks {
-info := TaskInfo{
-Name:        domainTask.Name,
-Description: domainTask.Description,
-Priority:    domainTask.Priority, // NEW
-}
-if info.Description == "" {
-info.Description = "No description"
-}
-tasks = append(tasks, info)
-}
-return tasks
+    tasks := make([]TaskInfo, 0, len(domainTasks))
+    for _, domainTask := range domainTasks {
+        info := TaskInfo{
+            Name:        domainTask.Name,
+            Description: domainTask.Description,
+            Priority:    domainTask.Priority, // NEW
+        }
+        if info.Description == "" {
+            info.Description = "No description"
+        }
+        tasks = append(tasks, info)
+    }
+    return tasks
 }
 ```
 
@@ -417,7 +419,7 @@ flags.BoolVar(&a.listByPriority, "list-priority", false, "List tasks sorted by p
 
 // Handle in run method
 if a.listByPriority {
-return ListTasksByPriority(a.configFile)
+    return ListTasksByPriority(a.configFile)
 }
 ```
 
@@ -454,10 +456,10 @@ return ListTasksByPriority(a.configFile)
 
 **Benefits:**
 
-- Easy to test (domain logic isolated)
-- Reusable (priority logic works anywhere)
-- Maintainable (change priority rules in one place)
-- Clear (each layer has single responsibility)
+-  Easy to test (domain logic isolated)
+-  Reusable (priority logic works anywhere)
+-  Maintainable (change priority rules in one place)
+-  Clear (each layer has single responsibility)
 
 ### Testing the Domain Layer
 
@@ -465,52 +467,52 @@ return ListTasksByPriority(a.configFile)
 
 ```go
 func TestTaskPriorityValidation(t *testing.T) {
-tests := []struct {
-name     string
-priority string
-wantErr  bool
-}{
-{"valid high", "high", false},
-{"valid medium", "medium", false},
-{"valid low", "low", false},
-{"invalid priority", "critical", true},
-{"empty priority", "", false}, // Optional field
-}
+    tests := []struct {
+        name     string
+        priority string
+        wantErr  bool
+    }{
+        {"valid high", "high", false},
+        {"valid medium", "medium", false},
+        {"valid low", "low", false},
+        {"invalid priority", "critical", true},
+        {"empty priority", "", false}, // Optional field
+    }
 
-for _, tt := range tests {
-t.Run(tt.name, func (t *testing.T) {
-task := &Task{
-Name:     "test",
-Priority: tt.priority,
-}
-err := task.Validate()
-if (err != nil) != tt.wantErr {
-t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
-}
-})
-}
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            task := &Task{
+                Name:     "test",
+                Priority: tt.priority,
+            }
+            err := task.Validate()
+            if (err != nil) != tt.wantErr {
+                t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
 }
 
 func TestRegistryListByPriority(t *testing.T) {
-registry := NewRegistry()
+    registry := NewRegistry()
 
-// Register tasks with different priorities
-registry.Register(&Task{Name: "task1", Priority: "low"})
-registry.Register(&Task{Name: "task2", Priority: "high"})
-registry.Register(&Task{Name: "task3", Priority: "medium"})
+    // Register tasks with different priorities
+    registry.Register(&Task{Name: "task1", Priority: "low"})
+    registry.Register(&Task{Name: "task2", Priority: "high"})
+    registry.Register(&Task{Name: "task3", Priority: "medium"})
 
-tasks := registry.ListByPriority()
+    tasks := registry.ListByPriority()
 
-// Should be ordered: high, medium, low
-if tasks[0].Name != "task2" || tasks[0].Priority != "high" {
-t.Error("Expected high priority task first")
-}
-if tasks[1].Name != "task3" || tasks[1].Priority != "medium" {
-t.Error("Expected medium priority task second")
-}
-if tasks[2].Name != "task1" || tasks[2].Priority != "low" {
-t.Error("Expected low priority task third")
-}
+    // Should be ordered: high, medium, low
+    if tasks[0].Name != "task2" || tasks[0].Priority != "high" {
+        t.Error("Expected high priority task first")
+    }
+    if tasks[1].Name != "task3" || tasks[1].Priority != "medium" {
+        t.Error("Expected medium priority task second")
+    }
+    if tasks[2].Name != "task1" || tasks[2].Priority != "low" {
+        t.Error("Expected low priority task third")
+    }
 }
 ```
 
@@ -523,8 +525,7 @@ When adding any new feature:
 3. **Test Domain Logic**: Unit tests without dependencies
 4. **Integrate with Engine**: Orchestrate domain operations
 5. **Expose via CLI**: User-facing interface
-6. **Update the Language Spec**: If syntax, semantics, or examples changed, update the relevant page in
-   the [language specification](../reference/language/overview.md) in the same change
+6. **Update the Language Spec**: If syntax, semantics, or examples changed, update the relevant page in the [language specification](../reference/language/overview.md) in the same change
 7. **Dogfood the Workflow**: If the feature affects project automation, update [.drun/spec.drun](./.drun/spec.drun)
 8. **Finish with Full Validation**: Run targeted tests while iterating, then finish with `xdrun ci`
 
@@ -553,12 +554,9 @@ xdrun fuzz iterations=100
 
 Fuzz result labels:
 
-- `PASS` means the mutated `.drun` file parsed successfully and its first discovered task also completed `--dry-run`
-  validation.
-- `SOFT` means the mutated file parsed successfully, but the harness could not find a first task it could dry-run with
-  the built-in parameter guesses. This is informational, not a crash.
-- `MISS` means the mutated file was rejected by the parser. This is expected sometimes because the generator
-  intentionally introduces some malformed but drun-like input.
+- `PASS` means the mutated `.drun` file parsed successfully and its first discovered task also completed `--dry-run` validation.
+- `SOFT` means the mutated file parsed successfully, but the harness could not find a first task it could dry-run with the built-in parameter guesses. This is informational, not a crash.
+- `MISS` means the mutated file was rejected by the parser. This is expected sometimes because the generator intentionally introduces some malformed but drun-like input.
 
 ### Test Organization
 
@@ -571,13 +569,13 @@ Fuzz result labels:
 ```go
 // internal/parser/parser_docker_test.go
 func TestParseDockerBuild(t *testing.T) {
-input := `build docker image "myapp:latest"`
-l := lexer.New(input)
-p := New(l)
+    input := `build docker image "myapp:latest"`
+    l := lexer.New(input)
+    p := New(l)
 
-stmt, err := p.parseDockerStatement()
-assert.NoError(t, err)
-assert.Equal(t, "build", stmt.Action)
+    stmt, err := p.parseDockerStatement()
+    assert.NoError(t, err)
+    assert.Equal(t, "build", stmt.Action)
 }
 ```
 
@@ -620,7 +618,7 @@ func (e *Engine) interpolateVariables(s string) string
 ```go
 // Always provide context
 if err != nil {
-return fmt.Errorf("failed to execute task '%s': %w", taskName, err)
+    return fmt.Errorf("failed to execute task '%s': %w", taskName, err)
 }
 
 // Use custom errors when appropriate
@@ -645,9 +643,9 @@ Create `internal/ast/ast_slack.go`:
 package ast
 
 type SlackStatement struct {
-	Action  string // "notify"
-	Channel string
-	Message string
+    Action  string // "notify"
+    Channel string
+    Message string
 }
 
 func (s *SlackStatement) statementNode() {}
@@ -662,9 +660,9 @@ package statement
 
 // Slack represents a Slack notification action
 type Slack struct {
-	Action  string
-	Channel string
-	Message string
+    Action  string
+    Channel string
+    Message string
 }
 
 func (s *Slack) Type() StatementType { return "slack" }
@@ -677,11 +675,11 @@ Add to `internal/domain/statement/converter.go`:
 ```go
 // In FromAST function
 case *ast.SlackStatement:
-return &Slack{
-Action:  s.Action,
-Channel: s.Channel,
-Message: s.Message,
-}, nil
+    return &Slack{
+        Action:  s.Action,
+        Channel: s.Channel,
+        Message: s.Message,
+    }, nil
 ```
 
 #### 4. Add Parser
@@ -692,15 +690,15 @@ Create `internal/parser/parser_slack.go`:
 package parser
 
 func (p *Parser) parseSlackStatement() (*ast.SlackStatement, error) {
-	stmt := &ast.SlackStatement{}
+    stmt := &ast.SlackStatement{}
 
-	if !p.expectPeek(IDENT) {
-		return nil, p.error("expected 'slack'")
-	}
+    if !p.expectPeek(IDENT) {
+        return nil, p.error("expected 'slack'")
+    }
 
-	// Parse channel, message...
+    // Parse channel, message...
 
-	return stmt, nil
+    return stmt, nil
 }
 ```
 
@@ -708,9 +706,9 @@ Wire it up in `parser_action.go`:
 
 ```go
 case "notify":
-if p.peekTokenIs(IDENT) && p.peekToken.Literal == "slack" {
-return p.parseSlackStatement()
-}
+    if p.peekTokenIs(IDENT) && p.peekToken.Literal == "slack" {
+        return p.parseSlackStatement()
+    }
 ```
 
 #### 5. Add Executor
@@ -723,13 +721,13 @@ package engine
 import "github.com/phillarmonic/drun/v2/internal/domain/statement"
 
 func (e *Engine) executeSlack(stmt *statement.Slack, ctx *ExecutionContext) error {
-	// Interpolate variables
-	message := e.interpolateVariables(stmt.Message, ctx)
-	channel := e.interpolateVariables(stmt.Channel, ctx)
+    // Interpolate variables
+    message := e.interpolateVariables(stmt.Message, ctx)
+    channel := e.interpolateVariables(stmt.Channel, ctx)
 
-	// Send to Slack...
+    // Send to Slack...
 
-	return nil
+    return nil
 }
 ```
 
@@ -737,7 +735,7 @@ Wire it up in `executeStatement` in `engine.go`:
 
 ```go
 case *statement.Slack:
-return e.executeSlack(s, ctx)
+    return e.executeSlack(s, ctx)
 ```
 
 #### 6. Add Tests
@@ -780,11 +778,11 @@ Runtime state during execution:
 
 ```go
 type ExecutionContext struct {
-Variables    map[string]string
-Parameters   map[string]string
-TaskStack    []string
-LoopStack    []LoopContext
-// ...
+    Variables    map[string]string
+    Parameters   map[string]string
+    TaskStack    []string
+    LoopStack    []LoopContext
+    // ...
 }
 ```
 
@@ -919,21 +917,21 @@ Check interpolation logic in:
 
 **Architecture Evolution:**
 
-| Metric               | Value              | Notes                                 |
-|----------------------|--------------------|---------------------------------------|
-| Domain Decoupling    | Complete           | Tasks/Projects use domain statements  |
-| Execution Planning   | Implemented        | Planner generates comprehensive plans |
-| Dependency Injection | Available          | Options-based configuration           |
-| Debug Diagnostics    | Available          | Graphviz, Mermaid, JSON exports       |
-| Code Organization    | 100+ focused files | Modular, maintainable structure       |
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Domain Decoupling |  Complete | Tasks/Projects use domain statements |
+| Execution Planning |  Implemented | Planner generates comprehensive plans |
+| Dependency Injection |  Available | Options-based configuration |
+| Debug Diagnostics |  Available | Graphviz, Mermaid, JSON exports |
+| Code Organization | 100+ focused files | Modular, maintainable structure |
 
 **Current Status:**
 
-- All unit tests passing
-- 60 examples working
-- All features functional
-- Zero regressions
-- Production ready
+-  All unit tests passing
+-  60 examples working
+-  All features functional
+-  Zero regressions
+-  Production ready
 
 ---
 

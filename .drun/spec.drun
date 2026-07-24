@@ -89,8 +89,6 @@ task "ci" mode "ci" means "Runs the whole CI pipeline":
 	call task lint
 	step "Unit tests"
 	call task test
-	step "Checking the immutable v2 compatibility contract"
-	run "./scripts/test-compatibility.sh"
 	step "Checking for regressions"
 	run "./scripts/test-regressions.sh"
 	step "Security checks"

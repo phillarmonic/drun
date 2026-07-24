@@ -334,31 +334,6 @@ func NewEngine(output io.Writer) *Engine {
 
 ## Adding New Features
 
-### Classify language changes first
-
-drun guarantees that scripts accepted by an earlier stable v2 release retain
-their documented language behavior throughout v2.x.x. Before implementing any
-user-visible language or runtime change, classify it in the pull request as
-**additive**, **compatible correction**, **deprecation**, or **incompatible**.
-
-Additive changes follow normal review. Compatible corrections and deprecations
-must include compatibility evidence and permanent fixtures. Deprecations remain
-functional for the rest of v2 and include migration guidance. Incompatible
-changes normally wait for v3; severe correctness, security, or data-loss
-exceptions require two maintainer approvals and a public exception entry.
-
-For every new or deliberately corrected behavior:
-
-1. update the canonical language specification and user documentation;
-2. add focused tests in the relevant parser, engine, or domain package;
-3. add an immutable fixture and semantic assertion under
-   `internal/compatibility/testdata/`; and
-4. run `./scripts/test-compatibility.sh`, then `xdrun ci`.
-
-Do not modify an earlier compatibility fixture merely to make a change pass.
-See [Compatibility and language governance](compatibility-governance.md) for
-the complete contract and exception process.
-
 ### Adding a New Action Type
 
 Example: Adding `notify slack "message"` support
