@@ -1,6 +1,7 @@
 # Permit search engines to crawl the public documentation site.
 User-agent: *
 Allow: /
+Allow: /sitemap.xml
 
 # Zensical generates this sitemap from the configured canonical site URL.
 Sitemap: https://phillarmonic.github.io/drun/sitemap.xml
