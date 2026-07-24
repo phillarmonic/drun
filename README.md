@@ -14,6 +14,7 @@ Official editor extensions are available for [VS Code](https://marketplace.visua
 
 ## Why drun?
 
+- [Saves money on AI agent usage](https://phillarmonic.github.io/drun/getting-started/ai-integration/#saving-money-on-ai-usage-with-drun) (input tokens) with the CI mode
 - Define build, test, release, and operations workflows in a readable DSL.
 - Replace ad hoc shell scripts or large Makefiles with named tasks.
 - Add validation, defaults, and tool checks to task parameters and project workflows.

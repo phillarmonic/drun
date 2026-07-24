@@ -197,6 +197,11 @@ The current implementation is intentionally small and focused on editor essentia
 - Full text-document sync
 - Parser-backed diagnostics
 - Simple keyword and task-name completions, including tool-requirement inheritance and Git policy branch keywords
+- Position-aware Markdown hover help with syntax-highlighted examples for common declarations,
+  control flow, task execution, file-value operations, filesystem and network actions, Git,
+  Docker, services, and orchestration
+- Hierarchical document symbols for project structure, tasks, templates, services,
+  orchestrations, parameters, dependencies, task calls, and control-flow blocks
 
 #### Syntax Highlighting
 

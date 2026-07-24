@@ -113,8 +113,10 @@ type initializeResult struct {
 }
 
 type serverCapabilities struct {
-	TextDocumentSync   int                `json:"textDocumentSync"`
-	CompletionProvider *completionOptions `json:"completionProvider,omitempty"`
+	TextDocumentSync       int                `json:"textDocumentSync"`
+	CompletionProvider     *completionOptions `json:"completionProvider,omitempty"`
+	HoverProvider          bool               `json:"hoverProvider"`
+	DocumentSymbolProvider bool               `json:"documentSymbolProvider"`
 }
 
 type completionOptions struct {
@@ -161,6 +163,21 @@ type didCloseParams struct {
 
 type completionParams struct {
 	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type hoverParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
+}
+
+type markupContent struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+}
+
+type hover struct {
+	Contents markupContent `json:"contents"`
+	Range    lspRange      `json:"range"`
 }
 
 type publishDiagnosticsParams struct {
@@ -246,6 +263,8 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 					CompletionProvider: &completionOptions{
 						ResolveProvider: false,
 					},
+					HoverProvider:          true,
+					DocumentSymbolProvider: true,
 				},
 				ServerInfo: serverInfo{
 					Name:    "xdrun-lsp",
@@ -304,6 +323,26 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			JSONRPC: "2.0",
 			ID:      msg.ID,
 			Result:  items,
+		})
+	case "textDocument/hover":
+		var params hoverParams
+		if err := json.Unmarshal(msg.Params, &params); err != nil {
+			return false, err
+		}
+		return false, s.writeResponse(message{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  hoverForSource(s.docs[params.TextDocument.URI], params.Position),
+		})
+	case "textDocument/documentSymbol":
+		var params documentSymbolParams
+		if err := json.Unmarshal(msg.Params, &params); err != nil {
+			return false, err
+		}
+		return false, s.writeResponse(message{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  documentSymbolsForSource(s.docs[params.TextDocument.URI]),
 		})
 	default:
 		if len(msg.ID) == 0 {

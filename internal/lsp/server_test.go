@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -97,6 +98,184 @@ func TestServerCompletionIncludesKeywordsAndTasks(t *testing.T) {
 	assertCompletionLabel(t, items, "protected branches")
 	assertCompletionLabel(t, items, "conventional commits")
 	assertFileValueCompletions(t, items)
+}
+
+func TestServerAdvertisesAndReturnsHover(t *testing.T) {
+	source := "version: 2.0\n\ntask \"deploy\":\n  run \"go build\"\n"
+	input := joinFrames(
+		frame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`),
+		frame(fmt.Sprintf(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///workspace/spec.drun","languageId":"drun","version":1,"text":%q}}}`, source)),
+		frame(`{"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///workspace/spec.drun"},"position":{"line":3,"character":3}}}`),
+		frame(`{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`),
+		frame(`{"jsonrpc":"2.0","method":"exit","params":{}}`),
+	)
+
+	var output bytes.Buffer
+	if err := NewServer(bytes.NewReader(input), &output).Run(); err != nil {
+		t.Fatalf("server run failed: %v", err)
+	}
+
+	messages := decodeFrames(t, output.Bytes())
+	var initializeMsg, hoverMsg message
+	for _, msg := range messages {
+		switch string(msg.ID) {
+		case "1":
+			initializeMsg = msg
+		case "2":
+			hoverMsg = msg
+		}
+	}
+
+	var initialized initializeResult
+	if err := json.Unmarshal(mustMarshal(initializeMsg.Result), &initialized); err != nil {
+		t.Fatalf("unmarshal initialize result: %v", err)
+	}
+	if !initialized.Capabilities.HoverProvider {
+		t.Fatal("expected hoverProvider capability")
+	}
+
+	var got hover
+	if err := json.Unmarshal(mustMarshal(hoverMsg.Result), &got); err != nil {
+		t.Fatalf("unmarshal hover: %v", err)
+	}
+	if got.Contents.Kind != "markdown" || !strings.Contains(got.Contents.Value, "Run a shell command") {
+		t.Fatalf("unexpected hover contents: %#v", got.Contents)
+	}
+	if count := strings.Count(got.Contents.Value, "```drun"); count != 3 {
+		t.Fatalf("expected syntax plus two highlighted examples, got %d fences:\n%s", count, got.Contents.Value)
+	}
+	if !strings.Contains(got.Contents.Value, `run "npm run dev" attached`) {
+		t.Fatalf("expected attached run example:\n%s", got.Contents.Value)
+	}
+	if got.Range.Start.Character != 2 || got.Range.End.Character != 5 {
+		t.Fatalf("unexpected hover range: %#v", got.Range)
+	}
+}
+
+func TestHoverCoversCommonStatementsAndIgnoresStringsAndComments(t *testing.T) {
+	tests := []struct {
+		name   string
+		line   string
+		column int
+		want   string
+	}{
+		{"task", `task "build":`, 1, "Task declaration"},
+		{"longest phrase", `  call task "build"`, 8, "Call another task"},
+		{"file value", `  update json "/version" in "package.json" to "2"`, 5, "Update a JSON value"},
+		{"control flow", `  for each $item in $items:`, 7, "Collection loop"},
+		{"tool requirements", `  requires tools:`, 12, "Tool requirements"},
+		{"unicode column", `é task "build":`, 3, ""},
+		{"keyword outside statement position", `  set run to true`, 7, ""},
+		{"quoted keyword", `  info "run this later"`, 9, ""},
+		{"comment keyword", `  # run something`, 5, ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := hoverForSource(test.line, position{Line: 0, Character: test.column})
+			if test.want == "" {
+				if got != nil {
+					t.Fatalf("hoverForSource() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil || !strings.Contains(got.Contents.Value, test.want) {
+				t.Fatalf("hoverForSource() = %#v, want contents containing %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestServerAdvertisesAndReturnsDocumentSymbols(t *testing.T) {
+	source := "version: 2.0\n\nproject \"demo\" version \"1.0\":\n  requires tools:\n    go >= \"1.24\"\n\ntask \"build\" means \"Build it\":\n  requires $target as string\n  depends on lint, test\n  call task \"compile\" with target=$target\n"
+	input := joinFrames(
+		frame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`),
+		frame(fmt.Sprintf(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///workspace/spec.drun","languageId":"drun","version":1,"text":%q}}}`, source)),
+		frame(`{"jsonrpc":"2.0","id":2,"method":"textDocument/documentSymbol","params":{"textDocument":{"uri":"file:///workspace/spec.drun"}}}`),
+		frame(`{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`),
+		frame(`{"jsonrpc":"2.0","method":"exit","params":{}}`),
+	)
+
+	var output bytes.Buffer
+	if err := NewServer(bytes.NewReader(input), &output).Run(); err != nil {
+		t.Fatalf("server run failed: %v", err)
+	}
+
+	messages := decodeFrames(t, output.Bytes())
+	var initializeMsg, symbolsMsg message
+	for _, msg := range messages {
+		switch string(msg.ID) {
+		case "1":
+			initializeMsg = msg
+		case "2":
+			symbolsMsg = msg
+		}
+	}
+
+	var initialized initializeResult
+	if err := json.Unmarshal(mustMarshal(initializeMsg.Result), &initialized); err != nil {
+		t.Fatalf("unmarshal initialize result: %v", err)
+	}
+	if !initialized.Capabilities.DocumentSymbolProvider {
+		t.Fatal("expected documentSymbolProvider capability")
+	}
+
+	var symbols []documentSymbol
+	if err := json.Unmarshal(mustMarshal(symbolsMsg.Result), &symbols); err != nil {
+		t.Fatalf("unmarshal document symbols: %v", err)
+	}
+	assertDocumentSymbol(t, symbols, "demo", "Project")
+	build := assertDocumentSymbol(t, symbols, "build", "Task")
+	assertDocumentSymbol(t, build.Children, "$target", "Parameter")
+	assertDocumentSymbol(t, build.Children, "lint, test", "Depends on")
+	assertDocumentSymbol(t, build.Children, "compile", "Calls task")
+}
+
+func TestDocumentSymbolsBuildUsefulNestedStructure(t *testing.T) {
+	source := `project "demo":
+	service "api" in "./api":
+		health check:
+			type "tcp"
+	orchestrate "dev":
+		services ["api"]
+
+task "deploy":
+	requires tools:
+		go >= "1.24"
+	when $environment is "production":
+		if $approved is true:
+			call task "release"
+	otherwise:
+		call task "preview"
+`
+
+	symbols := documentSymbolsForSource(source)
+	project := assertDocumentSymbol(t, symbols, "demo", "Project")
+	assertDocumentSymbol(t, project.Children, "api", "Service")
+	assertDocumentSymbol(t, project.Children, "dev", "Orchestration")
+
+	deploy := assertDocumentSymbol(t, symbols, "deploy", "Task")
+	assertDocumentSymbol(t, deploy.Children, "Required tools", "Required tools")
+	when := assertDocumentSymbol(t, deploy.Children, `$environment is "production"`, "When")
+	ifSymbol := assertDocumentSymbol(t, when.Children, "$approved is true", "If")
+	assertDocumentSymbol(t, ifSymbol.Children, "release", "Calls task")
+	otherwise := assertDocumentSymbol(t, deploy.Children, "Otherwise", "Otherwise")
+	assertDocumentSymbol(t, otherwise.Children, "preview", "Calls task")
+
+	if deploy.Range.End.Line != 14 {
+		t.Fatalf("deploy range ended on line %d, want 14", deploy.Range.End.Line)
+	}
+}
+
+func assertDocumentSymbol(t *testing.T, symbols []documentSymbol, name, detail string) documentSymbol {
+	t.Helper()
+	for _, symbol := range symbols {
+		if symbol.Name == name && symbol.Detail == detail {
+			return symbol
+		}
+	}
+	t.Fatalf("expected symbol %q (%s) in %#v", name, detail, symbols)
+	return documentSymbol{}
 }
 
 func TestFileValueDiagnosticsAreLocalized(t *testing.T) {
