@@ -77,6 +77,9 @@ task "install" means "Install xdrun with build info":
 task "skill" means "Show how to install drun AI guidance in a repository":
 	info "Install project AI guidance with: xdrun cmd:skill install drun-basics"
 
+task "test-vendor-skills" means "Tests portable skill vendoring":
+	run "./scripts/test-vendor-skills-to-ai-skills.sh"
+
 task "docs" means "Runs the local docs server":
     use workdir "docs"
     run "uv run zensical serve"
