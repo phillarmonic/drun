@@ -116,6 +116,7 @@ type serverCapabilities struct {
 	TextDocumentSync       int                `json:"textDocumentSync"`
 	CompletionProvider     *completionOptions `json:"completionProvider,omitempty"`
 	HoverProvider          bool               `json:"hoverProvider"`
+	DefinitionProvider     bool               `json:"definitionProvider"`
 	DocumentSymbolProvider bool               `json:"documentSymbolProvider"`
 }
 
@@ -264,6 +265,7 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 						ResolveProvider: false,
 					},
 					HoverProvider:          true,
+					DefinitionProvider:     true,
 					DocumentSymbolProvider: true,
 				},
 				ServerInfo: serverInfo{
@@ -333,6 +335,16 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			JSONRPC: "2.0",
 			ID:      msg.ID,
 			Result:  hoverForSource(s.docs[params.TextDocument.URI], params.Position),
+		})
+	case "textDocument/definition":
+		var params definitionParams
+		if err := json.Unmarshal(msg.Params, &params); err != nil {
+			return false, err
+		}
+		return false, s.writeResponse(message{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  definitionsForSource(params.TextDocument.URI, s.docs[params.TextDocument.URI], params.Position),
 		})
 	case "textDocument/documentSymbol":
 		var params documentSymbolParams

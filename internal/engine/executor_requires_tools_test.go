@@ -211,6 +211,82 @@ func TestEngine_checkToolRequirements_PostProvisionRecheckFailure(t *testing.T) 
 	}
 }
 
+func TestEngine_checkToolRequirements_AggregatesAllFailures(t *testing.T) {
+	e := NewEngine(io.Discard)
+
+	var checked []string
+	detector := &recordingToolDetector{
+		available: map[string]bool{
+			"missing-one": false,
+			"missing-two": false,
+			"go":          true,
+		},
+		versions: map[string]string{"go": "1.20.5"},
+		checked:  &checked,
+	}
+
+	err := e.checkToolRequirements(
+		detector,
+		[]statement.ToolRequirement{
+			{Name: "missing-one"},
+			{
+				Name: "go",
+				Constraints: []statement.VersionConstraint{
+					{Operator: ">=", Version: "1.21"},
+				},
+			},
+			{Name: "missing-two"},
+		},
+		&ProjectContext{},
+		nil,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	// Every tool must be checked even though earlier ones failed.
+	assertCheckedTools(t, checked, []string{"missing-one", "go", "missing-two"})
+
+	// All failures must be reported together in a single error.
+	msg := err.Error()
+	for _, want := range []string{
+		"missing tools:",
+		"required tool 'missing-one' is not installed",
+		"required tool 'missing-two' is not installed",
+		"unmet version requirements:",
+		"required tool 'go' version 1.20.5 does not satisfy constraint >= 1.21",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected aggregated error containing %q, got:\n%s", want, msg)
+		}
+	}
+}
+
+func TestEngine_checkToolRequirements_DirectRequirementOverridesDuplicate(t *testing.T) {
+	e := NewEngine(io.Discard)
+
+	var checked []string
+	detector := &recordingToolDetector{
+		available: map[string]bool{"shared-tool": true},
+		versions:  map[string]string{"shared-tool": "1.5.0"},
+		checked:   &checked,
+	}
+
+	err := e.checkToolRequirements(
+		detector,
+		[]statement.ToolRequirement{
+			{Name: "shared-tool", Constraints: []statement.VersionConstraint{{Operator: ">=", Version: "1.0"}}},
+			{Name: "shared-tool", Constraints: []statement.VersionConstraint{{Operator: ">=", Version: "2.0"}}},
+		},
+		&ProjectContext{},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("expected first requirement to win, got error: %v", err)
+	}
+	assertCheckedTools(t, checked, []string{"shared-tool"})
+}
+
 func TestEngine_ExecuteTaskRequiresToolsInheritanceChecksInheritedTools(t *testing.T) {
 	program, err := ParseString(`version: 2.0
 
