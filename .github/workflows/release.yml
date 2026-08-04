@@ -409,3 +409,102 @@ jobs:
         echo "- **All binaries**: Statically linked, no dependencies" >> $GITHUB_STEP_SUMMARY
         echo "- **High performance**: Microsecond-level operations" >> $GITHUB_STEP_SUMMARY
         echo "- **Cross-platform**: Native binaries for all major platforms" >> $GITHUB_STEP_SUMMARY
+
+  # Vendor portable skills into phillarmonic/ai-skills as a reviewable PR.
+  # AI_SKILLS_TOKEN is optional. When configured, it needs contents:write and
+  # pull-requests:write on phillarmonic/ai-skills.
+  vendor-skills:
+    name: Vendor Skills to ai-skills
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Check publishing credential
+      id: publishing
+      env:
+        AI_SKILLS_TOKEN: ${{ secrets.AI_SKILLS_TOKEN }}
+      run: |
+        if [ -z "${AI_SKILLS_TOKEN}" ]; then
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "## ai-skills publishing skipped"
+            echo ""
+            echo "AI_SKILLS_TOKEN is not configured. The Drun release succeeded, but no catalog refresh PR was opened."
+          } >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout drun
+      if: steps.publishing.outputs.configured == 'true'
+      uses: actions/checkout@v6
+
+    - name: Checkout ai-skills
+      if: steps.publishing.outputs.configured == 'true'
+      uses: actions/checkout@v6
+      with:
+        repository: phillarmonic/ai-skills
+        token: ${{ secrets.AI_SKILLS_TOKEN }}
+        path: ai-skills
+
+    - name: Install PyYAML
+      if: steps.publishing.outputs.configured == 'true'
+      run: pip install --user 'pyyaml>=6'
+
+    - name: Test vendoring
+      if: steps.publishing.outputs.configured == 'true'
+      run: ./scripts/test-vendor-skills-to-ai-skills.sh
+
+    - name: Vendor skills
+      if: steps.publishing.outputs.configured == 'true'
+      run: ./scripts/vendor-skills-to-ai-skills.sh --dest ai-skills --version "${GITHUB_REF_NAME}"
+
+    - name: Create pull request
+      if: steps.publishing.outputs.configured == 'true'
+      id: skills-pr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ secrets.AI_SKILLS_TOKEN }}
+        path: ai-skills
+        commit-message: "Vendor drun skills from ${{ github.ref_name }}"
+        title: "Vendor drun skills from ${{ github.ref_name }}"
+        body: |
+          ## Summary
+          - Vendors portable skills listed in `skills/VENDOR` from [phillarmonic/drun](https://github.com/phillarmonic/drun) tag `${{ github.ref_name }}`
+          - Preserves catalog-specific instructions while refreshing skill packages
+          - Updates the catalog manifest and README when needed
+
+          ## Source
+          - Repository: `${{ github.repository }}`
+          - Tag: `${{ github.ref_name }}`
+          - Commit: `${{ github.sha }}`
+          - Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+
+          ## Test plan
+          - [ ] Confirm only intended skills under `skills/` changed
+          - [ ] Confirm `repertoire.yaml` paths and instruction sources resolve
+          - [ ] Install `drun` from a local catalog override
+        branch: vendor/drun-${{ github.ref_name }}
+        delete-branch: true
+        add-paths: |
+          skills/drun/**
+          repertoire.yaml
+          README.md
+
+    - name: Summarize skills PR
+      if: steps.publishing.outputs.configured == 'true' && steps.skills-pr.outputs.pull-request-number != ''
+      run: |
+        {
+          echo "## ai-skills PR"
+          echo ""
+          echo "Opened PR [#${{ steps.skills-pr.outputs.pull-request-number }}](${{ steps.skills-pr.outputs.pull-request-url }}) to vendor skills from \`${GITHUB_REF_NAME}\`."
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: No skills changes
+      if: steps.publishing.outputs.configured == 'true' && steps.skills-pr.outputs.pull-request-number == ''
+      run: |
+        {
+          echo "## ai-skills catalog"
+          echo ""
+          echo "No skill changes to vendor for \`${GITHUB_REF_NAME}\`; the catalog is already current."
+        } >> "$GITHUB_STEP_SUMMARY"

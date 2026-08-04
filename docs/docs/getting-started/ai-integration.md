@@ -2,6 +2,45 @@
 
 In a hurry? Need to work with drun faster? Teach your AI agents how to work with drun!
 
+## Install with Repertoire
+
+The portable `drun` skill is published in the official
+[phillarmonic/ai-skills](https://github.com/phillarmonic/ai-skills) catalog.
+Install it in detected user-level agent directories with:
+
+```bash
+repertoire add drun
+# If another visible catalog also defines drun:
+repertoire add drun --catalog phillarmonic
+```
+
+For repeatable repository onboarding, declare the global skill in
+`.repertoire.yaml`. A project bootstrap keeps the complete skill in the user's
+agent directories and adds only compact, managed activation pointers to the
+repository:
+
+```yaml
+schema: 1
+skills:
+  github.com/phillarmonic/ai-skills/drun:
+    scope: global
+    targets: [codex]
+```
+
+Select the agent targets used by the repository, then run:
+
+```bash
+repertoire bootstrap
+```
+
+The pointers tell agents to load the skill when `.drun/spec.drun` exists or a
+task mentions drun or xdrun. The catalog does not create project-local skill
+copies or install git hooks. Git policy hooks remain an explicit Drun action:
+
+```bash
+xdrun cmd:hook install
+```
+
 ## Install the skill in your repository
 
 Teaching your AI agents how to use drun is pretty straightforward. Run the following command in the working directory of your project:

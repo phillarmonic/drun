@@ -1,0 +1,4 @@
+interface:
+  display_name: "drun"
+  short_description: "Work with drun specs and the xdrun CLI"
+  default_prompt: "Use $drun to inspect and change drun/xdrun automation in this repository."
