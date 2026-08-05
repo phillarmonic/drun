@@ -238,6 +238,26 @@ when node project exists:
   use npm or yarn
 ```
 
+Filesystem condition paths expand the current user's home directory and process
+environment variables before they are resolved against the task workdir. The
+supported forms are `~`, `~/path`, `$NAME/path`, and `${NAME}/path`. Undefined
+environment variables and named-user home paths such as `~generic/path` remain
+literal.
+
+```drun
+if folder "~/Library/Audio/Plug-Ins/VST3" exists:
+  info "The macOS VST3 folder exists"
+
+if folder "$HOME/.config/example" not exists:
+  warning "The example configuration folder is missing"
+
+if directory "$HOME/.cache/example" does not exist:
+  create folder "$HOME/.cache/example"
+```
+
+`folder`, `directory`, and `dir` are interchangeable. The negative existence
+forms `not exists` and `does not exist` are also equivalent.
+
 #### Compound Conditions
 
 ```drun

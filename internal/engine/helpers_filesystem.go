@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -10,10 +11,14 @@ import (
 // Domain: Filesystem Helpers
 // This file contains helper methods for filesystem operations
 
+var filesystemEnvironmentVariablePattern = regexp.MustCompile(`\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))`)
+
 func (e *Engine) resolveFilesystemPath(path string, ctx *ExecutionContext) string {
 	if path == "" {
 		return path
 	}
+
+	path = expandFilesystemPath(path)
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path)
 	}
@@ -35,6 +40,32 @@ func (e *Engine) resolveFilesystemPath(path string, ctx *ExecutionContext) strin
 		return filepath.Clean(path)
 	}
 	return filepath.Clean(filepath.Join(base, path))
+}
+
+func expandFilesystemPath(path string) string {
+	path = filesystemEnvironmentVariablePattern.ReplaceAllStringFunc(path, func(match string) string {
+		parts := filesystemEnvironmentVariablePattern.FindStringSubmatch(match)
+		name := parts[1]
+		if name == "" {
+			name = parts[2]
+		}
+		if value, exists := os.LookupEnv(name); exists {
+			return value
+		}
+		return match
+	})
+
+	if path != "~" && !strings.HasPrefix(path, "~/") && !strings.HasPrefix(path, `~\`) {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	return filepath.Join(home, path[2:])
 }
 
 // fileExists checks if a file exists

@@ -518,6 +518,13 @@ func (e *Engine) evaluateFilesystemExistsCondition(condition string, ctx *Execut
 
 		remainder := strings.TrimSpace(strings.TrimPrefix(condition, subject.prefix))
 		switch {
+		case strings.HasSuffix(remainder, " does not exist"):
+			path := strings.TrimSpace(strings.TrimSuffix(remainder, " does not exist"))
+			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")
+			if subject.isDir {
+				return !e.dirExists(path, ctx), true
+			}
+			return !e.fileExists(path, ctx), true
 		case strings.HasSuffix(remainder, " not exists"):
 			path := strings.TrimSpace(strings.TrimSuffix(remainder, " not exists"))
 			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")
