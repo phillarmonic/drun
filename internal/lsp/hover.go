@@ -160,8 +160,9 @@ func hoverForSource(source string, pos position) *hover {
 
 	var best *hoverEntry
 	bestStart := -1
-	for i := range hoverEntries {
-		entry := &hoverEntries[i]
+	entries := append(annotationHoverEntries(), hoverEntries...)
+	for i := range entries {
+		entry := &entries[i]
 		for from := 0; from < len(code); {
 			offset := strings.Index(code[from:], entry.Phrase)
 			if offset < 0 {
@@ -205,7 +206,9 @@ func hoverMarkdown(entry hoverEntry) string {
 		entry.Syntax,
 		"```",
 	}
-	if examples := hoverExtraExamples[entry.Phrase]; len(examples) > 0 {
+	examples := append([]string(nil), annotationExamples(entry.Phrase)...)
+	examples = append(examples, hoverExtraExamples[entry.Phrase]...)
+	if len(examples) > 0 {
 		lines = append(lines, "", "**Examples**")
 		for _, example := range examples {
 			lines = append(lines, "", "```drun", example, "```")

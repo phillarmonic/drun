@@ -173,15 +173,15 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			// Special handling for CREATE token - check context
 			if p.curToken.Type == lexer.CREATE {
 				// Look ahead to determine if this is git or file operation
-				if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
-					git := p.parseGitStatement()
-					if git != nil {
-						stmt.Body = append(stmt.Body, git)
-					}
-				} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || p.peekToken.Type == lexer.FILE || (p.peekToken.Type == lexer.IDENT && (p.peekToken.Literal == "file" || p.peekToken.Literal == "dir" || p.peekToken.Literal == "directory")) {
+				if p.isCreateFileStatementStart() {
 					file := p.parseFileStatement()
 					if file != nil {
 						stmt.Body = append(stmt.Body, file)
+					}
+				} else if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
+					git := p.parseGitStatement()
+					if git != nil {
+						stmt.Body = append(stmt.Body, git)
 					}
 				} else {
 					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', or 'directory'")

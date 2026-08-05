@@ -22,6 +22,10 @@ var supportedPlatforms = map[string]string{
 	"windows": Windows,
 }
 
+func CanonicalNames() []string {
+	return []string{Linux, Mac, Windows}
+}
+
 func Normalize(name string) (string, error) {
 	normalized, ok := supportedPlatforms[strings.ToLower(strings.TrimSpace(name))]
 	if !ok {

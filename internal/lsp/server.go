@@ -22,9 +22,10 @@ import (
 const (
 	textDocumentSyncFull = 1
 
-	completionItemKindText     = 1
-	completionItemKindFunction = 3
-	completionItemKindKeyword  = 14
+	completionItemKindText      = 1
+	completionItemKindFunction  = 3
+	completionItemKindKeyword   = 14
+	completionTextFormatSnippet = 2
 )
 
 var taskNamePattern = regexp.MustCompile(`(?m)^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
@@ -121,7 +122,8 @@ type serverCapabilities struct {
 }
 
 type completionOptions struct {
-	ResolveProvider bool `json:"resolveProvider"`
+	ResolveProvider   bool     `json:"resolveProvider"`
+	TriggerCharacters []string `json:"triggerCharacters,omitempty"`
 }
 
 type serverInfo struct {
@@ -164,6 +166,7 @@ type didCloseParams struct {
 
 type completionParams struct {
 	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
 }
 
 type hoverParams struct {
@@ -204,9 +207,18 @@ type position struct {
 }
 
 type completionItem struct {
-	Label  string `json:"label"`
-	Kind   int    `json:"kind,omitempty"`
-	Detail string `json:"detail,omitempty"`
+	Label            string         `json:"label"`
+	Kind             int            `json:"kind,omitempty"`
+	Detail           string         `json:"detail,omitempty"`
+	Documentation    *markupContent `json:"documentation,omitempty"`
+	InsertText       string         `json:"insertText,omitempty"`
+	InsertTextFormat int            `json:"insertTextFormat,omitempty"`
+	TextEdit         *textEdit      `json:"textEdit,omitempty"`
+}
+
+type textEdit struct {
+	Range   lspRange `json:"range"`
+	NewText string   `json:"newText"`
 }
 
 func NewServer(in io.Reader, out io.Writer) *Server {
@@ -262,7 +274,8 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 				Capabilities: serverCapabilities{
 					TextDocumentSync: textDocumentSyncFull,
 					CompletionProvider: &completionOptions{
-						ResolveProvider: false,
+						ResolveProvider:   false,
+						TriggerCharacters: []string{"@"},
 					},
 					HoverProvider:          true,
 					DefinitionProvider:     true,
@@ -320,7 +333,7 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			return false, err
 		}
 		text := s.docs[params.TextDocument.URI]
-		items := completionsForSource(params.TextDocument.URI, text)
+		items := completionsForSource(params.TextDocument.URI, text, params.Position)
 		return false, s.writeResponse(message{
 			JSONRPC: "2.0",
 			ID:      msg.ID,
@@ -422,9 +435,10 @@ func diagnosticsForSource(uri, text string) []diagnostic {
 	}}
 }
 
-func completionsForSource(uri, text string) []completionItem {
-	items := make([]completionItem, 0, len(keywordCompletions)+8)
+func completionsForSource(uri, text string, positions ...position) []completionItem {
+	items := make([]completionItem, 0, len(keywordCompletions)+len(annotationEntries)+8)
 	items = append(items, keywordCompletions...)
+	items = append(items, annotationCompletionItems(annotationCompletionRange(text, positions...))...)
 
 	seen := map[string]struct{}{}
 	for _, item := range items {

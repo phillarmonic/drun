@@ -15,8 +15,8 @@ import (
 // executeFile executes a file operation statement
 func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) error {
 	// Interpolate variables in paths and content
-	target := e.interpolateVariables(fileStmt.Target, ctx)
-	source := e.interpolateVariables(fileStmt.Source, ctx)
+	target := expandFilesystemPath(e.interpolateVariables(fileStmt.Target, ctx))
+	source := expandFilesystemPath(e.interpolateVariables(fileStmt.Source, ctx))
 	content := e.interpolateVariables(fileStmt.Content, ctx)
 
 	replacements := make(map[string]string, len(fileStmt.Replacements))

@@ -478,13 +478,29 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 				}
 			}
 		} else if p.isGitToken(p.curToken.Type) {
-			git := p.parseGitStatement()
-			if git != nil {
-				body = append(body, git)
-			} else if p.peekToken.Type == lexer.VALIDATE {
-				gitValidate := p.parseGitValidateStatement()
-				if gitValidate != nil {
-					body = append(body, gitValidate)
+			if p.curToken.Type == lexer.CREATE {
+				if p.isCreateFileStatementStart() {
+					file := p.parseFileStatement()
+					if file != nil {
+						body = append(body, file)
+					}
+				} else if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
+					git := p.parseGitStatement()
+					if git != nil {
+						body = append(body, git)
+					}
+				} else {
+					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', or 'directory'")
+				}
+			} else {
+				git := p.parseGitStatement()
+				if git != nil {
+					body = append(body, git)
+				} else if p.peekToken.Type == lexer.VALIDATE {
+					gitValidate := p.parseGitValidateStatement()
+					if gitValidate != nil {
+						body = append(body, gitValidate)
+					}
 				}
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {

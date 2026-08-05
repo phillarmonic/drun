@@ -108,6 +108,26 @@ func (p *Parser) isGitToken(tokenType lexer.TokenType) bool {
 	}
 }
 
+// isCreateFileStatementStart disambiguates filesystem creation from Git's
+// create branch/tag syntax in statement bodies where CREATE can start either.
+func (p *Parser) isCreateFileStatementStart() bool {
+	if p.curToken.Type != lexer.CREATE {
+		return false
+	}
+
+	switch p.peekToken.Type {
+	case lexer.FILE, lexer.DIR, lexer.DIRECTORY:
+		return true
+	case lexer.IDENT:
+		switch p.peekToken.Literal {
+		case "file", "dir", "directory":
+			return true
+		}
+	}
+
+	return false
+}
+
 // isHTTPToken checks if a token type represents an HTTP statement
 func (p *Parser) isHTTPToken(tokenType lexer.TokenType) bool {
 	switch tokenType {
