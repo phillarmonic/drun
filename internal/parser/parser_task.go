@@ -184,7 +184,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 						stmt.Body = append(stmt.Body, git)
 					}
 				} else {
-					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', or 'directory'")
+					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', 'directory', or 'folder'")
 				}
 			} else {
 				git := p.parseGitStatement()
@@ -202,6 +202,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			fileValue := p.parseFileValueStatement()
 			if fileValue != nil {
 				stmt.Body = append(stmt.Body, fileValue)
+			}
+		} else if p.isDeleteFileStatementStart() {
+			file := p.parseFileStatement()
+			if file != nil {
+				stmt.Body = append(stmt.Body, file)
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()

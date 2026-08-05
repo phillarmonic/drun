@@ -490,7 +490,7 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 						body = append(body, git)
 					}
 				} else {
-					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', or 'directory'")
+					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', 'directory', or 'folder'")
 				}
 			} else {
 				git := p.parseGitStatement()
@@ -502,6 +502,11 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 						body = append(body, gitValidate)
 					}
 				}
+			}
+		} else if p.isDeleteFileStatementStart() {
+			file := p.parseFileStatement()
+			if file != nil {
+				body = append(body, file)
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()

@@ -250,7 +250,13 @@ if folder "~/Library/Audio/Plug-Ins/VST3" exists:
 
 if folder "$HOME/.config/example" not exists:
   warning "The example configuration folder is missing"
+
+if directory "$HOME/.cache/example" does not exist:
+  create folder "$HOME/.cache/example"
 ```
+
+`folder`, `directory`, and `dir` are interchangeable. The negative existence
+forms `not exists` and `does not exist` are also equivalent.
 
 #### Compound Conditions
 

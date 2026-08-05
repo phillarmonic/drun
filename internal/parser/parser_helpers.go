@@ -120,7 +120,27 @@ func (p *Parser) isCreateFileStatementStart() bool {
 		return true
 	case lexer.IDENT:
 		switch p.peekToken.Literal {
-		case "file", "dir", "directory":
+		case "file", "dir", "directory", "folder":
+			return true
+		}
+	}
+
+	return false
+}
+
+// isDeleteFileStatementStart disambiguates filesystem deletion from an HTTP
+// DELETE request in statement bodies where DELETE can start either.
+func (p *Parser) isDeleteFileStatementStart() bool {
+	if p.curToken.Type != lexer.DELETE {
+		return false
+	}
+
+	switch p.peekToken.Type {
+	case lexer.FILE, lexer.DIR, lexer.DIRECTORY:
+		return true
+	case lexer.IDENT:
+		switch p.peekToken.Literal {
+		case "file", "dir", "directory", "folder":
 			return true
 		}
 	}

@@ -14,6 +14,7 @@ func TestParser_CreatePathAtConditionalBranchBoundary(t *testing.T) {
 		isDir bool
 	}{
 		{name: "directory", line: `create directory "~/Library/Application Support/example/cache"`, isDir: true},
+		{name: "folder", line: `create folder "~/Library/Application Support/example/cache"`, isDir: true},
 		{name: "file", line: `create file "$HOME/example/cache/config.json"`, isDir: false},
 	}
 

@@ -67,11 +67,16 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 		op.Target = target
 		op.Type = "copy" // Backup is essentially a copy operation
 	case "check_exists":
-		// Check if file exists
-		if e.fileExists(target, ctx) {
-			_, _ = fmt.Fprintf(e.output, "✅  File exists: %s\n", target)
+		kind := "File"
+		exists := e.fileExists(target, ctx)
+		if fileStmt.IsDir {
+			kind = "Directory"
+			exists = e.dirExists(target, ctx)
+		}
+		if exists {
+			_, _ = fmt.Fprintf(e.output, "✅  %s exists: %s\n", kind, target)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "❌  File does not exist: %s\n", target)
+			_, _ = fmt.Fprintf(e.output, "❌  %s does not exist: %s\n", kind, target)
 		}
 		return nil
 	case "get_size":

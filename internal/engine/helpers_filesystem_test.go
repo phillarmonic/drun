@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -113,5 +114,38 @@ task "create paths":
 	info, err := os.Stat(file)
 	if err != nil || info.IsDir() {
 		t.Fatalf("expected recursively created file %q, stat error: %v", file, err)
+	}
+}
+
+func TestFilesystemNounsAndMissingPredicatesAreInterchangeable(t *testing.T) {
+	root := t.TempDir()
+	existingDirectory := filepath.Join(root, "existing-directory")
+	if err := os.Mkdir(existingDirectory, 0o755); err != nil {
+		t.Fatalf("create existing directory: %v", err)
+	}
+	existingFile := filepath.Join(root, "existing-file")
+	if err := os.WriteFile(existingFile, []byte("present"), 0o600); err != nil {
+		t.Fatalf("create existing file: %v", err)
+	}
+	missing := filepath.Join(root, "missing")
+	engine := NewEngine(io.Discard)
+	ctx := &ExecutionContext{}
+
+	for noun, existing := range map[string]string{
+		"file":      existingFile,
+		"folder":    existingDirectory,
+		"directory": existingDirectory,
+		"dir":       existingDirectory,
+	} {
+		for _, predicate := range []string{"not exists", "does not exist"} {
+			condition := fmt.Sprintf(`%s %q %s`, noun, missing, predicate)
+			if !engine.evaluateCondition(condition, ctx) {
+				t.Errorf("condition %q should be true", condition)
+			}
+			condition = fmt.Sprintf(`%s %q %s`, noun, existing, predicate)
+			if engine.evaluateCondition(condition, ctx) {
+				t.Errorf("condition %q should be false", condition)
+			}
+		}
 	}
 }

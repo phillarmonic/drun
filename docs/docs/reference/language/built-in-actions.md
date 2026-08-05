@@ -436,8 +436,12 @@ replace in "config/.env":
 
 # Directory operations
 create directory "new-folder"
-remove directory "old-folder"
-copy directory "src" to "backup/src"
+create folder "another-folder"
+create dir "short-form-folder"
+delete directory "old-folder"
+delete folder "another-old-folder"
+delete dir "short-form-old-folder"
+copy "src" to "backup/src"
 
 # Parent directories are created recursively after path expansion
 create directory "~/Library/Application Support/example/cache"
@@ -451,6 +455,9 @@ File action source and target paths expand `~`, `~/path`, `$NAME/path`, and
 `${NAME}/path`. File and directory creation actions recursively create missing parent directories. Undefined environment
 variables and named-user paths such as
 `~generic/path` remain literal.
+
+The nouns `folder`, `directory`, and `dir` are interchangeable in filesystem
+actions and conditions.
 
 #### Structured file values
 
@@ -582,6 +589,16 @@ if directory "tests/coverage" is empty:
 - **Path interpolation**: Support for variable interpolation in paths
 - **Non-existent handling**: Non-existent directories are treated as empty
 - **Semantic conditions**: Natural `is empty` and `is not empty` syntax
+
+Existence conditions accept both missing-path forms:
+
+```drun
+if folder "cache" not exists:
+  create folder "cache"
+
+if directory "artifacts" does not exist:
+  create directory "artifacts"
+```
 
 ### Network Actions
 

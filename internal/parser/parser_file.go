@@ -41,7 +41,7 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 	}
 }
 
-// parseCreateStatement parses "create file/dir" statements
+// parseCreateStatement parses "create file/dir/directory/folder" statements.
 func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: create file "path" or create dir "path" or create directory "path"
 	switch p.peekToken.Type {
@@ -56,14 +56,14 @@ func (p *Parser) parseCreateStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		switch p.curToken.Literal {
 		case "file":
 			stmt.IsDir = false
-		case "dir", "directory":
+		case "dir", "directory", "folder":
 			stmt.IsDir = true
 		default:
-			p.addError("expected 'file', 'dir', or 'directory' after 'create'")
+			p.addError("expected 'file', 'dir', 'directory', or 'folder' after 'create'")
 			return nil
 		}
 	default:
-		p.addError("expected 'file', 'dir', or 'directory' after 'create'")
+		p.addError("expected 'file', 'dir', 'directory', or 'folder' after 'create'")
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func (p *Parser) parseMoveStatement(stmt *ast.FileStatement) *ast.FileStatement 
 	return stmt
 }
 
-// parseDeleteStatement parses "delete" statements
+// parseDeleteStatement parses "delete file/dir/directory/folder" statements.
 func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatement {
 	// Expect: delete file "path" or delete dir "path"
 	switch p.peekToken.Type {
@@ -155,14 +155,14 @@ func (p *Parser) parseDeleteStatement(stmt *ast.FileStatement) *ast.FileStatemen
 		switch p.curToken.Literal {
 		case "file":
 			stmt.IsDir = false
-		case "dir", "directory":
+		case "dir", "directory", "folder":
 			stmt.IsDir = true
 		default:
-			p.addError("expected 'file', 'dir', or 'directory' after 'delete'")
+			p.addError("expected 'file', 'dir', 'directory', or 'folder' after 'delete'")
 			return nil
 		}
 	default:
-		p.addError("expected 'file', 'dir', or 'directory' after 'delete'")
+		p.addError("expected 'file', 'dir', 'directory', or 'folder' after 'delete'")
 		return nil
 	}
 
@@ -338,7 +338,7 @@ func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement
 	switch p.peekToken.Type {
 	case lexer.IF:
 		p.nextToken() // consume IF
-		if !p.expectPeekFileKeyword() {
+		if !p.expectPeekFilesystemKind(stmt) {
 			return nil
 		}
 		if !p.expectPeek(lexer.STRING) {
@@ -366,4 +366,29 @@ func (p *Parser) parseCheckStatement(stmt *ast.FileStatement) *ast.FileStatement
 	}
 
 	return stmt
+}
+
+func (p *Parser) expectPeekFilesystemKind(stmt *ast.FileStatement) bool {
+	switch p.peekToken.Type {
+	case lexer.FILE:
+		stmt.IsDir = false
+	case lexer.DIR, lexer.DIRECTORY:
+		stmt.IsDir = true
+	case lexer.IDENT:
+		switch p.peekToken.Literal {
+		case "file":
+			stmt.IsDir = false
+		case "dir", "directory", "folder":
+			stmt.IsDir = true
+		default:
+			p.addError(fmt.Sprintf("expected 'file', 'dir', 'directory', or 'folder', got %s instead", p.peekToken.Literal))
+			return false
+		}
+	default:
+		p.addError(fmt.Sprintf("expected 'file', 'dir', 'directory', or 'folder', got %s instead", p.peekToken.Type))
+		return false
+	}
+
+	p.nextToken()
+	return true
 }

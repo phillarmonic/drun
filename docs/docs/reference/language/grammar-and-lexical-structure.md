@@ -92,7 +92,7 @@ property, json, yaml, toml, match, equals, differs
 
 # Smart detection
 docker, kubernetes, git, image, container, replicas, branch, tag
-directory, file, exists, running, healthy, available
+directory, folder, dir, file, exists, running, healthy, available
 
 # Special values
 true, false, now, current, secret, env
@@ -556,9 +556,15 @@ logical_expression = comparison_expression
 comparison_expression = additive_expression
                       [ comparison_operator additive_expression
                       | "is" version_order "than" "version" additive_expression ]
-                      | file_comparison_expression ;
+                      | file_comparison_expression
+                      | filesystem_exists_expression ;
 
 file_comparison_expression = "file" file_path [ "not" ] "matches" "file" file_path ;
+
+filesystem_exists_expression = ( "file" | directory_noun ) file_path
+                               ( "exists" | "not" "exists" | "does" "not" "exist" ) ;
+
+directory_noun = "folder" | "directory" | "dir" ;
 
 file_path = string_literal | interpolated_string | identifier ;
 
@@ -632,7 +638,8 @@ git_action = "commit" "changes" [ "with" "message" string_literal ]
 file_action = "copy" string_literal "to" string_literal
             | "move" string_literal "to" string_literal
             | "remove" string_literal
-            | "create" "directory" string_literal
+            | "create" ( "file" | directory_noun ) string_literal
+            | "delete" ( "file" | directory_noun ) string_literal
             | "backup" string_literal [ "as" string_literal ] ;
 
 status_action = "step" string_literal
