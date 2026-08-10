@@ -203,6 +203,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if fileValue != nil {
 				stmt.Body = append(stmt.Body, fileValue)
 			}
+		} else if p.isChangelogStatementStart() {
+			changelog := p.parseChangelogStatement()
+			if changelog != nil {
+				stmt.Body = append(stmt.Body, changelog)
+			}
 		} else if p.isDeleteFileStatementStart() {
 			file := p.parseFileStatement()
 			if file != nil {
@@ -212,6 +217,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			http := p.parseHTTPStatement()
 			if http != nil {
 				stmt.Body = append(stmt.Body, http)
+			}
+		} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+			// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+			wait := p.parseWaitStatement()
+			if wait != nil {
+				stmt.Body = append(stmt.Body, wait)
 			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()

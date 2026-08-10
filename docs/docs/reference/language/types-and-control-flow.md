@@ -301,20 +301,18 @@ run in parallel:
 wait for all to complete
 ```
 
-#### Range Iteration
+#### Retry with Backoff
+
+Pause between attempts with a fixed `wait` (seconds, minutes, or hours):
 
 ```drun
-for port from 3000 to 3005:
-  check if port {port} is available
-
-for i from 1 to retry_count:
+for each $attempt in ["1", "2", "3"]:
   try:
-    perform operation
+    run "./flaky-deploy.sh"
     break
   catch:
-    if i == retry_count:
-      fail "Max retries exceeded"
-    wait {i} seconds
+    warn "Attempt {$attempt} failed, backing off"
+    wait {$attempt} seconds
 ```
 
 #### Filtered Iteration

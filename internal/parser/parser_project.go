@@ -910,6 +910,12 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 				if http != nil {
 					hook.Body = append(hook.Body, http)
 				}
+			} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+				// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+				wait := p.parseWaitStatement()
+				if wait != nil {
+					hook.Body = append(hook.Body, wait)
+				}
 			} else if p.isNetworkToken(p.curToken.Type) {
 				network := p.parseNetworkStatement()
 				if network != nil {

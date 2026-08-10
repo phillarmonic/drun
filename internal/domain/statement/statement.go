@@ -29,8 +29,10 @@ const (
 	TypeHTTP             StatementType = "http"
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
+	TypeWait             StatementType = "wait"
 	TypeFile             StatementType = "file"
 	TypeFileValue        StatementType = "file_value"
+	TypeChangelog        StatementType = "changelog"
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
@@ -265,6 +267,14 @@ type Network struct {
 
 func (n *Network) Type() StatementType { return TypeNetwork }
 
+// Wait represents a fixed-duration wait (wait 5 seconds)
+type Wait struct {
+	Value string // Raw value: a number literal or a {variable} interpolation
+	Unit  string // Normalized singular unit: "second", "minute", "hour"
+}
+
+func (w *Wait) Type() StatementType { return TypeWait }
+
 // File represents file operations
 type File struct {
 	Action       string
@@ -293,6 +303,16 @@ type FileValue struct {
 }
 
 func (f *FileValue) Type() StatementType { return TypeFileValue }
+
+// Changelog represents a Keep a Changelog promotion of the Unreleased
+// section into a dated release section.
+type Changelog struct {
+	Path    string
+	Version string
+	Date    string // Optional release date override (YYYY-MM-DD), empty means today
+}
+
+func (c *Changelog) Type() StatementType { return TypeChangelog }
 
 // Detection represents tool detection operations
 type Detection struct {

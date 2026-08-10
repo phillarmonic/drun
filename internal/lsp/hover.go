@@ -22,6 +22,7 @@ var hoverEntries = []hoverEntry{
 	{"for each", `for each $item in $items:`, "Collection loop", "Runs the nested statements once for every value in a collection."},
 	{"else if", `else if <condition>:`, "Conditional branch", "Adds another condition to the preceding `if` statement."},
 	{"use workdir", `use workdir "path":`, "Scoped working directory", "Runs the nested statements with a different working directory, then restores the previous directory."},
+	{"wait", `wait <number|{$variable}> second(s)|minute(s)|hour(s)`, "Pause execution", "Pauses task execution for a fixed duration, then continues with the next statement. The duration can be a number literal or an interpolated variable. To wait until a service responds instead, use `wait for service at \"url\" to be ready`."},
 	{"get property", `get property "key" from "file" as $value`, "Read a properties value", "Reads a key from a Java properties file and assigns it to a variable."},
 	{"get json", `get json "/pointer" from "file" as $value`, "Read a JSON value", "Reads a value selected by JSON Pointer and assigns it to a variable."},
 	{"get yaml", `get yaml "path" from "file" as $value`, "Read a YAML value", "Reads a value selected by its YAML path and assigns it to a variable."},
@@ -37,6 +38,7 @@ var hoverEntries = []hoverEntry{
 	{"update yaml", `update yaml "path" in "file" to <value>`, "Update a YAML value", "Rewrites the value selected by its YAML path."},
 	{"update toml", `update toml "path" in "file" to <value>`, "Update a TOML value", "Rewrites the value selected by its dotted path."},
 	{"update match", `update match "pattern" in "file" to <value>`, "Update a regular-expression match", "Replaces the selected regular-expression capture."},
+	{"promote changelog", `promote changelog "file" to version "X.Y.Z" [on "YYYY-MM-DD"]`, "Promote unreleased changelog entries", "Moves the `## [Unreleased]` section of a Keep a Changelog file into a new dated release section, leaving an emptied Unreleased section behind. When the file has an `[Unreleased]: .../compare/<prev>...HEAD` link, the comparison links are updated too. The date defaults to today; use `on \"YYYY-MM-DD\"` to override it. Re-running for a version whose section already exists merges new Unreleased entries into it instead of failing, so release preparation is idempotent."},
 	{"git policy", `git policy:`, "Git policy", "Defines repository conventions such as branch naming, protected branches, and commit-message rules."},
 	{"git validate", `git validate`, "Validate Git policy", "Checks the current repository against the configured Git policy."},
 	{"version", `version: 2.0`, "Language version", "Selects the Drun language version used to parse this file."},
@@ -122,8 +124,20 @@ var hoverExtraExamples = map[string][]string{
 	"update json": {
 		"update json \"/version\" in \"package.json\" to $version",
 	},
+	"promote changelog": {
+		"promote changelog \"CHANGELOG.md\" to version \"{$release_version}\"",
+		"promote changelog \"CHANGELOG.md\" to version \"1.5.0\" on \"2026-09-01\"",
+		"task \"prepare-release\" means \"Prepare a release\":\n  requires $version as string matching semver_optional_v\n  set $release_version to \"{$version without prefix 'v'}\"\n  update json \"/version\" in \"package.json\" to \"{$release_version}\" or fail\n  promote changelog \"CHANGELOG.md\" to version \"{$release_version}\"",
+	},
 	"use workdir": {
 		"use workdir \"frontend\":\n  run \"pnpm test\"",
+	},
+	"wait": {
+		"wait 5 seconds",
+		"wait {$backoff} minutes",
+		"wait 1 hour",
+		"for each $attempt in [\"1\", \"2\", \"3\"]:\n  try:\n    run \"./flaky-deploy.sh\"\n    break\n  catch:\n    warn \"Attempt {$attempt} failed, backing off\"\n    wait {$attempt} minutes",
+		"wait for service at \"https://api.local/health\" to be ready timeout \"60s\"",
 	},
 	"call task": {
 		"call task \"build\"",

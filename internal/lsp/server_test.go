@@ -162,6 +162,7 @@ func TestHoverCoversCommonStatementsAndIgnoresStringsAndComments(t *testing.T) {
 		{"task", `task "build":`, 1, "Task declaration"},
 		{"longest phrase", `  call task "build"`, 8, "Call another task"},
 		{"file value", `  update json "/version" in "package.json" to "2"`, 5, "Update a JSON value"},
+		{"changelog promotion", `  promote changelog "CHANGELOG.md" to version "1.5.0"`, 5, "Promote unreleased changelog entries"},
 		{"control flow", `  for each $item in $items:`, 7, "Collection loop"},
 		{"tool requirements", `  requires tools:`, 12, "Tool requirements"},
 		{"unicode column", `é task "build":`, 3, ""},

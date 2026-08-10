@@ -28,6 +28,18 @@ that operate on the project declaration in the currently executing Drun file.
 They honor custom `--file` paths and use the same dry-run and atomic-write
 guarantees as other structured file-value statements.
 
+### Changelog statements
+
+```ebnf
+changelog-promote = "promote", "changelog", string, "to", "version", string,
+                    ["on", string] ;
+```
+
+The first string is the changelog file path, the second is the release
+version, and the optional `on` string is a `YYYY-MM-DD` release date. See
+[Changelog promotion](built-in-actions.md#changelog-promotion) for the exact
+transformation and failure modes.
+
 ### Composite Git version guard
 
 ```ebnf

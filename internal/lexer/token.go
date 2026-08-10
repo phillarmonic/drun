@@ -150,6 +150,18 @@ const (
 	BE         // be
 	EXPECT     // expect
 
+	// Time unit keywords
+	SECOND  // second
+	SECONDS // seconds
+	MINUTE  // minute
+	MINUTES // minutes
+	HOUR    // hour
+	HOURS   // hours
+
+	// Changelog keywords
+	PROMOTE   // promote
+	CHANGELOG // changelog
+
 	// Orchestration keywords
 	ORCHESTRATE   // orchestrate
 	SERVICES      // services
@@ -722,6 +734,22 @@ func (t TokenType) String() string {
 		return "BE"
 	case EXPECT:
 		return "EXPECT"
+	case SECOND:
+		return "SECOND"
+	case SECONDS:
+		return "SECONDS"
+	case MINUTE:
+		return "MINUTE"
+	case MINUTES:
+		return "MINUTES"
+	case HOUR:
+		return "HOUR"
+	case HOURS:
+		return "HOURS"
+	case PROMOTE:
+		return "PROMOTE"
+	case CHANGELOG:
+		return "CHANGELOG"
 	case ORCHESTRATE:
 		return "ORCHESTRATE"
 	case SERVICES:
@@ -1387,6 +1415,14 @@ var keywords = map[string]TokenType{
 	"at":            AT,
 	"be":            BE,
 	"expect":        EXPECT,
+	"second":        SECOND,
+	"seconds":       SECONDS,
+	"minute":        MINUTE,
+	"minutes":       MINUTES,
+	"hour":          HOUR,
+	"hours":         HOURS,
+	"promote":       PROMOTE,
+	"changelog":     CHANGELOG,
 	"orchestrate":   ORCHESTRATE,
 	"services":      SERVICES,
 	"strategy":      STRATEGY,

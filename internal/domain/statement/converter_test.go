@@ -172,3 +172,34 @@ func TestFromASTList_SkipsNil(t *testing.T) {
 		t.Errorf("Result length = %v, want 2 (parameter should be skipped)", len(domainList))
 	}
 }
+
+func TestFromAST_Changelog(t *testing.T) {
+	astChangelog := &ast.ChangelogStatement{
+		Path:    "CHANGELOG.md",
+		Version: "{$release_version}",
+		Date:    "2026-09-01",
+	}
+
+	domainStmt, err := FromAST(astChangelog)
+	if err != nil {
+		t.Fatalf("FromAST() error = %v", err)
+	}
+
+	changelogStmt, ok := domainStmt.(*Changelog)
+	if !ok {
+		t.Fatalf("Expected *Changelog, got %T", domainStmt)
+	}
+
+	if changelogStmt.Type() != TypeChangelog {
+		t.Errorf("Type() = %v, want %v", changelogStmt.Type(), TypeChangelog)
+	}
+	if changelogStmt.Path != "CHANGELOG.md" {
+		t.Errorf("Path = %v, want CHANGELOG.md", changelogStmt.Path)
+	}
+	if changelogStmt.Version != "{$release_version}" {
+		t.Errorf("Version = %v, want {$release_version}", changelogStmt.Version)
+	}
+	if changelogStmt.Date != "2026-09-01" {
+		t.Errorf("Date = %v, want 2026-09-01", changelogStmt.Date)
+	}
+}

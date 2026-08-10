@@ -1,0 +1,20 @@
+version: 2.0
+
+project "changelog-promotion" version "1.4.0":
+
+task "default" means "Describe the changelog example without touching local files":
+  info "Run prepare release version=X.Y.Z against a project with a Keep a Changelog CHANGELOG.md"
+
+task "prepare release" means "Promote unreleased changelog entries to a dated release section":
+  requires $version as string matching semver_optional_v
+
+  set $release_version to "{$version without prefix 'v'}"
+
+  # Moves the "## [Unreleased]" entries of CHANGELOG.md into a dated
+  # "## [X.Y.Z] - <today>" section and leaves an emptied Unreleased section
+  # behind. "[Unreleased]: .../compare/<prev>...HEAD" comparison links are
+  # updated as well when present.
+  promote changelog "CHANGELOG.md" to version "{$release_version}"
+
+  # Pin the date instead of using today:
+  # promote changelog "CHANGELOG.md" to version "1.5.0" on "2026-09-01"
