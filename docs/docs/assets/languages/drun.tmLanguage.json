@@ -1056,6 +1056,42 @@
     "network-actions": {
       "patterns": [
         {
+          "name": "meta.wait.duration.drun",
+          "match": "^(\\s*)(wait)(\\s+)(\\d+(?:\\.\\d+)?)(\\s+)(seconds?|minutes?|hours?)\\b",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "constant.numeric.drun"
+            },
+            "6": {
+              "name": "storage.type.time-unit.drun"
+            }
+          }
+        },
+        {
+          "name": "meta.wait.duration.variable.drun",
+          "match": "^(\\s*)(wait)(\\s+)(\\{)(\\$?[A-Za-z_][A-Za-z0-9_.-]*)(\\})(\\s+)(seconds?|minutes?|hours?)\\b",
+          "captures": {
+            "2": {
+              "name": "support.type.action.drun"
+            },
+            "4": {
+              "name": "punctuation.section.interpolation.begin.drun"
+            },
+            "5": {
+              "name": "variable.other.drun"
+            },
+            "6": {
+              "name": "punctuation.section.interpolation.end.drun"
+            },
+            "8": {
+              "name": "storage.type.time-unit.drun"
+            }
+          }
+        },
+        {
           "name": "meta.network.wait.drun",
           "match": "^(\\s*)(wait)(\\s+)(for)(\\s+)(service)(\\s+)(at)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")(\\s+)(to)(\\s+)(be)(\\s+)(ready)",
           "captures": {

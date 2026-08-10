@@ -858,6 +858,38 @@ task "download_config":
       allow permissions ["read","write"] to ["user","group","others"]
 ```
 
+#### Pausing Execution (Fixed Waits)
+
+Pause task execution for a fixed amount of time before continuing with the
+next statement. Durations can be given in seconds, minutes, or hours
+(singular and plural forms are interchangeable), and the amount can be a
+number literal or an interpolated variable.
+
+```drun
+wait 5 seconds
+wait 1 minute
+wait 2 hours
+
+# Variable-driven durations, e.g. exponential-style backoff
+let $backoff = "30"
+wait {$backoff} seconds
+
+# Retry loop with a growing pause between attempts
+for each $attempt in ["1", "2", "3"]:
+  try:
+    run "./flaky-deploy.sh"
+    break
+  catch:
+    warn "Attempt {$attempt} failed, backing off"
+    wait {$attempt} minutes
+```
+
+Fractional values are supported (e.g. `wait 0.5 seconds`, `wait 1.5 minutes`).
+In dry-run mode the wait is reported but not performed.
+
+> **Note:** To wait until a service responds rather than for a fixed amount of
+> time, use `wait for service at ... to be ready` (see below).
+
 #### Network Health Checks and Service Waiting
 
 ```drun

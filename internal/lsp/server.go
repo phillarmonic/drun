@@ -65,6 +65,8 @@ var keywordCompletions = []completionItem{
 	{Label: "update toml", Kind: completionItemKindKeyword, Detail: "Update a TOML value"},
 	{Label: "update match", Kind: completionItemKindKeyword, Detail: "Update a regular-expression capture"},
 	{Label: "use workdir", Kind: completionItemKindKeyword, Detail: "Change working directory"},
+	{Label: "wait", Kind: completionItemKindKeyword, Detail: "Pause execution for a fixed duration"},
+	{Label: "wait for service", Kind: completionItemKindKeyword, Detail: "Wait until a service is ready"},
 	{Label: "call task", Kind: completionItemKindKeyword, Detail: "Call another task"},
 	{Label: "orchestrate", Kind: completionItemKindKeyword, Detail: "Orchestration definition or action"},
 	{Label: "service", Kind: completionItemKindKeyword, Detail: "Service definition"},

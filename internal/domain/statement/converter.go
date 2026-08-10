@@ -224,6 +224,12 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Condition: s.Condition,
 		}, nil
 
+	case *ast.WaitStatement:
+		return &Wait{
+			Value: s.Value,
+			Unit:  s.Unit,
+		}, nil
+
 	case *ast.FileStatement:
 		return &File{
 			Action:       s.Action,

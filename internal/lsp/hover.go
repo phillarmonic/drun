@@ -22,6 +22,7 @@ var hoverEntries = []hoverEntry{
 	{"for each", `for each $item in $items:`, "Collection loop", "Runs the nested statements once for every value in a collection."},
 	{"else if", `else if <condition>:`, "Conditional branch", "Adds another condition to the preceding `if` statement."},
 	{"use workdir", `use workdir "path":`, "Scoped working directory", "Runs the nested statements with a different working directory, then restores the previous directory."},
+	{"wait", `wait <number|{$variable}> second(s)|minute(s)|hour(s)`, "Pause execution", "Pauses task execution for a fixed duration, then continues with the next statement. The duration can be a number literal or an interpolated variable. To wait until a service responds instead, use `wait for service at \"url\" to be ready`."},
 	{"get property", `get property "key" from "file" as $value`, "Read a properties value", "Reads a key from a Java properties file and assigns it to a variable."},
 	{"get json", `get json "/pointer" from "file" as $value`, "Read a JSON value", "Reads a value selected by JSON Pointer and assigns it to a variable."},
 	{"get yaml", `get yaml "path" from "file" as $value`, "Read a YAML value", "Reads a value selected by its YAML path and assigns it to a variable."},
@@ -124,6 +125,13 @@ var hoverExtraExamples = map[string][]string{
 	},
 	"use workdir": {
 		"use workdir \"frontend\":\n  run \"pnpm test\"",
+	},
+	"wait": {
+		"wait 5 seconds",
+		"wait {$backoff} minutes",
+		"wait 1 hour",
+		"for each $attempt in [\"1\", \"2\", \"3\"]:\n  try:\n    run \"./flaky-deploy.sh\"\n    break\n  catch:\n    warn \"Attempt {$attempt} failed, backing off\"\n    wait {$attempt} minutes",
+		"wait for service at \"https://api.local/health\" to be ready timeout \"60s\"",
 	},
 	"call task": {
 		"call task \"build\"",

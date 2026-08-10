@@ -29,6 +29,7 @@ const (
 	TypeHTTP             StatementType = "http"
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
+	TypeWait             StatementType = "wait"
 	TypeFile             StatementType = "file"
 	TypeFileValue        StatementType = "file_value"
 	TypeDetection        StatementType = "detection"
@@ -264,6 +265,14 @@ type Network struct {
 }
 
 func (n *Network) Type() StatementType { return TypeNetwork }
+
+// Wait represents a fixed-duration wait (wait 5 seconds)
+type Wait struct {
+	Value string // Raw value: a number literal or a {variable} interpolation
+	Unit  string // Normalized singular unit: "second", "minute", "hour"
+}
+
+func (w *Wait) Type() StatementType { return TypeWait }
 
 // File represents file operations
 type File struct {

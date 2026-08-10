@@ -513,6 +513,12 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if http != nil {
 				body = append(body, http)
 			}
+		} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+			// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+			wait := p.parseWaitStatement()
+			if wait != nil {
+				body = append(body, wait)
+			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()
 			if network != nil {

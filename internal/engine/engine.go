@@ -952,6 +952,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeDownload(s, ctx)
 	case *statement.Network:
 		return e.executeNetwork(s, ctx)
+	case *statement.Wait:
+		return e.executeWait(s, ctx)
 	case *statement.File:
 		return e.executeFile(s, ctx)
 	case *statement.FileValue:

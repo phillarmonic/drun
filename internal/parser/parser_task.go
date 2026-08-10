@@ -213,6 +213,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if http != nil {
 				stmt.Body = append(stmt.Body, http)
 			}
+		} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+			// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+			wait := p.parseWaitStatement()
+			if wait != nil {
+				stmt.Body = append(stmt.Body, wait)
+			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()
 			if network != nil {

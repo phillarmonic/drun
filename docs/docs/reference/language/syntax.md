@@ -768,4 +768,25 @@ finally:
   cleanup temporary resources
 ```
 
+### Wait Statements
+
+Pause execution for a fixed duration before continuing:
+
+```drun
+wait <number> <unit>
+wait {<variable>} <unit>
+```
+
+Where `<unit>` is `second`/`seconds`, `minute`/`minutes`, or `hour`/`hours`.
+
+```drun
+wait 5 seconds
+wait 1 minute
+wait {$backoff} seconds
+```
+
+To wait until a service responds instead of for a fixed duration, see
+`wait for service at "url" to be ready` in
+[Built-in Actions](./built-in-actions.md#network-health-checks-and-service-waiting).
+
 ---
