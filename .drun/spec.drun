@@ -3,7 +3,7 @@
 
 version: 2.0
 
-project "Drun" version "2.0":
+project "Drun" version "2.27.0":
 	requires tools:
 		go >= "1.26.5"
 		golangci-lint provision
@@ -98,14 +98,17 @@ task "ci" mode "ci" means "Runs the whole CI pipeline":
 	success "CI executed successfully end-to-end"
 
 task "prepare-release" means "Runs checks related to going to a next release":
-    requires $release_version as string matching semver_optional_v
-    step "Preflight. Proposed version: v{$release_version}"
+    requires $version as string matching semver_optional_v
+    step "Preflight. Proposed version: v{$version}"
     # Byte for byte comparison
     if file "./drun.tmLanguage.json" not matches file "./docs/docs/assets/languages/drun.tmLanguage.json":
         fail "There are different vendored versions of the TextMate grammar in the repo.\nPlease make sure they match each other before merging."
     # Magic method for comparison (you can do this manually if you want to)
-    git ensure $release_version is newer than latest version from drun-main
+    git ensure $version is newer than latest version from drun-main
     step "Preflight checks have passed. Will now run the CI."
     call task ci
+    step "Promoting unreleased changelog entries to {$version}"
+    promote changelog "CHANGELOG.md" to version "{$version}"
+    update project version to "{$version}"
     success "According to the current spec, you should be good to go."
     warning "But be mindful, with great power, comes great responsibility."

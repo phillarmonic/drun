@@ -203,6 +203,11 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if fileValue != nil {
 				stmt.Body = append(stmt.Body, fileValue)
 			}
+		} else if p.isChangelogStatementStart() {
+			changelog := p.parseChangelogStatement()
+			if changelog != nil {
+				stmt.Body = append(stmt.Body, changelog)
+			}
 		} else if p.isDeleteFileStatementStart() {
 			file := p.parseFileStatement()
 			if file != nil {

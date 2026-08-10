@@ -249,6 +249,11 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			ValueType: s.ValueType,
 		}, nil
 
+	case *ast.ChangelogStatement:
+		return &Changelog{
+			Path: s.Path, Version: s.Version, Date: s.Date,
+		}, nil
+
 	case *ast.DetectionStatement:
 		body, err := FromASTList(s.Body)
 		if err != nil {

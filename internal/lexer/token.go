@@ -158,6 +158,10 @@ const (
 	HOUR    // hour
 	HOURS   // hours
 
+	// Changelog keywords
+	PROMOTE   // promote
+	CHANGELOG // changelog
+
 	// Orchestration keywords
 	ORCHESTRATE   // orchestrate
 	SERVICES      // services
@@ -742,6 +746,10 @@ func (t TokenType) String() string {
 		return "HOUR"
 	case HOURS:
 		return "HOURS"
+	case PROMOTE:
+		return "PROMOTE"
+	case CHANGELOG:
+		return "CHANGELOG"
 	case ORCHESTRATE:
 		return "ORCHESTRATE"
 	case SERVICES:
@@ -1413,6 +1421,8 @@ var keywords = map[string]TokenType{
 	"minutes":       MINUTES,
 	"hour":          HOUR,
 	"hours":         HOURS,
+	"promote":       PROMOTE,
+	"changelog":     CHANGELOG,
 	"orchestrate":   ORCHESTRATE,
 	"services":      SERVICES,
 	"strategy":      STRATEGY,

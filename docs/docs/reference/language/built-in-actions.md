@@ -537,6 +537,54 @@ command when a file falls outside these rules.
 
 The existing literal `replace in` action remains unchanged and independent of structured file-value operations.
 
+#### Changelog promotion
+
+Release tasks commonly move the `Unreleased` entries of a [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+file into a dated release section. Drun supports this directly:
+
+```drun
+promote changelog "CHANGELOG.md" to version "{$release_version}"
+promote changelog "CHANGELOG.md" to version "1.5.0" on "2026-09-01"
+```
+
+The grammar is:
+
+```text
+promote changelog <file> to version <version> [on <date>]
+```
+
+The statement rewrites the file so the previous `## [Unreleased]` body becomes a new `## [<version>] - <date>`
+section, inserted directly below a freshly emptied `## [Unreleased]` section that keeps the subsection skeleton it had
+(`### Added`, `### Changed`, and so on). When the file carries an
+`[Unreleased]: <base>/compare/<previous>...HEAD` link definition, it is rewritten to compare from the new release and
+a matching `[<version>]: <base>/compare/<previous>...<version>` link is inserted below it. Files without comparison
+links are promoted without link handling.
+
+`<version>` is interpolated, tolerates a leading `v`, and must otherwise be a plain semantic version (`X.Y.Z`).
+`<date>` must be a valid calendar date in `YYYY-MM-DD` form and defaults to the current local date. Promotion fails
+when the file has no `## [Unreleased]` heading.
+
+Promotion is idempotent so a release preparation can be re-run before the release is actually published: when the
+`## [<version>]` section already exists, new `Unreleased` entries are merged into it (matching subsections are
+appended to, new subsections are added, and the section's date and comparison links stay untouched), while an emptied
+`Unreleased` section is a no-op. The statement participates in dry runs and writes with the same
+permission-preserving atomic replacement as structured file-value updates.
+
+A complete release task typically combines it with structured updates:
+
+```drun
+task "prepare-release" means "Prepare and verify a developer-selected release version":
+  requires $version as string matching semver_optional_v
+
+  set $release_version to "{$version without prefix 'v'}"
+
+  update json "/version" in "package.json" to "{$release_version}" or fail
+  promote changelog "CHANGELOG.md" to version "{$release_version}"
+```
+
+The complete executable example is
+[`examples/75-changelog-promotion.drun`](https://github.com/phillarmonic/drun/blob/master/examples/75-changelog-promotion.drun).
+
 #### File Inspection
 
 ```drun

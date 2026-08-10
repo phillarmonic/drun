@@ -38,6 +38,7 @@ var hoverEntries = []hoverEntry{
 	{"update yaml", `update yaml "path" in "file" to <value>`, "Update a YAML value", "Rewrites the value selected by its YAML path."},
 	{"update toml", `update toml "path" in "file" to <value>`, "Update a TOML value", "Rewrites the value selected by its dotted path."},
 	{"update match", `update match "pattern" in "file" to <value>`, "Update a regular-expression match", "Replaces the selected regular-expression capture."},
+	{"promote changelog", `promote changelog "file" to version "X.Y.Z" [on "YYYY-MM-DD"]`, "Promote unreleased changelog entries", "Moves the `## [Unreleased]` section of a Keep a Changelog file into a new dated release section, leaving an emptied Unreleased section behind. When the file has an `[Unreleased]: .../compare/<prev>...HEAD` link, the comparison links are updated too. The date defaults to today; use `on \"YYYY-MM-DD\"` to override it. Re-running for a version whose section already exists merges new Unreleased entries into it instead of failing, so release preparation is idempotent."},
 	{"git policy", `git policy:`, "Git policy", "Defines repository conventions such as branch naming, protected branches, and commit-message rules."},
 	{"git validate", `git validate`, "Validate Git policy", "Checks the current repository against the configured Git policy."},
 	{"version", `version: 2.0`, "Language version", "Selects the Drun language version used to parse this file."},
@@ -122,6 +123,11 @@ var hoverExtraExamples = map[string][]string{
 	},
 	"update json": {
 		"update json \"/version\" in \"package.json\" to $version",
+	},
+	"promote changelog": {
+		"promote changelog \"CHANGELOG.md\" to version \"{$release_version}\"",
+		"promote changelog \"CHANGELOG.md\" to version \"1.5.0\" on \"2026-09-01\"",
+		"task \"prepare-release\" means \"Prepare a release\":\n  requires $version as string matching semver_optional_v\n  set $release_version to \"{$version without prefix 'v'}\"\n  update json \"/version\" in \"package.json\" to \"{$release_version}\" or fail\n  promote changelog \"CHANGELOG.md\" to version \"{$release_version}\"",
 	},
 	"use workdir": {
 		"use workdir \"frontend\":\n  run \"pnpm test\"",

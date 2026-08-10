@@ -32,6 +32,7 @@ const (
 	TypeWait             StatementType = "wait"
 	TypeFile             StatementType = "file"
 	TypeFileValue        StatementType = "file_value"
+	TypeChangelog        StatementType = "changelog"
 	TypeDetection        StatementType = "detection"
 	TypeUseSnippet       StatementType = "use_snippet"
 	TypeSecret           StatementType = "secret"
@@ -302,6 +303,16 @@ type FileValue struct {
 }
 
 func (f *FileValue) Type() StatementType { return TypeFileValue }
+
+// Changelog represents a Keep a Changelog promotion of the Unreleased
+// section into a dated release section.
+type Changelog struct {
+	Path    string
+	Version string
+	Date    string // Optional release date override (YYYY-MM-DD), empty means today
+}
+
+func (c *Changelog) Type() StatementType { return TypeChangelog }
 
 // Detection represents tool detection operations
 type Detection struct {

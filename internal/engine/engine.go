@@ -958,6 +958,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeFile(s, ctx)
 	case *statement.FileValue:
 		return e.executeFileValue(s, ctx)
+	case *statement.Changelog:
+		return e.executeChangelog(s, ctx)
 	case *statement.Detection:
 		return e.executeDetection(s, ctx)
 	case *statement.TaskCall:

@@ -64,6 +64,7 @@ var keywordCompletions = []completionItem{
 	{Label: "update yaml", Kind: completionItemKindKeyword, Detail: "Update a YAML value"},
 	{Label: "update toml", Kind: completionItemKindKeyword, Detail: "Update a TOML value"},
 	{Label: "update match", Kind: completionItemKindKeyword, Detail: "Update a regular-expression capture"},
+	{Label: "promote changelog", Kind: completionItemKindKeyword, Detail: "Promote unreleased changelog entries to a release section"},
 	{Label: "use workdir", Kind: completionItemKindKeyword, Detail: "Change working directory"},
 	{Label: "wait", Kind: completionItemKindKeyword, Detail: "Pause execution for a fixed duration"},
 	{Label: "wait for service", Kind: completionItemKindKeyword, Detail: "Wait until a service is ready"},
