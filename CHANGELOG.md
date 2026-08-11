@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added the `open url "<target>"` statement for opening URLs and local file paths in the OS default handler (`open` on macOS, `xdg-open` on Linux, `cmd /c start` on Windows). On headless machines, SSH sessions, and CI environments the statement prints a non-fatal warning with the URL and continues. Local paths without a scheme are resolved to absolute paths. Variables in the target are interpolated. Dry runs report the target without opening it.
+- Added folder trust for `open url`: because the statement can launch programs, the folder must be trusted before it runs. On first use drun prompts interactively; `xdrun cmd:trust` and `xdrun cmd:untrust` manage trust from the CLI. The trusted-folder list is stored in `~/.drun/trusted.yml` and parent directories cover their children.
 - Added LSP support for `open url`: keyword completion and hover documentation with examples.
 
 ### Changed

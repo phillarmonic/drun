@@ -943,6 +943,19 @@ In dry-run mode the wait is reported but not performed.
 Open a URL or local file path in the OS default handler (browser, file viewer, etc.).
 Variables in the target are interpolated at execution time.
 
+Because `open url` can launch arbitrary programs, the containing folder must be
+trusted before the statement executes. On first use drun prompts interactively;
+you can also trust a folder ahead of time with the CLI:
+
+```bash
+xdrun cmd:trust            # trust the current directory
+xdrun cmd:trust /path/to   # trust a specific directory
+xdrun cmd:untrust           # revoke trust
+```
+
+Trust is stored per user in `~/.drun/trusted.yml`. A trusted parent directory
+covers all of its children. Dry runs skip the trust check (nothing is opened).
+
 ```drun
 # Open a URL in the default browser
 open url "https://example.com/docs"

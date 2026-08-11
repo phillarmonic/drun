@@ -71,6 +71,11 @@ func openerCommand(target string) (*exec.Cmd, error) {
 
 // executeOpen executes: open url "<target>"
 func (e *Engine) executeOpen(stmt *statement.Open, ctx *ExecutionContext) error {
+	if !e.folderTrusted {
+		return fmt.Errorf("open url: this folder is not trusted for security-sensitive operations\n" +
+			"Run 'xdrun cmd:trust' in the project directory to allow 'open url' statements")
+	}
+
 	target, err := e.interpolateVariablesWithError(stmt.URL, ctx)
 	if err != nil {
 		return err

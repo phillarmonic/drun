@@ -49,6 +49,10 @@ type EngineOptions struct {
 
 	// Secrets manager
 	SecretsManager SecretsManager
+
+	// FolderTrusted indicates whether the folder containing the task file has
+	// been trusted for security-sensitive operations such as open url.
+	FolderTrusted bool
 }
 
 // Option is a functional option for configuring the Engine
@@ -129,6 +133,13 @@ func WithEmbeddedProvisioningSources(sources []provisioning.EmbeddedSource) Opti
 func WithSecretsManager(sm SecretsManager) Option {
 	return func(o *EngineOptions) {
 		o.SecretsManager = sm
+	}
+}
+
+// WithFolderTrusted marks the folder as trusted for security-sensitive operations.
+func WithFolderTrusted(trusted bool) Option {
+	return func(o *EngineOptions) {
+		o.FolderTrusted = trusted
 	}
 }
 

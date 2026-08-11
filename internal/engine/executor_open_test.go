@@ -20,7 +20,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 	engine.SetDryRun(true)
 
 	if err := engine.Execute(program, "demo"); err != nil {
@@ -50,7 +50,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 
 	if err := engine.Execute(program, "demo"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -88,7 +88,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 
 	if err := engine.Execute(program, "demo"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -113,7 +113,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 
 	if err := engine.Execute(program, "demo"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -135,7 +135,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 
 	err = engine.Execute(program, "demo")
 	if err == nil {
@@ -157,7 +157,7 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 	engine.SetDryRun(true)
 
 	if err := engine.Execute(program, "demo"); err != nil {
@@ -261,11 +261,33 @@ task "demo":
 	}
 
 	var out bytes.Buffer
-	engine := NewEngine(&out)
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(true))
 
 	if err := engine.Execute(program, "demo"); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
 	t.Logf("output: %s", out.String())
+}
+
+func TestEngine_OpenUntrustedFolderFails(t *testing.T) {
+	program, err := ParseString(`version: 2.0
+
+task "demo":
+  open url "https://example.com"
+`)
+	if err != nil {
+		t.Fatalf("ParseString() error = %v", err)
+	}
+
+	var out bytes.Buffer
+	engine := NewEngineWithOptions(WithOutput(&out), WithFolderTrusted(false))
+
+	err = engine.Execute(program, "demo")
+	if err == nil {
+		t.Fatal("expected error for untrusted folder, got nil")
+	}
+	if !strings.Contains(err.Error(), "not trusted") {
+		t.Errorf("expected trust error, got: %v", err)
+	}
 }

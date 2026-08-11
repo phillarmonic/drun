@@ -222,6 +222,8 @@ func (a *App) setupCommands() {
 		a.createSkillCommand(),
 		a.createSecretsCommand(),
 		a.createHookCommand(),
+		a.createTrustCommand(),
+		a.createUntrustCommand(),
 	}
 	for _, cmd := range cmds {
 		cmd.Hidden = true

@@ -67,6 +67,7 @@ type Engine struct {
 
 	// Secrets management
 	secretsManager SecretsManager
+	folderTrusted  bool
 
 	allowToolVersionChanges bool
 	userProvisioningSources []string
@@ -122,6 +123,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 		// Secrets management
 		secretsManager: options.SecretsManager,
+		folderTrusted:  options.FolderTrusted,
 
 		allowToolVersionChanges: options.AllowToolVersionChanges,
 		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
