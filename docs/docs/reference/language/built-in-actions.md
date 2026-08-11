@@ -938,6 +938,52 @@ In dry-run mode the wait is reported but not performed.
 > **Note:** To wait until a service responds rather than for a fixed amount of
 > time, use `wait for service at ... to be ready` (see below).
 
+#### Opening a URL or File
+
+Open a URL or local file path in the OS default handler (browser, file viewer, etc.).
+Variables in the target are interpolated at execution time.
+
+```drun
+# Open a URL in the default browser
+open url "https://example.com/docs"
+
+# Interpolated target
+let $base = "https://docs.example.com"
+open url "{$base}/getting-started"
+
+# Open a local file (resolved to an absolute path before opening)
+open url "./coverage/index.html"
+```
+
+**Headless and remote sessions:**
+
+On headless machines (no `DISPLAY` or `WAYLAND_DISPLAY` on Linux), over SSH, or
+in CI environments, the statement prints a non-fatal warning with the URL and
+continues instead of failing:
+
+```
+Warning: no desktop environment detected (headless/SSH/CI)
+    Open this URL manually: https://example.com/docs
+```
+
+In dry-run mode, the statement reports the target without opening it:
+
+```
+[DRY RUN] Would open https://example.com/docs
+```
+
+**OS openers:**
+
+| Platform | Opener        |
+|----------|---------------|
+| macOS    | `open`        |
+| Linux    | `xdg-open`    |
+| Windows  | `cmd /c start` |
+
+On Windows, `&` characters in URLs may be misinterpreted by `cmd /c start`.
+If the URL contains `&`, consider wrapping it in a `file://` redirect page or
+using a shortened URL.
+
 #### Network Health Checks and Service Waiting
 
 ```drun

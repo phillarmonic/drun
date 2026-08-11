@@ -519,6 +519,12 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 			if wait != nil {
 				body = append(body, wait)
 			}
+		} else if p.curToken.Type == lexer.OPEN {
+			// open url "<target>"
+			openStmt := p.parseOpenStatement()
+			if openStmt != nil {
+				body = append(body, openStmt)
+			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()
 			if network != nil {

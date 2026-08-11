@@ -30,6 +30,7 @@ const (
 	TypeDownload         StatementType = "download"
 	TypeNetwork          StatementType = "network"
 	TypeWait             StatementType = "wait"
+	TypeOpen             StatementType = "open"
 	TypeFile             StatementType = "file"
 	TypeFileValue        StatementType = "file_value"
 	TypeChangelog        StatementType = "changelog"
@@ -274,6 +275,14 @@ type Wait struct {
 }
 
 func (w *Wait) Type() StatementType { return TypeWait }
+
+// Open represents opening a URL or file in the OS default handler (open url "...")
+type Open struct {
+	Noun string // Always "url" today
+	URL  string // Raw target; may contain {variable} interpolation
+}
+
+func (o *Open) Type() StatementType { return TypeOpen }
 
 // File represents file operations
 type File struct {

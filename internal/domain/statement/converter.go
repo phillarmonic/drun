@@ -230,6 +230,12 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Unit:  s.Unit,
 		}, nil
 
+	case *ast.OpenStatement:
+		return &Open{
+			Noun: s.Noun,
+			URL:  s.URL,
+		}, nil
+
 	case *ast.FileStatement:
 		return &File{
 			Action:       s.Action,
