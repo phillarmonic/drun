@@ -3,7 +3,7 @@
 
 version: 2.0
 
-project "Drun" version "2.27.0":
+project "Drun" version "2.28.0":
 	requires tools:
 		go >= "1.26.5"
 		golangci-lint provision
@@ -112,3 +112,9 @@ task "prepare-release" means "Runs checks related to going to a next release":
     update project version to "{$version}"
     success "According to the current spec, you should be good to go."
     warning "But be mindful, with great power, comes great responsibility."
+
+task "changelog" means "Generates the changelog for the project":
+    given $version as string matching semver_optional_v
+    step "Generating changelog for version {$version}"
+    promote changelog "CHANGELOG.md" to version "{$version}"
+    success "Changelog generated for version {$version}"
