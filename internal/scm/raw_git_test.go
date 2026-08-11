@@ -26,6 +26,7 @@ func (r *failFetchRunner) Run(ctx context.Context, arguments, environment []stri
 }
 
 func TestRawGitFilesystemAndRemoteSessions(t *testing.T) {
+	allowTestBareRepos(t)
 	worktree := createTagTestRepository(t)
 	bare := filepath.Join(t.TempDir(), "repository.git")
 	runTestGit(t, "", "clone", "--bare", worktree, bare)
@@ -93,6 +94,7 @@ func TestRawGitSSHKeyIsPassedByPath(t *testing.T) {
 }
 
 func TestMetadataFetchRequiresBothGatesAndCleansUp(t *testing.T) {
+	allowTestBareRepos(t)
 	worktree := createTagTestRepository(t)
 	bare := filepath.Join(t.TempDir(), "repository.git")
 	runTestGit(t, "", "clone", "--bare", worktree, bare)
@@ -187,4 +189,14 @@ func runTestGitEnv(t *testing.T, directory string, environment []string, argumen
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %v failed: %v\n%s", arguments, err, output)
 	}
+}
+
+// allowTestBareRepos permits git operations on bare repositories in temp
+// directories. Git >= 2.55 defaults safe.bareRepository to "explicit" and
+// rejects bare repos in non-standard locations such as /tmp.
+func allowTestBareRepos(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "safe.bareRepository")
+	t.Setenv("GIT_CONFIG_VALUE_0", "all")
 }

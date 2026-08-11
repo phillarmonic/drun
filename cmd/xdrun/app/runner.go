@@ -86,16 +86,16 @@ func ExecuteTask(
 	// When the program uses "open url" and the folder is not already trusted,
 	// prompt the user before proceeding.
 	folderTrusted := false
-	if ProgramUsesOpenURL(program) {
+	if listTasks || dryRun {
+		// Listing tasks and dry runs don't execute anything, so trust is not required.
+		folderTrusted = true
+	} else if ProgramUsesOpenURL(program) {
 		configDir, _ := filepath.Abs(filepath.Dir(actualConfigFile))
 		trusted, err := IsDirTrusted(configDir)
 		if err != nil {
 			return fmt.Errorf("failed to check folder trust: %w", err)
 		}
 		if trusted {
-			folderTrusted = true
-		} else if dryRun {
-			// Dry runs never actually open anything, so trust is not required.
 			folderTrusted = true
 		} else {
 			fmt.Fprintf(os.Stderr,
