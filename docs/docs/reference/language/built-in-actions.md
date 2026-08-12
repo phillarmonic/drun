@@ -1016,11 +1016,20 @@ wait for service at "https://api.example.com" to be ready timeout "30s" retry "5
 # Port connectivity testing
 test connection to "database.example.com" on port 5432
 test connection to "localhost" on port 8080 timeout "10s"
+check if port 6379 is open on "redis.local"
 
 # Ping testing
 ping host "example.com"
 ping host "8.8.8.8" timeout "3s"
 ```
+
+Port checks run natively (a TCP dial, no external tools such as `nc`). The
+`timeout` option accepts Go durations (`"500ms"`, `"10s"`) or bare seconds
+(`"10"`); the default is 5 seconds. A successful check means something is
+listening on the port (the port is in use); a failed check fails the task. To
+branch on the result instead of failing, use the
+[port condition](types-and-control-flow.md#port-conditions) in an `if`/`when`
+statement.
 
 #### Advanced Network Operations
 

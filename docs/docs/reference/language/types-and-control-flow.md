@@ -258,6 +258,27 @@ if directory "$HOME/.cache/example" does not exist:
 `folder`, `directory`, and `dir` are interchangeable. The negative existence
 forms `not exists` and `does not exist` are also equivalent.
 
+#### Port Conditions
+
+A port condition probes a TCP port natively (no external tools) and branches on
+whether something is listening:
+
+```drun
+if port 5432 is open on "localhost":
+  info "PostgreSQL is already running"
+else:
+  start local database container
+
+if port {redis_port} is not open on "{redis_host}" with timeout "2s":
+  info "Redis is down - skipping cache warmup"
+```
+
+`is open` is true when a TCP dial succeeds, i.e. the port is in use. Host,
+port, and the optional `with timeout` value all support interpolation; the
+timeout accepts Go durations (`"2s"`) or bare seconds and defaults to 5
+seconds. In `--dry-run` mode no connection is opened and the condition
+evaluates as if the port were closed.
+
 #### Compound Conditions
 
 ```drun

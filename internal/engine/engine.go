@@ -1042,7 +1042,9 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 		_, _ = fmt.Fprintf(e.output, "✅  %s\n", interpolatedMessage)
 	case "fail":
 		_, _ = fmt.Fprintf(e.output, "💥  %s\n", interpolatedMessage)
-		return fmt.Errorf("task failed: %s", interpolatedMessage)
+		// Return the message as-is: the engine already wraps statement errors
+		// with "task '<name>' failed: ..." on the way out.
+		return fmt.Errorf("%s", interpolatedMessage)
 	case "echo":
 		// Process \n escape sequences for newlines
 		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")

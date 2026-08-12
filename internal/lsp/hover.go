@@ -40,6 +40,10 @@ var hoverEntries = []hoverEntry{
 	{"update match", `update match "pattern" in "file" to <value>`, "Update a regular-expression match", "Replaces the selected regular-expression capture."},
 	{"promote changelog", `promote changelog "file" to version "X.Y.Z" [on "YYYY-MM-DD"]`, "Promote unreleased changelog entries", "Moves the `## [Unreleased]` section of a Keep a Changelog file into a new dated release section, leaving an emptied Unreleased section behind. When the file has an `[Unreleased]: .../compare/<prev>...HEAD` link, the comparison links are updated too. The date defaults to today; use `on \"YYYY-MM-DD\"` to override it. Re-running for a version whose section already exists merges new Unreleased entries into it instead of failing, so release preparation is idempotent."},
 	{"open url", `open url "<target>"`, "Open in default application", "Opens a URL or local file path in the OS default handler (browser, file viewer, etc.). The folder must be trusted before execution (prompted interactively or via `xdrun cmd:trust`). In headless, SSH, or CI sessions it prints the target instead of failing. Local paths without a scheme are resolved to absolute paths. Variables in the target are interpolated at execution time."},
+	{"test connection", `test connection to "<host>" on port <port> [timeout "<duration>"]`, "TCP port check", "Probes a TCP port natively (a dial, no external tools such as `nc`). The check succeeds when something is listening on the port - i.e. the port is in use - and fails the task otherwise. `timeout` accepts Go durations (`\"500ms\"`, `\"10s\"`) or bare seconds and defaults to 5 seconds. To branch on the result instead of failing the task, use the `if port <port> is open on \"host\"` condition."},
+	{"check if port", `check if port <port> is open on "<host>" [timeout "<duration>"]`, "TCP port check", "Probes a TCP port natively (a dial, no external tools such as `nc`). This is an alternate spelling of `test connection to \"host\" on port N`: it succeeds when the port is in use and fails the task otherwise. To branch on the result instead of failing the task, use the `if port <port> is open on \"host\"` condition."},
+	{"if port", `if port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation; the timeout accepts Go durations or bare seconds and defaults to 5 seconds. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
+	{"when port", `when port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches; use `otherwise` for the fallback branch. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
 	{"git policy", `git policy:`, "Git policy", "Defines repository conventions such as branch naming, protected branches, and commit-message rules."},
 	{"git validate", `git validate`, "Validate Git policy", "Checks the current repository against the configured Git policy."},
 	{"version", `version: 2.0`, "Language version", "Selects the Drun language version used to parse this file."},
@@ -166,6 +170,21 @@ var hoverExtraExamples = map[string][]string{
 		"open url \"{$base_url}/releases/tag/v{$version}\"",
 		"open url \"./coverage/index.html\"",
 		"task \"docs\" means \"Open the project documentation\":\n  let $docs_url = \"https://docs.example.com\"\n  open url \"{$docs_url}/getting-started\"",
+	},
+	"test connection": {
+		"test connection to \"database.example.com\" on port 5432",
+		"test connection to \"localhost\" on port 8080 timeout \"10s\"",
+	},
+	"check if port": {
+		"check if port 6379 is open on \"redis.local\"",
+		"check if port 8080 is open on \"localhost\" timeout \"2s\"",
+	},
+	"if port": {
+		"if port 5432 is open on \"localhost\":\n  info \"PostgreSQL is already running\"\nelse:\n  call task \"start-database\"",
+		"if port {$redis_port} is not open on \"{$redis_host}\" with timeout \"2s\":\n  warn \"Redis is down - skipping cache warmup\"",
+	},
+	"when port": {
+		"when port 8080 is open on \"localhost\":\n  info \"Dev server is up\"\notherwise:\n  info \"Dev server is not running\"",
 	},
 }
 
