@@ -44,6 +44,8 @@ var hoverEntries = []hoverEntry{
 	{"check if port", `check if port <port> is open on "<host>" [timeout "<duration>"]`, "TCP port check", "Probes a TCP port natively (a dial, no external tools such as `nc`). This is an alternate spelling of `test connection to \"host\" on port N`: it succeeds when the port is in use and fails the task otherwise. To branch on the result instead of failing the task, use the `if port <port> is open on \"host\"` condition."},
 	{"if port", `if port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation; the timeout accepts Go durations or bare seconds and defaults to 5 seconds. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
 	{"when port", `when port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches; use `otherwise` for the fallback branch. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
+	{"if docker network", `if docker network "<name>" [not] exists:`, "Docker network condition", "Asks the Docker daemon whether a network exists and runs the nested statements when the answer matches. `exists` is true when the daemon lists the network; use `not exists` for the inverse. The network name supports interpolation. In `--dry-run` mode the daemon is not queried and the condition evaluates as if the network were missing."},
+	{"when docker network", `when docker network "<name>" [not] exists:`, "Docker network condition", "Asks the Docker daemon whether a network exists and runs the nested statements when the answer matches; use `otherwise` for the fallback branch. `exists` is true when the daemon lists the network; use `not exists` for the inverse. The network name supports interpolation. In `--dry-run` mode the daemon is not queried and the condition evaluates as if the network were missing."},
 	{"git policy", `git policy:`, "Git policy", "Defines repository conventions such as branch naming, protected branches, and commit-message rules."},
 	{"git validate", `git validate`, "Validate Git policy", "Checks the current repository against the configured Git policy."},
 	{"version", `version: 2.0`, "Language version", "Selects the Drun language version used to parse this file."},
@@ -185,6 +187,13 @@ var hoverExtraExamples = map[string][]string{
 	},
 	"when port": {
 		"when port 8080 is open on \"localhost\":\n  info \"Dev server is up\"\notherwise:\n  info \"Dev server is not running\"",
+	},
+	"if docker network": {
+		"if docker network \"proxy\" exists:\n  info \"Reusing the existing proxy network\"\nelse:\n  call task \"create-proxy-network\"",
+		"if docker network \"{$app_network}\" not exists:\n  warn \"Network {$app_network} is missing - orchestration will create it\"",
+	},
+	"when docker network": {
+		"when docker network \"legacy-bridge\" exists:\n  info \"Attaching to the legacy network\"\notherwise:\n  info \"Using the default bridge\"",
 	},
 }
 

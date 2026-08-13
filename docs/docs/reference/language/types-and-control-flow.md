@@ -279,6 +279,28 @@ timeout accepts Go durations (`"2s"`) or bare seconds and defaults to 5
 seconds. In `--dry-run` mode no connection is opened and the condition
 evaluates as if the port were closed.
 
+#### Docker Conditions
+
+A Docker condition asks the Docker daemon whether a resource exists and
+branches on the answer. Networks are supported:
+
+```drun
+if docker network "proxy" exists:
+  info "Reusing the existing proxy network"
+else:
+  call task "create-proxy-network"
+
+when docker network "{app_network}" not exists:
+  warn "Network {app_network} is missing - orchestration will create it"
+otherwise:
+  info "Network ready"
+```
+
+The network name supports interpolation. In `--dry-run` mode the daemon is not
+queried and the condition evaluates as if the network were missing. The
+`docker <resource> "<name>" [not] exists` shape is designed to grow further
+resource variants (containers, images, volumes) over time.
+
 #### Compound Conditions
 
 ```drun

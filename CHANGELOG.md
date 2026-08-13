@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `docker network "<name>" [not] exists` condition for `if`/`when` statements, e.g. `if docker network "proxy" exists:`. The condition queries the Docker daemon (via `docker network ls`), supports interpolation in the network name, and evaluates as if the network were missing in `--dry-run` mode (no daemon query). The `docker <resource> "<name>" [not] exists` shape leaves room for future resource variants (containers, images, volumes).
+- Added LSP hover documentation with examples for the `if docker network` and `when docker network` conditions.
+
 ### Changed
 
 ### Deprecated

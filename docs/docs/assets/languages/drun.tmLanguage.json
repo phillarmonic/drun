@@ -74,6 +74,9 @@
           "include": "#variable-declaration"
         },
         {
+          "include": "#docker-conditions"
+        },
+        {
           "include": "#control-flow"
         },
         {
@@ -767,6 +770,34 @@
             },
             "7": {
               "name": "support.constant.domain.drun"
+            }
+          }
+        }
+      ]
+    },
+    "docker-conditions": {
+      "patterns": [
+        {
+          "name": "meta.condition.docker.network.drun",
+          "match": "^(\\s*)(if|when)(\\s+)(docker)(\\s+)(network)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_\\-]*)(?:(\\s+)(not))?(\\s+)(exists)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.drun"
+            },
+            "10": {
+              "name": "keyword.control.drun"
+            },
+            "12": {
+              "name": "keyword.control.drun"
             }
           }
         }

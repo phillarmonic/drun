@@ -104,7 +104,8 @@ func (e *Engine) executeConditional(stmt *statement.Conditional, ctx *ExecutionC
 
 	// File comparisons are exact byte comparisons and may return actionable I/O
 	// errors. Version-aware conditions use numeric MAJOR.MINOR.PATCH ordering.
-	// Port conditions run a native TCP probe. Other condition families continue
+	// Port conditions run a native TCP probe. Docker conditions query the
+	// daemon for resource existence. Other condition families continue
 	// through the general evaluator.
 	conditionResult, handled, err := e.evaluateFileComparisonCondition(stmt.Condition, ctx)
 	if err != nil {
@@ -118,6 +119,12 @@ func (e *Engine) executeConditional(stmt *statement.Conditional, ctx *ExecutionC
 	}
 	if !handled {
 		conditionResult, handled, err = e.evaluatePortCondition(stmt.Condition, ctx)
+		if err != nil {
+			return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
+		}
+	}
+	if !handled {
+		conditionResult, handled, err = e.evaluateDockerCondition(stmt.Condition, ctx)
 		if err != nil {
 			return fmt.Errorf("in %s condition: %w", stmt.ConditionType, err)
 		}

@@ -74,6 +74,9 @@
           "include": "#variable-declaration"
         },
         {
+          "include": "#docker-conditions"
+        },
+        {
           "include": "#control-flow"
         },
         {
@@ -772,6 +775,34 @@
         }
       ]
     },
+    "docker-conditions": {
+      "patterns": [
+        {
+          "name": "meta.condition.docker.network.drun",
+          "match": "^(\\s*)(if|when)(\\s+)(docker)(\\s+)(network)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_\\-]*)(?:(\\s+)(not))?(\\s+)(exists)\\b",
+          "captures": {
+            "2": {
+              "name": "keyword.control.drun"
+            },
+            "4": {
+              "name": "support.constant.domain.drun"
+            },
+            "6": {
+              "name": "support.constant.domain.drun"
+            },
+            "8": {
+              "name": "string.quoted.double.drun"
+            },
+            "10": {
+              "name": "keyword.control.drun"
+            },
+            "12": {
+              "name": "keyword.control.drun"
+            }
+          }
+        }
+      ]
+    },
     "control-flow": {
       "patterns": [
         {
@@ -783,45 +814,6 @@
             },
             "4": {
               "name": "keyword.control.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.condition.port.drun",
-          "match": "^(\\s*)(if|when)(\\s+)(port)(\\s+)(\\d+|\\{[^}]+\\})(\\s+)(is)(?:(\\s+)(not))?(\\s+)(open)(\\s+)(on)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\})(?:(\\s+)(with)(\\s+)(timeout)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\"|\\{[^}]+\\}))?",
-          "captures": {
-            "2": {
-              "name": "keyword.control.drun"
-            },
-            "4": {
-              "name": "support.constant.domain.drun"
-            },
-            "6": {
-              "name": "constant.numeric.drun"
-            },
-            "8": {
-              "name": "keyword.control.drun"
-            },
-            "10": {
-              "name": "keyword.control.drun"
-            },
-            "12": {
-              "name": "support.constant.domain.drun"
-            },
-            "14": {
-              "name": "keyword.operator.word.drun"
-            },
-            "16": {
-              "name": "string.quoted.double.drun"
-            },
-            "18": {
-              "name": "keyword.operator.word.drun"
-            },
-            "20": {
-              "name": "support.constant.domain.drun"
-            },
-            "22": {
-              "name": "string.quoted.double.drun"
             }
           }
         },
@@ -1258,36 +1250,6 @@
             },
             "14": {
               "name": "constant.numeric.drun"
-            }
-          }
-        },
-        {
-          "name": "meta.network.port-check.drun",
-          "match": "^(\\s*)(check)(\\s+)(if)(\\s+)(port)(\\s+)(\\d+)(\\s+)(is)(\\s+)(open)(\\s+)(on)(\\s+)(\"(?:[^\"\\\\]|\\\\.)*\")",
-          "captures": {
-            "2": {
-              "name": "support.type.action.drun"
-            },
-            "4": {
-              "name": "keyword.control.drun"
-            },
-            "6": {
-              "name": "support.constant.domain.drun"
-            },
-            "8": {
-              "name": "constant.numeric.drun"
-            },
-            "10": {
-              "name": "keyword.control.drun"
-            },
-            "12": {
-              "name": "support.constant.domain.drun"
-            },
-            "14": {
-              "name": "keyword.operator.word.drun"
-            },
-            "16": {
-              "name": "string.quoted.double.drun"
             }
           }
         },
