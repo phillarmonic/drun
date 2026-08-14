@@ -53,6 +53,7 @@ func DefaultOptions() *Options {
 	}
 }
 
+// defaultShell returns the shell drun uses when a project does not configure one.
 func defaultShell() string {
 	switch runtime.GOOS {
 	case "darwin":
@@ -63,34 +64,102 @@ func defaultShell() string {
 		if gitBash := detectGitBash(); gitBash != "" {
 			return gitBash
 		}
+		if pwsh, err := exec.LookPath("pwsh.exe"); err == nil {
+			return pwsh
+		}
 		return "powershell.exe"
 	default:
 		return "/bin/sh"
 	}
 }
 
+// isWindowsPowerShell reports whether the shell path refers to Windows
+// PowerShell or PowerShell Core, which need different flags than POSIX shells.
+func isWindowsPowerShell(shellPath string) bool {
+	base := strings.ToLower(filepath.Base(shellPath))
+	base = strings.TrimSuffix(base, ".exe")
+	return base == "powershell" || base == "pwsh"
+}
+
+// isWindowsCmd reports whether the shell path refers to cmd.exe.
+func isWindowsCmd(shellPath string) bool {
+	base := strings.ToLower(filepath.Base(shellPath))
+	return base == "cmd.exe" || base == "cmd"
+}
+
+// shellCommandArgs returns the argument list that makes the given shell run a
+// single command string.
+func shellCommandArgs(shellPath, command string) []string {
+	switch {
+	case isWindowsPowerShell(shellPath):
+		return []string{"-NoProfile", "-NonInteractive", "-Command", command}
+	case isWindowsCmd(shellPath):
+		return []string{"/c", command}
+	default:
+		return []string{"-c", command}
+	}
+}
+
+// detectGitBash locates a Git for Windows bash.exe. It deliberately ignores
+// %SystemRoot%\System32\bash.exe, which is the WSL launcher: WSL runs a Linux
+// distribution with its own PATH, so Windows executables drun detected (go,
+// docker, ...) are not reachable from there.
 func detectGitBash() string {
-	if bashPath, err := exec.LookPath("bash.exe"); err == nil {
-		return bashPath
-	}
-
-	candidates := []string{
-		filepath.Join(`C:\Program Files`, "Git", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files`, "Git", "usr", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files (x86)`, "Git", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files (x86)`, "Git", "usr", "bin", "bash.exe"),
-	}
-
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
-		}
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+	for _, candidate := range gitBashCandidates() {
+		if isExecutableFile(candidate) {
 			return candidate
 		}
 	}
 
+	if bashPath, err := exec.LookPath("bash.exe"); err == nil && !isWindowsSystemPath(bashPath) {
+		return bashPath
+	}
+
 	return ""
+}
+
+func gitBashCandidates() []string {
+	var roots []string
+	if gitExe, err := exec.LookPath("git.exe"); err == nil && !isWindowsSystemPath(gitExe) {
+		// <root>\cmd\git.exe or <root>\bin\git.exe
+		roots = append(roots, filepath.Dir(filepath.Dir(gitExe)))
+	}
+	for _, env := range []string{"ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"} {
+		if base := os.Getenv(env); base != "" {
+			roots = append(roots, filepath.Join(base, "Git"))
+		}
+	}
+	roots = append(roots, `C:\Program Files\Git`, `C:\Program Files (x86)\Git`)
+
+	candidates := make([]string, 0, len(roots)*2)
+	for _, root := range roots {
+		candidates = append(candidates,
+			filepath.Join(root, "bin", "bash.exe"),
+			filepath.Join(root, "usr", "bin", "bash.exe"),
+		)
+	}
+	return candidates
+}
+
+func isExecutableFile(path string) bool {
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// isWindowsSystemPath reports whether the path lives under %SystemRoot%.
+func isWindowsSystemPath(path string) bool {
+	systemRoot := os.Getenv("SystemRoot")
+	if systemRoot == "" {
+		systemRoot = `C:\Windows`
+	}
+	rel, err := filepath.Rel(systemRoot, path)
+	if err != nil {
+		return false
+	}
+	return !strings.HasPrefix(rel, "..")
 }
 
 // Execute runs a shell command with the given options
@@ -256,7 +325,7 @@ func buildCommand(ctx context.Context, command string, opts *Options) *exec.Cmd 
 	}
 
 	// #nosec G204 -- task execution intentionally invokes the configured shell with a user-authored command.
-	return exec.CommandContext(ctx, opts.Shell, "-c", command)
+	return exec.CommandContext(ctx, opts.Shell, shellCommandArgs(opts.Shell, command)...)
 }
 
 func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd {
@@ -269,7 +338,7 @@ func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd 
 		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", fmt.Sprintf("%s -c %q", shellPath, command), "/dev/null")
 	default:
 		// #nosec G204 -- interactive task execution intentionally invokes the selected shell command in a TTY.
-		return exec.CommandContext(ctx, shellPath, "-c", command)
+		return exec.CommandContext(ctx, shellPath, shellCommandArgs(shellPath, command)...)
 	}
 }
 

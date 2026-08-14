@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -360,6 +361,37 @@ func TestBuildCommand_DefaultUsesShell(t *testing.T) {
 
 	if filepath.Base(cmd.Path) != filepath.Base(opts.Shell) {
 		t.Fatalf("Expected shell %q, got %q", opts.Shell, cmd.Path)
+	}
+}
+
+func TestDefaultShell_WindowsNeverUsesWSLBash(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("windows-only shell selection")
+	}
+
+	shellPath := defaultShell()
+	if isWindowsSystemPath(shellPath) {
+		t.Fatalf("default shell %q resolves under %%SystemRoot%%; WSL bash cannot see Windows tools", shellPath)
+	}
+}
+
+func TestShellCommandArgs(t *testing.T) {
+	tests := []struct {
+		shell string
+		want  []string
+	}{
+		{"/bin/bash", []string{"-c", "echo hi"}},
+		{`C:\Program Files\Git\bin\bash.exe`, []string{"-c", "echo hi"}},
+		{"powershell.exe", []string{"-NoProfile", "-NonInteractive", "-Command", "echo hi"}},
+		{`C:\Program Files\PowerShell\7\pwsh.exe`, []string{"-NoProfile", "-NonInteractive", "-Command", "echo hi"}},
+		{"cmd.exe", []string{"/c", "echo hi"}},
+	}
+
+	for _, tt := range tests {
+		got := shellCommandArgs(tt.shell, "echo hi")
+		if !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("shellCommandArgs(%q) = %v, want %v", tt.shell, got, tt.want)
+		}
 	}
 }
 
