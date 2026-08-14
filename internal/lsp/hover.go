@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/phillarmonic/drun/v2/internal/patterns"
 )
 
 type hoverEntry struct {
@@ -209,6 +211,9 @@ func hoverForSource(source string, pos position) *hover {
 	if cursor < 0 {
 		return nil
 	}
+	if macro := macroHover(code, cursor, pos.Line); macro != nil {
+		return macro
+	}
 	statementStart := len(code) - len(strings.TrimLeft(code, " \t"))
 
 	var best *hoverEntry
@@ -243,6 +248,72 @@ func hoverForSource(source string, pos position) *hover {
 			End:   position{Line: pos.Line, Character: utf16Column(code[:end])},
 		},
 	}
+}
+
+// macroHover returns hover documentation when the cursor rests on a built-in
+// pattern macro name that follows the `matching` keyword.
+func macroHover(code string, cursor, lineNo int) *hover {
+	if cursor < 0 || cursor > len(code) {
+		return nil
+	}
+	start := cursor
+	for start > 0 && isWordByte(code[start-1]) {
+		start--
+	}
+	end := cursor
+	for end < len(code) && isWordByte(code[end]) {
+		end++
+	}
+	if start == end {
+		return nil
+	}
+	macro, ok := patterns.GetMacro(code[start:end])
+	if !ok {
+		return nil
+	}
+	// Only treat the word as a macro when it directly follows `matching`, so
+	// identifiers that happen to share a macro name are not documented.
+	prefix := strings.TrimRight(code[:start], " \t")
+	if !strings.HasSuffix(prefix, "matching") {
+		return nil
+	}
+	if before := len(prefix) - len("matching"); before > 0 && isWordByte(prefix[before-1]) {
+		return nil
+	}
+	if insideQuotedString(code, start) {
+		return nil
+	}
+
+	return &hover{
+		Contents: markupContent{Kind: "markdown", Value: macroHoverMarkdown(macro)},
+		Range: lspRange{
+			Start: position{Line: lineNo, Character: utf16Column(code[:start])},
+			End:   position{Line: lineNo, Character: utf16Column(code[:end])},
+		},
+	}
+}
+
+func macroHoverMarkdown(macro patterns.PatternMacro) string {
+	lines := []string{
+		fmt.Sprintf("### `%s`", macro.Name),
+		"",
+		"**Pattern macro**",
+		"",
+		macro.Description,
+		"",
+		"**Regex**",
+		"",
+		"```regex",
+		macro.Pattern,
+		"```",
+		"",
+		"**Syntax**",
+		"",
+		"```drun",
+		fmt.Sprintf("requires $value as string matching %s", macro.Name),
+		"```",
+	}
+	return strings.Join(lines, "\n")
 }
 
 func hoverMarkdown(entry hoverEntry) string {
