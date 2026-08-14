@@ -214,6 +214,9 @@ func hoverForSource(source string, pos position) *hover {
 	if macro := macroHover(code, cursor, pos.Line); macro != nil {
 		return macro
 	}
+	if fn := functionHover(code, cursor, pos.Line); fn != nil {
+		return fn
+	}
 	statementStart := len(code) - len(strings.TrimLeft(code, " \t"))
 
 	var best *hoverEntry
