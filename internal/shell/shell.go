@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -88,8 +89,17 @@ func Name(shellPath string) string {
 	if shellPath == "" {
 		return ""
 	}
-	base := strings.ToLower(filepath.Base(shellPath))
+	base := strings.ToLower(shellBase(shellPath))
 	return strings.TrimSuffix(base, ".exe")
+}
+
+// shellBase returns the final path component of a shell path, splitting on
+// both "/" and "\". Shell paths (e.g. Windows paths detected via config) can
+// use either separator regardless of the host OS running drun/tests, so this
+// must not rely on filepath.Base, which only recognizes the host OS separator.
+func shellBase(shellPath string) string {
+	shellPath = strings.ReplaceAll(shellPath, "\\", "/")
+	return path.Base(shellPath)
 }
 
 // IsPOSIXShell reports whether the given shell path refers to a POSIX-style
@@ -135,14 +145,14 @@ func NormalizePath(path string, posix bool) string {
 // isWindowsPowerShell reports whether the shell path refers to Windows
 // PowerShell or PowerShell Core, which need different flags than POSIX shells.
 func isWindowsPowerShell(shellPath string) bool {
-	base := strings.ToLower(filepath.Base(shellPath))
+	base := strings.ToLower(shellBase(shellPath))
 	base = strings.TrimSuffix(base, ".exe")
 	return base == "powershell" || base == "pwsh"
 }
 
 // isWindowsCmd reports whether the shell path refers to cmd.exe.
 func isWindowsCmd(shellPath string) bool {
-	base := strings.ToLower(filepath.Base(shellPath))
+	base := strings.ToLower(shellBase(shellPath))
 	return base == "cmd.exe" || base == "cmd"
 }
 
