@@ -70,6 +70,7 @@ type Engine struct {
 	folderTrusted  bool
 
 	allowToolVersionChanges bool
+	ignoreToolRequirements  bool
 	userProvisioningSources []string
 	embeddedProvisionings   []provisioning.EmbeddedSource
 	newToolDetector         func() toolDetector
@@ -126,6 +127,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		folderTrusted:  options.FolderTrusted,
 
 		allowToolVersionChanges: options.AllowToolVersionChanges,
+		ignoreToolRequirements:  options.IgnoreToolRequirements,
 		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
 		embeddedProvisionings:   embeddedProvisionings,
 

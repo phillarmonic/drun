@@ -73,6 +73,65 @@ func defaultShell() string {
 	}
 }
 
+// DefaultShell returns the shell drun uses when a project does not configure
+// one. It is exported so other packages (e.g. builtins) can report the active
+// shell to drun scripts.
+func DefaultShell() string {
+	return defaultShell()
+}
+
+// Name returns the friendly family name of a shell path, without directory or
+// ".exe" suffix and lower-cased (e.g. "bash", "zsh", "pwsh", "powershell",
+// "cmd"). It lets drun scripts branch on the active shell via the {shell}
+// builtin.
+func Name(shellPath string) string {
+	if shellPath == "" {
+		return ""
+	}
+	base := strings.ToLower(filepath.Base(shellPath))
+	return strings.TrimSuffix(base, ".exe")
+}
+
+// IsPOSIXShell reports whether the given shell path refers to a POSIX-style
+// shell (bash, sh, zsh, fish, ...) as opposed to Windows PowerShell or cmd.exe.
+// POSIX shells treat the backslash as an escape character, so paths interpolated
+// into commands must use forward slashes.
+func IsPOSIXShell(shellPath string) bool {
+	return !isWindowsPowerShell(shellPath) && !isWindowsCmd(shellPath)
+}
+
+// NormalizePath rewrites a filesystem path so it is safe to interpolate into a
+// command executed by the active shell. For POSIX shells backslashes become
+// forward slashes (otherwise the shell would treat them as escapes); for
+// Windows shells forward slashes become backslashes. Trailing separators are
+// trimmed (except for a lone root or drive root) so a path never leaves a
+// dangling separator before the next command argument.
+func NormalizePath(path string, posix bool) string {
+	if path == "" {
+		return path
+	}
+
+	sep := "\\"
+	if posix {
+		path = strings.ReplaceAll(path, "\\", "/")
+		sep = "/"
+	} else {
+		path = strings.ReplaceAll(path, "/", "\\")
+	}
+
+	for len(path) > 1 && strings.HasSuffix(path, sep) {
+		trimmed := path[:len(path)-1]
+		// Preserve drive roots ("C:\" or "C:/") and other separators that are
+		// meaningful roots.
+		if strings.HasSuffix(trimmed, ":") {
+			break
+		}
+		path = trimmed
+	}
+
+	return path
+}
+
 // isWindowsPowerShell reports whether the shell path refers to Windows
 // PowerShell or PowerShell Core, which need different flags than POSIX shells.
 func isWindowsPowerShell(shellPath string) bool {

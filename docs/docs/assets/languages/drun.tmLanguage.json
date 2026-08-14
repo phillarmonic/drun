@@ -1695,11 +1695,11 @@
         },
         {
           "name": "support.function.builtin.drun",
-          "match": "\\b(?:now|pwd|hostname|env|secret|current)(?=\\b|\\.)"
+          "match": "\\b(?:now|pwd|hostname|os|shell|env|secret|current)(?=\\b|\\.)"
         },
         {
           "name": "support.function.builtin.drun",
-          "match": "\\b(?:concat|split|replace|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|basename|dirname|extension|prefix|suffix|filtered|sorted|reversed|unique|first|last)\\b"
+          "match": "\\b(?:concat|split|replace|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|basename|dirname|extension|normalized|prefix|suffix|filtered|sorted|reversed|unique|first|last)\\b"
         },
         {
           "name": "support.function.builtin.drun",
@@ -1759,7 +1759,7 @@
         },
         {
           "name": "support.constant.domain.drun",
-          "match": "\\b(?:drun|drunhub|changelog|setup|teardown|docker|image|container|compose|replicas|rollout|pods|pod|ingress|manifest|manifests|namespace|port|registry|git|github|gitlab|generic|cli|filesystem|latest|tags|series|formats|metadata|authentication|ambient|refs|date|branch|checkout|repository|remote|changes|message|files|get|post|put|delete|patch|head|options|request|response|body|headers|header|endpoint|api|data|timeout|retry|follow|redirects|verify|ssl|auth|bearer|basic|token|user|password|content|type|accept|health|healthy|service|services|provision|ready|host|connection|strategy|sequential|parallel|dependency-based|circuit|breaker|failure|threshold|recovery|interval|retries|networks|external|required|autoprovision|driver|condition|dns|tcp|domain|record|expected|ip|ips|command|working|workdir|missing|force|recreate|deps|never|always|makefile|target|args|pre|post|jobs|verbose|allocate_tty|ssh|key|fallback|delay|path|startup|shutdown|discovery|metrics|enabled|labels|unavailable|max|min|consul|etcd|server|domains|ttl|cache|memory|cpu|limit|policy|orphans|period|env_file|available|installed|tool|tools|framework|environment|node|npm|yarn|pnpm|bun|python|pip|go|golang|cargo|java|maven|gradle|ruby|gem|php|composer|rust|make|kubectl|helm|terraform|aws|gcp|azure|ci|local|production|staging|development|react|vue|angular|django|rails|express|spring|laravel|line|match|pattern|email|format|concat|split|replace|secret|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|transform|subtract|multiply|divide|modulo|property|filtered|sorted|reversed|unique|first|last|basename|dirname|extension|prefix|suffix|allow|permissions|dir|file|folder|any|running|current|all|exists|locally|attached)\\b"
+          "match": "\\b(?:drun|drunhub|changelog|setup|teardown|docker|image|container|compose|replicas|rollout|pods|pod|ingress|manifest|manifests|namespace|port|registry|git|github|gitlab|generic|cli|filesystem|latest|tags|series|formats|metadata|authentication|ambient|refs|date|branch|checkout|repository|remote|changes|message|files|get|post|put|delete|patch|head|options|request|response|body|headers|header|endpoint|api|data|timeout|retry|follow|redirects|verify|ssl|auth|bearer|basic|token|user|password|content|type|accept|health|healthy|service|services|provision|ready|host|connection|strategy|sequential|parallel|dependency-based|circuit|breaker|failure|threshold|recovery|interval|retries|networks|external|required|autoprovision|driver|condition|dns|tcp|domain|record|expected|ip|ips|command|working|workdir|missing|force|recreate|deps|never|always|makefile|target|args|pre|post|jobs|verbose|allocate_tty|ssh|key|fallback|delay|path|startup|shutdown|discovery|metrics|enabled|labels|unavailable|max|min|consul|etcd|server|domains|ttl|cache|memory|cpu|limit|policy|orphans|period|env_file|available|installed|tool|tools|framework|environment|node|npm|yarn|pnpm|bun|python|pip|go|golang|cargo|java|maven|gradle|ruby|gem|php|composer|rust|make|kubectl|helm|terraform|aws|gcp|azure|ci|local|production|staging|development|react|vue|angular|django|rails|express|spring|laravel|line|match|pattern|email|format|concat|split|replace|secret|trim|uppercase|lowercase|prepend|join|slice|length|keys|values|transform|subtract|multiply|divide|modulo|property|filtered|sorted|reversed|unique|first|last|basename|dirname|extension|normalized|prefix|suffix|allow|permissions|dir|file|folder|any|running|current|all|exists|locally|attached)\\b"
         }
       ]
     },

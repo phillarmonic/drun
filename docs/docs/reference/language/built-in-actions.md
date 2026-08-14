@@ -1291,6 +1291,12 @@ set $project_dir to {pwd}
 # Get hostname
 set $host to {hostname}
 
+# Get the operating system (windows, linux, darwin)
+set $platform to {os}
+
+# Get the shell drun executes commands with (bash, zsh, pwsh, powershell, cmd)
+set $active_shell to {shell}
+
 # Get environment variable
 set $api_key to {env('API_KEY')}
 
@@ -1391,6 +1397,8 @@ task "parameter defaults with pipes":
 | `{current git branch}`                      | Current git branch name                                                           | `feature/new-api`        |
 | `{pwd}`                                     | Current working directory                                                         | `/home/user/project`     |
 | `{hostname}`                                | System hostname                                                                   | `dev-machine`            |
+| `{os}`                                      | Operating system drun is running on                                               | `windows`, `linux`, `darwin` |
+| `{shell}`                                   | Shell drun executes commands with                                                 | `bash`, `zsh`, `pwsh`, `powershell`, `cmd` |
 | `{env('VAR')}`                              | Environment variable                                                              | `production`             |
 | `{now.format('layout')}`                    | Formatted current time                                                            | `2025-09-22 14:30:00`    |
 | `{available tasks('separator', 'omit'...)}` | OS-available user tasks joined by a separator, with optional exact-name omissions | `lint, check, build, ci` |

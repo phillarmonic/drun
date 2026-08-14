@@ -41,6 +41,9 @@ type EngineOptions struct {
 	// Allow runtime provisioning to change an installed tool's version.
 	AllowToolVersionChanges bool
 
+	// Skip all tool requirement checks.
+	IgnoreToolRequirements bool
+
 	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
 	UserProvisioningSources []string
 
@@ -112,6 +115,13 @@ func WithTaskModeOverride(mode string) Option {
 func WithAllowToolVersionChanges(allow bool) Option {
 	return func(o *EngineOptions) {
 		o.AllowToolVersionChanges = allow
+	}
+}
+
+// WithIgnoreToolRequirements skips all tool requirement checks.
+func WithIgnoreToolRequirements(ignore bool) Option {
+	return func(o *EngineOptions) {
+		o.IgnoreToolRequirements = ignore
 	}
 }
 

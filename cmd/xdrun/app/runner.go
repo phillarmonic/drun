@@ -25,6 +25,7 @@ func ExecuteTask(
 	taskModeOverride string,
 	allowUndefinedVars bool,
 	allowToolVersionChanges bool,
+	ignoreToolRequirements bool,
 	noDrunCache bool,
 	args []string,
 ) error {
@@ -122,6 +123,7 @@ func ExecuteTask(
 		engine.WithVerbose(verbose),
 		engine.WithTaskModeOverride(taskModeOverride),
 		engine.WithAllowToolVersionChanges(allowToolVersionChanges),
+		engine.WithIgnoreToolRequirements(ignoreToolRequirements),
 		engine.WithUserProvisioningSources(userConfig.ProvisioningSources),
 		engine.WithSecretsManager(secretsMgr),
 		engine.WithFolderTrusted(folderTrusted),

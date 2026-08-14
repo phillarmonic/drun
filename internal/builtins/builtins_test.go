@@ -3,6 +3,7 @@ package builtins
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,46 @@ func TestCheckFileExists(t *testing.T) {
 	_, err = checkFileExists(nil)
 	if err == nil {
 		t.Error("Expected error when no arguments provided")
+	}
+}
+
+func TestGetOperatingSystem(t *testing.T) {
+	result, err := getOperatingSystem(nil)
+	if err != nil {
+		t.Fatalf("getOperatingSystem() failed: %v", err)
+	}
+	if result != runtime.GOOS {
+		t.Errorf("Expected %q, got %q", runtime.GOOS, result)
+	}
+}
+
+// shellProvider is a test Context that reports a fixed active shell.
+type shellProvider struct {
+	name string
+}
+
+func (s shellProvider) GetProjectName() string             { return "" }
+func (s shellProvider) GetSecretsManager() SecretsManager  { return nil }
+func (s shellProvider) IsDryRun() bool                     { return false }
+func (s shellProvider) GetActiveShell() string             { return s.name }
+
+func TestGetActiveShell(t *testing.T) {
+	// With a provider, the reported shell is used.
+	result, err := getActiveShell(shellProvider{name: "bash"})
+	if err != nil {
+		t.Fatalf("getActiveShell() failed: %v", err)
+	}
+	if result != "bash" {
+		t.Errorf("Expected 'bash', got %q", result)
+	}
+
+	// Without a provider, it falls back to a non-empty default shell name.
+	result, err = getActiveShell(nil)
+	if err != nil {
+		t.Fatalf("getActiveShell() fallback failed: %v", err)
+	}
+	if result == "" {
+		t.Error("Expected a non-empty default shell name")
 	}
 }
 

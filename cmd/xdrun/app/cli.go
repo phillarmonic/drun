@@ -38,6 +38,7 @@ type App struct {
 	selfUpdate              bool
 	allowUndefinedVars      bool
 	allowToolVersionChanges bool
+	ignoreToolRequirements  bool
 	noDrunCache             bool
 
 	// Debug flags
@@ -189,6 +190,7 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.selfUpdate, "self-update", false, "[xdrun CLI cmd] Check for updates and update xdrun to the latest version")
 	flags.BoolVar(&a.allowUndefinedVars, "allow-undefined-variables", false, "[xdrun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
 	flags.BoolVar(&a.allowToolVersionChanges, "allow-tool-version-changes", false, "[xdrun CLI cmd] Allow provisioning to upgrade or downgrade installed tools when versioned requirements opt into provision")
+	flags.BoolVar(&a.ignoreToolRequirements, "ignore-tool-requirements", false, "[xdrun CLI cmd] Skip all tool requirement checks")
 
 	// Debug flags
 	flags.BoolVar(&a.debugMode, "debug", false, "[xdrun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
@@ -296,6 +298,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		a.taskMode,
 		a.allowUndefinedVars,
 		a.allowToolVersionChanges,
+		a.ignoreToolRequirements,
 		a.noDrunCache,
 		args,
 	)

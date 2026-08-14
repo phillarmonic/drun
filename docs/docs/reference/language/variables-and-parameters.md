@@ -519,6 +519,33 @@ task "loop_with_operations":
 - `basename` - Extract filename from path
 - `dirname` - Extract directory from path
 - `extension` - Extract file extension (without dot)
+- `normalized for shell` - Rewrite path separators for the active shell (see below)
+
+#### Normalizing Paths for the Active Shell
+
+When a path is interpolated into a `run` command it is passed to the shell drun
+executes commands with. POSIX shells (bash, sh, zsh) treat the backslash as an
+escape character, so a Windows-style path such as `C:\Users\me\bin\` gets
+mangled (backslashes are stripped and a trailing `\` can even swallow the
+following space).
+
+The `normalized for shell` operation rewrites separators for the active shell —
+backslashes become forward slashes for POSIX shells (and vice-versa for
+PowerShell/cmd) — and trims any trailing separator:
+
+```drun
+task "install" means "Build into a directory":
+  requires $path
+
+  # On Windows with Git Bash: C:\Users\me\bin\  ->  C:/Users/me/bin
+  run "go build -o {$path normalized for shell} ./cmd/mytool"
+```
+
+Combine it with the `{shell}` and `{os}` built-ins to branch on the environment:
+
+```drun
+info "Running on {os} using the {shell} shell"
+```
 
 ---
 

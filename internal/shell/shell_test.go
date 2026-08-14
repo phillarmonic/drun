@@ -438,3 +438,61 @@ func TestExecute_ImmediateErrorWithStderr(t *testing.T) {
 		t.Errorf("Expected stderr to contain error message, got %q", result.Stderr)
 	}
 }
+
+func TestName(t *testing.T) {
+	cases := map[string]string{
+		`C:\Program Files\Git\bin\bash.exe`: "bash",
+		"/bin/zsh":                          "zsh",
+		"powershell.exe":                    "powershell",
+		"pwsh":                              "pwsh",
+		`C:\Windows\System32\cmd.exe`:       "cmd",
+		"":                                  "",
+	}
+	for input, want := range cases {
+		if got := Name(input); got != want {
+			t.Errorf("Name(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestIsPOSIXShell(t *testing.T) {
+	posix := []string{"/bin/bash", "/bin/sh", "/bin/zsh", `C:\Program Files\Git\bin\bash.exe`}
+	for _, s := range posix {
+		if !IsPOSIXShell(s) {
+			t.Errorf("IsPOSIXShell(%q) = false, want true", s)
+		}
+	}
+
+	nonPosix := []string{"powershell.exe", "pwsh.exe", "cmd.exe", "cmd"}
+	for _, s := range nonPosix {
+		if IsPOSIXShell(s) {
+			t.Errorf("IsPOSIXShell(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestNormalizePath(t *testing.T) {
+	cases := []struct {
+		name  string
+		path  string
+		posix bool
+		want  string
+	}{
+		{"posix converts backslashes", `C:\Users\lab\xdrun`, true, "C:/Users/lab/xdrun"},
+		{"posix trims trailing backslash", `C:\Users\lab\xdrun\`, true, "C:/Users/lab/xdrun"},
+		{"posix trims trailing slash", "C:/Users/lab/xdrun/", true, "C:/Users/lab/xdrun"},
+		{"posix preserves drive root", `C:\`, true, "C:/"},
+		{"posix preserves lone root", "/", true, "/"},
+		{"windows converts slashes", "C:/Users/lab/xdrun", false, `C:\Users\lab\xdrun`},
+		{"windows trims trailing slash", "C:/Users/lab/xdrun/", false, `C:\Users\lab\xdrun`},
+		{"windows preserves drive root", "C:/", false, `C:\`},
+		{"empty stays empty", "", true, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizePath(tc.path, tc.posix); got != tc.want {
+				t.Errorf("NormalizePath(%q, %v) = %q, want %q", tc.path, tc.posix, got, tc.want)
+			}
+		})
+	}
+}

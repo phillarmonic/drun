@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/phillarmonic/drun/v2/internal/shell"
 )
 
 // VariableOperation represents a single operation on a variable
@@ -133,6 +135,11 @@ func (e *Engine) parseOperation(tokens []string) (*VariableOperation, error) {
 	case "reversed", "unique", "first", "last", "basename", "dirname", "extension":
 		// No arguments needed
 
+	case "normalized":
+		// "normalized for shell" — rewrite path separators for the active shell.
+		// No arguments are captured; the trailing "for shell" words are optional
+		// sugar that make the operation read naturally.
+
 	default:
 		return nil, fmt.Errorf("unknown operation: %s", opType)
 	}
@@ -193,6 +200,9 @@ func (e *Engine) applyVariableOperation(value string, op VariableOperation, ctx 
 
 	case "split":
 		return e.applySplitOperation(value, op.Args)
+
+	case "normalized":
+		return e.applyNormalizedForShellOperation(value, ctx)
 
 	default:
 		return "", fmt.Errorf("unknown operation type: %s", op.Type)
@@ -358,6 +368,17 @@ func (e *Engine) applyExtensionOperation(value string) (string, error) {
 		ext = ext[1:]
 	}
 	return ext, nil
+}
+
+// applyNormalizedForShellOperation rewrites a path so it interpolates safely
+// into a command executed by the active shell. POSIX shells (bash/sh/zsh) treat
+// the backslash as an escape character, so Windows-style paths are converted to
+// forward slashes; Windows shells get backslashes. Trailing separators are
+// trimmed so the path never leaves a dangling separator before the next
+// command argument.
+func (e *Engine) applyNormalizedForShellOperation(value string, ctx *ExecutionContext) (string, error) {
+	opts := e.getPlatformShellConfig(ctx)
+	return shell.NormalizePath(value, shell.IsPOSIXShell(opts.Shell)), nil
 }
 
 // String split operation

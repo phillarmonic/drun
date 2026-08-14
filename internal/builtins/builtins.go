@@ -5,10 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/phillarmonic/drun/v2/internal/shell"
 )
 
 // Context provides access to execution context for builtins
@@ -62,6 +65,8 @@ var Registry = map[string]BuiltinFunction{
 	"env":                    getEnvironmentVariable,
 	"pwd":                    getCurrentDirectory,
 	"hostname":               getHostname,
+	"os":                     getOperatingSystem,
+	"shell":                  getActiveShell,
 	"start progress":         startProgress,
 	"update progress":        updateProgress,
 	"finish progress":        finishProgress,
@@ -236,6 +241,25 @@ func getHostname(ctx Context, args ...string) (string, error) {
 	}
 
 	return hostname, nil
+}
+
+// getOperatingSystem returns the current operating system (runtime.GOOS), e.g.
+// "windows", "linux" or "darwin". It lets drun scripts branch on the platform.
+func getOperatingSystem(ctx Context, args ...string) (string, error) {
+	return runtime.GOOS, nil
+}
+
+// getActiveShell returns the friendly name of the shell drun uses to execute
+// commands (e.g. "bash", "zsh", "pwsh", "powershell", "cmd"). When the engine
+// exposes the resolved shell (honouring project shell configuration) that value
+// is used; otherwise the platform default shell is reported.
+func getActiveShell(ctx Context, args ...string) (string, error) {
+	if provider, ok := ctx.(interface{ GetActiveShell() string }); ok {
+		if name := provider.GetActiveShell(); name != "" {
+			return name, nil
+		}
+	}
+	return shell.Name(shell.DefaultShell()), nil
 }
 
 // CallBuiltin calls a built-in function by name with optional context
