@@ -23,6 +23,25 @@ func requireDockerDaemon(t *testing.T) {
 	}
 }
 
+// requireExistingDockerNetworkName returns one network currently known by the
+// daemon. Windows Docker hosts often use "nat" instead of "bridge", so tests
+// should avoid hardcoding a Linux-specific network.
+func requireExistingDockerNetworkName(t *testing.T) string {
+	t.Helper()
+	output, err := exec.Command("docker", "network", "ls", "--format", "{{.Name}}").Output()
+	if err != nil {
+		t.Skip("docker daemon not available")
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		name := strings.TrimSpace(line)
+		if name != "" {
+			return name
+		}
+	}
+	t.Skip("no docker networks available")
+	return ""
+}
+
 func executeDockerConditionTask(t *testing.T, condition string, dryRun bool) (string, error) {
 	t.Helper()
 	input := `version: 2.0
@@ -69,6 +88,7 @@ func TestDockerNetworkConditionRouting(t *testing.T) {
 
 func TestDockerNetworkCondition(t *testing.T) {
 	requireDockerDaemon(t)
+	existingNetworkName := requireExistingDockerNetworkName(t)
 
 	tests := []struct {
 		name           string
@@ -78,7 +98,7 @@ func TestDockerNetworkCondition(t *testing.T) {
 	}{
 		{
 			name:           "existing network takes if branch",
-			condition:      `docker network "bridge" exists`,
+			condition:      `docker network "` + existingNetworkName + `" exists`,
 			expectedOutput: []string{"branch: taken"},
 			notExpected:    []string{"branch: skipped"},
 		},
@@ -96,7 +116,7 @@ func TestDockerNetworkCondition(t *testing.T) {
 		},
 		{
 			name:           "not exists is false for existing network",
-			condition:      `docker network "bridge" not exists`,
+			condition:      `docker network "` + existingNetworkName + `" not exists`,
 			expectedOutput: []string{"branch: skipped"},
 			notExpected:    []string{"branch: taken"},
 		},
@@ -124,11 +144,12 @@ func TestDockerNetworkCondition(t *testing.T) {
 
 func TestDockerNetworkConditionInterpolation(t *testing.T) {
 	requireDockerDaemon(t)
+	existingNetworkName := requireExistingDockerNetworkName(t)
 
 	input := `version: 2.0
 
 task "probe":
-  given $network_name defaults to "bridge"
+  given $network_name defaults to "` + existingNetworkName + `"
   if docker network "{$network_name}" exists:
     info "network is up"
   else:
@@ -155,7 +176,7 @@ task "probe":
 func TestDockerNetworkConditionDryRun(t *testing.T) {
 	// Dry run must not query the daemon: even an existing network evaluates as
 	// missing, and no docker CLI is required for this test.
-	outputStr, err := executeDockerConditionTask(t, `docker network "bridge" exists`, true)
+	outputStr, err := executeDockerConditionTask(t, `docker network "any-network-name" exists`, true)
 	if err != nil {
 		t.Fatalf("Execution failed: %v", err)
 	}
