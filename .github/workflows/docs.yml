@@ -1,26 +1,48 @@
 name: Documentation
+
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build and Release"]
+    types: [completed]
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 jobs:
+  gate:
+    name: Release Gate
+    # Manual dispatch always proceeds; workflow_run only proceeds on a successful v* release.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    environment: docs
+    steps:
+      - name: Confirm release
+        run: echo "Release ${{ github.event.workflow_run.head_branch }} cleared for docs deployment"
+
   deploy:
+    name: Deploy Docs
+    needs: gate
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/configure-pages@v6
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
         with:
-          python-version: 3.x
-      - run: pip install zensical
-      - run: zensical build --clean
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync
+        working-directory: docs
+      - name: Build docs
+        run: uv run zensical build --clean
         working-directory: docs
       - uses: actions/upload-pages-artifact@v5
         with:
