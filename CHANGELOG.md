@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed Ctrl+C not stopping long-running tasks on Windows. `(*os.Process).Signal` cannot deliver `os.Interrupt`/`SIGTERM` to a child process on Windows, so the forwarded interrupt was silently discarded and child process trees (e.g. a docs server) kept running. On Windows drun now terminates the whole child process tree via `taskkill /F /T` when the interrupt is received; Unix signal forwarding is unchanged.
+
 ### Security
 
 ## [2.28.0] - 2026-08-11

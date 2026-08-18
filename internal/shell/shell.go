@@ -7,12 +7,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -426,32 +424,4 @@ func ExecuteWithOutput(command string, output io.Writer) (*Result, error) {
 	opts.StreamOutput = true
 	opts.Output = output
 	return Execute(command, opts)
-}
-
-func forwardSignals(cmd *exec.Cmd) func() {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-	done := make(chan struct{})
-
-	go func() {
-		for {
-			select {
-			case sig, ok := <-signalCh:
-				if !ok {
-					return
-				}
-				if cmd.Process != nil {
-					_ = cmd.Process.Signal(sig)
-				}
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	return func() {
-		close(done)
-		signal.Stop(signalCh)
-		close(signalCh)
-	}
 }
