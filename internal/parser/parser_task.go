@@ -224,6 +224,12 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			if wait != nil {
 				stmt.Body = append(stmt.Body, wait)
 			}
+		} else if p.curToken.Type == lexer.OPEN {
+			// open url "<target>"
+			openStmt := p.parseOpenStatement()
+			if openStmt != nil {
+				stmt.Body = append(stmt.Body, openStmt)
+			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()
 			if network != nil {

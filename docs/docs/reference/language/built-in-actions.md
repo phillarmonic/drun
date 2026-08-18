@@ -938,6 +938,65 @@ In dry-run mode the wait is reported but not performed.
 > **Note:** To wait until a service responds rather than for a fixed amount of
 > time, use `wait for service at ... to be ready` (see below).
 
+#### Opening a URL or File
+
+Open a URL or local file path in the OS default handler (browser, file viewer, etc.).
+Variables in the target are interpolated at execution time.
+
+Because `open url` can launch arbitrary programs, the containing folder must be
+trusted before the statement executes. On first use drun prompts interactively;
+you can also trust a folder ahead of time with the CLI:
+
+```bash
+xdrun cmd:trust            # trust the current directory
+xdrun cmd:trust /path/to   # trust a specific directory
+xdrun cmd:untrust           # revoke trust
+```
+
+Trust is stored per user in `~/.drun/trusted.yml`. A trusted parent directory
+covers all of its children. Dry runs skip the trust check (nothing is opened).
+
+```drun
+# Open a URL in the default browser
+open url "https://example.com/docs"
+
+# Interpolated target
+let $base = "https://docs.example.com"
+open url "{$base}/getting-started"
+
+# Open a local file (resolved to an absolute path before opening)
+open url "./coverage/index.html"
+```
+
+**Headless and remote sessions:**
+
+On headless machines (no `DISPLAY` or `WAYLAND_DISPLAY` on Linux), over SSH, or
+in CI environments, the statement prints a non-fatal warning with the URL and
+continues instead of failing:
+
+```
+Warning: no desktop environment detected (headless/SSH/CI)
+    Open this URL manually: https://example.com/docs
+```
+
+In dry-run mode, the statement reports the target without opening it:
+
+```
+[DRY RUN] Would open https://example.com/docs
+```
+
+**OS openers:**
+
+| Platform | Opener        |
+|----------|---------------|
+| macOS    | `open`        |
+| Linux    | `xdg-open`    |
+| Windows  | `cmd /c start` |
+
+On Windows, `&` characters in URLs may be misinterpreted by `cmd /c start`.
+If the URL contains `&`, consider wrapping it in a `file://` redirect page or
+using a shortened URL.
+
 #### Network Health Checks and Service Waiting
 
 ```drun
@@ -957,11 +1016,20 @@ wait for service at "https://api.example.com" to be ready timeout "30s" retry "5
 # Port connectivity testing
 test connection to "database.example.com" on port 5432
 test connection to "localhost" on port 8080 timeout "10s"
+check if port 6379 is open on "redis.local"
 
 # Ping testing
 ping host "example.com"
 ping host "8.8.8.8" timeout "3s"
 ```
+
+Port checks run natively (a TCP dial, no external tools such as `nc`). The
+`timeout` option accepts Go durations (`"500ms"`, `"10s"`) or bare seconds
+(`"10"`); the default is 5 seconds. A successful check means something is
+listening on the port (the port is in use); a failed check fails the task. To
+branch on the result instead of failing, use the
+[port condition](types-and-control-flow.md#port-conditions) in an `if`/`when`
+statement.
 
 #### Advanced Network Operations
 
@@ -1223,6 +1291,12 @@ set $project_dir to {pwd}
 # Get hostname
 set $host to {hostname}
 
+# Get the operating system (windows, linux, darwin)
+set $platform to {os}
+
+# Get the shell drun executes commands with (bash, zsh, pwsh, powershell, cmd)
+set $active_shell to {shell}
+
 # Get environment variable
 set $api_key to {env('API_KEY')}
 
@@ -1323,6 +1397,8 @@ task "parameter defaults with pipes":
 | `{current git branch}`                      | Current git branch name                                                           | `feature/new-api`        |
 | `{pwd}`                                     | Current working directory                                                         | `/home/user/project`     |
 | `{hostname}`                                | System hostname                                                                   | `dev-machine`            |
+| `{os}`                                      | Operating system drun is running on                                               | `windows`, `linux`, `darwin` |
+| `{shell}`                                   | Shell drun executes commands with                                                 | `bash`, `zsh`, `pwsh`, `powershell`, `cmd` |
 | `{env('VAR')}`                              | Environment variable                                                              | `production`             |
 | `{now.format('layout')}`                    | Formatted current time                                                            | `2025-09-22 14:30:00`    |
 | `{available tasks('separator', 'omit'...)}` | OS-available user tasks joined by a separator, with optional exact-name omissions | `lint, check, build, ci` |

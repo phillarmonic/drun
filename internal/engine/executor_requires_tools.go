@@ -75,6 +75,12 @@ func (f *toolCheckFailure) Error() string {
 
 // executeRequiresTools checks that all required tools are available and meet version constraints.
 func (e *Engine) executeRequiresTools(stmt *statement.RequiresTools, ctx *ExecutionContext) error {
+	if e.ignoreToolRequirements {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⏭️  Skipping tool requirements (--ignore-tool-requirements)\n")
+		}
+		return nil
+	}
 	tools := append([]statement.ToolRequirement(nil), stmt.Tools...)
 	if len(stmt.TaskRefs) > 0 {
 		inherited, err := task.ResolveInheritedProjectToolRequirements(e.taskRegistry, stmt.TaskRefs)
@@ -110,6 +116,12 @@ func (e *Engine) checkToolRequirements(detector toolDetector, tools []statement.
 
 // checkProjectToolRequirements checks project-level tool requirements at startup.
 func (e *Engine) checkProjectToolRequirements(projectCtx *ProjectContext) error {
+	if e.ignoreToolRequirements {
+		if e.verbose {
+			_, _ = fmt.Fprintf(e.output, "⏭️  Skipping project tool requirements (--ignore-tool-requirements)\n")
+		}
+		return nil
+	}
 	if projectCtx == nil || (len(projectCtx.RequiredTools) == 0 && len(projectCtx.RequiredToolTaskRefs) == 0) {
 		return nil
 	}

@@ -67,8 +67,10 @@ type Engine struct {
 
 	// Secrets management
 	secretsManager SecretsManager
+	folderTrusted  bool
 
 	allowToolVersionChanges bool
+	ignoreToolRequirements  bool
 	userProvisioningSources []string
 	embeddedProvisionings   []provisioning.EmbeddedSource
 	newToolDetector         func() toolDetector
@@ -122,8 +124,10 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 		// Secrets management
 		secretsManager: options.SecretsManager,
+		folderTrusted:  options.FolderTrusted,
 
 		allowToolVersionChanges: options.AllowToolVersionChanges,
+		ignoreToolRequirements:  options.IgnoreToolRequirements,
 		userProvisioningSources: append([]string(nil), options.UserProvisioningSources...),
 		embeddedProvisionings:   embeddedProvisionings,
 
@@ -954,6 +958,8 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeNetwork(s, ctx)
 	case *statement.Wait:
 		return e.executeWait(s, ctx)
+	case *statement.Open:
+		return e.executeOpen(s, ctx)
 	case *statement.File:
 		return e.executeFile(s, ctx)
 	case *statement.FileValue:
@@ -1038,7 +1044,9 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 		_, _ = fmt.Fprintf(e.output, "✅  %s\n", interpolatedMessage)
 	case "fail":
 		_, _ = fmt.Fprintf(e.output, "💥  %s\n", interpolatedMessage)
-		return fmt.Errorf("task failed: %s", interpolatedMessage)
+		// Return the message as-is: the engine already wraps statement errors
+		// with "task '<name>' failed: ..." on the way out.
+		return fmt.Errorf("%s", interpolatedMessage)
 	case "echo":
 		// Process \n escape sequences for newlines
 		processedMessage := strings.ReplaceAll(interpolatedMessage, "\\n", "\n")

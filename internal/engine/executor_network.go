@@ -1,17 +1,27 @@
 package engine
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/domain/orchestration"
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
+	"github.com/phillarmonic/drun/v2/internal/healthcheck"
 )
 
 // Domain: Network Operations Execution
 // This file contains executors for:
 // - Network connectivity checks (ping, port check)
 // - File downloads (HTTP/HTTPS)
+
+// defaultPortCheckTimeout is the dial timeout when no timeout option is given.
+const defaultPortCheckTimeout = 5 * time.Second
 
 // executeNetwork executes network operations (health checks, port testing, ping)
 func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionContext) error {
@@ -26,7 +36,7 @@ func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionCo
 		options[key] = e.interpolateVariables(value, ctx)
 	}
 
-	if e.dryRun {
+	if e.dryRun && networkStmt.Action != "port_check" {
 		return e.buildNetworkCommand(networkStmt.Action, target, port, condition, options, true)
 	}
 
@@ -48,8 +58,92 @@ func (e *Engine) executeNetwork(networkStmt *statement.Network, ctx *ExecutionCo
 		_, _ = fmt.Fprintf(e.output, "🌐  Network operation: %s on %s\n", networkStmt.Action, target)
 	}
 
+	// Port checks run natively (no external tools); other network actions
+	// still go through the shell command builder.
+	if networkStmt.Action == "port_check" {
+		return e.executePortCheck(target, port, options)
+	}
+
 	// Build and execute the actual network command
 	return e.buildNetworkCommand(networkStmt.Action, target, port, condition, options, false)
+}
+
+// executePortCheck natively probes a TCP endpoint using the health check
+// subsystem instead of shelling out to netcat. A successful dial means the
+// port is open (something is listening); a dial error fails the statement.
+func (e *Engine) executePortCheck(target, port string, options map[string]string) error {
+	endpoint, err := portCheckEndpoint(target, port)
+	if err != nil {
+		return err
+	}
+
+	timeout, err := parsePortCheckTimeout(options["timeout"])
+	if err != nil {
+		return fmt.Errorf("port check: %w", err)
+	}
+
+	if e.dryRun {
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would probe TCP port: %s (timeout %s)\n", endpoint, timeout)
+		return nil
+	}
+
+	if e.verbose {
+		_, _ = fmt.Fprintf(e.output, "Probe: dial tcp %s (timeout %s)\n", endpoint, timeout)
+	}
+
+	if err := probeTCPPort(endpoint, timeout); err != nil {
+		_, _ = fmt.Fprintf(e.output, "❌  Port check failed: %v\n", err)
+		return err
+	}
+
+	_, _ = fmt.Fprintf(e.output, "✅  Port is open: %s\n", endpoint)
+	return nil
+}
+
+// portCheckEndpoint builds a host:port endpoint for the dialer. When port is
+// empty the target itself must already carry a port (e.g. "db.internal:5432").
+func portCheckEndpoint(target, port string) (string, error) {
+	target = strings.TrimSpace(target)
+	port = strings.TrimSpace(port)
+
+	if target == "" {
+		return "", fmt.Errorf("port check: host is empty")
+	}
+	if port != "" {
+		return net.JoinHostPort(target, port), nil
+	}
+	if _, _, err := net.SplitHostPort(target); err == nil {
+		return target, nil
+	}
+	return "", fmt.Errorf("port check: no port given for host %q", target)
+}
+
+// parsePortCheckTimeout accepts Go durations ("5s", "500ms") or bare seconds
+// ("5"). Empty means the default timeout.
+func parsePortCheckTimeout(raw string) (time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultPortCheckTimeout, nil
+	}
+	if d, err := time.ParseDuration(raw); err == nil {
+		return d, nil
+	}
+	if secs, err := strconv.Atoi(raw); err == nil {
+		return time.Duration(secs) * time.Second, nil
+	}
+	return 0, fmt.Errorf("invalid timeout %q (use e.g. \"5s\" or \"5\")", raw)
+}
+
+// probeTCPPort performs a single native TCP dial through the health check
+// subsystem, so port probing shares one implementation with service health
+// checks.
+func probeTCPPort(endpoint string, timeout time.Duration) error {
+	checker := healthcheck.NewChecker()
+	return checker.Check(context.Background(), &orchestration.HealthCheck{
+		Type:     "tcp",
+		Endpoint: endpoint,
+		Timeout:  timeout,
+	})
 }
 
 // executeDownload executes file download operations using native Go HTTP client

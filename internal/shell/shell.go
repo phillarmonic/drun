@@ -7,11 +7,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -53,6 +52,7 @@ func DefaultOptions() *Options {
 	}
 }
 
+// defaultShell returns the shell drun uses when a project does not configure one.
 func defaultShell() string {
 	switch runtime.GOOS {
 	case "darwin":
@@ -63,34 +63,170 @@ func defaultShell() string {
 		if gitBash := detectGitBash(); gitBash != "" {
 			return gitBash
 		}
+		if pwsh, err := exec.LookPath("pwsh.exe"); err == nil {
+			return pwsh
+		}
 		return "powershell.exe"
 	default:
 		return "/bin/sh"
 	}
 }
 
-func detectGitBash() string {
-	if bashPath, err := exec.LookPath("bash.exe"); err == nil {
-		return bashPath
+// DefaultShell returns the shell drun uses when a project does not configure
+// one. It is exported so other packages (e.g. builtins) can report the active
+// shell to drun scripts.
+func DefaultShell() string {
+	return defaultShell()
+}
+
+// Name returns the friendly family name of a shell path, without directory or
+// ".exe" suffix and lower-cased (e.g. "bash", "zsh", "pwsh", "powershell",
+// "cmd"). It lets drun scripts branch on the active shell via the {shell}
+// builtin.
+func Name(shellPath string) string {
+	if shellPath == "" {
+		return ""
+	}
+	base := strings.ToLower(shellBase(shellPath))
+	return strings.TrimSuffix(base, ".exe")
+}
+
+// shellBase returns the final path component of a shell path, splitting on
+// both "/" and "\". Shell paths (e.g. Windows paths detected via config) can
+// use either separator regardless of the host OS running drun/tests, so this
+// must not rely on filepath.Base, which only recognizes the host OS separator.
+func shellBase(shellPath string) string {
+	shellPath = strings.ReplaceAll(shellPath, "\\", "/")
+	return path.Base(shellPath)
+}
+
+// IsPOSIXShell reports whether the given shell path refers to a POSIX-style
+// shell (bash, sh, zsh, fish, ...) as opposed to Windows PowerShell or cmd.exe.
+// POSIX shells treat the backslash as an escape character, so paths interpolated
+// into commands must use forward slashes.
+func IsPOSIXShell(shellPath string) bool {
+	return !isWindowsPowerShell(shellPath) && !isWindowsCmd(shellPath)
+}
+
+// NormalizePath rewrites a filesystem path so it is safe to interpolate into a
+// command executed by the active shell. For POSIX shells backslashes become
+// forward slashes (otherwise the shell would treat them as escapes); for
+// Windows shells forward slashes become backslashes. Trailing separators are
+// trimmed (except for a lone root or drive root) so a path never leaves a
+// dangling separator before the next command argument.
+func NormalizePath(path string, posix bool) string {
+	if path == "" {
+		return path
 	}
 
-	candidates := []string{
-		filepath.Join(`C:\Program Files`, "Git", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files`, "Git", "usr", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files (x86)`, "Git", "bin", "bash.exe"),
-		filepath.Join(`C:\Program Files (x86)`, "Git", "usr", "bin", "bash.exe"),
+	sep := "\\"
+	if posix {
+		path = strings.ReplaceAll(path, "\\", "/")
+		sep = "/"
+	} else {
+		path = strings.ReplaceAll(path, "/", "\\")
 	}
 
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
+	for len(path) > 1 && strings.HasSuffix(path, sep) {
+		trimmed := path[:len(path)-1]
+		// Preserve drive roots ("C:\" or "C:/") and other separators that are
+		// meaningful roots.
+		if strings.HasSuffix(trimmed, ":") {
+			break
 		}
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		path = trimmed
+	}
+
+	return path
+}
+
+// isWindowsPowerShell reports whether the shell path refers to Windows
+// PowerShell or PowerShell Core, which need different flags than POSIX shells.
+func isWindowsPowerShell(shellPath string) bool {
+	base := strings.ToLower(shellBase(shellPath))
+	base = strings.TrimSuffix(base, ".exe")
+	return base == "powershell" || base == "pwsh"
+}
+
+// isWindowsCmd reports whether the shell path refers to cmd.exe.
+func isWindowsCmd(shellPath string) bool {
+	base := strings.ToLower(shellBase(shellPath))
+	return base == "cmd.exe" || base == "cmd"
+}
+
+// shellCommandArgs returns the argument list that makes the given shell run a
+// single command string.
+func shellCommandArgs(shellPath, command string) []string {
+	switch {
+	case isWindowsPowerShell(shellPath):
+		return []string{"-NoProfile", "-NonInteractive", "-Command", command}
+	case isWindowsCmd(shellPath):
+		return []string{"/c", command}
+	default:
+		return []string{"-c", command}
+	}
+}
+
+// detectGitBash locates a Git for Windows bash.exe. It deliberately ignores
+// %SystemRoot%\System32\bash.exe, which is the WSL launcher: WSL runs a Linux
+// distribution with its own PATH, so Windows executables drun detected (go,
+// docker, ...) are not reachable from there.
+func detectGitBash() string {
+	for _, candidate := range gitBashCandidates() {
+		if isExecutableFile(candidate) {
 			return candidate
 		}
 	}
 
+	if bashPath, err := exec.LookPath("bash.exe"); err == nil && !isWindowsSystemPath(bashPath) {
+		return bashPath
+	}
+
 	return ""
+}
+
+func gitBashCandidates() []string {
+	var roots []string
+	if gitExe, err := exec.LookPath("git.exe"); err == nil && !isWindowsSystemPath(gitExe) {
+		// <root>\cmd\git.exe or <root>\bin\git.exe
+		roots = append(roots, filepath.Dir(filepath.Dir(gitExe)))
+	}
+	for _, env := range []string{"ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"} {
+		if base := os.Getenv(env); base != "" {
+			roots = append(roots, filepath.Join(base, "Git"))
+		}
+	}
+	roots = append(roots, `C:\Program Files\Git`, `C:\Program Files (x86)\Git`)
+
+	candidates := make([]string, 0, len(roots)*2)
+	for _, root := range roots {
+		candidates = append(candidates,
+			filepath.Join(root, "bin", "bash.exe"),
+			filepath.Join(root, "usr", "bin", "bash.exe"),
+		)
+	}
+	return candidates
+}
+
+func isExecutableFile(path string) bool {
+	if path == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// isWindowsSystemPath reports whether the path lives under %SystemRoot%.
+func isWindowsSystemPath(path string) bool {
+	systemRoot := os.Getenv("SystemRoot")
+	if systemRoot == "" {
+		systemRoot = `C:\Windows`
+	}
+	rel, err := filepath.Rel(systemRoot, path)
+	if err != nil {
+		return false
+	}
+	return !strings.HasPrefix(rel, "..")
 }
 
 // Execute runs a shell command with the given options
@@ -256,7 +392,7 @@ func buildCommand(ctx context.Context, command string, opts *Options) *exec.Cmd 
 	}
 
 	// #nosec G204 -- task execution intentionally invokes the configured shell with a user-authored command.
-	return exec.CommandContext(ctx, opts.Shell, "-c", command)
+	return exec.CommandContext(ctx, opts.Shell, shellCommandArgs(opts.Shell, command)...)
 }
 
 func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd {
@@ -269,7 +405,7 @@ func createTTYCommand(ctx context.Context, command, shellPath string) *exec.Cmd 
 		return exec.CommandContext(ctx, "script", "-q", "-e", "-c", fmt.Sprintf("%s -c %q", shellPath, command), "/dev/null")
 	default:
 		// #nosec G204 -- interactive task execution intentionally invokes the selected shell command in a TTY.
-		return exec.CommandContext(ctx, shellPath, "-c", command)
+		return exec.CommandContext(ctx, shellPath, shellCommandArgs(shellPath, command)...)
 	}
 }
 
@@ -288,32 +424,4 @@ func ExecuteWithOutput(command string, output io.Writer) (*Result, error) {
 	opts.StreamOutput = true
 	opts.Output = output
 	return Execute(command, opts)
-}
-
-func forwardSignals(cmd *exec.Cmd) func() {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-	done := make(chan struct{})
-
-	go func() {
-		for {
-			select {
-			case sig, ok := <-signalCh:
-				if !ok {
-					return
-				}
-				if cmd.Process != nil {
-					_ = cmd.Process.Signal(sig)
-				}
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	return func() {
-		close(done)
-		signal.Stop(signalCh)
-		close(signalCh)
-	}
 }

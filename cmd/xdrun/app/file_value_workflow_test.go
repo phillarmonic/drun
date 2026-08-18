@@ -5,9 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// skipOnWindowsPOSIXShell skips end-to-end tests whose fixtures rely on POSIX
+// shell scripts, tools (sed, head, curl) and executables without an .exe
+// extension, which are not portable to native Windows.
+func skipOnWindowsPOSIXShell(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping POSIX-shell dependent e2e test on Windows")
+	}
+}
 
 const fileValueReleaseSpec = `version: 2.0
 
@@ -161,6 +172,7 @@ func TestFileValueReleaseWorkflowResolvesTagAndFirstReleaseInputs(t *testing.T) 
 
 func newFileValueReleaseFixture(t *testing.T, version string) fileValueReleaseFixture {
 	t.Helper()
+	skipOnWindowsPOSIXShell(t)
 
 	workspace := t.TempDir()
 	fixture := fileValueReleaseFixture{

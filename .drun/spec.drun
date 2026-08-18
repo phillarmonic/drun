@@ -3,12 +3,12 @@
 
 version: 2.0
 
-project "Drun" version "2.27.0":
+project "Drun" version "2.28.0":
 	requires tools:
 		go >= "1.26.5"
 		golangci-lint provision
 		gosec provision
-	    govulncheck
+		govulncheck provision
 
 	git policy:
 		branch:
@@ -69,10 +69,23 @@ task "fuzz" means "Runs the fuzzers":
 task "vuln" means "Performs dependencies vulnerability checks":
     run "govulncheck ./..."
 
-task "install" means "Install xdrun with build info":
-	info "Installing xdrun with embedded build date/time..."
-	run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
-	success "xdrun installed to $GOPATH/bin"
+task "install" means "Install xdrun with build info (give a path to send it somewhere custom)":
+	given $path defaults to empty
+	if $path is empty:
+		# Standard install
+		info "Installing xdrun with embedded build date/time..."
+		run "go install -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" ./cmd/xdrun"
+		success "xdrun installed to $GOPATH/bin"
+	else:
+		if folder {$path} exists:
+			info "Installing xdrun into {$path}..."
+			# Normalize the target path for the active shell so separators (and
+			# any trailing slash) don't get mangled — e.g. Git Bash on Windows
+			# would otherwise treat backslashes as escape characters.
+			run "go build -ldflags=\"-X 'main.date=$(date +'%d/%m/%Y %H:%M:%S') (dev build)'\" -o {$path normalized for shell} ./cmd/xdrun"
+		else:
+			fail "Path {$path} doesn't exist. Cannot install."
+
 
 task "skill" means "Show how to install drun AI guidance in a repository":
 	info "Install project AI guidance with: xdrun cmd:skill install drun-basics"
@@ -81,6 +94,7 @@ task "docs" means "Runs the local docs server":
     use workdir "docs"
     run "uv run zensical serve"
 
+# See what's happening here by running xdrun ci --task-mode=normal
 task "ci" mode "ci" means "Runs the whole CI pipeline":
 	info "Executing the local CI pipeline..."
 	step "Dependency vulnerability checks"
@@ -112,3 +126,9 @@ task "prepare-release" means "Runs checks related to going to a next release":
     update project version to "{$version}"
     success "According to the current spec, you should be good to go."
     warning "But be mindful, with great power, comes great responsibility."
+
+task "changelog" means "Generates the changelog for the project":
+    given $version as string matching semver_optional_v
+    step "Generating changelog for version {$version}"
+    promote changelog "CHANGELOG.md" to version "{$version}"
+    success "Changelog generated for version {$version}"

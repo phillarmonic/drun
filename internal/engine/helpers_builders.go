@@ -365,19 +365,6 @@ exit 1`, timeout, retryInterval, target)
 
 		networkCmd = []string{"sh", "-c", script}
 
-	case "port_check":
-		// Use netcat for port checking
-		networkCmd = append(networkCmd, "nc", "-z")
-
-		// Add timeout if specified
-		if timeout, exists := options["timeout"]; exists {
-			networkCmd = append(networkCmd, "-w", timeout)
-		} else {
-			networkCmd = append(networkCmd, "-w", "5") // Default 5s timeout
-		}
-
-		networkCmd = append(networkCmd, target, port)
-
 	case "ping":
 		// Use ping command
 		networkCmd = append(networkCmd, "ping", "-c", "1")

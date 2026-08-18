@@ -41,6 +41,9 @@ type EngineOptions struct {
 	// Allow runtime provisioning to change an installed tool's version.
 	AllowToolVersionChanges bool
 
+	// Skip all tool requirement checks.
+	IgnoreToolRequirements bool
+
 	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
 	UserProvisioningSources []string
 
@@ -49,6 +52,10 @@ type EngineOptions struct {
 
 	// Secrets manager
 	SecretsManager SecretsManager
+
+	// FolderTrusted indicates whether the folder containing the task file has
+	// been trusted for security-sensitive operations such as open url.
+	FolderTrusted bool
 }
 
 // Option is a functional option for configuring the Engine
@@ -111,6 +118,13 @@ func WithAllowToolVersionChanges(allow bool) Option {
 	}
 }
 
+// WithIgnoreToolRequirements skips all tool requirement checks.
+func WithIgnoreToolRequirements(ignore bool) Option {
+	return func(o *EngineOptions) {
+		o.IgnoreToolRequirements = ignore
+	}
+}
+
 // WithUserProvisioningSources sets user-level fallback provisioning catalogs.
 func WithUserProvisioningSources(sources []string) Option {
 	return func(o *EngineOptions) {
@@ -129,6 +143,13 @@ func WithEmbeddedProvisioningSources(sources []provisioning.EmbeddedSource) Opti
 func WithSecretsManager(sm SecretsManager) Option {
 	return func(o *EngineOptions) {
 		o.SecretsManager = sm
+	}
+}
+
+// WithFolderTrusted marks the folder as trusted for security-sensitive operations.
+func WithFolderTrusted(trusted bool) Option {
+	return func(o *EngineOptions) {
+		o.FolderTrusted = trusted
 	}
 }
 

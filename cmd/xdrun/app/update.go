@@ -69,6 +69,12 @@ func HandleSelfUpdate(versionStr string) error {
 		return nil
 	}
 
+	// Windows cannot replace a running executable in place, so delegate the actual
+	// replacement to the PowerShell updater, which waits for this process to exit.
+	if runtime.GOOS == "windows" {
+		return launchWindowsUpdater(latestVersion, currentExe)
+	}
+
 	// Create backup
 	backupPath, err := createBackup(currentExe, versionStr)
 	if err != nil {
@@ -96,6 +102,53 @@ func HandleSelfUpdate(versionStr string) error {
 	fmt.Println("\nVerifying updated binary:")
 	if err := verifyInstalledBinary(currentExe); err != nil {
 		fmt.Printf("⚠️  Warning: Failed to verify updated binary: %v\n", err)
+	}
+
+	return nil
+}
+
+// updateScriptURL points at the PowerShell updater used on Windows.
+const updateScriptURL = "https://raw.githubusercontent.com/phillarmonic/drun/master/update.ps1"
+
+// launchWindowsUpdater delegates the update to the PowerShell script. Windows
+// keeps the running executable locked, so the script waits for this process to
+// exit before replacing the binary.
+func launchWindowsUpdater(version, currentExe string) error {
+	powershell, err := exec.LookPath("powershell.exe")
+	if err != nil {
+		if powershell, err = exec.LookPath("pwsh.exe"); err != nil {
+			return fmt.Errorf("PowerShell was not found; update manually with:\n  irm %s | iex", updateScriptURL)
+		}
+	}
+
+	installDir := filepath.Dir(currentExe)
+	pid := os.Getpid()
+
+	// Download the updater and invoke it with our parameters, waiting for this
+	// process (pid) to exit before the binary is replaced.
+	script := fmt.Sprintf(
+		"& ([scriptblock]::Create((irm %s))) -Version '%s' -InstallDir '%s' -WaitForPid %d -Force",
+		updateScriptURL, version, installDir, pid,
+	)
+
+	// #nosec G204 -- arguments are internal constants and process-derived paths, not user input.
+	cmd := exec.Command(powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Println("🚀  Launching the Windows updater...")
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to launch PowerShell updater: %w", err)
+	}
+
+	fmt.Println("⏳  The updater will finish after xdrun exits. Please wait a moment...")
+	fmt.Println("💡  If it does not complete, run manually:")
+	fmt.Printf("      irm %s | iex\n", updateScriptURL)
+
+	// Detach so this process can exit and release the executable lock.
+	if err := cmd.Process.Release(); err != nil {
+		return fmt.Errorf("failed to detach PowerShell updater: %w", err)
 	}
 
 	return nil

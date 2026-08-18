@@ -73,6 +73,7 @@ var keywordCompletions = []completionItem{
 	{Label: "service", Kind: completionItemKindKeyword, Detail: "Service definition"},
 	{Label: "attached", Kind: completionItemKindKeyword, Detail: "Interactive run modifier"},
 	{Label: "git policy", Kind: completionItemKindKeyword, Detail: "Git conventions policy block"},
+	{Label: "open url", Kind: completionItemKindKeyword, Detail: "Open a URL or file in the default application"},
 	{Label: "git validate", Kind: completionItemKindKeyword, Detail: "Validate git conventions"},
 	{Label: "branch", Kind: completionItemKindKeyword, Detail: "Branch policy block"},
 	{Label: "default branches", Kind: completionItemKindKeyword, Detail: "Default branch list (inside git policy)"},

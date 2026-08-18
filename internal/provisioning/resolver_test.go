@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -530,6 +531,19 @@ func TestDeriveExactVersion(t *testing.T) {
 func withEnv(t *testing.T, key, value string, fn func()) {
 	t.Helper()
 
+	setEnv(t, key, value)
+	// os.UserHomeDir() reads USERPROFILE on Windows, so mirror HOME there to
+	// keep home-directory overrides working across platforms.
+	if key == "HOME" && runtime.GOOS == "windows" {
+		setEnv(t, "USERPROFILE", value)
+	}
+
+	fn()
+}
+
+func setEnv(t *testing.T, key, value string) {
+	t.Helper()
+
 	originalValue, hadValue := os.LookupEnv(key)
 	if err := os.Setenv(key, value); err != nil {
 		t.Fatalf("Setenv(%q) error = %v", key, err)
@@ -546,6 +560,4 @@ func withEnv(t *testing.T, key, value string, fn func()) {
 			t.Fatalf("restore env %q error = %v", key, err)
 		}
 	})
-
-	fn()
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -24,6 +25,7 @@ func ExecuteTask(
 	taskModeOverride string,
 	allowUndefinedVars bool,
 	allowToolVersionChanges bool,
+	ignoreToolRequirements bool,
 	noDrunCache bool,
 	args []string,
 ) error {
@@ -81,6 +83,39 @@ func ExecuteTask(
 		return err
 	}
 
+	// Check whether the folder is trusted for security-sensitive operations.
+	// When the program uses "open url" and the folder is not already trusted,
+	// prompt the user before proceeding.
+	folderTrusted := false
+	if listTasks || dryRun {
+		// Listing tasks and dry runs don't execute anything, so trust is not required.
+		folderTrusted = true
+	} else if ProgramUsesOpenURL(program) {
+		configDir, _ := filepath.Abs(filepath.Dir(actualConfigFile))
+		trusted, err := IsDirTrusted(configDir)
+		if err != nil {
+			return fmt.Errorf("failed to check folder trust: %w", err)
+		}
+		if trusted {
+			folderTrusted = true
+		} else {
+			fmt.Fprintf(os.Stderr,
+				"This spec uses 'open url', which can launch programs on your machine.\n"+
+					"The folder %s is not yet trusted.\n", configDir)
+			if askForConfirmation("Trust this folder and continue?") {
+				if err := TrustDir(configDir); err != nil {
+					return fmt.Errorf("failed to trust folder: %w", err)
+				}
+				folderTrusted = true
+			} else {
+				return fmt.Errorf("execution aborted: folder not trusted for 'open url'")
+			}
+		}
+	} else {
+		// No open url in the program; trust is irrelevant.
+		folderTrusted = true
+	}
+
 	// Create engine with secrets support
 	eng := engine.NewEngineWithOptions(
 		engine.WithOutput(os.Stdout),
@@ -88,8 +123,10 @@ func ExecuteTask(
 		engine.WithVerbose(verbose),
 		engine.WithTaskModeOverride(taskModeOverride),
 		engine.WithAllowToolVersionChanges(allowToolVersionChanges),
+		engine.WithIgnoreToolRequirements(ignoreToolRequirements),
 		engine.WithUserProvisioningSources(userConfig.ProvisioningSources),
 		engine.WithSecretsManager(secretsMgr),
+		engine.WithFolderTrusted(folderTrusted),
 	)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)
 

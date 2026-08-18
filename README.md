@@ -23,10 +23,16 @@ Official editor extensions are available for [VS Code](https://marketplace.visua
 
 ## Install
 
-Use the install script:
+Use the install script (Linux, macOS, Git Bash):
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
+```
+
+On Windows, use the PowerShell installer:
+
+```powershell
+irm https://raw.githubusercontent.com/phillarmonic/drun/master/install.ps1 | iex
 ```
 
 Or install with Go:
@@ -36,6 +42,20 @@ go install github.com/phillarmonic/drun/v2/cmd/xdrun@latest
 ```
 
 See the [install guide](./docs/docs/getting-started/install.md) for platform notes, pinned versions, and verification.
+
+## Update
+
+On Linux and macOS, xdrun updates itself:
+
+```bash
+xdrun --self-update
+```
+
+On Windows, `xdrun --self-update` launches a PowerShell updater that waits for xdrun to exit and replaces the binary (a running `.exe` can't overwrite itself). You can also run the updater directly:
+
+```powershell
+irm https://raw.githubusercontent.com/phillarmonic/drun/master/update.ps1 | iex
+```
 
 ## Quick Start
 

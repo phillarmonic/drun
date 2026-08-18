@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/phillarmonic/drun/v2/internal/patterns"
 )
 
 type hoverEntry struct {
@@ -39,6 +41,13 @@ var hoverEntries = []hoverEntry{
 	{"update toml", `update toml "path" in "file" to <value>`, "Update a TOML value", "Rewrites the value selected by its dotted path."},
 	{"update match", `update match "pattern" in "file" to <value>`, "Update a regular-expression match", "Replaces the selected regular-expression capture."},
 	{"promote changelog", `promote changelog "file" to version "X.Y.Z" [on "YYYY-MM-DD"]`, "Promote unreleased changelog entries", "Moves the `## [Unreleased]` section of a Keep a Changelog file into a new dated release section, leaving an emptied Unreleased section behind. When the file has an `[Unreleased]: .../compare/<prev>...HEAD` link, the comparison links are updated too. The date defaults to today; use `on \"YYYY-MM-DD\"` to override it. Re-running for a version whose section already exists merges new Unreleased entries into it instead of failing, so release preparation is idempotent."},
+	{"open url", `open url "<target>"`, "Open in default application", "Opens a URL or local file path in the OS default handler (browser, file viewer, etc.). The folder must be trusted before execution (prompted interactively or via `xdrun cmd:trust`). In headless, SSH, or CI sessions it prints the target instead of failing. Local paths without a scheme are resolved to absolute paths. Variables in the target are interpolated at execution time."},
+	{"test connection", `test connection to "<host>" on port <port> [timeout "<duration>"]`, "TCP port check", "Probes a TCP port natively (a dial, no external tools such as `nc`). The check succeeds when something is listening on the port - i.e. the port is in use - and fails the task otherwise. `timeout` accepts Go durations (`\"500ms\"`, `\"10s\"`) or bare seconds and defaults to 5 seconds. To branch on the result instead of failing the task, use the `if port <port> is open on \"host\"` condition."},
+	{"check if port", `check if port <port> is open on "<host>" [timeout "<duration>"]`, "TCP port check", "Probes a TCP port natively (a dial, no external tools such as `nc`). This is an alternate spelling of `test connection to \"host\" on port N`: it succeeds when the port is in use and fails the task otherwise. To branch on the result instead of failing the task, use the `if port <port> is open on \"host\"` condition."},
+	{"if port", `if port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation; the timeout accepts Go durations or bare seconds and defaults to 5 seconds. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
+	{"when port", `when port <port> is [not] open on "<host>" [with timeout "<duration>"]:`, "TCP port condition", "Probes a TCP port natively and runs the nested statements when the probe result matches; use `otherwise` for the fallback branch. `is open` is true when a dial succeeds, i.e. something is listening on the port (the port is in use). Host, port, and the optional timeout all support interpolation. In `--dry-run` mode no connection is opened and the condition evaluates as if the port were closed."},
+	{"if docker network", `if docker network "<name>" [not] exists:`, "Docker network condition", "Asks the Docker daemon whether a network exists and runs the nested statements when the answer matches. `exists` is true when the daemon lists the network; use `not exists` for the inverse. The network name supports interpolation. In `--dry-run` mode the daemon is not queried and the condition evaluates as if the network were missing."},
+	{"when docker network", `when docker network "<name>" [not] exists:`, "Docker network condition", "Asks the Docker daemon whether a network exists and runs the nested statements when the answer matches; use `otherwise` for the fallback branch. `exists` is true when the daemon lists the network; use `not exists` for the inverse. The network name supports interpolation. In `--dry-run` mode the daemon is not queried and the condition evaluates as if the network were missing."},
 	{"git policy", `git policy:`, "Git policy", "Defines repository conventions such as branch naming, protected branches, and commit-message rules."},
 	{"git validate", `git validate`, "Validate Git policy", "Checks the current repository against the configured Git policy."},
 	{"version", `version: 2.0`, "Language version", "Selects the Drun language version used to parse this file."},
@@ -160,6 +169,34 @@ var hoverExtraExamples = map[string][]string{
 	"orchestrate": {
 		"orchestrate \"development\" means \"Local services\":\n  services [\"api\", \"database\"]\n  strategy \"dependency-based\"",
 	},
+	"open url": {
+		"open url \"https://example.com/docs\"",
+		"open url \"{$base_url}/releases/tag/v{$version}\"",
+		"open url \"./coverage/index.html\"",
+		"task \"docs\" means \"Open the project documentation\":\n  let $docs_url = \"https://docs.example.com\"\n  open url \"{$docs_url}/getting-started\"",
+	},
+	"test connection": {
+		"test connection to \"database.example.com\" on port 5432",
+		"test connection to \"localhost\" on port 8080 timeout \"10s\"",
+	},
+	"check if port": {
+		"check if port 6379 is open on \"redis.local\"",
+		"check if port 8080 is open on \"localhost\" timeout \"2s\"",
+	},
+	"if port": {
+		"if port 5432 is open on \"localhost\":\n  info \"PostgreSQL is already running\"\nelse:\n  call task \"start-database\"",
+		"if port {$redis_port} is not open on \"{$redis_host}\" with timeout \"2s\":\n  warn \"Redis is down - skipping cache warmup\"",
+	},
+	"when port": {
+		"when port 8080 is open on \"localhost\":\n  info \"Dev server is up\"\notherwise:\n  info \"Dev server is not running\"",
+	},
+	"if docker network": {
+		"if docker network \"proxy\" exists:\n  info \"Reusing the existing proxy network\"\nelse:\n  call task \"create-proxy-network\"",
+		"if docker network \"{$app_network}\" not exists:\n  warn \"Network {$app_network} is missing - orchestration will create it\"",
+	},
+	"when docker network": {
+		"when docker network \"legacy-bridge\" exists:\n  info \"Attaching to the legacy network\"\notherwise:\n  info \"Using the default bridge\"",
+	},
 }
 
 func hoverForSource(source string, pos position) *hover {
@@ -173,6 +210,12 @@ func hoverForSource(source string, pos position) *hover {
 	cursor := byteOffsetForUTF16(code, pos.Character)
 	if cursor < 0 {
 		return nil
+	}
+	if macro := macroHover(code, cursor, pos.Line); macro != nil {
+		return macro
+	}
+	if fn := functionHover(code, cursor, pos.Line); fn != nil {
+		return fn
 	}
 	statementStart := len(code) - len(strings.TrimLeft(code, " \t"))
 
@@ -208,6 +251,72 @@ func hoverForSource(source string, pos position) *hover {
 			End:   position{Line: pos.Line, Character: utf16Column(code[:end])},
 		},
 	}
+}
+
+// macroHover returns hover documentation when the cursor rests on a built-in
+// pattern macro name that follows the `matching` keyword.
+func macroHover(code string, cursor, lineNo int) *hover {
+	if cursor < 0 || cursor > len(code) {
+		return nil
+	}
+	start := cursor
+	for start > 0 && isWordByte(code[start-1]) {
+		start--
+	}
+	end := cursor
+	for end < len(code) && isWordByte(code[end]) {
+		end++
+	}
+	if start == end {
+		return nil
+	}
+	macro, ok := patterns.GetMacro(code[start:end])
+	if !ok {
+		return nil
+	}
+	// Only treat the word as a macro when it directly follows `matching`, so
+	// identifiers that happen to share a macro name are not documented.
+	prefix := strings.TrimRight(code[:start], " \t")
+	if !strings.HasSuffix(prefix, "matching") {
+		return nil
+	}
+	if before := len(prefix) - len("matching"); before > 0 && isWordByte(prefix[before-1]) {
+		return nil
+	}
+	if insideQuotedString(code, start) {
+		return nil
+	}
+
+	return &hover{
+		Contents: markupContent{Kind: "markdown", Value: macroHoverMarkdown(macro)},
+		Range: lspRange{
+			Start: position{Line: lineNo, Character: utf16Column(code[:start])},
+			End:   position{Line: lineNo, Character: utf16Column(code[:end])},
+		},
+	}
+}
+
+func macroHoverMarkdown(macro patterns.PatternMacro) string {
+	lines := []string{
+		fmt.Sprintf("### `%s`", macro.Name),
+		"",
+		"**Pattern macro**",
+		"",
+		macro.Description,
+		"",
+		"**Regex**",
+		"",
+		"```regex",
+		macro.Pattern,
+		"```",
+		"",
+		"**Syntax**",
+		"",
+		"```drun",
+		fmt.Sprintf("requires $value as string matching %s", macro.Name),
+		"```",
+	}
+	return strings.Join(lines, "\n")
 }
 
 func hoverMarkdown(entry hoverEntry) string {
