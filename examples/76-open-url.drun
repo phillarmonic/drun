@@ -1,0 +1,16 @@
+version: 2.0
+
+# Example 76: Open URL
+# Demonstrates opening URLs and local file paths in the OS default handler.
+
+task "default" means "Describe the open url feature":
+  info "Use 'open url' to launch a URL or local file in the default application."
+  info "In headless/SSH/CI environments a warning with the URL is printed instead."
+  info "Run with --dry-run to see targets without opening them."
+
+task "docs" means "Open project documentation in the browser":
+  let $base = "https://example.com"
+  open url "{$base}/getting-started"
+
+task "coverage" means "Open the HTML coverage report":
+  open url "./coverage/index.html"

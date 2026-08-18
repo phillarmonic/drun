@@ -224,6 +224,18 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Condition: s.Condition,
 		}, nil
 
+	case *ast.WaitStatement:
+		return &Wait{
+			Value: s.Value,
+			Unit:  s.Unit,
+		}, nil
+
+	case *ast.OpenStatement:
+		return &Open{
+			Noun: s.Noun,
+			URL:  s.URL,
+		}, nil
+
 	case *ast.FileStatement:
 		return &File{
 			Action:       s.Action,
@@ -241,6 +253,11 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			Target: s.Target, CaptureVar: s.CaptureVar, Comparison: s.Comparison,
 			Expected: s.Expected, Value: s.Value, MissingPolicy: s.MissingPolicy,
 			ValueType: s.ValueType,
+		}, nil
+
+	case *ast.ChangelogStatement:
+		return &Changelog{
+			Path: s.Path, Version: s.Version, Date: s.Date,
 		}, nil
 
 	case *ast.DetectionStatement:

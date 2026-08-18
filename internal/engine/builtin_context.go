@@ -11,6 +11,7 @@ import (
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/builtins"
 	"github.com/phillarmonic/drun/v2/internal/platform"
+	"github.com/phillarmonic/drun/v2/internal/shell"
 )
 
 // BuiltinContext implements builtins.Context interface for the engine
@@ -41,6 +42,21 @@ func (bc *BuiltinContext) GetSecretsManager() builtins.SecretsManager {
 // IsDryRun returns whether we're in dry-run mode
 func (bc *BuiltinContext) IsDryRun() bool {
 	return bc.dryRun
+}
+
+// GetActiveShell returns the friendly name of the shell drun uses to execute
+// commands, honouring any platform-specific project shell configuration. It
+// backs the {shell} builtin so scripts can branch on the active shell.
+func (bc *BuiltinContext) GetActiveShell() string {
+	shellPath := shell.DefaultShell()
+
+	if bc.execCtx != nil && bc.execCtx.Project != nil && len(bc.execCtx.Project.ShellConfigs) > 0 {
+		if config, ok := bc.execCtx.Project.ShellConfigs[platform.Current()]; ok && config.Executable != "" {
+			shellPath = config.Executable
+		}
+	}
+
+	return shell.Name(shellPath)
 }
 
 // GetTaskNames returns all user-defined tasks available to the current

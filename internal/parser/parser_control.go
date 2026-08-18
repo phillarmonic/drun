@@ -478,19 +478,52 @@ func (p *Parser) parseControlFlowBody() []ast.Statement {
 				}
 			}
 		} else if p.isGitToken(p.curToken.Type) {
-			git := p.parseGitStatement()
-			if git != nil {
-				body = append(body, git)
-			} else if p.peekToken.Type == lexer.VALIDATE {
-				gitValidate := p.parseGitValidateStatement()
-				if gitValidate != nil {
-					body = append(body, gitValidate)
+			if p.curToken.Type == lexer.CREATE {
+				if p.isCreateFileStatementStart() {
+					file := p.parseFileStatement()
+					if file != nil {
+						body = append(body, file)
+					}
+				} else if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
+					git := p.parseGitStatement()
+					if git != nil {
+						body = append(body, git)
+					}
+				} else {
+					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', 'directory', or 'folder'")
 				}
+			} else {
+				git := p.parseGitStatement()
+				if git != nil {
+					body = append(body, git)
+				} else if p.peekToken.Type == lexer.VALIDATE {
+					gitValidate := p.parseGitValidateStatement()
+					if gitValidate != nil {
+						body = append(body, gitValidate)
+					}
+				}
+			}
+		} else if p.isDeleteFileStatementStart() {
+			file := p.parseFileStatement()
+			if file != nil {
+				body = append(body, file)
 			}
 		} else if p.isHTTPToken(p.curToken.Type) {
 			http := p.parseHTTPStatement()
 			if http != nil {
 				body = append(body, http)
+			}
+		} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+			// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+			wait := p.parseWaitStatement()
+			if wait != nil {
+				body = append(body, wait)
+			}
+		} else if p.curToken.Type == lexer.OPEN {
+			// open url "<target>"
+			openStmt := p.parseOpenStatement()
+			if openStmt != nil {
+				body = append(body, openStmt)
 			}
 		} else if p.isNetworkToken(p.curToken.Type) {
 			network := p.parseNetworkStatement()

@@ -16,6 +16,7 @@ import (
 
 var semanticVersionConditionPattern = regexp.MustCompile(`^(.+?)\s+is\s+(older|newer)\s+than\s+version\s+(.+)$`)
 var fileComparisonConditionPattern = regexp.MustCompile(`^file\s+(.+?)\s+(not\s+)?matches\s+file\s+(.+?)\s*$`)
+var portConditionPattern = regexp.MustCompile(`^port\s+(\S+)\s+is\s+(not\s+)?open\s+on\s+(.+?)(?:\s+with\s+timeout\s+(\S+))?\s*$`)
 
 // evaluateFileComparisonCondition handles exact file-content comparisons:
 //
@@ -123,6 +124,62 @@ func (e *Engine) resolveVersionConditionOperand(operand string, ctx *ExecutionCo
 		return "", err
 	}
 	return strings.Trim(strings.TrimSpace(value), `"'`), nil
+}
+
+// evaluatePortCondition handles native TCP port probes:
+//
+//	port 5432 is open on "localhost"
+//	port {db_port} is not open on "{db_host}" with timeout "2s"
+//
+// "Open" means a TCP dial succeeds, i.e. something is listening on the port
+// (the port is in use). Host, port, and timeout support interpolation.
+func (e *Engine) evaluatePortCondition(condition string, ctx *ExecutionContext) (bool, bool, error) {
+	match := portConditionPattern.FindStringSubmatch(strings.TrimSpace(condition))
+	if match == nil {
+		return false, false, nil
+	}
+
+	port, err := e.resolvePortConditionOperand(match[1], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving port: %w", err)
+	}
+	host, err := e.resolvePortConditionOperand(match[3], ctx)
+	if err != nil {
+		return false, true, fmt.Errorf("resolving host: %w", err)
+	}
+	timeout, err := parsePortCheckTimeout(match[4])
+	if err != nil {
+		return false, true, fmt.Errorf("port condition: %w", err)
+	}
+
+	// Dry runs never open connections; treat the port as closed so dependent
+	// branches are skipped rather than executed on a fabricated probe result.
+	if e.dryRun {
+		return false, true, nil
+	}
+
+	endpoint, err := portCheckEndpoint(host, port)
+	if err != nil {
+		return false, true, err
+	}
+
+	open := probeTCPPort(endpoint, timeout) == nil
+	if strings.TrimSpace(match[2]) == "not" {
+		return !open, true, nil
+	}
+	return open, true, nil
+}
+
+func (e *Engine) resolvePortConditionOperand(operand string, ctx *ExecutionContext) (string, error) {
+	value, err := e.interpolateVariablesWithError(strings.TrimSpace(operand), ctx)
+	if err != nil {
+		return "", err
+	}
+	value = strings.Trim(strings.TrimSpace(value), `"'`)
+	if value == "" {
+		return "", fmt.Errorf("value is empty")
+	}
+	return value, nil
 }
 
 // checkConditionForUndefinedVars checks if a condition contains undefined variables
@@ -518,6 +575,13 @@ func (e *Engine) evaluateFilesystemExistsCondition(condition string, ctx *Execut
 
 		remainder := strings.TrimSpace(strings.TrimPrefix(condition, subject.prefix))
 		switch {
+		case strings.HasSuffix(remainder, " does not exist"):
+			path := strings.TrimSpace(strings.TrimSuffix(remainder, " does not exist"))
+			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")
+			if subject.isDir {
+				return !e.dirExists(path, ctx), true
+			}
+			return !e.fileExists(path, ctx), true
 		case strings.HasSuffix(remainder, " not exists"):
 			path := strings.TrimSpace(strings.TrimSuffix(remainder, " not exists"))
 			path = strings.Trim(e.interpolateVariables(path, ctx), "\"'")

@@ -22,9 +22,10 @@ import (
 const (
 	textDocumentSyncFull = 1
 
-	completionItemKindText     = 1
-	completionItemKindFunction = 3
-	completionItemKindKeyword  = 14
+	completionItemKindText      = 1
+	completionItemKindFunction  = 3
+	completionItemKindKeyword   = 14
+	completionTextFormatSnippet = 2
 )
 
 var taskNamePattern = regexp.MustCompile(`(?m)^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
@@ -63,12 +64,16 @@ var keywordCompletions = []completionItem{
 	{Label: "update yaml", Kind: completionItemKindKeyword, Detail: "Update a YAML value"},
 	{Label: "update toml", Kind: completionItemKindKeyword, Detail: "Update a TOML value"},
 	{Label: "update match", Kind: completionItemKindKeyword, Detail: "Update a regular-expression capture"},
+	{Label: "promote changelog", Kind: completionItemKindKeyword, Detail: "Promote unreleased changelog entries to a release section"},
 	{Label: "use workdir", Kind: completionItemKindKeyword, Detail: "Change working directory"},
+	{Label: "wait", Kind: completionItemKindKeyword, Detail: "Pause execution for a fixed duration"},
+	{Label: "wait for service", Kind: completionItemKindKeyword, Detail: "Wait until a service is ready"},
 	{Label: "call task", Kind: completionItemKindKeyword, Detail: "Call another task"},
 	{Label: "orchestrate", Kind: completionItemKindKeyword, Detail: "Orchestration definition or action"},
 	{Label: "service", Kind: completionItemKindKeyword, Detail: "Service definition"},
 	{Label: "attached", Kind: completionItemKindKeyword, Detail: "Interactive run modifier"},
 	{Label: "git policy", Kind: completionItemKindKeyword, Detail: "Git conventions policy block"},
+	{Label: "open url", Kind: completionItemKindKeyword, Detail: "Open a URL or file in the default application"},
 	{Label: "git validate", Kind: completionItemKindKeyword, Detail: "Validate git conventions"},
 	{Label: "branch", Kind: completionItemKindKeyword, Detail: "Branch policy block"},
 	{Label: "default branches", Kind: completionItemKindKeyword, Detail: "Default branch list (inside git policy)"},
@@ -116,11 +121,13 @@ type serverCapabilities struct {
 	TextDocumentSync       int                `json:"textDocumentSync"`
 	CompletionProvider     *completionOptions `json:"completionProvider,omitempty"`
 	HoverProvider          bool               `json:"hoverProvider"`
+	DefinitionProvider     bool               `json:"definitionProvider"`
 	DocumentSymbolProvider bool               `json:"documentSymbolProvider"`
 }
 
 type completionOptions struct {
-	ResolveProvider bool `json:"resolveProvider"`
+	ResolveProvider   bool     `json:"resolveProvider"`
+	TriggerCharacters []string `json:"triggerCharacters,omitempty"`
 }
 
 type serverInfo struct {
@@ -163,6 +170,7 @@ type didCloseParams struct {
 
 type completionParams struct {
 	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
 }
 
 type hoverParams struct {
@@ -203,9 +211,18 @@ type position struct {
 }
 
 type completionItem struct {
-	Label  string `json:"label"`
-	Kind   int    `json:"kind,omitempty"`
-	Detail string `json:"detail,omitempty"`
+	Label            string         `json:"label"`
+	Kind             int            `json:"kind,omitempty"`
+	Detail           string         `json:"detail,omitempty"`
+	Documentation    *markupContent `json:"documentation,omitempty"`
+	InsertText       string         `json:"insertText,omitempty"`
+	InsertTextFormat int            `json:"insertTextFormat,omitempty"`
+	TextEdit         *textEdit      `json:"textEdit,omitempty"`
+}
+
+type textEdit struct {
+	Range   lspRange `json:"range"`
+	NewText string   `json:"newText"`
 }
 
 func NewServer(in io.Reader, out io.Writer) *Server {
@@ -261,9 +278,11 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 				Capabilities: serverCapabilities{
 					TextDocumentSync: textDocumentSyncFull,
 					CompletionProvider: &completionOptions{
-						ResolveProvider: false,
+						ResolveProvider:   false,
+						TriggerCharacters: []string{"@"},
 					},
 					HoverProvider:          true,
+					DefinitionProvider:     true,
 					DocumentSymbolProvider: true,
 				},
 				ServerInfo: serverInfo{
@@ -318,7 +337,7 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			return false, err
 		}
 		text := s.docs[params.TextDocument.URI]
-		items := completionsForSource(params.TextDocument.URI, text)
+		items := completionsForSource(params.TextDocument.URI, text, params.Position)
 		return false, s.writeResponse(message{
 			JSONRPC: "2.0",
 			ID:      msg.ID,
@@ -333,6 +352,16 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 			JSONRPC: "2.0",
 			ID:      msg.ID,
 			Result:  hoverForSource(s.docs[params.TextDocument.URI], params.Position),
+		})
+	case "textDocument/definition":
+		var params definitionParams
+		if err := json.Unmarshal(msg.Params, &params); err != nil {
+			return false, err
+		}
+		return false, s.writeResponse(message{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  definitionsForSource(params.TextDocument.URI, s.docs[params.TextDocument.URI], params.Position),
 		})
 	case "textDocument/documentSymbol":
 		var params documentSymbolParams
@@ -410,9 +439,10 @@ func diagnosticsForSource(uri, text string) []diagnostic {
 	}}
 }
 
-func completionsForSource(uri, text string) []completionItem {
-	items := make([]completionItem, 0, len(keywordCompletions)+8)
+func completionsForSource(uri, text string, positions ...position) []completionItem {
+	items := make([]completionItem, 0, len(keywordCompletions)+len(annotationEntries)+8)
 	items = append(items, keywordCompletions...)
+	items = append(items, annotationCompletionItems(annotationCompletionRange(text, positions...))...)
 
 	seen := map[string]struct{}{}
 	for _, item := range items {

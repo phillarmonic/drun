@@ -245,7 +245,22 @@ func (p *Parser) isDetectionContext() bool {
 		return true
 	case lexer.IF:
 		// Check if this is "if <tool> is available" or "if <tool> version ..."
-		return p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING
+		if p.peekToken.Type == lexer.STRING {
+			return true
+		}
+		// A tool name alone is not enough: resource conditions such as
+		// "if docker network "proxy" exists" belong to the generic conditional.
+		// Detection forms always continue with is/are, a version comparison,
+		// or a comma-separated tool list.
+		if p.isToolToken(p.peekToken.Type) {
+			switch p.peekSecondToken().Type {
+			case lexer.IS, lexer.ARE, lexer.VERSION, lexer.COMMA:
+				return true
+			default:
+				return false
+			}
+		}
+		return false
 	case lexer.WHEN:
 		// Check if this is "when in <environment> environment"
 		return p.peekToken.Type == lexer.IN

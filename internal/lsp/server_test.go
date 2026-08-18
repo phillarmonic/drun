@@ -162,6 +162,7 @@ func TestHoverCoversCommonStatementsAndIgnoresStringsAndComments(t *testing.T) {
 		{"task", `task "build":`, 1, "Task declaration"},
 		{"longest phrase", `  call task "build"`, 8, "Call another task"},
 		{"file value", `  update json "/version" in "package.json" to "2"`, 5, "Update a JSON value"},
+		{"changelog promotion", `  promote changelog "CHANGELOG.md" to version "1.5.0"`, 5, "Promote unreleased changelog entries"},
 		{"control flow", `  for each $item in $items:`, 7, "Collection loop"},
 		{"tool requirements", `  requires tools:`, 12, "Tool requirements"},
 		{"unicode column", `é task "build":`, 3, ""},
@@ -181,6 +182,142 @@ func TestHoverCoversCommonStatementsAndIgnoresStringsAndComments(t *testing.T) {
 			}
 			if got == nil || !strings.Contains(got.Contents.Value, test.want) {
 				t.Fatalf("hoverForSource() = %#v, want contents containing %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestServerAdvertisesAndReturnsDefinition(t *testing.T) {
+	source := "version: 2.0\n\ntask \"lint\":\n  run \"golangci-lint run\"\n\ntask \"build\":\n  call task lint\n"
+	input := joinFrames(
+		frame(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`),
+		frame(fmt.Sprintf(`{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///workspace/spec.drun","languageId":"drun","version":1,"text":%q}}}`, source)),
+		frame(`{"jsonrpc":"2.0","id":2,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///workspace/spec.drun"},"position":{"line":6,"character":13}}}`),
+		frame(`{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`),
+		frame(`{"jsonrpc":"2.0","method":"exit","params":{}}`),
+	)
+
+	var output bytes.Buffer
+	if err := NewServer(bytes.NewReader(input), &output).Run(); err != nil {
+		t.Fatalf("server run failed: %v", err)
+	}
+
+	messages := decodeFrames(t, output.Bytes())
+	var initializeMsg, definitionMsg message
+	for _, msg := range messages {
+		switch string(msg.ID) {
+		case "1":
+			initializeMsg = msg
+		case "2":
+			definitionMsg = msg
+		}
+	}
+
+	var initialized initializeResult
+	if err := json.Unmarshal(mustMarshal(initializeMsg.Result), &initialized); err != nil {
+		t.Fatalf("unmarshal initialize result: %v", err)
+	}
+	if !initialized.Capabilities.DefinitionProvider {
+		t.Fatal("expected definitionProvider capability")
+	}
+
+	var locations []location
+	if err := json.Unmarshal(mustMarshal(definitionMsg.Result), &locations); err != nil {
+		t.Fatalf("unmarshal definition result: %v", err)
+	}
+	if len(locations) != 1 {
+		t.Fatalf("expected one definition location, got %#v", locations)
+	}
+	got := locations[0]
+	if got.URI != "file:///workspace/spec.drun" {
+		t.Fatalf("unexpected definition URI: %q", got.URI)
+	}
+	if got.Range.Start.Line != 2 || got.Range.Start.Character != 6 || got.Range.End.Character != 10 {
+		t.Fatalf("unexpected definition range: %#v", got.Range)
+	}
+}
+
+func TestDefinitionsForSource(t *testing.T) {
+	source := `version: 2.0
+
+snippet "greet":
+  info "hello"
+
+task "lint":
+  run "golangci-lint run"
+
+template task "scaffold":
+  run "cookiecutter ."
+
+task "release":
+  run "goreleaser release"
+
+task "build":
+  depends on lint, scaffold and then "release"
+  call task "lint"
+  call task scaffold
+  use snippet "greet"
+`
+	const uri = "file:///workspace/spec.drun"
+
+	tests := []struct {
+		name      string
+		line      int
+		character int
+		wantLine  int
+		wantStart int
+		wantEnd   int
+	}{
+		{"quoted call task", 16, 14, 5, 6, 10},
+		{"bare call task to template", 17, 14, 8, 15, 23},
+		{"depends on first", 15, 15, 5, 6, 10},
+		{"depends on template", 15, 22, 8, 15, 23},
+		{"depends on quoted", 15, 40, 11, 6, 13},
+		{"use snippet", 18, 16, 2, 9, 14},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			locations := definitionsForSource(uri, source, position{Line: test.line, Character: test.character})
+			if len(locations) != 1 {
+				t.Fatalf("definitionsForSource() = %#v, want one location", locations)
+			}
+			got := locations[0]
+			if got.URI != uri {
+				t.Fatalf("definition URI = %q, want %q", got.URI, uri)
+			}
+			want := lspRange{
+				Start: position{Line: test.wantLine, Character: test.wantStart},
+				End:   position{Line: test.wantLine, Character: test.wantEnd},
+			}
+			if got.Range != want {
+				t.Fatalf("definition range = %#v, want %#v", got.Range, want)
+			}
+		})
+	}
+}
+
+func TestDefinitionsForSourceReturnsNilWithoutReference(t *testing.T) {
+	source := "version: 2.0\n\ntask \"lint\":\n  run \"golangci-lint run\"\n  call task missing\n  # call task lint\n"
+	const uri = "file:///workspace/spec.drun"
+
+	tests := []struct {
+		name      string
+		line      int
+		character int
+	}{
+		{"cursor on keyword", 4, 3},
+		{"cursor elsewhere on call line", 4, 1},
+		{"unrelated statement", 3, 5},
+		{"unknown task", 4, 14},
+		{"commented call", 5, 13},
+		{"line out of range", 42, 0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := definitionsForSource(uri, source, position{Line: test.line, Character: test.character}); got != nil {
+				t.Fatalf("definitionsForSource() = %#v, want nil", got)
 			}
 		})
 	}

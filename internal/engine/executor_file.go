@@ -15,8 +15,8 @@ import (
 // executeFile executes a file operation statement
 func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) error {
 	// Interpolate variables in paths and content
-	target := e.interpolateVariables(fileStmt.Target, ctx)
-	source := e.interpolateVariables(fileStmt.Source, ctx)
+	target := expandFilesystemPath(e.interpolateVariables(fileStmt.Target, ctx))
+	source := expandFilesystemPath(e.interpolateVariables(fileStmt.Source, ctx))
 	content := e.interpolateVariables(fileStmt.Content, ctx)
 
 	replacements := make(map[string]string, len(fileStmt.Replacements))
@@ -67,11 +67,16 @@ func (e *Engine) executeFile(fileStmt *statement.File, ctx *ExecutionContext) er
 		op.Target = target
 		op.Type = "copy" // Backup is essentially a copy operation
 	case "check_exists":
-		// Check if file exists
-		if e.fileExists(target, ctx) {
-			_, _ = fmt.Fprintf(e.output, "✅  File exists: %s\n", target)
+		kind := "File"
+		exists := e.fileExists(target, ctx)
+		if fileStmt.IsDir {
+			kind = "Directory"
+			exists = e.dirExists(target, ctx)
+		}
+		if exists {
+			_, _ = fmt.Fprintf(e.output, "✅  %s exists: %s\n", kind, target)
 		} else {
-			_, _ = fmt.Fprintf(e.output, "❌  File does not exist: %s\n", target)
+			_, _ = fmt.Fprintf(e.output, "❌  %s does not exist: %s\n", kind, target)
 		}
 		return nil
 	case "get_size":

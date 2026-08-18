@@ -4,6 +4,8 @@ set -euo pipefail
 # drun installer script
 # Usage: curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
 # Usage: curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v1.0.0
+# Usage: curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- /usr/local/bin
+# Usage: curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- v1.0.0 /usr/local/bin
 
 # Configuration
 REPO="phillarmonic/drun"
@@ -162,6 +164,46 @@ validate_version() {
         log_error "Expected format: v1.0.0 or v1.0.0-beta.1"
         exit 1
     fi
+}
+
+# Parse an optional version and install directory while preserving the existing
+# single-version argument.
+parse_arguments() {
+    REQUESTED_VERSION=""
+
+    if [[ $# -gt 2 ]]; then
+        log_error "Too many arguments"
+        show_usage
+        exit 1
+    fi
+
+    local first_argument="${1:-}"
+
+    if [[ "$first_argument" == "-h" || "$first_argument" == "--help" ]]; then
+        show_usage
+        exit 0
+    fi
+
+    if [[ -z "$first_argument" ]]; then
+        return
+    fi
+
+    if [[ "$first_argument" == v* ]]; then
+        validate_version "$first_argument"
+        REQUESTED_VERSION="$first_argument"
+        if [[ $# -eq 2 ]]; then
+            INSTALL_DIR="$2"
+        fi
+        return
+    fi
+
+    if [[ $# -eq 2 ]]; then
+        log_error "The first argument must be a version when an install directory is provided as the second argument"
+        show_usage
+        exit 1
+    fi
+
+    INSTALL_DIR="$first_argument"
 }
 
 # Check if version exists
@@ -387,14 +429,25 @@ drun installer
 
 USAGE:
     curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
-    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s [VERSION]
+    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- [VERSION] [INSTALL_DIR]
 
 EXAMPLES:
     # Install latest version
     curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash
     
     # Install specific version
-    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s v1.0.0
+    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- v1.0.0
+
+    # Install latest version to a custom directory
+    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- /usr/local/bin
+
+    # Install specific version to a custom directory
+    curl -sSL https://raw.githubusercontent.com/phillarmonic/drun/master/install.sh | bash -s -- v1.0.0 /usr/local/bin
+
+ARGUMENTS:
+    VERSION        Release tag to install (default: latest)
+    INSTALL_DIR    Installation directory
+                   (default: $HOME/.local/bin on Unix, $HOME/bin on Windows)
 
 ENVIRONMENT VARIABLES:
     INSTALL_DIR    Installation directory 
@@ -416,13 +469,8 @@ EOF
 
 # Main installation function
 main() {
-    local version="${1:-}"
-    
-    # Show help if requested
-    if [[ "$version" == "-h" || "$version" == "--help" ]]; then
-        show_usage
-        exit 0
-    fi
+    parse_arguments "$@"
+    local version="$REQUESTED_VERSION"
     
     echo "🚀 drun installer"
     echo "=================="

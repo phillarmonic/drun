@@ -876,21 +876,18 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 				// Special handling for CREATE token - check context
 				if p.curToken.Type == lexer.CREATE {
 					// Look ahead to determine if this is git or file operation
-					if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
-						git := p.parseGitStatement()
-						if git != nil {
-							hook.Body = append(hook.Body, git)
-						}
-					} else if p.peekToken.Type == lexer.DIRECTORY || p.peekToken.Type == lexer.DIR || (p.peekToken.Type == lexer.IDENT && p.peekToken.Literal == "file") {
+					if p.isCreateFileStatementStart() {
 						file := p.parseFileStatement()
 						if file != nil {
 							hook.Body = append(hook.Body, file)
 						}
-					} else {
+					} else if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
 						git := p.parseGitStatement()
 						if git != nil {
 							hook.Body = append(hook.Body, git)
 						}
+					} else {
+						p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', 'directory', or 'folder'")
 					}
 				} else {
 					git := p.parseGitStatement()
@@ -903,10 +900,21 @@ func (p *Parser) parseLifecycleHook() *ast.LifecycleHook {
 						}
 					}
 				}
+			} else if p.isDeleteFileStatementStart() {
+				file := p.parseFileStatement()
+				if file != nil {
+					hook.Body = append(hook.Body, file)
+				}
 			} else if p.isHTTPToken(p.curToken.Type) {
 				http := p.parseHTTPStatement()
 				if http != nil {
 					hook.Body = append(hook.Body, http)
+				}
+			} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+				// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
+				wait := p.parseWaitStatement()
+				if wait != nil {
+					hook.Body = append(hook.Body, wait)
 				}
 			} else if p.isNetworkToken(p.curToken.Type) {
 				network := p.parseNetworkStatement()

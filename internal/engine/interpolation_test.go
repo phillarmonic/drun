@@ -10,6 +10,7 @@ import (
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 	"github.com/phillarmonic/drun/v2/internal/parser"
+	"github.com/phillarmonic/drun/v2/internal/shell"
 	"github.com/phillarmonic/drun/v2/internal/types"
 )
 
@@ -379,6 +380,36 @@ func TestInterpolateVariablesFunction(t *testing.T) {
 				t.Errorf("Expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestNormalizedForShellOperation(t *testing.T) {
+	engine := NewEngine(nil)
+
+	ctx := &ExecutionContext{
+		Parameters: make(map[string]*types.Value),
+		Variables:  make(map[string]string),
+	}
+	raw := `C:\Users\lab\AppData\Local\Programs\xdrun\`
+	typedValue, err := types.NewValue(types.StringType, raw)
+	if err != nil {
+		t.Fatalf("Failed to create typed value: %v", err)
+	}
+	ctx.Parameters["path"] = typedValue
+
+	// The operation normalizes for whichever shell drun resolved on this
+	// platform, so compare against the same helper the engine uses.
+	opts := engine.getPlatformShellConfig(ctx)
+	want := shell.NormalizePath(raw, shell.IsPOSIXShell(opts.Shell))
+
+	got := engine.interpolateVariables("{$path normalized for shell}", ctx)
+	if got != want {
+		t.Errorf("normalized for shell = %q, want %q", got, want)
+	}
+
+	// A trailing separator must never survive normalization.
+	if strings.HasSuffix(got, "/") || strings.HasSuffix(got, `\`) {
+		t.Errorf("normalized path retained a trailing separator: %q", got)
 	}
 }
 

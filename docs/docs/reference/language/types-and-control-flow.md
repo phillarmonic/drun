@@ -238,6 +238,69 @@ when node project exists:
   use npm or yarn
 ```
 
+Filesystem condition paths expand the current user's home directory and process
+environment variables before they are resolved against the task workdir. The
+supported forms are `~`, `~/path`, `$NAME/path`, and `${NAME}/path`. Undefined
+environment variables and named-user home paths such as `~generic/path` remain
+literal.
+
+```drun
+if folder "~/Library/Audio/Plug-Ins/VST3" exists:
+  info "The macOS VST3 folder exists"
+
+if folder "$HOME/.config/example" not exists:
+  warning "The example configuration folder is missing"
+
+if directory "$HOME/.cache/example" does not exist:
+  create folder "$HOME/.cache/example"
+```
+
+`folder`, `directory`, and `dir` are interchangeable. The negative existence
+forms `not exists` and `does not exist` are also equivalent.
+
+#### Port Conditions
+
+A port condition probes a TCP port natively (no external tools) and branches on
+whether something is listening:
+
+```drun
+if port 5432 is open on "localhost":
+  info "PostgreSQL is already running"
+else:
+  start local database container
+
+if port {redis_port} is not open on "{redis_host}" with timeout "2s":
+  info "Redis is down - skipping cache warmup"
+```
+
+`is open` is true when a TCP dial succeeds, i.e. the port is in use. Host,
+port, and the optional `with timeout` value all support interpolation; the
+timeout accepts Go durations (`"2s"`) or bare seconds and defaults to 5
+seconds. In `--dry-run` mode no connection is opened and the condition
+evaluates as if the port were closed.
+
+#### Docker Conditions
+
+A Docker condition asks the Docker daemon whether a resource exists and
+branches on the answer. Networks are supported:
+
+```drun
+if docker network "proxy" exists:
+  info "Reusing the existing proxy network"
+else:
+  call task "create-proxy-network"
+
+when docker network "{app_network}" not exists:
+  warn "Network {app_network} is missing - orchestration will create it"
+otherwise:
+  info "Network ready"
+```
+
+The network name supports interpolation. In `--dry-run` mode the daemon is not
+queried and the condition evaluates as if the network were missing. The
+`docker <resource> "<name>" [not] exists` shape is designed to grow further
+resource variants (containers, images, volumes) over time.
+
 #### Compound Conditions
 
 ```drun
@@ -281,20 +344,18 @@ run in parallel:
 wait for all to complete
 ```
 
-#### Range Iteration
+#### Retry with Backoff
+
+Pause between attempts with a fixed `wait` (seconds, minutes, or hours):
 
 ```drun
-for port from 3000 to 3005:
-  check if port {port} is available
-
-for i from 1 to retry_count:
+for each $attempt in ["1", "2", "3"]:
   try:
-    perform operation
+    run "./flaky-deploy.sh"
     break
   catch:
-    if i == retry_count:
-      fail "Max retries exceeded"
-    wait {i} seconds
+    warn "Attempt {$attempt} failed, backing off"
+    wait {$attempt} seconds
 ```
 
 #### Filtered Iteration

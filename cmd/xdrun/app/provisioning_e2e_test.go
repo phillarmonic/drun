@@ -18,6 +18,7 @@ var (
 )
 
 func TestXdrunProvisioningE2E_ProjectSourceOverridesUserSource(t *testing.T) {
+	skipOnWindowsPOSIXShell(t)
 	workspace := t.TempDir()
 	homeDir := filepath.Join(workspace, "home")
 	binDir := filepath.Join(workspace, "bin")
@@ -76,6 +77,7 @@ provisionings:
 }
 
 func TestXdrunProvisioningE2E_ExactVersionRequiresFlagAndThenSucceeds(t *testing.T) {
+	skipOnWindowsPOSIXShell(t)
 	workspace := t.TempDir()
 	homeDir := filepath.Join(workspace, "home")
 	binDir := filepath.Join(workspace, "bin")
@@ -136,6 +138,7 @@ provisionings:
 }
 
 func TestXdrunProvisioningE2E_EmbeddedFallbackReportsPostProvisionFailure(t *testing.T) {
+	skipOnWindowsPOSIXShell(t)
 	workspace := t.TempDir()
 	homeDir := filepath.Join(workspace, "home")
 	binDir := filepath.Join(workspace, "bin")

@@ -2,9 +2,11 @@ package app
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -139,11 +141,13 @@ task "default" means "Welcome":
 `
 
 	originalFetcher := initTemplateContentFetcher
+	manifestKey := filepath.Join("/tmp/official", "templates.yaml")
+	templateKey := filepath.Join("/tmp/official", "go-cli.drun")
 	initTemplateContentFetcher = func(url string) ([]byte, error) {
 		switch url {
-		case "/tmp/official/templates.yaml":
+		case manifestKey:
 			return []byte(manifest), nil
-		case "/tmp/official/go-cli.drun":
+		case templateKey:
 			return []byte(templateSpec), nil
 		default:
 			return nil, os.ErrNotExist
@@ -345,7 +349,7 @@ templates:
 	if err != nil {
 		t.Fatalf("loadInitTemplateManifest() error = %v", err)
 	}
-	if loaded.Templates[0].Source != "/catalog/templates/go-cli.drun" {
+	if loaded.Templates[0].Source != filepath.FromSlash("/catalog/templates/go-cli.drun") {
 		t.Fatalf("resolved source = %q", loaded.Templates[0].Source)
 	}
 }
@@ -410,8 +414,9 @@ templates:
 `
 
 	originalFetcher := initTemplateContentFetcher
+	manifestKey := filepath.Join("/catalog", "templates.yaml")
 	initTemplateContentFetcher = func(url string) ([]byte, error) {
-		if url == "/catalog/templates.yaml" {
+		if url == manifestKey {
 			return []byte(manifest), nil
 		}
 		return nil, os.ErrNotExist
@@ -425,7 +430,7 @@ templates:
 		}
 	})
 
-	if !strings.Contains(output, "Available init templates (/catalog/templates.yaml):") {
+	if !strings.Contains(output, fmt.Sprintf("Available init templates (%s):", manifestKey)) {
 		t.Fatalf("unexpected list output:\n%s", output)
 	}
 	if !strings.Contains(output, "  - api\n") || !strings.Contains(output, "  - go-cli: Go CLI starter\n") {
@@ -438,7 +443,7 @@ func TestResolveDefaultTemplateManifestPrefersTemplatesRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolveDefaultTemplateManifest() error = %v", err)
 	}
-	if manifest != "/workspace/drun-templates/templates.yaml" {
+	if manifest != filepath.Join("/workspace/drun-templates", "templates.yaml") {
 		t.Fatalf("manifest = %q", manifest)
 	}
 }
@@ -707,6 +712,19 @@ func withWorkingDir(t *testing.T, dir string, fn func()) {
 func withEnv(t *testing.T, key, value string, fn func()) {
 	t.Helper()
 
+	setEnv(t, key, value)
+	// os.UserHomeDir() reads USERPROFILE on Windows, so mirror HOME there to
+	// keep home-directory overrides working across platforms.
+	if key == "HOME" && runtime.GOOS == "windows" {
+		setEnv(t, "USERPROFILE", value)
+	}
+
+	fn()
+}
+
+func setEnv(t *testing.T, key, value string) {
+	t.Helper()
+
 	originalValue, hadValue := os.LookupEnv(key)
 	if err := os.Setenv(key, value); err != nil {
 		t.Fatalf("Setenv(%q) error = %v", key, err)
@@ -723,6 +741,4 @@ func withEnv(t *testing.T, key, value string, fn func()) {
 			t.Fatalf("restore env %q error = %v", key, err)
 		}
 	})
-
-	fn()
 }

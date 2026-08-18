@@ -55,6 +55,16 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.lexer.NextToken()
 }
 
+// peekSecondToken returns the token after peekToken without consuming it.
+// The lexer state is a flat struct, so a value copy snapshots it; this must
+// only be used mid-line (no INDENT/DEDENT bookkeeping in between).
+func (p *Parser) peekSecondToken() lexer.Token {
+	saved := *p.lexer
+	token := p.lexer.NextToken()
+	*p.lexer = saved
+	return token
+}
+
 // ParseProgram parses the entire program
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}

@@ -768,4 +768,45 @@ finally:
   cleanup temporary resources
 ```
 
+### Wait Statements
+
+Pause execution for a fixed duration before continuing:
+
+```drun
+wait <number> <unit>
+wait {<variable>} <unit>
+```
+
+Where `<unit>` is `second`/`seconds`, `minute`/`minutes`, or `hour`/`hours`.
+
+```drun
+wait 5 seconds
+wait 1 minute
+wait {$backoff} seconds
+```
+
+To wait until a service responds instead of for a fixed duration, see
+`wait for service at "url" to be ready` in
+[Built-in Actions](./built-in-actions.md#network-health-checks-and-service-waiting).
+
+### Open URL
+
+```
+open url "<target>"
+```
+
+Opens a URL or local file path in the OS default handler. The target may
+contain `{variable}` interpolation. Local paths (those without a `://` scheme)
+are resolved to absolute paths before opening.
+
+```drun
+open url "https://example.com/docs"
+open url "{$base_url}/releases/tag/v{$version}"
+open url "./coverage/index.html"
+```
+
+On headless machines, SSH sessions, and CI environments the statement prints a
+warning with the URL and continues without failing. See
+[Built-in Actions](./built-in-actions.md#opening-a-url-or-file) for details.
+
 ---
