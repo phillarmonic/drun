@@ -359,16 +359,19 @@ add_to_windows_path() {
 add_to_shell_profile() {
     local dir_to_add="$1"
     local profile_file="$HOME/.bashrc"
-    
-    # Check for other common shell profiles
-    if [[ -f "$HOME/.zshrc" ]]; then
+
+    if [[ "$PLATFORM_OS" == "darwin" && "${SHELL:-}" == */zsh ]]; then
+        # macOS default shell is zsh; login shells (and tools that resolve
+        # commands through `$SHELL -l`) read .zprofile, not .zshrc.
+        profile_file="$HOME/.zprofile"
+    elif [[ -f "$HOME/.zshrc" ]]; then
         profile_file="$HOME/.zshrc"
     elif [[ -f "$HOME/.bash_profile" ]]; then
         profile_file="$HOME/.bash_profile"
     fi
-    
+
     local path_export="export PATH=\"\$PATH:$dir_to_add\""
-    
+
     # Check if already in profile
     if [[ -f "$profile_file" ]] && grep -q "$dir_to_add" "$profile_file"; then
         log_info "$dir_to_add already in $profile_file"
