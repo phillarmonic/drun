@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -62,6 +63,17 @@ func (e *Engine) executeGitEnsureVersion(guard *statement.GitEnsureVersion, ctx 
 	}
 	latestResult, err := query.Execute(context.Background(), session, source)
 	if err != nil {
+		if errors.Is(err, scm.ErrNoMatchingVersionTags) {
+			// No prior version exists on the source yet: the candidate is
+			// trivially the first release, so the guard passes loosely.
+			if guard.CaptureVar != "" {
+				ctx.Variables[guard.CaptureVar] = ""
+				_, _ = fmt.Fprintf(e.output, "✅  Version %s accepted; no prior version tags found on %s, captured latest as empty $%s\n", candidate.Raw, guard.Source, guard.CaptureVar)
+			} else {
+				_, _ = fmt.Fprintf(e.output, "✅  Version %s accepted; no prior version tags found on %s\n", candidate.Raw, guard.Source)
+			}
+			return nil
+		}
 		return fmt.Errorf("git ensure source %q cannot resolve latest stable version: %w", guard.Source, err)
 	}
 	latest := latestResult.Version
