@@ -10,7 +10,11 @@ task "throw test" means "Test throw statements":
 	success "This should not be reached"
 
 task "ignore test" means "Test ignore statements":
-	info "Testing ignore functionality"
-	ignore
+	info "Testing ignore inside a catch block"
+	try:
+		throw "expected hiccup"
+	catch:
+		info "Ignoring the expected hiccup"
+		ignore
 	success "Ignore test completed!"
 

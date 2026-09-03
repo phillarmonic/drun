@@ -99,6 +99,7 @@ type Loop struct {
 	RangeStart string
 	RangeEnd   string
 	RangeStep  string
+	Subject    string // match loops: the $variable the pattern is matched against
 	Filter     *Filter
 	Parallel   bool
 	MaxWorkers int

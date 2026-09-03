@@ -51,6 +51,7 @@ type LoopStatement struct {
 	RangeStart string
 	RangeEnd   string
 	RangeStep  string
+	Subject    string // match loops: the $variable the pattern is matched against
 	Filter     *FilterExpression
 	Parallel   bool
 	MaxWorkers int
@@ -84,6 +85,10 @@ func (ls *LoopStatement) String() string {
 		out.WriteString(ls.Variable)
 		out.WriteString(" in pattern ")
 		out.WriteString(ls.Iterable)
+		if ls.Subject != "" {
+			out.WriteString(" of ")
+			out.WriteString(ls.Subject)
+		}
 	default: // "each"
 		out.WriteString("for each ")
 		out.WriteString(ls.Variable)

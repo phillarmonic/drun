@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -196,7 +197,8 @@ func TestParser_MatchLoop(t *testing.T) {
 	input := `version: 2.0
 
 task "match_test":
-  for each match result in pattern "[0-9]+":
+  given $log defaults to "abc123def456"
+  for each match result in pattern "[0-9]+" of $log:
     info "Found number: {result}"
     
   success "Match loop completed!"`
@@ -227,6 +229,36 @@ task "match_test":
 
 	if loopStmt.Iterable != "[0-9]+" {
 		t.Errorf("loop iterable not '[0-9]+'. got=%q", loopStmt.Iterable)
+	}
+
+	if loopStmt.Subject != "$log" {
+		t.Errorf("loop subject not '$log'. got=%q", loopStmt.Subject)
+	}
+}
+
+func TestParser_MatchLoopRequiresSubject(t *testing.T) {
+	input := `version: 2.0
+
+task "match_test":
+  for each match result in pattern "[0-9]+":
+    info "Found number: {result}"`
+
+	l := lexer.NewLexer(input)
+	p := NewParser(l)
+	_ = p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Fatalf("expected parse error for subject-less match loop, got none")
+	}
+
+	foundHelpful := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "subject") {
+			foundHelpful = true
+		}
+	}
+	if !foundHelpful {
+		t.Errorf("expected an error message mentioning a subject, got: %v", p.Errors())
 	}
 }
 
