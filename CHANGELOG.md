@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [2.29.0] - 2026-09-03
+
+### Added
+
 - Added the `now` built-in function: `{now}` (and `capture <name> from now`) returns the current Unix time in seconds, letting tasks record timestamps for timing purposes.
 
 ### Changed
