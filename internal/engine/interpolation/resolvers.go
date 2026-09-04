@@ -86,11 +86,11 @@ func (i *Interpolator) resolveSimpleVariableDirectly(variable string, ctx Contex
 }
 
 // resolveExpression resolves various types of expressions
-func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
+func (i *Interpolator) resolveExpression(expr string, ctx Context, builtinErrors *[]string) string {
 	// 0. Check for conditional expressions (ternary and if-then-else)
 	// Ternary: "$var ? 'true_val' : 'false_val'"
 	if strings.Contains(expr, "?") && strings.Contains(expr, ":") {
-		result, matched := i.resolveTernaryExpression(expr, ctx)
+		result, matched := i.resolveTernaryExpression(expr, ctx, builtinErrors)
 		if matched {
 			return result // Return even if empty string
 		}
@@ -98,7 +98,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 
 	// If-then-else: "if $var then 'val1' else 'val2'" or "if $var is 'value' then 'val1' else 'val2'"
 	if strings.HasPrefix(strings.TrimSpace(expr), "if ") && strings.Contains(expr, " then ") && strings.Contains(expr, " else ") {
-		result, matched := i.resolveIfThenElse(expr, ctx)
+		result, matched := i.resolveIfThenElse(expr, ctx, builtinErrors)
 		if matched {
 			return result // Return even if empty string
 		}
@@ -151,7 +151,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 				return result
 			} else {
 				// Builtin function failed - capture error for later reporting
-				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 				return "" // Return empty to avoid printing literal
 			}
 		}
@@ -160,7 +160,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 			return result
 		} else {
 			// Builtin function failed - capture error for later reporting
-			i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+			*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 			return "" // Return empty to avoid printing literal
 		}
 	}
@@ -181,7 +181,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 					return result
 				} else {
 					// Builtin function failed - capture error for later reporting
-					i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+					*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 					return "" // Return empty to avoid printing literal
 				}
 			}
@@ -190,7 +190,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 				return result
 			} else {
 				// Builtin function failed - capture error for later reporting
-				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 				return "" // Return empty to avoid printing literal
 			}
 		}
@@ -208,14 +208,14 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 				if result, err := i.resolveBuiltin(funcName, args, ctx); err == nil {
 					return result
 				} else {
-					i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+					*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 					return ""
 				}
 			}
 			if result, err := builtins.CallBuiltinLegacy(funcName, args...); err == nil {
 				return result
 			} else {
-				i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+				*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 				return ""
 			}
 		}
@@ -236,7 +236,7 @@ func (i *Interpolator) resolveExpression(expr string, ctx Context) string {
 						return result
 					} else {
 						// Builtin function failed - capture error for later reporting
-						i.builtinErrors = append(i.builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
+						*builtinErrors = append(*builtinErrors, fmt.Sprintf("{%s}: %s", expr, err.Error()))
 						return "" // Return empty to avoid printing literal
 					}
 				}

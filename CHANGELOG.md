@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `capture <name> from <expression>` storing the raw expression text: it now interpolates/evaluates the expression like `let`/`set`, and bare `from now` stores the `now` builtin's epoch-seconds timestamp.
 - Fixed `accepts $x as list of <elem>` failing validation with "unknown data type: list of ..." at runtime. List parameters now require a list value and validate every element against the declared element type (`list of strings`, `list of numbers`, `list of booleans`); unknown element types are reported clearly.
 - Fixed unquoted non-keyword tool names in availability conditions silently evaluating false: `if my-fake-tool is available` now checks the tool (any bare identifier followed by `is`/`are` + `available`/`running`/`not available`/`not running` or a comma-separated tool list), while generic comparisons such as `if tags is not empty:` remain ordinary conditionals.
+- Fixed data races when `for each ... in parallel`/range bodies run concurrently: builtin-error collection is now per interpolation call and engine output writes are synchronized, so the race detector (`go test -race`) no longer trips on parallel loops. Loop tests that embed temp-file paths now use forward slashes so they are not corrupted by drun string-literal escape handling on Windows CI.
 
 ### Security
 

@@ -6,7 +6,7 @@ import (
 
 // resolveTernaryExpression resolves ternary conditional expressions: $var ? 'true_val' : 'false_val'
 // Returns (result, matched) where matched indicates if this was a valid ternary expression
-func (i *Interpolator) resolveTernaryExpression(expr string, ctx Context) (string, bool) {
+func (i *Interpolator) resolveTernaryExpression(expr string, ctx Context, builtinErrors *[]string) (string, bool) {
 	// Find the ? and : positions
 	questionPos := strings.Index(expr, "?")
 	colonPos := strings.LastIndex(expr, ":")
@@ -24,7 +24,7 @@ func (i *Interpolator) resolveTernaryExpression(expr string, ctx Context) (strin
 	conditionValue, found := i.resolveSimpleVariableDirectly(condition, ctx)
 	if !found {
 		// Try resolving as expression
-		conditionValue = i.resolveExpression(condition, ctx)
+		conditionValue = i.resolveExpression(condition, ctx, builtinErrors)
 	}
 
 	// Evaluate condition as boolean
@@ -44,7 +44,7 @@ func (i *Interpolator) resolveTernaryExpression(expr string, ctx Context) (strin
 //   - if $var is not 'value' then 'val1' else 'val2'
 //
 // Returns (result, matched) where matched indicates if this was a valid if-then-else expression
-func (i *Interpolator) resolveIfThenElse(expr string, ctx Context) (string, bool) {
+func (i *Interpolator) resolveIfThenElse(expr string, ctx Context, builtinErrors *[]string) (string, bool) {
 	expr = strings.TrimSpace(expr)
 
 	// Must start with "if "
@@ -66,7 +66,7 @@ func (i *Interpolator) resolveIfThenElse(expr string, ctx Context) (string, bool
 	falseValue := strings.TrimSpace(expr[elsePos+6:])         // Skip " else "
 
 	// Evaluate the condition
-	isTrue := i.evaluateIfCondition(conditionPart, ctx)
+	isTrue := i.evaluateIfCondition(conditionPart, ctx, builtinErrors)
 
 	// Return the appropriate value (unquote if needed)
 	if isTrue {
@@ -76,14 +76,14 @@ func (i *Interpolator) resolveIfThenElse(expr string, ctx Context) (string, bool
 }
 
 // evaluateIfCondition evaluates the condition part of an if-then-else expression
-func (i *Interpolator) evaluateIfCondition(condition string, ctx Context) bool {
+func (i *Interpolator) evaluateIfCondition(condition string, ctx Context, builtinErrors *[]string) bool {
 	condition = strings.TrimSpace(condition)
 
 	// Check for "is not" comparison
 	if strings.Contains(condition, " is not ") {
 		parts := strings.SplitN(condition, " is not ", 2)
 		if len(parts) == 2 {
-			leftValue := i.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
+			leftValue := i.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx, builtinErrors)
 			rightValue := i.unquoteString(strings.TrimSpace(parts[1]))
 			return leftValue != rightValue
 		}
@@ -93,19 +93,19 @@ func (i *Interpolator) evaluateIfCondition(condition string, ctx Context) bool {
 	if strings.Contains(condition, " is ") {
 		parts := strings.SplitN(condition, " is ", 2)
 		if len(parts) == 2 {
-			leftValue := i.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx)
+			leftValue := i.resolveVariableOrValue(strings.TrimSpace(parts[0]), ctx, builtinErrors)
 			rightValue := i.unquoteString(strings.TrimSpace(parts[1]))
 			return leftValue == rightValue
 		}
 	}
 
 	// Simple boolean check - resolve the variable and check if it's truthy
-	value := i.resolveVariableOrValue(condition, ctx)
+	value := i.resolveVariableOrValue(condition, ctx, builtinErrors)
 	return i.isTruthy(value)
 }
 
 // resolveVariableOrValue resolves a variable or returns the literal value
-func (i *Interpolator) resolveVariableOrValue(expr string, ctx Context) string {
+func (i *Interpolator) resolveVariableOrValue(expr string, ctx Context, builtinErrors *[]string) string {
 	expr = strings.TrimSpace(expr)
 
 	// If it's a variable (starts with $), resolve it
@@ -114,7 +114,7 @@ func (i *Interpolator) resolveVariableOrValue(expr string, ctx Context) string {
 			return resolved
 		}
 		// Try resolving as expression
-		return i.resolveExpression(expr, ctx)
+		return i.resolveExpression(expr, ctx, builtinErrors)
 	}
 
 	// Otherwise, return as literal value (unquoted if needed)

@@ -12,7 +12,9 @@ import (
 )
 
 // writeTestFile creates a file under a temp dir with the given content,
-// returning its absolute path.
+// returning its absolute path in forward-slash form. drun string literals
+// treat backslashes as escapes, so Windows temp paths must be embedded in
+// scripts with '/' separators (the engine's file APIs accept them).
 func writeTestFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -20,7 +22,7 @@ func writeTestFile(t *testing.T, content string) string {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writing test file: %v", err)
 	}
-	return path
+	return filepath.ToSlash(path)
 }
 
 // executeLineTask runs a drun task and returns captured output and error.
@@ -77,7 +79,9 @@ task "test":
 
 // A missing file must produce a clear error instead of iterating fake lines.
 func TestLineLoopMissingFileErrors(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "no-such-file.txt")
+	// drun string literals treat backslashes as escapes, so embed the missing
+	// path in forward-slash form (see writeTestFile).
+	missing := filepath.ToSlash(filepath.Join(t.TempDir(), "no-such-file.txt"))
 
 	input := `version: 2.0
 
@@ -119,8 +123,9 @@ task "test":
 
 // Relative filenames resolve against the current use-workdir directory.
 func TestLineLoopResolvesAgainstWorkdir(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "data.txt"), []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+	rawDir := t.TempDir()
+	dir := filepath.ToSlash(rawDir)
+	if err := os.WriteFile(filepath.Join(rawDir, "data.txt"), []byte("one\ntwo\nthree\n"), 0o644); err != nil {
 		t.Fatalf("writing workdir file: %v", err)
 	}
 

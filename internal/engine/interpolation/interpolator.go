@@ -23,9 +23,6 @@ type Interpolator struct {
 	resolveBuiltinOps  func(funcName string, operations string, ctx interface{}) (string, error)
 	resolveBuiltin     func(funcName string, args []string, ctx interface{}) (string, error)
 
-	// Error collection during interpolation
-	builtinErrors []string
-
 	// Future: allowedFailures can be used to allow specific builtins to fail silently
 	// Example: allowedFailures = map[string]bool{"optional_function": true}
 	// Currently unused - all builtin failures cause task failures for predictability
@@ -92,8 +89,9 @@ func (i *Interpolator) Interpolate(s string, ctx Context) string {
 
 // InterpolateWithError performs variable and environment variable interpolation with error reporting
 func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string, error) {
-	// Reset error collection
-	i.builtinErrors = nil
+	// Builtin failures are collected per call so concurrent interpolations on a
+	// shared interpolator (e.g. parallel loop bodies) cannot interleave errors.
+	var builtinErrors []string
 
 	// First pass: resolve ${VAR} environment variables (shell-style)
 	// Quick check: if there are no ${...} patterns, skip this phase
@@ -141,7 +139,7 @@ func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string
 	// Second pass: resolve {$var} Drun variables. Placeholders use balanced { } so
 	// nested {$x} inside a ternary branch (e.g. {$a ? 'prefix-{$b}' : ''}) is one span.
 	var undefinedVars []string
-	result, err := i.expandDrunBraceInterpolations(message, ctx, &undefinedVars)
+	result, err := i.expandDrunBraceInterpolations(message, ctx, &undefinedVars, &builtinErrors)
 	if err != nil {
 		return message, err
 	}
@@ -156,11 +154,11 @@ func (i *Interpolator) InterpolateWithError(message string, ctx Context) (string
 	}
 
 	// Check for builtin errors (e.g., secret() calls that failed)
-	if len(i.builtinErrors) > 0 {
-		if len(i.builtinErrors) == 1 {
-			return result, fmt.Errorf("%s", i.builtinErrors[0])
+	if len(builtinErrors) > 0 {
+		if len(builtinErrors) == 1 {
+			return result, fmt.Errorf("%s", builtinErrors[0])
 		}
-		return result, fmt.Errorf("multiple errors: %s", strings.Join(i.builtinErrors, "; "))
+		return result, fmt.Errorf("multiple errors: %s", strings.Join(builtinErrors, "; "))
 	}
 
 	return result, nil
@@ -211,7 +209,7 @@ func findBalancedInterpolationSpan(s string, start int) (begin, end int, ok bool
 
 // expandDrunBraceInterpolations repeatedly expands {$...} placeholders until none change
 // (so a ternary can yield text that still contains {$x}).
-func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context, undefinedVars *[]string) (string, error) {
+func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context, undefinedVars, builtinErrors *[]string) (string, error) {
 	for pass := 0; pass < maxDrunInterpolationPasses; pass++ {
 		var b strings.Builder
 		pos := 0
@@ -231,7 +229,7 @@ func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context
 				pos = end
 				continue
 			}
-			repl := i.resolveDrunBraceContent(content, match, ctx, undefinedVars)
+			repl := i.resolveDrunBraceContent(content, match, ctx, builtinErrors, undefinedVars)
 			if repl != match {
 				changed = true
 			}
@@ -246,7 +244,7 @@ func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context
 	return message, nil
 }
 
-func (i *Interpolator) resolveDrunBraceContent(content, match string, ctx Context, undefinedVars *[]string) string {
+func (i *Interpolator) resolveDrunBraceContent(content, match string, ctx Context, builtinErrors, undefinedVars *[]string) string {
 	// Condition expressions join tokens with spaces (e.g. "if not {$node}:" → "not { $node }"), so brace
 	// content can be " $node" instead of "$node". Trim so resolution matches unspaced {$var} forms.
 	content = strings.TrimSpace(content)
@@ -262,20 +260,20 @@ func (i *Interpolator) resolveDrunBraceContent(content, match string, ctx Contex
 	// Check for conditional expressions first (they can return empty strings)
 	// Ternary: "$var ? 'true_val' : 'false_val'"
 	if strings.Contains(content, "?") && strings.Contains(content, ":") {
-		if result, matched := i.resolveTernaryExpression(content, ctx); matched {
+		if result, matched := i.resolveTernaryExpression(content, ctx, builtinErrors); matched {
 			return result // Accept even if empty
 		}
 	}
 
 	// If-then-else: "if $var then 'val1' else 'val2'"
 	if strings.HasPrefix(strings.TrimSpace(content), "if ") && strings.Contains(content, " then ") && strings.Contains(content, " else ") {
-		if result, matched := i.resolveIfThenElse(content, ctx); matched {
+		if result, matched := i.resolveIfThenElse(content, ctx, builtinErrors); matched {
 			return result // Accept even if empty
 		}
 	}
 
 	// Fall back to complex expression resolution
-	if resolved := i.resolveExpression(content, ctx); resolved != "" {
+	if resolved := i.resolveExpression(content, ctx, builtinErrors); resolved != "" {
 		return resolved
 	}
 
