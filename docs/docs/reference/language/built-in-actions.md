@@ -1552,9 +1552,10 @@ the result.
 
 The outcomes are deliberately distinct:
 
-- If the source, selected access method, or stable-tag set cannot be resolved, the statement fails with a
-  credential-safe source-resolution error. A source with no tags matching the effective stable version contract is in
-  this case.
+- If the source or selected access method cannot be resolved, the statement fails with a credential-safe
+  source-resolution error.
+- If the source resolves but exposes no tags matching the effective stable version contract, the guard passes loosely:
+  the candidate is treated as the first release. Any optional capture is assigned an empty string.
 - If the candidate equals the latest version, it fails as already tagged and reports that version.
 - If the candidate is older, it fails and reports the latest version.
 - If the candidate is newer, it succeeds and then assigns the optional capture.

@@ -52,12 +52,15 @@ func TestExecuteGitEnsureVersionFailureModes(t *testing.T) {
 	}
 }
 
-func TestExecuteGitEnsureVersionNoStableTagsIsResolutionError(t *testing.T) {
+func TestExecuteGitEnsureVersionNoStableTagsPassesLoosely(t *testing.T) {
 	repository := gitEnsureTestRepository(t, []string{"latest", "v2.0.0-rc1"})
-	program := parseGitEnsureTestProgram(t, gitEnsureTestSource(repository, `git ensure "2.0.0" is newer than latest version from runtime using filesystem`))
-	err := NewEngine(&bytes.Buffer{}).Execute(program, "release")
-	if err == nil || !strings.Contains(err.Error(), "cannot resolve latest stable version") || !strings.Contains(err.Error(), "no stable version tags") {
+	program := parseGitEnsureTestProgram(t, gitEnsureTestSource(repository, `git ensure "2.0.0" is newer than latest version from runtime using filesystem as $latest_version`))
+	output := &bytes.Buffer{}
+	if err := NewEngine(output).Execute(program, "release"); err != nil {
 		t.Fatalf("error = %v", err)
+	}
+	if !strings.Contains(output.String(), "no prior version tags found") {
+		t.Fatalf("output = %q", output.String())
 	}
 }
 
