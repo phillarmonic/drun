@@ -18,6 +18,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [2.29.0] - 2026-09-03
+
+### Added
+
+- Added the `now` built-in function: `{now}` (and `capture <name> from now`) returns the current Unix time in seconds, letting tasks record timestamps for timing purposes.
+
+### Changed
+
+- `for each` over a string value that contains commas now iterates per comma-separated item (each item trimmed); values without commas keep splitting on whitespace. Array literals and typed `as list` parameters iterate their elements directly.
+- Pattern-match loops now require an `of $subject` clause naming the variable or parameter to match against: `for each match m in pattern "<regex>" of $subject`.
+- `if`/`when` availability and running checks accept any bare tool name (for example hyphenated `my-fake-tool`), not just keyword tools and quoted strings.
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+- Fixed `call task ... with key="value"` swallowing the next statement when that statement starts with a keyword (e.g. `set $x to ...` on the line after a task call). The lexer does not emit newline tokens between statements inside a block, so the `with` parameter loop kept consuming parameter names from the following line and failed with `expected '=' after parameter name`. Parameter names must now stay on the same source line as the `with` keyword.
+- Fixed range, file-line, and pattern-match loops executing against hardcoded sample items. `for $i in range a to b [step s]` iterates the real bounds (including negative steps) and rejects zero/invalid steps; `for each line text in file "f"` reads the file line by line with a clear error for missing files; `for each match m in pattern "<regex>" of $subject` returns the real regex matches of the subject and reports invalid patterns or missing subjects clearly. Dry runs report what would be processed.
+- Fixed errors raised inside `catch` bodies being swallowed: they now propagate and fail the task. `rethrow` inside a catch now re-raises the original caught error with its message instead of a generic "rethrown error". A bare `ignore` is valid only inside a catch body (marks the caught error handled) and errors clearly elsewhere.
+- Fixed `capture <name> from <expression>` storing the raw expression text: it now interpolates/evaluates the expression like `let`/`set`, and bare `from now` stores the `now` builtin's epoch-seconds timestamp.
+- Fixed `accepts $x as list of <elem>` failing validation with "unknown data type: list of ..." at runtime. List parameters now require a list value and validate every element against the declared element type (`list of strings`, `list of numbers`, `list of booleans`); unknown element types are reported clearly.
+- Fixed unquoted non-keyword tool names in availability conditions silently evaluating false: `if my-fake-tool is available` now checks the tool (any bare identifier followed by `is`/`are` + `available`/`running`/`not available`/`not running` or a comma-separated tool list), while generic comparisons such as `if tags is not empty:` remain ordinary conditionals.
+- Fixed data races when `for each ... in parallel`/range bodies run concurrently: builtin-error collection is now per interpolation call and engine output writes are synchronized, so the race detector (`go test -race`) no longer trips on parallel loops. Loop tests that embed temp-file paths now use forward slashes so they are not corrupted by drun string-literal escape handling on Windows CI.
+
+### Security
+
 ## [2.28.0] - 2026-08-11
 
 ### Added

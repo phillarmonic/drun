@@ -1,5 +1,9 @@
 version: 2.0
 
 task "just ignore":
-	ignore
-
+	try:
+		throw "expected outage"
+	catch:
+		info "Ignoring the expected outage"
+		ignore
+	success "Ignore is only meaningful inside a catch block"

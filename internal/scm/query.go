@@ -2,9 +2,15 @@ package scm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 )
+
+// ErrNoMatchingVersionTags is returned by GitTagQuery.Execute when the source
+// exposes no tags matching the query. Callers can treat this as a signal that
+// the repository has no prior version yet (e.g. an unseeded release history).
+var ErrNoMatchingVersionTags = errors.New("no stable version tags matched the query")
 
 type GitTagQuery struct {
 	Result         string
@@ -54,7 +60,7 @@ func (q GitTagQuery) Execute(ctx context.Context, session GitRepositorySession, 
 		candidates = append(candidates, GitTagQueryResult{Tag: ref.Name, Version: version, Date: ref.Date.UnixNano()})
 	}
 	if len(candidates) == 0 {
-		return GitTagQueryResult{}, fmt.Errorf("no stable version tags matched the query")
+		return GitTagQueryResult{}, ErrNoMatchingVersionTags
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		left, right := candidates[i], candidates[j]

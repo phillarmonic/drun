@@ -60,6 +60,7 @@ var Registry = map[string]BuiltinFunction{
 	"current git commit":     getCurrentGitCommit,
 	"current git branch":     getCurrentGitBranch,
 	"now.format":             formatCurrentTime,
+	"now":                    getNowEpochSeconds,
 	"file exists":            checkFileExists,
 	"dir exists":             checkDirExists,
 	"env":                    getEnvironmentVariable,
@@ -162,6 +163,13 @@ func formatCurrentTime(ctx Context, args ...string) (string, error) {
 	}
 
 	return now.Format(format), nil
+}
+
+// getNowEpochSeconds returns the current Unix time in seconds. Capturing it at
+// two points (`capture start from now` ... `capture end from now`) yields
+// timestamps whose difference is the elapsed time in seconds.
+func getNowEpochSeconds(ctx Context, args ...string) (string, error) {
+	return strconv.FormatInt(time.Now().Unix(), 10), nil
 }
 
 // checkFileExists checks if a file exists

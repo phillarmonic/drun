@@ -9,6 +9,7 @@ var functionHoverEntries = []hoverEntry{
 	{"current git commit", `{current git commit}`, "Current commit hash", "Returns the current Git commit hash. Pass `'short'` for the abbreviated 7-character form."},
 	{"current git branch", `{current git branch}`, "Current branch name", "Returns the name of the currently checked-out Git branch."},
 	{"now.format", `{now.format('2006-01-02 15:04:05')}`, "Formatted current time", "Formats the current time using a Go time layout (the reference time is `Mon Jan 2 15:04:05 MST 2006`)."},
+	{"now", `{now}`, "Current Unix time", "Returns the current Unix time in seconds. Capture it at two points (`capture start from now` ... `capture end from now`) to measure elapsed seconds."},
 	{"file exists", `{file exists('path')}`, "File existence check", "Returns the string `\"true\"` when the given path is an existing file, otherwise `\"false\"`."},
 	{"dir exists", `{dir exists('path')}`, "Directory existence check", "Returns the string `\"true\"` when the given path is an existing directory, otherwise `\"false\"`."},
 	{"env", `{env('VAR', 'default')}`, "Environment variable", "Reads an environment variable. The optional second argument supplies a fallback when the variable is unset."},

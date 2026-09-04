@@ -1,7 +1,11 @@
 package engine
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
@@ -264,7 +268,6 @@ func (e *Engine) executeParallelLoop(stmt *statement.Loop, items []string, ctx *
 
 	// Execute in parallel
 	results, err := executor.ExecuteLoop(items, stmt.Variable, stmt.Body, executeItem)
-
 	// Report results
 	if err != nil {
 		// Count successful executions
@@ -294,16 +297,37 @@ func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 		step = e.interpolateVariables(stmt.RangeStep, ctx)
 	}
 
-	// Convert to integers (simplified implementation)
-	startInt := 0
-	endInt := 10
-	stepInt := 1
+	// Parse the interpolated bounds into integers so they actually drive
+	// iteration. Non-numeric bounds are a programming error, not something to
+	// paper over with a default range.
+	startInt, err := strconv.Atoi(strings.TrimSpace(start))
+	if err != nil {
+		return fmt.Errorf("range loop: start bound %q is not a valid integer", start)
+	}
+	endInt, err := strconv.Atoi(strings.TrimSpace(end))
+	if err != nil {
+		return fmt.Errorf("range loop: end bound %q is not a valid integer", end)
+	}
+	stepInt, err := strconv.Atoi(strings.TrimSpace(step))
+	if err != nil {
+		return fmt.Errorf("range loop: step %q is not a valid integer", step)
+	}
+	if stepInt == 0 {
+		return fmt.Errorf("range loop: step cannot be zero (would loop forever)")
+	}
 
-	// In a real implementation, you would parse these properly
-	// For now, we'll create a simple range
+	// Build the real range. Positive steps count up to (and including) end;
+	// negative steps count down to (and including) end. A range whose step
+	// points away from end simply yields no items.
 	var items []string
-	for i := startInt; i <= endInt; i += stepInt {
-		items = append(items, fmt.Sprintf("%d", i))
+	if stepInt > 0 {
+		for i := startInt; i <= endInt; i += stepInt {
+			items = append(items, fmt.Sprintf("%d", i))
+		}
+	} else {
+		for i := startInt; i >= endInt; i += stepInt {
+			items = append(items, fmt.Sprintf("%d", i))
+		}
 	}
 
 	if e.dryRun {
@@ -327,16 +351,36 @@ func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 
 // executeLineLoop executes line-by-line file processing loops
 func (e *Engine) executeLineLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
-	filename := e.interpolateVariables(stmt.Iterable, ctx)
+	filename, err := e.interpolateVariablesWithError(stmt.Iterable, ctx)
+	if err != nil {
+		return fmt.Errorf("line loop: file path: %w", err)
+	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would read lines from file: %s\n", filename)
 		return nil
 	}
 
-	// In a real implementation, you would read the file
-	// For now, we'll simulate with some sample lines
-	lines := []string{"line1", "line2", "line3"}
+	// Resolve relative paths against the current working directory
+	// (use-workdir aware), then read the real file line by line.
+	path := e.resolveFilesystemPath(filename, ctx)
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("line loop: cannot read file %q: %w", filename, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	// Allow lines longer than the 64 KiB scanner default.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("line loop: reading file %q: %w", filename, err)
+	}
 
 	_, _ = fmt.Fprintf(e.output, "📄 Reading lines from file: %s (%d lines)\n", filename, len(lines))
 
@@ -352,20 +396,44 @@ func (e *Engine) executeLineLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 	return e.executeSequentialLoop(stmt, lines, ctx)
 }
 
-// executeMatchLoop executes pattern matching loops
+// executeMatchLoop executes pattern matching loops.
+//
+// Syntax: for each match <var> in pattern "<regex>" of $subject
+// The regex is compiled and every non-overlapping match found in the
+// subject variable's value is bound to <var> for one iteration.
 func (e *Engine) executeMatchLoop(stmt *statement.Loop, ctx *ExecutionContext) error {
 	pattern := e.interpolateVariables(stmt.Iterable, ctx)
 
+	if stmt.Subject == "" {
+		return fmt.Errorf("match loop: no subject; use: for each match <var> in pattern %q of $subject", pattern)
+	}
+
 	if e.dryRun {
-		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find matches for pattern: %s\n", pattern)
+		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would find matches for pattern: %s in %s\n", pattern, stmt.Subject)
 		return nil
 	}
 
-	// In a real implementation, you would use regex to find matches
-	// For now, we'll simulate with some sample matches
-	matches := []string{"match1", "match2"}
+	// Resolve the subject variable ($name, name, or a typed parameter).
+	subjectRef := stmt.Subject
+	var subject string
+	if value, exists := ctx.Variables[subjectRef]; exists {
+		subject = value
+	} else if value, exists := ctx.Variables[strings.TrimPrefix(subjectRef, "$")]; exists {
+		subject = value
+	} else if param, exists := ctx.Parameters[strings.TrimPrefix(subjectRef, "$")]; exists {
+		subject = param.AsString()
+	} else {
+		return fmt.Errorf("match loop: subject variable %q not found", subjectRef)
+	}
 
-	_, _ = fmt.Fprintf(e.output, "🔍  Finding matches for pattern: %s (%d matches)\n", pattern, len(matches))
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("match loop: invalid pattern %q: %w", pattern, err)
+	}
+
+	matches := re.FindAllString(subject, -1)
+
+	_, _ = fmt.Fprintf(e.output, "🔍  Finding matches for pattern: %s in %s (%d matches)\n", pattern, subjectRef, len(matches))
 
 	// Apply filter if present
 	if stmt.Filter != nil {
@@ -377,6 +445,30 @@ func (e *Engine) executeMatchLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 		return e.executeParallelLoop(stmt, matches, ctx)
 	}
 	return e.executeSequentialLoop(stmt, matches, ctx)
+}
+
+// splitIterableString splits a raw string iterable into items. Values that
+// contain a comma are treated as comma-separated lists (each item trimmed);
+// otherwise whitespace separates items. Array-literal strings ([...]) are
+// parsed by the caller before this helper is reached.
+func splitIterableString(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	if strings.Contains(s, ",") {
+		parts := strings.Split(s, ",")
+		items := make([]string, 0, len(parts))
+		for _, part := range parts {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				items = append(items, trimmed)
+			}
+		}
+		return items
+	}
+
+	return strings.Fields(s)
 }
 
 // executeEachLoop executes traditional each loops
@@ -404,7 +496,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
 						return nil
 					}
-					items = strings.Fields(iterableStr)
+					items = splitIterableString(iterableStr)
 				}
 			} else {
 				return fmt.Errorf("project setting '%s' not found", key)
@@ -438,7 +530,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 		if strings.HasPrefix(iterableStr, "[") && strings.HasSuffix(iterableStr, "]") {
 			items = e.parseArrayLiteralString(iterableStr)
 		} else {
-			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+			items = splitIterableString(iterableStr) // Split iterable string into items
 		}
 	} else {
 		// Check if it's a legacy direct project setting access (for backward compatibility)
@@ -456,7 +548,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 						_, _ = fmt.Fprintf(e.output, "ℹ️  No items to process in loop\n")
 						return nil
 					}
-					items = strings.Fields(iterableStr)
+					items = splitIterableString(iterableStr)
 				}
 			} else {
 				// Parameter reference
@@ -473,7 +565,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 					return nil
 				}
 
-				items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+				items = splitIterableString(iterableStr) // Split iterable string into items
 			}
 		} else {
 			// Parameter reference (no project)
@@ -490,7 +582,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 				return nil
 			}
 
-			items = strings.Fields(iterableStr) // Use Fields to split by any whitespace
+			items = splitIterableString(iterableStr) // Split iterable string into items
 		}
 	}
 

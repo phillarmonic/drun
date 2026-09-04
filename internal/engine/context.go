@@ -20,6 +20,11 @@ type ExecutionContext struct {
 	Program            *ast.Program            // the AST program being executed
 	WorkingDir         string                  // override working directory for shell commands (empty = use process cwd)
 	OriginalWorkingDir string                  // the cwd captured at task start; relative paths are resolved from here
+
+	// CurrentCaughtError holds the error being handled while a catch clause
+	// body executes, so a `rethrow` inside the body can re-raise the original
+	// error with its message intact. Nil outside a catch body.
+	CurrentCaughtError error
 }
 
 // Implement interpolation.Context interface

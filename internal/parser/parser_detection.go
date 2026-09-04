@@ -81,17 +81,18 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 		// if docker is available:
 		// if "docker buildx" is available:
 		// if docker,"docker-compose" is not available:
+		// if my-fake-tool is available:
 		// if node version >= "16":
 		stmt.Type = "if_available"
 
-		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING {
+		if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING || p.peekToken.Type == lexer.IDENT {
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
 			// Parse additional tools separated by commas
 			for p.peekToken.Type == lexer.COMMA {
 				p.nextToken() // consume COMMA
-				if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) {
+				if p.peekToken.Type == lexer.STRING || p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.IDENT {
 					p.nextToken()
 					stmt.Alternatives = append(stmt.Alternatives, p.curToken.Literal)
 				} else {
@@ -248,7 +249,7 @@ func (p *Parser) isDetectionContext() bool {
 		if p.peekToken.Type == lexer.STRING {
 			return true
 		}
-		// A tool name alone is not enough: resource conditions such as
+		// A tool keyword alone is not enough: resource conditions such as
 		// "if docker network "proxy" exists" belong to the generic conditional.
 		// Detection forms always continue with is/are, a version comparison,
 		// or a comma-separated tool list.
@@ -258,6 +259,28 @@ func (p *Parser) isDetectionContext() bool {
 				return true
 			default:
 				return false
+			}
+		}
+		// Any bare identifier (e.g. the dashed name my-fake-tool) followed by
+		// is/are + available|running, is/are not available|running, or by a
+		// comma-separated tool list, is a tool detection. This keeps unquoted
+		// hyphenated tool names working instead of silently evaluating false
+		// through the generic conditional, while generic comparisons such as
+		// `if tags is not empty:` stay conditionals.
+		if p.peekToken.Type == lexer.IDENT {
+			switch p.peekSecondToken().Type {
+			case lexer.COMMA:
+				return true
+			case lexer.IS, lexer.ARE:
+				switch p.peekThirdToken().Type {
+				case lexer.AVAILABLE, lexer.RUNNING:
+					return true
+				case lexer.NOT:
+					switch p.peekFourthToken().Type {
+					case lexer.AVAILABLE, lexer.RUNNING:
+						return true
+					}
+				}
 			}
 		}
 		return false

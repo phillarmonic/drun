@@ -25,8 +25,16 @@ func TestNewEngineWithOptions(t *testing.T) {
 		t.Fatal("Expected engine to be created")
 	}
 
-	if engine.output != output {
-		t.Error("Expected output to be set from options")
+	if engine.output == nil {
+		t.Fatal("Expected output to be set from options")
+	}
+	// Writes through the engine's (possibly synchronizing) writer must reach
+	// the configured buffer.
+	if _, err := engine.output.Write([]byte("probe")); err != nil {
+		t.Fatalf("writing through engine output: %v", err)
+	}
+	if output.String() != "probe" {
+		t.Errorf("Expected output writes to reach the configured buffer, got %q", output.String())
 	}
 
 	if engine.taskRegistry != registry {
@@ -92,8 +100,16 @@ func TestNewEngine_BackwardCompatibility(t *testing.T) {
 		t.Fatal("Expected engine to be created")
 	}
 
-	if engine.output != output {
-		t.Error("Expected output to be set")
+	if engine.output == nil {
+		t.Fatal("Expected output to be set")
+	}
+	// Writes through the engine's (possibly synchronizing) writer must reach
+	// the configured buffer.
+	if _, err := engine.output.Write([]byte("probe")); err != nil {
+		t.Fatalf("writing through engine output: %v", err)
+	}
+	if output.String() != "probe" {
+		t.Errorf("Expected output writes to reach the configured buffer, got %q", output.String())
 	}
 
 	// Should have defaults

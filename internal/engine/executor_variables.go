@@ -123,8 +123,16 @@ func (e *Engine) executeTransformStatement(varStmt *statement.Variable, ctx *Exe
 
 // executeCaptureStatement executes "capture variable_name from expression" statements
 func (e *Engine) executeCaptureStatement(varStmt *statement.Variable, ctx *ExecutionContext) error {
-	// The value is already a string in domain model
+	// Evaluate the captured expression the same way let/set do: interpolate
+	// variables and builtin calls so the stored value is the resolved text, not
+	// the raw expression. A bare `now` source is the documented timing idiom
+	// (`capture start from now`) and resolves to the `now` builtin's
+	// epoch-seconds timestamp.
 	value := varStmt.Value
+	if strings.TrimSpace(value) == "now" {
+		value = "{now}"
+	}
+	value = e.interpolateVariables(value, ctx)
 
 	// Determine the variable name (namespace it if in an included snippet/task)
 	varName := varStmt.Name

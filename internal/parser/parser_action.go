@@ -88,13 +88,21 @@ func (p *Parser) parseTaskCallStatement() *ast.TaskCallStatement {
 	// Check for optional "with" parameters
 	if p.peekToken.Type == lexer.WITH {
 		p.nextToken() // consume "with"
+		withLine := p.curToken.Line
 
 		// Parse parameters - continue while we see parameter names (IDENT or keywords)
 		// We allow both IDENT and keywords as parameter names
 		// Stop when we hit tokens that indicate end of parameters
+		//
+		// The lexer does not emit NEWLINE tokens between statements inside a
+		// block, so parameter names must stay on the same source line as the
+		// "with" keyword. Without the line check, a following statement that
+		// starts with a keyword (e.g. "set $x to ...") would be misread as
+		// another parameter name.
 		for (p.peekToken.Type == lexer.IDENT || p.isKeywordToken(p.peekToken.Type)) &&
 			p.peekToken.Type != lexer.NEWLINE && p.peekToken.Type != lexer.COMMENT &&
-			p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
+			p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF &&
+			p.peekToken.Line == withLine {
 
 			p.nextToken() // consume parameter name
 			paramName := p.curToken.Literal

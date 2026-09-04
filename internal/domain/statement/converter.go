@@ -80,6 +80,7 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			RangeStart: s.RangeStart,
 			RangeEnd:   s.RangeEnd,
 			RangeStep:  s.RangeStep,
+			Subject:    s.Subject,
 			Filter:     filter,
 			Parallel:   s.Parallel,
 			MaxWorkers: s.MaxWorkers,

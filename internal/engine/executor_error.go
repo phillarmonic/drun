@@ -45,41 +45,60 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 	}
 
 	// Execute catch blocks if there was an error
+	handled := false
 	if tryError != nil {
-		handled := false
 		for _, catchClause := range tryStmt.CatchClauses {
-			if e.shouldHandleError(tryError, catchClause) {
-				_, _ = fmt.Fprintf(e.output, "🔧 Handling error with catch block\n")
-
-				// Set error variable if specified
-				if catchClause.ErrorVar != "" {
-					ctx.Variables[catchClause.ErrorVar] = tryError.Error()
-					_, _ = fmt.Fprintf(e.output, "📦  Captured error in variable '%s'\n", catchClause.ErrorVar)
-				}
-
-				// Execute catch body (domain statements)
-				for _, stmt := range catchClause.Body {
-					if err := e.executeStatement(stmt, ctx); err != nil {
-						// Error in catch block - this becomes the new error
-						tryError = err
-						break
-					}
-				}
-
-				handled = true
-				break
+			if !e.shouldHandleError(tryError, catchClause) {
+				continue
 			}
-		}
 
-		if !handled {
-			_, _ = fmt.Fprintf(e.output, "❌  Unhandled error: %v\n", tryError)
-		} else {
-			_, _ = fmt.Fprintf(e.output, "✅  Error handled successfully\n")
-			tryError = nil // Error was handled
+			_, _ = fmt.Fprintf(e.output, "🔧 Handling error with catch block\n")
+
+			// Set error variable if specified
+			if catchClause.ErrorVar != "" {
+				ctx.Variables[catchClause.ErrorVar] = tryError.Error()
+				_, _ = fmt.Fprintf(e.output, "📦  Captured error in variable '%s'\n", catchClause.ErrorVar)
+			}
+
+			handled = true
+
+			// Track the error being handled so a `rethrow` inside the catch
+			// body can re-raise it with its message intact.
+			savedCaughtError := ctx.CurrentCaughtError
+			ctx.CurrentCaughtError = tryError
+
+			// Execute the catch body. An error raised inside it is NOT
+			// swallowed: it replaces the original error and propagates out of
+			// the try statement.
+			var catchBodyErr error
+			for _, stmt := range catchClause.Body {
+				if err := e.executeStatement(stmt, ctx); err != nil {
+					catchBodyErr = err
+					_, _ = fmt.Fprintf(e.output, "⚠️  Error in catch block: %v\n", err)
+					break
+				}
+			}
+			ctx.CurrentCaughtError = savedCaughtError
+
+			if catchBodyErr != nil {
+				tryError = catchBodyErr
+			} else {
+				tryError = nil // Error was handled successfully
+			}
+			break // only the first matching clause runs
 		}
-	} else {
+	}
+
+	// Report how the error (if any) resolved.
+	if handled && tryError == nil {
+		_, _ = fmt.Fprintf(e.output, "✅  Error handled successfully\n")
+	} else if !handled && tryError != nil {
+		_, _ = fmt.Fprintf(e.output, "❌  Unhandled error: %v\n", tryError)
+	} else if tryError == nil {
 		_, _ = fmt.Fprintf(e.output, "✅  Try block completed successfully\n")
 	}
+	// handled && tryError != nil means the matching catch body raised its own
+	// error; the "Error in catch block" message above is the only report.
 
 	// Always execute finally block (domain statements)
 	if len(tryStmt.FinallyBody) > 0 {
@@ -124,12 +143,17 @@ func (e *Engine) executeThrow(throwStmt *statement.Throw, ctx *ExecutionContext)
 		_, _ = fmt.Fprintf(e.output, "💥  Throwing error: %s\n", message)
 		return fmt.Errorf("thrown error: %s", message)
 	case "rethrow":
-		_, _ = fmt.Fprintf(e.output, "🔄  Rethrowing current error\n")
-		// In a real implementation, we'd need to track the current error context
-		return fmt.Errorf("rethrown error")
+		if ctx == nil || ctx.CurrentCaughtError == nil {
+			return fmt.Errorf("rethrow: no active caught error (rethrow only works inside a catch block)")
+		}
+		_, _ = fmt.Fprintf(e.output, "🔄  Rethrowing current error: %v\n", ctx.CurrentCaughtError)
+		return ctx.CurrentCaughtError
 	case "ignore":
-		_, _ = fmt.Fprintf(e.output, "🤐 Ignoring current error\n")
-		return nil // Ignore effectively suppresses the error
+		if ctx == nil || ctx.CurrentCaughtError == nil {
+			return fmt.Errorf("ignore: bare 'ignore' only makes sense inside a catch block (it marks the caught error as handled); it cannot suppress a failing statement, because a command that fails already aborts the task")
+		}
+		_, _ = fmt.Fprintf(e.output, "🤐 Ignoring current error: %v\n", ctx.CurrentCaughtError)
+		return nil // Explicit documentation-only no-op: the caught error is handled
 	default:
 		return fmt.Errorf("unknown throw action: %s", throwStmt.Action)
 	}

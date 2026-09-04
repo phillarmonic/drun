@@ -46,6 +46,12 @@ func (v *Validator) validateDataType(param *Parameter, value *types.Value) error
 		return nil // Strings are always valid
 	}
 
+	// The parser emits typed lists as "list of <elem>" (parser_parameter.go).
+	// Require a list value, then validate each element against the element type.
+	if strings.HasPrefix(param.DataType, "list of ") {
+		return v.validateTypedList(param, value, strings.TrimPrefix(param.DataType, "list of "))
+	}
+
 	switch param.DataType {
 	case "number":
 		if value.Type != types.NumberType {
@@ -87,6 +93,65 @@ func (v *Validator) validateDataType(param *Parameter, value *types.Value) error
 	}
 
 	return nil
+}
+
+// validateTypedList validates a "list of <elem>" parameter: the value must be a
+// list, and each element must be usable as the declared element type. Unknown
+// element types error clearly rather than silently accepting anything.
+func (v *Validator) validateTypedList(param *Parameter, value *types.Value, elemType string) error {
+	if value.Type != types.ListType {
+		return &ValidationError{
+			Parameter: param.Name,
+			Message:   "must be a list",
+			Value:     value.String(),
+		}
+	}
+
+	parsedElem, err := types.ParseParameterType(normalizeElementType(elemType))
+	if err != nil {
+		return &ValidationError{
+			Parameter: param.Name,
+			Message:   fmt.Sprintf("unknown data type: %s", param.DataType),
+		}
+	}
+
+	elements, err := value.AsList()
+	if err != nil {
+		return &ValidationError{
+			Parameter: param.Name,
+			Message:   "must be a list",
+			Value:     value.String(),
+		}
+	}
+
+	for i, element := range elements {
+		if _, err := types.NewValue(parsedElem, element); err != nil {
+			return &ValidationError{
+				Parameter: param.Name,
+				Message:   fmt.Sprintf("element %d must be a %s", i+1, elemType),
+				Value:     element,
+			}
+		}
+	}
+
+	return nil
+}
+
+// normalizeElementType maps the plural type names used after "list of"
+// ("strings", "numbers", "booleans") to the singulars ParseParameterType
+// recognizes. Unknown names pass through unchanged so they can fail with a
+// clear "unknown data type" error.
+func normalizeElementType(name string) string {
+	switch name {
+	case "strings":
+		return "string"
+	case "numbers":
+		return "number"
+	case "booleans":
+		return "boolean"
+	default:
+		return name
+	}
 }
 
 // validateConstraints validates parameter constraints

@@ -173,6 +173,21 @@ func (p *Parser) parseForEachStatement(stmt *ast.LoopStatement) *ast.LoopStateme
 		}
 		stmt.Iterable = p.curToken.Literal
 
+		// A pattern-match loop needs a subject to match against:
+		//   for each match <var> in pattern "<regex>" of $subject
+		if p.peekToken.Type == lexer.OF {
+			p.nextToken() // consume OF
+			if p.peekToken.Type != lexer.VARIABLE {
+				p.addError(fmt.Sprintf("expected subject variable (with $ prefix) after 'of', got %s", p.peekToken.Type))
+				return nil
+			}
+			p.nextToken()
+			stmt.Subject = p.curToken.Literal
+		} else {
+			p.addError("pattern match loops need a subject to match against; use: for each match <var> in pattern \"<regex>\" of $subject")
+			return nil
+		}
+
 	default:
 		// Regular "for each $variable in $iterable"
 		if !p.expectPeek(lexer.VARIABLE) {
@@ -253,27 +268,28 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 		stmt.Type = "range"
 
 		// Parse range: start to end [step step_value]
-		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+		// Bounds may be numbers (including negative), or identifiers.
+		stmt.RangeStart = p.parseRangeBound()
+		if stmt.RangeStart == "" {
 			return nil
 		}
-		stmt.RangeStart = p.curToken.Literal
 
 		if !p.expectPeek(lexer.TO) {
 			return nil
 		}
 
-		if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+		stmt.RangeEnd = p.parseRangeBound()
+		if stmt.RangeEnd == "" {
 			return nil
 		}
-		stmt.RangeEnd = p.curToken.Literal
 
 		// Optional step
 		if p.peekToken.Type == lexer.STEP {
 			p.nextToken() // consume STEP
-			if !p.expectPeek(lexer.NUMBER) && !p.expectPeek(lexer.IDENT) {
+			stmt.RangeStep = p.parseRangeBound()
+			if stmt.RangeStep == "" {
 				return nil
 			}
-			stmt.RangeStep = p.curToken.Literal
 		}
 
 	} else {
@@ -321,6 +337,32 @@ func (p *Parser) parseForVariableStatement(stmt *ast.LoopStatement) *ast.LoopSta
 	stmt.Body = p.parseControlFlowBody()
 
 	return stmt
+}
+
+// parseRangeBound consumes a single range bound: an optional '-' sign followed
+// by a NUMBER (e.g. "-2"), or a plain NUMBER or IDENT. It records an error and
+// returns "" when the next tokens do not form a valid bound. Unlike the
+// expectPeek-based code it replaced, it does not record spurious errors for
+// valid IDENT bounds.
+func (p *Parser) parseRangeBound() string {
+	if p.peekToken.Type == lexer.MINUS {
+		p.nextToken() // consume MINUS
+		if p.peekToken.Type != lexer.NUMBER {
+			p.addError(fmt.Sprintf("expected NUMBER after '-', got %s", p.peekToken.Type))
+			return ""
+		}
+		p.nextToken()
+		return "-" + p.curToken.Literal
+	}
+
+	switch p.peekToken.Type {
+	case lexer.NUMBER, lexer.IDENT:
+		p.nextToken()
+		return p.curToken.Literal
+	default:
+		p.addError(fmt.Sprintf("expected range bound (number or identifier), got %s", p.peekToken.Type))
+		return ""
+	}
 }
 
 // parseFilterExpression parses filter conditions like "where item contains 'test'"

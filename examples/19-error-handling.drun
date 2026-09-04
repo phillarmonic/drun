@@ -7,9 +7,12 @@ task "error demo" means "Demonstrate error handling capabilities":
 	warn "⚠️  File does not exist, but continuing..."
 	info "✅ Handled missing file gracefully"
 
-	info "🔄 Testing ignore functionality"
-	ignore
-	info "✅ Ignore executed successfully"
+	info "🔄 Testing ignore inside a catch"
+	try:
+		throw "expected non-fatal issue"
+	catch:
+		info "✅ Ignore executed successfully"
+		ignore
 
 	success "Error handling demo completed!"
 

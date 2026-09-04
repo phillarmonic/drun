@@ -331,14 +331,19 @@ The following tools are recognized as built-in keywords and can be used without 
 
 - `git` - Git version control system
 
-**Note:** For tools with spaces or tools not in this list, use quoted strings:
+**Note:** Tools whose names contain spaces must be quoted. Any other tool —
+whether a keyword above, hyphenated (`my-fake-tool`), or otherwise not in the
+list — may be written bare or quoted:
 
 ```drun
 if "docker compose" is available:
     info "Using Docker Compose v2"
 
-if "docker-compose" is available:
+if docker-compose is available:
     info "Using Docker Compose v1"
+
+if "docker-compose" is available:
+    info "Same check, quoted form"
 ```
 
 ### Docker Compose Command Macro

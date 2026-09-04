@@ -4,6 +4,7 @@ project "Advanced Control Flow Demo" version "1.0":
 
 task "showcase_advanced_loops":
 	given $items defaults to "item1,test_item,item2,skip_item,item3.js,item4.py,test_file.js"
+	given $log defaults to "found 3 errors and 17 warnings"
 
 	info "🚀 Starting Advanced Control Flow Showcase"
 
@@ -28,14 +29,14 @@ task "showcase_advanced_loops":
 		break when $item == "item3.js"
 		info "  Completed processing: {$item}"
 
-	# Line processing example (simulated)
+	# Line processing example
 	info "📄 Line Processing Example:"
 	for each line text in file "sample.txt":
 		info "  Line content: {text}"
 
-	# Pattern matching example (simulated)
+	# Pattern matching example: iterate the regex matches found in a subject variable
 	info "🔍 Pattern Matching Example:"
-	for each match result in pattern "[0-9]+":
+	for each match result in pattern "[0-9]+" of $log:
 		info "  Found number: {result}"
 
 	success "✅ Advanced Control Flow Showcase completed!"
@@ -86,7 +87,7 @@ task "range_operations":
 	for $i in range 0 to 10 step 3:
 		info "  Item {$i}"
 
-	# Nested ranges (simulated with break/continue)
+	# Complex range processing driven by break/continue control flow
 	info "📊 Complex Range Processing:"
 	for $i in range 1 to 5:
 		continue if $i == 3

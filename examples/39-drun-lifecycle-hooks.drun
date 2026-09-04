@@ -8,6 +8,8 @@ version: 2.0
 
 project "lifecycle-demo" version "1.0":
 	# Tool-level lifecycle hooks (run once per drun execution)
+	# `capture <name> from now` stores the `now` builtin's Unix time in seconds;
+	# for human-readable durations use the timer built-ins (example 38).
 	on drun setup:
 		info "🚀 Starting drun execution pipeline"
 		info "📊 Tool version: v2.0"
@@ -21,15 +23,13 @@ project "lifecycle-demo" version "1.0":
 	
 	after any task:
 		capture task_end_time from now
-		let task_duration be {task_end_time} - {task_start_time}
-		info "✅ Task '{$globals.current_task}' completed in {task_duration}s"
+		info "✅ Task '{$globals.current_task}' completed (Unix time {task_end_time}s; started at {task_start_time}s)"
 	
 	# Tool-level teardown (runs once at the end)
 	on drun teardown:
 		capture pipeline_end_time from now
-		let total_time be {pipeline_end_time} - {pipeline_start_time}
 		info "🏁 Drun execution pipeline completed"
-		info "📊 Total execution time: {total_time}s"
+		info "📊 Pipeline ran from Unix time {pipeline_start_time}s to {pipeline_end_time}s"
 		info "🎉 Thanks for using drun!"
 
 task "prepare" means "Prepare the environment":

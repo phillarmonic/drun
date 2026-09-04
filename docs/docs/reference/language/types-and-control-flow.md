@@ -329,6 +329,41 @@ for each item at index in collection:
   info "Processing item {index}: {item}"
 ```
 
+##### Iterable forms and splitting
+
+`for each` accepts array literals, variables, parameters, and project settings
+(`$globals.key`):
+
+- **Array literal**: `for each $x in ["a", "b", "c"]` iterates each element.
+- **String value containing commas**: the string is split on commas and each
+  item is trimmed — `"a, b, c"` iterates as `a`, `b`, `c`.
+- **String value without commas**: the string is split on whitespace —
+  `"a b c"` iterates as `a`, `b`, `c`.
+- **Typed list parameter** (`accepts $items as list of strings`): iterates the
+  list elements.
+
+##### Other loop forms
+
+Range, file-line, and pattern-match loops are also implemented:
+
+```drun
+# Range with an explicit step (also supports negative steps)
+for $i in range 1 to 10 step 2:
+  info "Item {$i}"
+
+# File lines
+for each line text in file "logs/out.txt":
+  info "Line: {text}"
+
+# Regex matches found in a subject variable
+for each match result in pattern "[0-9]+" of $log:
+  info "Found number: {result}"
+```
+
+The match loop requires the `of $subject` clause; the subject is read from a
+variable or parameter. See the examples for filters (`where`), `break`/
+`continue`, and `in parallel` variants.
+
 #### Parallel Execution
 
 ```drun

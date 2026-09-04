@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -82,6 +83,20 @@ type Engine struct {
 	paramArgRegex  *regexp.Regexp
 }
 
+// lockedWriter serializes writes to a shared io.Writer. Parallel loop bodies
+// and other concurrent components print through the same engine output, so
+// without locking two goroutines can race on an underlying buffer.
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}
+
 // ExecutionContext and ProjectContext moved to context.go
 
 // NewEngine creates a new v2 execution engine with default options
@@ -99,6 +114,13 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	}
 	options.applyDefaults()
 
+	// Serialize writes to the shared output so parallel loop bodies and other
+	// concurrent components cannot corrupt an underlying writer.
+	out := options.Output
+	if _, ok := out.(*lockedWriter); !ok {
+		out = &lockedWriter{w: out}
+	}
+
 	// Create default fetchers and interpolator
 	githubFetcher := remote.NewGitHubFetcher()
 	httpsFetcher := remote.NewHTTPSFetcher()
@@ -108,7 +130,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	embeddedProvisionings = append(embeddedProvisionings, provisioning.DefaultEmbeddedSources()...)
 
 	e := &Engine{
-		output:           options.Output,
+		output:           out,
 		dryRun:           options.DryRun,
 		verbose:          options.Verbose,
 		taskModeOverride: options.TaskModeOverride,
@@ -155,7 +177,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	e.provisionCommandRunner = e.runProvisioningCommand
 
 	// Set the engine as the domain statement executor
-	e.executor = executor.NewExecutor(options.Output, options.DryRun, e)
+	e.executor = executor.NewExecutor(out, options.DryRun, e)
 
 	// Initialize includes resolver
 	e.includesResolver = includes.NewResolver(
@@ -164,7 +186,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		httpsFetcher,
 		drunhubFetcher,
 		options.Verbose,
-		options.Output,
+		out,
 		ParseStringWithFilename,
 	)
 

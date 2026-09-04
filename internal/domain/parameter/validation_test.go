@@ -1,6 +1,7 @@
 package parameter
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/phillarmonic/drun/v2/internal/types"
@@ -55,6 +56,102 @@ func TestValidator_ValidateDataType(t *testing.T) {
 			err := validator.Validate(tt.param, tt.value)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// Regression: the parser emits DataType "list of <elem>" (parser_parameter.go),
+// but validateDataType only knew bare "list", so typed list declarations
+// (`accepts $items as list of strings`) failed at runtime with
+// "unknown data type: list of strings".
+func TestValidator_ValidateListOfTypes(t *testing.T) {
+	validator := NewValidator()
+
+	tests := []struct {
+		name    string
+		param   *Parameter
+		value   *types.Value
+		wantErr bool
+		wantMsg string // substring expected in the error message when wantErr
+	}{
+		{
+			name:    "list of strings accepts a list value",
+			param:   &Parameter{Name: "items", DataType: "list of strings"},
+			value:   mustNewValue(types.ListType, "alpha,beta"),
+			wantErr: false,
+		},
+		{
+			name:    "list of strings rejects a non-list value",
+			param:   &Parameter{Name: "items", DataType: "list of strings"},
+			value:   mustNewValue(types.StringType, "alpha"),
+			wantErr: true,
+			wantMsg: "must be a list",
+		},
+		{
+			name:    "list of strings accepts digit strings as elements",
+			param:   &Parameter{Name: "items", DataType: "list of strings"},
+			value:   mustNewValue(types.ListType, "1,2,3"),
+			wantErr: false,
+		},
+		{
+			name:    "list of numbers accepts numeric elements",
+			param:   &Parameter{Name: "ports", DataType: "list of numbers"},
+			value:   mustNewValue(types.ListType, "80,443,8080"),
+			wantErr: false,
+		},
+		{
+			name:    "list of numbers rejects a non-numeric element",
+			param:   &Parameter{Name: "ports", DataType: "list of numbers"},
+			value:   mustNewValue(types.ListType, "80,https"),
+			wantErr: true,
+			wantMsg: "element 2 must be a number",
+		},
+		{
+			name:    "list of booleans accepts boolean elements",
+			param:   &Parameter{Name: "flags", DataType: "list of booleans"},
+			value:   mustNewValue(types.ListType, "true,false"),
+			wantErr: false,
+		},
+		{
+			name:    "list of booleans rejects a non-boolean element",
+			param:   &Parameter{Name: "flags", DataType: "list of booleans"},
+			value:   mustNewValue(types.ListType, "true,maybe"),
+			wantErr: true,
+			wantMsg: "element 2 must be a boolean",
+		},
+		{
+			name:    "unknown element type errors clearly",
+			param:   &Parameter{Name: "items", DataType: "list of frobnicate"},
+			value:   mustNewValue(types.ListType, "a,b"),
+			wantErr: true,
+			wantMsg: "unknown data type",
+		},
+		{
+			name:    "plain list behavior is unchanged for a list value",
+			param:   &Parameter{Name: "items", DataType: "list"},
+			value:   mustNewValue(types.ListType, "a,b"),
+			wantErr: false,
+		},
+		{
+			name:    "plain list behavior is unchanged for a non-list value",
+			param:   &Parameter{Name: "items", DataType: "list"},
+			value:   mustNewValue(types.StringType, "a"),
+			wantErr: true,
+			wantMsg: "must be a list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.Validate(tt.param, tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && tt.wantMsg != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantMsg) {
+					t.Errorf("Validate() error = %v, want message containing %q", err, tt.wantMsg)
+				}
 			}
 		})
 	}

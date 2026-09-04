@@ -65,6 +65,29 @@ func (p *Parser) peekSecondToken() lexer.Token {
 	return token
 }
 
+// peekThirdToken returns the token two positions past peekToken (three ahead
+// of curToken) without consuming it. Same mid-line snapshot caveat as
+// peekSecondToken.
+func (p *Parser) peekThirdToken() lexer.Token {
+	saved := *p.lexer
+	p.lexer.NextToken() // discard the token after peekToken
+	token := p.lexer.NextToken()
+	*p.lexer = saved
+	return token
+}
+
+// peekFourthToken returns the token three positions past peekToken (four ahead
+// of curToken) without consuming it. Same mid-line snapshot caveat as
+// peekSecondToken.
+func (p *Parser) peekFourthToken() lexer.Token {
+	saved := *p.lexer
+	p.lexer.NextToken() // discard token after peekToken
+	p.lexer.NextToken() // discard token two past peekToken
+	token := p.lexer.NextToken()
+	*p.lexer = saved
+	return token
+}
+
 // ParseProgram parses the entire program
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
