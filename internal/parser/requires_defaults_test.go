@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
@@ -62,8 +63,8 @@ func TestRequiresWithDefaultValueValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
-		shouldError bool
 		errorMsg    string
+		shouldError bool
 	}{
 		{
 			name: "valid default value",
@@ -127,13 +128,7 @@ task "build":
 			}
 
 			if tt.shouldError && hasError {
-				found := false
-				for _, err := range p.Errors() {
-					if err == tt.errorMsg {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(p.Errors(), tt.errorMsg)
 				if !found {
 					t.Errorf("expected error message '%s', got %v", tt.errorMsg, p.Errors())
 				}

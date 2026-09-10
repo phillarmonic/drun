@@ -261,13 +261,13 @@ func TestInferType(t *testing.T) {
 
 func TestParameterType_String(t *testing.T) {
 	tests := []struct {
-		paramType ParameterType
 		expected  string
+		paramType ParameterType
 	}{
-		{StringType, "string"},
-		{NumberType, "number"},
-		{BooleanType, "boolean"},
-		{ListType, "list"},
+		{paramType: StringType, expected: "string"},
+		{paramType: NumberType, expected: "number"},
+		{paramType: BooleanType, expected: "boolean"},
+		{paramType: ListType, expected: "list"},
 	}
 
 	for _, test := range tests {

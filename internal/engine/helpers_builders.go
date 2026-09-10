@@ -13,7 +13,8 @@ func (e *Engine) assembleDockerCommand(operation, resource, name string, options
 	var dockerCmd []string
 	dockerCmd = append(dockerCmd, "docker")
 
-	if operation == "compose" {
+	switch {
+	case operation == "compose":
 		dockerCmd = append(dockerCmd, "compose")
 		if raw, exists := options["args"]; exists && strings.TrimSpace(raw) != "" {
 			return strings.TrimSpace(strings.Join(dockerCmd, " ") + " " + strings.TrimSpace(raw))
@@ -21,7 +22,7 @@ func (e *Engine) assembleDockerCommand(operation, resource, name string, options
 		if command, exists := options["command"]; exists && command != "" {
 			dockerCmd = append(dockerCmd, command)
 		}
-	} else if operation == "scale" && resource == "compose" {
+	case operation == "scale" && resource == "compose":
 		dockerCmd = append(dockerCmd, "compose", "scale")
 		if name != "" {
 			if replicas, exists := options["replicas"]; exists && replicas != "" {
@@ -30,7 +31,7 @@ func (e *Engine) assembleDockerCommand(operation, resource, name string, options
 				dockerCmd = append(dockerCmd, name)
 			}
 		}
-	} else {
+	default:
 		dockerCmd = append(dockerCmd, operation)
 		if resource != "" {
 			dockerCmd = append(dockerCmd, resource)

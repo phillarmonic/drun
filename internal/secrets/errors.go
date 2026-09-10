@@ -17,10 +17,10 @@ var (
 
 // SecretError wraps an error with additional context
 type SecretError struct {
+	Err       error
 	Namespace string
 	Key       string
 	Op        string
-	Err       error
 }
 
 func (e *SecretError) Error() string {

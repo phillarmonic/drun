@@ -261,9 +261,9 @@ func truncateString(s string, maxLen int) string {
 
 // DomainDebugInfo contains debug information about the domain layer
 type DomainDebugInfo struct {
-	TaskRegistry       interface{}
-	DependencyResolver interface{}
-	ParameterValidator interface{}
+	TaskRegistry       any
+	DependencyResolver any
+	ParameterValidator any
 }
 
 // DebugDomain prints domain layer information (task registry, dependencies, params)
@@ -274,7 +274,7 @@ func DebugDomain(info DomainDebugInfo) {
 
 	// Task Registry Debug
 	if taskReg, ok := info.TaskRegistry.(interface {
-		List() []interface{}
+		List() []any
 		Count() int
 	}); ok {
 		fmt.Println("📋 Task Registry:")

@@ -387,7 +387,7 @@ task "download_multiple":
 	}
 
 	// Check all three download statements
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, ok := task.Body[i].(*ast.DownloadStatement)
 		if !ok {
 			t.Fatalf("statement %d should be DownloadStatement. got=%T", i, task.Body[i])

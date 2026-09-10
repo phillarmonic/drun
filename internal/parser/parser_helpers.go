@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -31,7 +32,7 @@ func (p *Parser) parseAnnotation() *ast.Annotation {
 
 	for {
 		if !p.expectPeek(lexer.STRING) {
-			p.addError(fmt.Sprintf("expected string argument in @%s", annotation.Name))
+			p.addError("expected string argument in @" + annotation.Name)
 			return nil
 		}
 		annotation.Args = append(annotation.Args, p.curToken.Literal)
@@ -378,11 +379,9 @@ func (p *Parser) expectPeek(t lexer.TokenType) bool {
 
 // expectPeekOneOf checks the peek token against several allowed types and advances if one matches.
 func (p *Parser) expectPeekOneOf(types ...lexer.TokenType) bool {
-	for _, t := range types {
-		if p.peekToken.Type == t {
-			p.nextToken()
-			return true
-		}
+	if slices.Contains(types, p.peekToken.Type) {
+		p.nextToken()
+		return true
 	}
 
 	expected := make([]string, 0, len(types))
@@ -560,11 +559,9 @@ func (p *Parser) validateVariableName(name string) bool {
 		"$params",  // Used to access project parameters
 	}
 
-	for _, reserved := range reservedNames {
-		if name == reserved {
-			p.addError(fmt.Sprintf("cannot use reserved variable name '%s'", name))
-			return false
-		}
+	if slices.Contains(reservedNames, name) {
+		p.addError(fmt.Sprintf("cannot use reserved variable name '%s'", name))
+		return false
 	}
 
 	return true
@@ -633,9 +630,9 @@ func (p *Parser) isPortCheckPattern() bool {
 	if currentPos >= 0 && currentPos < len(input) {
 		// Find "if" after current position
 		remaining := input[currentPos:]
-		ifIndex := strings.Index(remaining, "if")
-		if ifIndex >= 0 {
-			afterIf := remaining[ifIndex+2:]
+		_, after, ok := strings.Cut(remaining, "if")
+		if ok {
+			afterIf := after
 			// Skip whitespace and look for "port"
 			afterIf = strings.TrimLeft(afterIf, " \t")
 			return strings.HasPrefix(afterIf, "port")

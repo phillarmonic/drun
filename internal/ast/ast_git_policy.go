@@ -11,15 +11,15 @@ import (
 // It defines branch naming rules, commit message patterns, banned messages,
 // and signing requirements.
 type GitPolicyStatement struct {
-	Token                lexer.Token
+	BranchPattern        string // e.g. "{type}/{identifier}-{description}"
+	CommitPattern        string // e.g. "{identifier}: {message}"
 	DefaultBranches      []string
 	ProtectedBranches    []string
-	BranchPattern        string   // e.g. "{type}/{identifier}-{description}"
 	BranchTypes          []string // e.g. ["feat", "fix", "hotfix", "chore"]
-	CommitPattern        string   // e.g. "{identifier}: {message}"
-	ExtractIdentifier    bool     // extract identifier from branch name
-	CommitMinLength      int      // minimum commit message length (0 = no limit)
 	CommitBans           []string // banned commit message patterns (exact match)
+	Token                lexer.Token
+	CommitMinLength      int  // minimum commit message length (0 = no limit)
+	ExtractIdentifier    bool // extract identifier from branch name
 	EnforceSignedCommits bool
 }
 

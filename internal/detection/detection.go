@@ -13,22 +13,22 @@ import (
 // Detector handles smart detection of tools, frameworks, and environments
 type Detector struct {
 	// Cache for detection results to avoid repeated checks
-	cache map[string]interface{}
+	cache map[string]any
 }
 
 // NewDetector creates a new detector instance
 func NewDetector() *Detector {
 	return &Detector{
-		cache: make(map[string]interface{}),
+		cache: make(map[string]any),
 	}
 }
 
 // DetectionResult represents the result of a detection operation
 type DetectionResult struct {
-	Available bool
+	Details   map[string]string
 	Version   string
 	Path      string
-	Details   map[string]string
+	Available bool
 }
 
 // IsToolAvailable checks if a tool is available in the system
@@ -38,7 +38,7 @@ func (d *Detector) IsToolAvailable(tool string) bool {
 		return cached.(bool)
 	}
 
-	available := false
+	var available bool
 	switch strings.ToLower(tool) {
 	case "docker":
 		available = d.isCommandAvailable("docker")
@@ -111,7 +111,7 @@ func (d *Detector) GetToolVersion(tool string) string {
 		return cached.(string)
 	}
 
-	version := ""
+	var version string
 	switch strings.ToLower(tool) {
 	case "docker":
 		version = d.getCommandVersion("docker", "--version", `Docker version (\d+\.\d+\.\d+)`)
@@ -168,13 +168,14 @@ func (d *Detector) DetectEnvironment() string {
 	env := "local" // default
 
 	// Check for CI environments
-	if d.isCIEnvironment() {
+	switch {
+	case d.isCIEnvironment():
 		env = "ci"
-	} else if d.isProductionEnvironment() {
+	case d.isProductionEnvironment():
 		env = "production"
-	} else if d.isStagingEnvironment() {
+	case d.isStagingEnvironment():
 		env = "staging"
-	} else if d.isDevelopmentEnvironment() {
+	case d.isDevelopmentEnvironment():
 		env = "development"
 	}
 
@@ -421,12 +422,9 @@ func (d *Detector) parseVersion(version string) []int {
 }
 
 func (d *Detector) compareVersions(v1, v2 []int) int {
-	maxLen := len(v1)
-	if len(v2) > maxLen {
-		maxLen = len(v2)
-	}
+	maxLen := max(len(v2), len(v1))
 
-	for i := 0; i < maxLen; i++ {
+	for i := range maxLen {
 		n1, n2 := 0, 0
 		if i < len(v1) {
 			n1 = v1[i]

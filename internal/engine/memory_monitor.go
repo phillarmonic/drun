@@ -7,10 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
+	"github.com/phillarmonic/drun/v2/internal/debug"
 )
+
+// labelGoroutine attaches the pprof labels that Go 1.27 prints next to the
+// goroutine state in tracebacks, so a panic or SIGQUIT dump names the drun
+// component instead of an anonymous goroutine. The context must not be nil.
+func labelGoroutine(ctx context.Context, pairs ...string) {
+	pprof.SetGoroutineLabels(pprof.WithLabels(ctx, pprof.Labels(pairs...)))
+}
 
 const (
 	// Memory thresholds
@@ -29,18 +38,18 @@ type MemoryMonitor struct {
 
 // MemoryStats holds memory usage information
 type MemoryStats struct {
+	Timestamp    time.Time `json:"timestamp"`
 	AllocMB      uint64    `json:"alloc_mb"`
 	TotalAllocMB uint64    `json:"total_alloc_mb"`
 	SysMB        uint64    `json:"sys_mb"`
 	NumGC        uint32    `json:"num_gc"`
-	Timestamp    time.Time `json:"timestamp"`
 }
 
 // DiagnosticDump contains all diagnostic information
 type DiagnosticDump struct {
-	MemoryStats MemoryStats            `json:"memory_stats"`
-	Program     *ast.Program           `json:"program"`
-	RuntimeInfo map[string]interface{} `json:"runtime_info"`
+	Program     *ast.Program   `json:"program"`
+	RuntimeInfo map[string]any `json:"runtime_info"`
+	MemoryStats MemoryStats    `json:"memory_stats"`
 }
 
 // NewMemoryMonitor creates a new memory monitor
@@ -65,6 +74,8 @@ func (m *MemoryMonitor) Stop() {
 
 // monitorLoop runs the monitoring loop
 func (m *MemoryMonitor) monitorLoop() {
+	labelGoroutine(m.ctx, "drun.component", "memory-monitor")
+
 	ticker := time.NewTicker(CheckIntervalMS * time.Millisecond)
 	defer ticker.Stop()
 
@@ -114,7 +125,7 @@ func (m *MemoryMonitor) dumpDiagnostics(mem runtime.MemStats) {
 	dump := DiagnosticDump{
 		MemoryStats: stats,
 		Program:     m.program,
-		RuntimeInfo: map[string]interface{}{
+		RuntimeInfo: map[string]any{
 			"go_version":    runtime.Version(),
 			"num_goroutine": runtime.NumGoroutine(),
 			"num_cpu":       runtime.NumCPU(),
@@ -136,10 +147,15 @@ func (m *MemoryMonitor) dumpDiagnostics(mem runtime.MemStats) {
 	// Write JSON dump
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(dump); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write dump: %v\n", err)
+	if encodeErr := encoder.Encode(dump); encodeErr != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write dump: %v\n", encodeErr)
 		return
 	}
+
+	// Go 1.27's goroutineleak profile names the goroutines that can never make
+	// progress, which is one of the ways memory runs away in the first place.
+	// Capturing it costs nothing until this crash path runs.
+	leakPath, leakErr := debug.WriteGoroutineLeakProfile(".")
 
 	// Also create a simple text summary
 	summaryFile := fmt.Sprintf("drun-crash-summary-%s.txt", time.Now().Format("20060102-150405"))
@@ -165,6 +181,13 @@ func (m *MemoryMonitor) dumpDiagnostics(mem runtime.MemStats) {
 		_, _ = fmt.Fprintf(f, "  Tasks: %d\n", len(m.program.Tasks))
 		if m.program.Project != nil {
 			_, _ = fmt.Fprintf(f, "  Project: %s\n", m.program.Project.Name)
+		}
+		if leakErr == nil {
+			_, _ = fmt.Fprintf(f, "\nGoroutineleak profile: %s\n", leakPath)
+		}
+		_, _ = fmt.Fprintf(f, "\nLeaked goroutines:\n")
+		if captureErr := debug.CaptureGoroutineLeakProfile(f, 1); captureErr != nil {
+			_, _ = fmt.Fprintf(f, "  unavailable: %v\n", captureErr)
 		}
 		_, _ = fmt.Fprintf(f, "\nFull details in: %s\n", filename)
 	}

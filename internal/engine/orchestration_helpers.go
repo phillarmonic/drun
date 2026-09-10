@@ -1,18 +1,19 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
 
 func (e *Engine) resolveOrchestrateServicesBuiltin(execCtx *ExecutionContext, args []string) (string, error) {
 	if execCtx == nil || execCtx.Program == nil {
-		return "", fmt.Errorf("no orchestration context available")
+		return "", errors.New("no orchestration context available")
 	}
 
 	groupName := strings.TrimSpace(args[0])
 	if groupName == "" {
-		return "", fmt.Errorf("orchestrate services requires an orchestration name")
+		return "", errors.New("orchestrate services requires an orchestration name")
 	}
 
 	var orchestrationServices []string

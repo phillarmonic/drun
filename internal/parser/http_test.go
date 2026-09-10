@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -40,7 +41,7 @@ task "api_test":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "GET" {
+	if httpStmt.Method != http.MethodGet {
 		t.Errorf("http method not 'GET'. got=%q", httpStmt.Method)
 	}
 
@@ -73,7 +74,7 @@ task "create_user":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "POST" {
+	if httpStmt.Method != http.MethodPost {
 		t.Errorf("http method not 'POST'. got=%q", httpStmt.Method)
 	}
 
@@ -111,7 +112,7 @@ task "api_with_headers":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "GET" {
+	if httpStmt.Method != http.MethodGet {
 		t.Errorf("http method not 'GET'. got=%q", httpStmt.Method)
 	}
 
@@ -144,7 +145,7 @@ task "authenticated_request":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "GET" {
+	if httpStmt.Method != http.MethodGet {
 		t.Errorf("http method not 'GET'. got=%q", httpStmt.Method)
 	}
 
@@ -177,7 +178,7 @@ task "json_request":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "POST" {
+	if httpStmt.Method != http.MethodPost {
 		t.Errorf("http method not 'POST'. got=%q", httpStmt.Method)
 	}
 
@@ -214,7 +215,7 @@ task "accept_json":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "GET" {
+	if httpStmt.Method != http.MethodGet {
 		t.Errorf("http method not 'GET'. got=%q", httpStmt.Method)
 	}
 
@@ -247,7 +248,7 @@ task "timeout_request":
 		t.Fatalf("first statement should be HTTPStatement. got=%T", task.Body[0])
 	}
 
-	if httpStmt.Method != "GET" {
+	if httpStmt.Method != http.MethodGet {
 		t.Errorf("http method not 'GET'. got=%q", httpStmt.Method)
 	}
 

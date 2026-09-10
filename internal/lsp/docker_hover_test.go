@@ -9,8 +9,8 @@ func TestDockerNetworkHover(t *testing.T) {
 	tests := []struct {
 		name   string
 		line   string
-		column int
 		want   []string
+		column int
 	}{
 		{
 			name:   "if docker network condition wins over plain if",

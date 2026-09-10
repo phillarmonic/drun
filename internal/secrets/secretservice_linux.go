@@ -27,7 +27,7 @@ func NewSecretServiceBackend() (Backend, error) {
 	}
 
 	secretsDir := filepath.Join(homeDir, ".drun")
-	_ = os.MkdirAll(secretsDir, 0700)
+	_ = os.MkdirAll(secretsDir, 0o700)
 
 	indexPath := filepath.Join(secretsDir, "secrets-index.json")
 
@@ -160,5 +160,5 @@ func (s *SecretServiceBackend) saveIndexUnsafe(keys []string) error {
 		return err
 	}
 
-	return os.WriteFile(s.indexPath, data, 0600)
+	return os.WriteFile(s.indexPath, data, 0o600)
 }

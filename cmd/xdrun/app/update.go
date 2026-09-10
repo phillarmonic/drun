@@ -2,7 +2,8 @@ package app
 
 import (
 	"bufio"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,13 +21,13 @@ import (
 
 // GitHubRelease represents a GitHub release response
 type GitHubRelease struct {
-	TagName    string `json:"tag_name"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
-	Assets     []struct {
+	TagName string `json:"tag_name"`
+	Assets  []struct {
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
+	Draft      bool `json:"draft"`
+	Prerelease bool `json:"prerelease"`
 }
 
 const githubReleasesAPI = "https://api.github.com/repos/phillarmonic/drun/releases"
@@ -89,7 +90,7 @@ func HandleSelfUpdate(versionStr string) error {
 		fmt.Printf("❌  Update failed: %v\n", err)
 		fmt.Println("🔄  Restoring backup...")
 		if restoreErr := restoreBackup(backupPath, currentExe); restoreErr != nil {
-			return fmt.Errorf("update failed and backup restoration failed: %v (original error: %w)", restoreErr, err)
+			return fmt.Errorf("update failed and backup restoration failed: %w (original error: %w)", restoreErr, err)
 		}
 		fmt.Println("✅  Backup restored successfully")
 		return err
@@ -181,7 +182,7 @@ func getReleases() ([]GitHubRelease, error) {
 	}
 
 	var releases []GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &releases); err != nil {
 		return nil, fmt.Errorf("failed to parse release information: %w", err)
 	}
 
@@ -206,7 +207,7 @@ func getRelease(version string) (GitHubRelease, error) {
 	}
 
 	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &release); err != nil {
 		return GitHubRelease{}, fmt.Errorf("failed to parse release information: %w", err)
 	}
 
@@ -242,7 +243,7 @@ func createBackup(currentExe, versionStr string) (string, error) {
 	}
 
 	backupDir := filepath.Join(homeDir, ".drun")
-	if err := os.MkdirAll(backupDir, 0750); err != nil {
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -262,7 +263,7 @@ func createBackup(currentExe, versionStr string) (string, error) {
 
 	// Make backup executable
 	// #nosec G302 -- backups must remain executable for rollback verification by the current user.
-	if err := os.Chmod(backupPath, 0700); err != nil {
+	if err := os.Chmod(backupPath, 0o700); err != nil {
 		return "", fmt.Errorf("failed to make backup executable: %w", err)
 	}
 
@@ -333,7 +334,7 @@ func downloadAndInstall(version, targetPath string) error {
 
 	// Make temp file executable
 	// #nosec G302 -- the downloaded binary must be executable for local verification by the current user.
-	if err := os.Chmod(tempFile.Name(), 0700); err != nil {
+	if err := os.Chmod(tempFile.Name(), 0o700); err != nil {
 		return fmt.Errorf("failed to make binary executable: %w", err)
 	}
 
@@ -496,7 +497,7 @@ func installBinaryWindows(sourcePath, targetPath string) error {
 		return nil
 	}
 
-	return fmt.Errorf("windows cannot replace the running executable in place; a restart may be required to complete the update")
+	return errors.New("windows cannot replace the running executable in place; a restart may be required to complete the update")
 }
 
 func desiredInstallMode(sourcePath, targetPath string) (os.FileMode, error) {
@@ -518,7 +519,7 @@ func desiredInstallMode(sourcePath, targetPath string) (os.FileMode, error) {
 
 func verifyInstalledBinary(binaryPath string) error {
 	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
+	for range 3 {
 		// #nosec G204 -- self-update verifies the exact executable path that was just installed.
 		cmd := exec.Command(binaryPath, "--version")
 		cmd.Stdout = os.Stdout
@@ -559,8 +560,8 @@ func copyFile(src, dst string) error {
 		}
 	}()
 
-	if _, err := io.Copy(destFile, sourceFile); err != nil {
-		return err
+	if _, copyErr := io.Copy(destFile, sourceFile); copyErr != nil {
+		return copyErr
 	}
 
 	// Copy permissions
@@ -590,8 +591,8 @@ func cleanupOldBackups(backupDir string) {
 
 	// Sort files by modification time (newest first)
 	type fileInfo struct {
-		path    string
 		modTime time.Time
+		path    string
 	}
 
 	var fileInfos []fileInfo

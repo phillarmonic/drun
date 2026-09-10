@@ -25,43 +25,43 @@ type documentSymbolParams struct {
 type documentSymbol struct {
 	Name           string           `json:"name"`
 	Detail         string           `json:"detail,omitempty"`
-	Kind           int              `json:"kind"`
+	Children       []documentSymbol `json:"children,omitempty"`
 	Range          lspRange         `json:"range"`
 	SelectionRange lspRange         `json:"selectionRange"`
-	Children       []documentSymbol `json:"children,omitempty"`
+	Kind           int              `json:"kind"`
 }
 
 type symbolPattern struct {
 	re        *regexp.Regexp
-	kind      int
 	label     string
+	kind      int
 	container bool
 }
 
 var documentSymbolPatterns = []symbolPattern{
-	{regexp.MustCompile(`^version\s*:\s*(\S+)`), symbolKindConstant, "Language version", false},
-	{regexp.MustCompile(`^project\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`), symbolKindNamespace, "Project", true},
-	{regexp.MustCompile(`^template\s+task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), symbolKindFunction, "Task template", true},
-	{regexp.MustCompile(`^task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), symbolKindFunction, "Task", true},
-	{regexp.MustCompile(`^service\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), symbolKindClass, "Service", true},
-	{regexp.MustCompile(`^orchestrate\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))(?::|\s+means)`), symbolKindClass, "Orchestration", true},
-	{regexp.MustCompile(`^snippet\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), symbolKindFunction, "Snippet", true},
-	{regexp.MustCompile(`^requires\s+tools\s*:`), symbolKindObject, "Required tools", true},
-	{regexp.MustCompile(`^provisioning\s+sources\s*:`), symbolKindObject, "Provisioning sources", true},
-	{regexp.MustCompile(`^git\s+policy\s*:`), symbolKindObject, "Git policy", true},
-	{regexp.MustCompile(`^shell\s+config\s*:`), symbolKindObject, "Shell configuration", true},
-	{regexp.MustCompile(`^scm\s*:`), symbolKindModule, "SCM", true},
-	{regexp.MustCompile(`^(?:given|requires)\s+(\$[A-Za-z_][A-Za-z0-9_-]*)`), symbolKindVariable, "Parameter", false},
-	{regexp.MustCompile(`^depends\s+on\s+(.+)$`), symbolKindOperator, "Depends on", false},
-	{regexp.MustCompile(`^call\s+task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), symbolKindMethod, "Calls task", false},
-	{regexp.MustCompile(`^else\s+if\s+(.+):$`), symbolKindOperator, "Else if", true},
-	{regexp.MustCompile(`^if\s+(.+):$`), symbolKindOperator, "If", true},
-	{regexp.MustCompile(`^when\s+(.+):$`), symbolKindOperator, "When", true},
-	{regexp.MustCompile(`^otherwise\s*:$`), symbolKindOperator, "Otherwise", true},
-	{regexp.MustCompile(`^for\s+each\s+(.+):$`), symbolKindOperator, "For each", true},
-	{regexp.MustCompile(`^try\s*:$`), symbolKindOperator, "Try", true},
-	{regexp.MustCompile(`^catch(?:\s+(.+))?\s*:$`), symbolKindOperator, "Catch", true},
-	{regexp.MustCompile(`^use\s+workdir\s+(?:"([^"]+)"|(\S+))\s*:$`), symbolKindFile, "Working directory", true},
+	{re: regexp.MustCompile(`^version\s*:\s*(\S+)`), kind: symbolKindConstant, label: "Language version", container: false},
+	{re: regexp.MustCompile(`^project\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`), kind: symbolKindNamespace, label: "Project", container: true},
+	{re: regexp.MustCompile(`^template\s+task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), kind: symbolKindFunction, label: "Task template", container: true},
+	{re: regexp.MustCompile(`^task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), kind: symbolKindFunction, label: "Task", container: true},
+	{re: regexp.MustCompile(`^service\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), kind: symbolKindClass, label: "Service", container: true},
+	{re: regexp.MustCompile(`^orchestrate\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))(?::|\s+means)`), kind: symbolKindClass, label: "Orchestration", container: true},
+	{re: regexp.MustCompile(`^snippet\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), kind: symbolKindFunction, label: "Snippet", container: true},
+	{re: regexp.MustCompile(`^requires\s+tools\s*:`), kind: symbolKindObject, label: "Required tools", container: true},
+	{re: regexp.MustCompile(`^provisioning\s+sources\s*:`), kind: symbolKindObject, label: "Provisioning sources", container: true},
+	{re: regexp.MustCompile(`^git\s+policy\s*:`), kind: symbolKindObject, label: "Git policy", container: true},
+	{re: regexp.MustCompile(`^shell\s+config\s*:`), kind: symbolKindObject, label: "Shell configuration", container: true},
+	{re: regexp.MustCompile(`^scm\s*:`), kind: symbolKindModule, label: "SCM", container: true},
+	{re: regexp.MustCompile(`^(?:given|requires)\s+(\$[A-Za-z_][A-Za-z0-9_-]*)`), kind: symbolKindVariable, label: "Parameter", container: false},
+	{re: regexp.MustCompile(`^depends\s+on\s+(.+)$`), kind: symbolKindOperator, label: "Depends on", container: false},
+	{re: regexp.MustCompile(`^call\s+task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`), kind: symbolKindMethod, label: "Calls task", container: false},
+	{re: regexp.MustCompile(`^else\s+if\s+(.+):$`), kind: symbolKindOperator, label: "Else if", container: true},
+	{re: regexp.MustCompile(`^if\s+(.+):$`), kind: symbolKindOperator, label: "If", container: true},
+	{re: regexp.MustCompile(`^when\s+(.+):$`), kind: symbolKindOperator, label: "When", container: true},
+	{re: regexp.MustCompile(`^otherwise\s*:$`), kind: symbolKindOperator, label: "Otherwise", container: true},
+	{re: regexp.MustCompile(`^for\s+each\s+(.+):$`), kind: symbolKindOperator, label: "For each", container: true},
+	{re: regexp.MustCompile(`^try\s*:$`), kind: symbolKindOperator, label: "Try", container: true},
+	{re: regexp.MustCompile(`^catch(?:\s+(.+))?\s*:$`), kind: symbolKindOperator, label: "Catch", container: true},
+	{re: regexp.MustCompile(`^use\s+workdir\s+(?:"([^"]+)"|(\S+))\s*:$`), kind: symbolKindFile, label: "Working directory", container: true},
 }
 
 type openDocumentSymbol struct {

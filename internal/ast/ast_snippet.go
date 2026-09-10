@@ -2,36 +2,41 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // SnippetStatement represents a reusable code block
 type SnippetStatement struct {
-	Token       lexer.Token
 	Name        string
 	Annotations []Annotation
 	Body        []Statement
+	Token       lexer.Token
 }
 
 func (ss *SnippetStatement) statementNode()      {}
 func (ss *SnippetStatement) projectSettingNode() {}
 func (ss *SnippetStatement) String() string {
 	var out string
+	var outSb21 strings.Builder
 	for _, annotation := range ss.Annotations {
-		out += annotation.String() + "\n"
+		outSb21.WriteString(annotation.String() + "\n")
 	}
+	out += outSb21.String()
 	out += fmt.Sprintf("snippet \"%s\":", ss.Name)
+	var outSb25 strings.Builder
 	for _, stmt := range ss.Body {
-		out += "\n  " + stmt.String()
+		outSb25.WriteString("\n  " + stmt.String())
 	}
+	out += outSb25.String()
 	return out
 }
 
 // UseSnippetStatement represents using a snippet
 type UseSnippetStatement struct {
-	Token       lexer.Token
 	SnippetName string
+	Token       lexer.Token
 }
 
 func (uss *UseSnippetStatement) statementNode() {}

@@ -1,0 +1,66 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+
+  enable:
+    # Error handling
+    - errorlint
+    - nilerr
+    - nilnesserr
+    - nilnil
+
+    # Bugs / correctness
+    - bodyclose
+    - contextcheck
+    - durationcheck
+    - govet
+    - staticcheck
+    - wastedassign
+
+    # Resource handling
+    - rowserrcheck
+    - sqlclosecheck
+
+    # Security
+    - gosec
+
+    # Code quality
+    - gocritic
+    - misspell
+    - unconvert
+    - predeclared
+
+    # Modern Go
+    - modernize
+    - perfsprint
+    - usestdlibvars
+
+    # Linter hygiene
+    - nolintlint
+
+  settings:
+    govet:
+      enable-all: true
+
+  exclusions:
+    generated: strict
+
+    rules:
+      # Tests are allowed to be a little less strict.
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

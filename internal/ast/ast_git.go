@@ -2,17 +2,18 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // GitStatement represents Git operations
 type GitStatement struct {
-	Token     lexer.Token
+	Options   map[string]string
 	Operation string
 	Resource  string
 	Name      string
-	Options   map[string]string
+	Token     lexer.Token
 }
 
 func (gs *GitStatement) statementNode() {}
@@ -27,9 +28,11 @@ func (gs *GitStatement) String() string {
 		out += fmt.Sprintf(" \"%s\"", gs.Name)
 	}
 
+	var outSb30 strings.Builder
 	for key, value := range gs.Options {
-		out += fmt.Sprintf(" %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb30, " %s \"%s\"", key, value)
 	}
+	out += outSb30.String()
 
 	return out
 }

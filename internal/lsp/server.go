@@ -3,7 +3,9 @@ package lsp
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -28,8 +30,10 @@ const (
 	completionTextFormatSnippet = 2
 )
 
-var taskNamePattern = regexp.MustCompile(`(?m)^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
-var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z_][A-Za-z0-9_-]*\}\}`)
+var (
+	taskNamePattern            = regexp.MustCompile(`(?m)^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_-]*))`)
+	templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z_][A-Za-z0-9_-]*\}\}`)
+)
 
 var keywordCompletions = []completionItem{
 	{Label: "task", Kind: completionItemKindKeyword, Detail: "Declare a task"},
@@ -99,35 +103,35 @@ type serverState struct {
 }
 
 type message struct {
-	JSONRPC string          `json:"jsonrpc,omitempty"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Result  any             `json:"result,omitempty"`
-	Error   *responseError  `json:"error,omitempty"`
+	Result  any            `json:"result,omitempty"`
+	Error   *responseError `json:"error,omitempty"`
+	JSONRPC string         `json:"jsonrpc,omitempty"`
+	Method  string         `json:"method,omitempty"`
+	ID      jsontext.Value `json:"id,omitempty"`
+	Params  jsontext.Value `json:"params,omitempty"`
 }
 
 type responseError struct {
-	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Code    int    `json:"code"`
 }
 
 type initializeResult struct {
-	Capabilities serverCapabilities `json:"capabilities"`
 	ServerInfo   serverInfo         `json:"serverInfo"`
+	Capabilities serverCapabilities `json:"capabilities"`
 }
 
 type serverCapabilities struct {
-	TextDocumentSync       int                `json:"textDocumentSync"`
 	CompletionProvider     *completionOptions `json:"completionProvider,omitempty"`
+	TextDocumentSync       int                `json:"textDocumentSync"`
 	HoverProvider          bool               `json:"hoverProvider"`
 	DefinitionProvider     bool               `json:"definitionProvider"`
 	DocumentSymbolProvider bool               `json:"documentSymbolProvider"`
 }
 
 type completionOptions struct {
-	ResolveProvider   bool     `json:"resolveProvider"`
 	TriggerCharacters []string `json:"triggerCharacters,omitempty"`
+	ResolveProvider   bool     `json:"resolveProvider"`
 }
 
 type serverInfo struct {
@@ -142,8 +146,8 @@ type textDocumentIdentifier struct {
 type textDocumentItem struct {
 	URI        string `json:"uri"`
 	LanguageID string `json:"languageId,omitempty"`
-	Version    int    `json:"version,omitempty"`
 	Text       string `json:"text"`
+	Version    int    `json:"version,omitempty"`
 }
 
 type didOpenParams struct {
@@ -194,10 +198,10 @@ type publishDiagnosticsParams struct {
 }
 
 type diagnostic struct {
-	Range    lspRange `json:"range"`
-	Severity int      `json:"severity,omitempty"`
 	Source   string   `json:"source,omitempty"`
 	Message  string   `json:"message"`
+	Range    lspRange `json:"range"`
+	Severity int      `json:"severity,omitempty"`
 }
 
 type lspRange struct {
@@ -211,18 +215,18 @@ type position struct {
 }
 
 type completionItem struct {
-	Label            string         `json:"label"`
-	Kind             int            `json:"kind,omitempty"`
-	Detail           string         `json:"detail,omitempty"`
 	Documentation    *markupContent `json:"documentation,omitempty"`
-	InsertText       string         `json:"insertText,omitempty"`
-	InsertTextFormat int            `json:"insertTextFormat,omitempty"`
 	TextEdit         *textEdit      `json:"textEdit,omitempty"`
+	Label            string         `json:"label"`
+	Detail           string         `json:"detail,omitempty"`
+	InsertText       string         `json:"insertText,omitempty"`
+	Kind             int            `json:"kind,omitempty"`
+	InsertTextFormat int            `json:"insertTextFormat,omitempty"`
 }
 
 type textEdit struct {
-	Range   lspRange `json:"range"`
 	NewText string   `json:"newText"`
+	Range   lspRange `json:"range"`
 }
 
 func NewServer(in io.Reader, out io.Writer) *Server {
@@ -237,14 +241,14 @@ func (s *Server) Run() error {
 	for {
 		payload, err := s.readPayload()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
 		}
 
 		var msg message
-		if err := json.Unmarshal(payload, &msg); err != nil {
+		if unmarshalErr := json.Unmarshal(payload, &msg); unmarshalErr != nil {
 			if writeErr := s.writeResponse(message{
 				JSONRPC: "2.0",
 				ID:      msg.ID,
@@ -304,7 +308,7 @@ func (s *Server) handleMessage(msg message) (bool, error) {
 		if s.state.shutdownRequested {
 			return true, nil
 		}
-		return false, fmt.Errorf("received exit before shutdown")
+		return false, errors.New("received exit before shutdown")
 	case "textDocument/didOpen":
 		var params didOpenParams
 		if err := json.Unmarshal(msg.Params, &params); err != nil {
@@ -409,7 +413,7 @@ func diagnosticsForSource(uri, text string) []diagnostic {
 		return []diagnostic{}
 	}
 
-	if errorList, ok := err.(*drunErrors.ParseErrorList); ok {
+	if errorList, ok := errors.AsType[*drunErrors.ParseErrorList](err); ok {
 		diagnostics := make([]diagnostic, 0, len(errorList.Errors))
 		for _, parseErr := range errorList.Errors {
 			startLine := max(parseErr.Token.Line-1, 0)
@@ -620,7 +624,7 @@ func (s *Server) writeMessage(msg message) error {
 	return err
 }
 
-func mustMarshal(v any) json.RawMessage {
+func mustMarshal(v any) jsontext.Value {
 	data, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
@@ -647,11 +651,4 @@ func filenameFromURI(raw string) string {
 		return raw
 	}
 	return path
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

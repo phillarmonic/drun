@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -84,10 +85,10 @@ type shellProvider struct {
 	name string
 }
 
-func (s shellProvider) GetProjectName() string             { return "" }
-func (s shellProvider) GetSecretsManager() SecretsManager  { return nil }
-func (s shellProvider) IsDryRun() bool                     { return false }
-func (s shellProvider) GetActiveShell() string             { return s.name }
+func (s shellProvider) GetProjectName() string            { return "" }
+func (s shellProvider) GetSecretsManager() SecretsManager { return nil }
+func (s shellProvider) IsDryRun() bool                    { return false }
+func (s shellProvider) GetActiveShell() string            { return s.name }
 
 func TestGetActiveShell(t *testing.T) {
 	// With a provider, the reported shell is used.
@@ -514,14 +515,14 @@ func TestTimerFunctions(t *testing.T) {
 
 func TestProgressBar(t *testing.T) {
 	tests := []struct {
-		percentage int
 		expected   string
+		percentage int
 	}{
-		{0, "[░░░░░░░░░░░░░░░░░░░░]"},
-		{25, "[█████░░░░░░░░░░░░░░░]"},
-		{50, "[██████████░░░░░░░░░░]"},
-		{75, "[███████████████░░░░░]"},
-		{100, "[████████████████████]"},
+		{percentage: 0, expected: "[░░░░░░░░░░░░░░░░░░░░]"},
+		{percentage: 25, expected: "[█████░░░░░░░░░░░░░░░]"},
+		{percentage: 50, expected: "[██████████░░░░░░░░░░]"},
+		{percentage: 75, expected: "[███████████████░░░░░]"},
+		{percentage: 100, expected: "[████████████████████]"},
 	}
 
 	for _, test := range tests {
@@ -536,7 +537,6 @@ func TestDetectDockerComposeCommand(t *testing.T) {
 	// This test will check if the detection logic works
 	// Note: The actual result depends on what's installed on the system
 	cmd, err := detectDockerComposeCommand()
-
 	if err != nil {
 		// If neither docker compose nor docker-compose is available, that's fine for testing
 		// We just want to make sure the function handles this case properly
@@ -553,15 +553,16 @@ func TestDetectDockerComposeCommand(t *testing.T) {
 	}
 
 	// Should be either ["docker", "compose"] or ["docker-compose"]
-	if len(cmd) == 2 {
+	switch {
+	case len(cmd) == 2:
 		if cmd[0] != "docker" || cmd[1] != "compose" {
 			t.Errorf("Expected [docker, compose], got %v", cmd)
 		}
-	} else if len(cmd) == 1 {
+	case len(cmd) == 1:
 		if cmd[0] != "docker-compose" {
 			t.Errorf("Expected [docker-compose], got %v", cmd)
 		}
-	} else {
+	default:
 		t.Errorf("Unexpected command format: %v", cmd)
 	}
 }
@@ -647,20 +648,13 @@ func TestIsCommandAvailable(t *testing.T) {
 func TestCheckDockerComposeStatus(t *testing.T) {
 	// Test with current directory (should work even if no compose project exists)
 	result, err := checkDockerComposeStatus(nil)
-
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// If docker compose is available, we should get a valid status
 	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
-	found := false
-	for _, status := range validStatuses {
-		if result == status {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(validStatuses, result)
 
 	if !found {
 		t.Errorf("Expected one of %v, got %s", validStatuses, result)
@@ -670,7 +664,6 @@ func TestCheckDockerComposeStatus(t *testing.T) {
 func TestCheckDockerComposeStatusWithPath(t *testing.T) {
 	// Test with a non-existent directory
 	result, err := checkDockerComposeStatus(nil, "/non/existent/directory")
-
 	if err != nil {
 		// Should only error when compose is available and the directory change fails.
 		if !strings.Contains(err.Error(), "failed to change to project directory") {
@@ -681,13 +674,7 @@ func TestCheckDockerComposeStatusWithPath(t *testing.T) {
 
 	// If no error, should be a valid status
 	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
-	found := false
-	for _, status := range validStatuses {
-		if result == status {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(validStatuses, result)
 
 	if !found {
 		t.Errorf("Expected one of %v, got %s", validStatuses, result)
@@ -711,13 +698,7 @@ func TestDockerComposeStatusInterpolation(t *testing.T) {
 
 	// If no error, should be a valid status
 	validStatuses := []string{"down", "usable", "unusable", "partial", "unavailable", "error"}
-	found := false
-	for _, status := range validStatuses {
-		if result == status {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(validStatuses, result)
 
 	if !found {
 		t.Errorf("Expected one of %v, got %s", validStatuses, result)

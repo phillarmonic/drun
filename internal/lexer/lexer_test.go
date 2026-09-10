@@ -27,33 +27,33 @@ task "hello world":
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{COMMENT, "# Hello World - Your First drun v2 Task"},
-		{COMMENT, "# This demonstrates the most basic semantic syntax"},
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{TASK, "task"},
-		{STRING, "hello"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "Hello from drun v2! 👋"},
-		{DEDENT, ""},
-		{TASK, "task"},
-		{STRING, "hello world"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{STEP, "step"},
-		{STRING, "Starting hello world example"},
-		{INFO, "info"},
-		{STRING, "Welcome to the semantic task runner!"},
-		{SUCCESS, "success"},
-		{STRING, "Hello world completed successfully!"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: COMMENT, expectedLiteral: "# Hello World - Your First drun v2 Task"},
+		{expectedType: COMMENT, expectedLiteral: "# This demonstrates the most basic semantic syntax"},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "hello"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "Hello from drun v2! 👋"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "hello world"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: STEP, expectedLiteral: "step"},
+		{expectedType: STRING, expectedLiteral: "Starting hello world example"},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "Welcome to the semantic task runner!"},
+		{expectedType: SUCCESS, expectedLiteral: "success"},
+		{expectedType: STRING, expectedLiteral: "Hello world completed successfully!"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, expected := range expectedTokens {
@@ -77,20 +77,20 @@ task "test":
   info "message"`
 
 	tests := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "message"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "message"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	lexer := NewLexer(input)
@@ -114,21 +114,21 @@ func TestLexer_Keywords(t *testing.T) {
 	input := `version task means info step warn error success fail true false`
 
 	tests := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{VERSION, "version"},
-		{TASK, "task"},
-		{MEANS, "means"},
-		{INFO, "info"},
-		{STEP, "step"},
-		{WARN, "warn"},
-		{ERROR, "error"},
-		{SUCCESS, "success"},
-		{FAIL, "fail"},
-		{BOOLEAN, "true"},
-		{BOOLEAN, "false"},
-		{EOF, ""},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: MEANS, expectedLiteral: "means"},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STEP, expectedLiteral: "step"},
+		{expectedType: WARN, expectedLiteral: "warn"},
+		{expectedType: ERROR, expectedLiteral: "error"},
+		{expectedType: SUCCESS, expectedLiteral: "success"},
+		{expectedType: FAIL, expectedLiteral: "fail"},
+		{expectedType: BOOLEAN, expectedLiteral: "true"},
+		{expectedType: BOOLEAN, expectedLiteral: "false"},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	lexer := NewLexer(input)
@@ -156,25 +156,25 @@ func TestLexer_Indentation(t *testing.T) {
 info "level 0"`
 
 	tests := []struct {
-		expectedType TokenType
-		description  string
+		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task keyword"},
-		{STRING, "task name"},
-		{COLON, "colon"},
-		{INDENT, "indent to level 1"},
-		{INFO, "info at level 1"},
-		{STRING, "message"},
-		{INDENT, "indent to level 2"},
-		{INFO, "info at level 2"},
-		{STRING, "message"},
-		{DEDENT, "dedent to level 1"},
-		{INFO, "info back at level 1"},
-		{STRING, "message"},
-		{DEDENT, "dedent to level 0"},
-		{INFO, "info at level 0"},
-		{STRING, "message"},
-		{EOF, "end of file"},
+		{expectedType: TASK, expectedLiteral: "task keyword"},
+		{expectedType: STRING, expectedLiteral: "task name"},
+		{expectedType: COLON, expectedLiteral: "colon"},
+		{expectedType: INDENT, expectedLiteral: "indent to level 1"},
+		{expectedType: INFO, expectedLiteral: "info at level 1"},
+		{expectedType: STRING, expectedLiteral: "message"},
+		{expectedType: INDENT, expectedLiteral: "indent to level 2"},
+		{expectedType: INFO, expectedLiteral: "info at level 2"},
+		{expectedType: STRING, expectedLiteral: "message"},
+		{expectedType: DEDENT, expectedLiteral: "dedent to level 1"},
+		{expectedType: INFO, expectedLiteral: "info back at level 1"},
+		{expectedType: STRING, expectedLiteral: "message"},
+		{expectedType: DEDENT, expectedLiteral: "dedent to level 0"},
+		{expectedType: INFO, expectedLiteral: "info at level 0"},
+		{expectedType: STRING, expectedLiteral: "message"},
+		{expectedType: EOF, expectedLiteral: "end of file"},
 	}
 
 	lexer := NewLexer(input)
@@ -184,7 +184,7 @@ info "level 0"`
 
 		if tok.Type != tt.expectedType {
 			t.Fatalf("tests[%d] (%s) - tokentype wrong. expected=%q, got=%q",
-				i, tt.description, tt.expectedType, tok.Type)
+				i, tt.expectedLiteral, tt.expectedType, tok.Type)
 		}
 	}
 }
@@ -205,49 +205,49 @@ task "test":
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{GIVEN, "given"},
-		{VARIABLE, "$features"},
-		{AS, "as"},
-		{LIST, "list"},
-		{DEFAULTS, "defaults"},
-		{TO, "to"},
-		{EMPTY, "empty"}, // Test that empty is tokenized as EMPTY
-		{GIVEN, "given"},
-		{VARIABLE, "$name"},
-		{DEFAULTS, "defaults"},
-		{TO, "to"},
-		{STRING, ""},
-		{IF, "if"},
-		{VARIABLE, "$features"},
-		{IS, "is"},
-		{EMPTY, "empty"}, // Test that empty is tokenized as EMPTY in conditions
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "Features is empty"},
-		{DEDENT, ""},
-		{IF, "if"},
-		{VARIABLE, "$features"},
-		{IS, "is"},
-		{NOT, "not"},
-		{EMPTY, "empty"}, // Test that empty is tokenized as EMPTY in "is not empty"
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "Features: {$features}"},
-		{DEDENT, ""},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: GIVEN, expectedLiteral: "given"},
+		{expectedType: VARIABLE, expectedLiteral: "$features"},
+		{expectedType: AS, expectedLiteral: "as"},
+		{expectedType: LIST, expectedLiteral: "list"},
+		{expectedType: DEFAULTS, expectedLiteral: "defaults"},
+		{expectedType: TO, expectedLiteral: "to"},
+		{expectedType: EMPTY, expectedLiteral: "empty"}, // Test that empty is tokenized as EMPTY
+		{expectedType: GIVEN, expectedLiteral: "given"},
+		{expectedType: VARIABLE, expectedLiteral: "$name"},
+		{expectedType: DEFAULTS, expectedLiteral: "defaults"},
+		{expectedType: TO, expectedLiteral: "to"},
+		{expectedType: STRING, expectedLiteral: ""},
+		{expectedType: IF, expectedLiteral: "if"},
+		{expectedType: VARIABLE, expectedLiteral: "$features"},
+		{expectedType: IS, expectedLiteral: "is"},
+		{expectedType: EMPTY, expectedLiteral: "empty"}, // Test that empty is tokenized as EMPTY in conditions
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "Features is empty"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: IF, expectedLiteral: "if"},
+		{expectedType: VARIABLE, expectedLiteral: "$features"},
+		{expectedType: IS, expectedLiteral: "is"},
+		{expectedType: NOT, expectedLiteral: "not"},
+		{expectedType: EMPTY, expectedLiteral: "empty"}, // Test that empty is tokenized as EMPTY in "is not empty"
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "Features: {$features}"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -281,22 +281,22 @@ task "test":
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{MULTILINE_COMMENT, "/*\n    Drun Lifecycle Hooks Example\n    This example demonstrates the new tool-level lifecycle hooks\n    that run once at drun startup and shutdown\n*/"},
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{MULTILINE_COMMENT, "/* Another multiline comment */"},
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "Hello World"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: MULTILINE_COMMENT, expectedLiteral: "/*\n    Drun Lifecycle Hooks Example\n    This example demonstrates the new tool-level lifecycle hooks\n    that run once at drun startup and shutdown\n*/"},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: MULTILINE_COMMENT, expectedLiteral: "/* Another multiline comment */"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "Hello World"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -323,11 +323,11 @@ version: 2.0`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{MULTILINE_COMMENT, "/*\n    This comment is not terminated\n    \nversion: 2.0"},
-		{EOF, ""},
+		{expectedType: MULTILINE_COMMENT, expectedLiteral: "/*\n    This comment is not terminated\n    \nversion: 2.0"},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -353,19 +353,19 @@ func TestLexer_EscapedQuotes(t *testing.T) {
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test with \"escaped\" quotes"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "This has \"quotes\" inside"},
-		{RUN, "run"},
-		{STRING, "echo \"Hello World\""},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test with \"escaped\" quotes"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "This has \"quotes\" inside"},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "echo \"Hello World\""},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -392,17 +392,17 @@ line 3"`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{RUN, "run"},
-		{STRING, "line 1\nline 2\nline 3"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "line 1\nline 2\nline 3"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -429,17 +429,17 @@ Done"`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{RUN, "run"},
-		{STRING, "echo \"Hello\nWorld\"\nDone"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "echo \"Hello\nWorld\"\nDone"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -466,17 +466,17 @@ line 3"`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{RUN, "run"},
-		{STRING, "line 1 line 2 line 3"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "line 1 line 2 line 3"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -504,21 +504,21 @@ docker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "judge"},
-		{MEANS, "means"},
-		{STRING, "Evaluate code quality"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{STEP, "step"},
-		{STRING, "Generating a code report"},
-		{RUN, "run"},
-		{STRING, "rm -f coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php vendor/bin/phpunit --coverage-clover ./coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/console tests:probe-coverage coverage.xml"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "judge"},
+		{expectedType: MEANS, expectedLiteral: "means"},
+		{expectedType: STRING, expectedLiteral: "Evaluate code quality"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: STEP, expectedLiteral: "step"},
+		{expectedType: STRING, expectedLiteral: "Generating a code report"},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "rm -f coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php vendor/bin/phpunit --coverage-clover ./coverage.xml\ndocker compose exec -e APP_ENV=test -e XDEBUG_MODE=coverage -u=www-data php bin/console tests:probe-coverage coverage.xml"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -546,21 +546,21 @@ to deploy"`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{LET, "let"},
-		{VARIABLE, "$env"},
-		{EQUALS, "="},
-		{STRING, "production"},
-		{RUN, "run"},
-		{STRING, "echo {$env}\nis ready\nto deploy"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: LET, expectedLiteral: "let"},
+		{expectedType: VARIABLE, expectedLiteral: "$env"},
+		{expectedType: EQUALS, expectedLiteral: "="},
+		{expectedType: STRING, expectedLiteral: "production"},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "echo {$env}\nis ready\nto deploy"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {
@@ -589,17 +589,17 @@ Final line"`
 	lexer := NewLexer(input)
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{RUN, "run"},
-		{STRING, "echo \"Starting...\"\nLine 2 with continuation here\nFinal line"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: RUN, expectedLiteral: "run"},
+		{expectedType: STRING, expectedLiteral: "echo \"Starting...\"\nLine 2 with continuation here\nFinal line"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	for i, tt := range expectedTokens {

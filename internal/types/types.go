@@ -1,8 +1,10 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -53,9 +55,9 @@ func ParseParameterType(s string) (ParameterType, error) {
 
 // Value represents a typed value
 type Value struct {
-	Type  ParameterType
-	Raw   string // Original string value
 	Value any    // Parsed typed value
+	Raw   string // Original string value
+	Type  ParameterType
 }
 
 // NewValue creates a new typed value
@@ -102,7 +104,7 @@ func (v *Value) AsString() string {
 		}
 		return fmt.Sprintf("%v", v.Value)
 	case BooleanType:
-		return fmt.Sprintf("%t", v.Value.(bool))
+		return strconv.FormatBool(v.Value.(bool))
 	case ListType:
 		list := v.Value.([]string)
 		return strings.Join(list, ",")
@@ -162,7 +164,7 @@ func (v *Value) AsList() ([]string, error) {
 func parseNumber(s string) (float64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, fmt.Errorf("empty number")
+		return 0, errors.New("empty number")
 	}
 
 	// Try parsing as float
@@ -223,13 +225,7 @@ func (v *Value) ValidateConstraints(constraints []string) error {
 		}
 
 		for _, item := range list {
-			found := false
-			for _, constraint := range constraints {
-				if item == constraint {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(constraints, item)
 			if !found {
 				return fmt.Errorf("list item '%s' is not in allowed values: %v", item, constraints)
 			}
@@ -240,10 +236,8 @@ func (v *Value) ValidateConstraints(constraints []string) error {
 	// For non-list types, validate the string representation
 	valueStr := v.AsString()
 
-	for _, constraint := range constraints {
-		if valueStr == constraint {
-			return nil
-		}
+	if slices.Contains(constraints, valueStr) {
+		return nil
 	}
 
 	return fmt.Errorf("value '%s' is not in allowed values: %v", valueStr, constraints)
@@ -254,7 +248,7 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 	// Validate range constraints for numbers
 	if minValue != nil || maxValue != nil {
 		if v.Type != NumberType {
-			return fmt.Errorf("range constraints can only be applied to number types")
+			return errors.New("range constraints can only be applied to number types")
 		}
 
 		num, err := v.AsNumber()
@@ -274,7 +268,7 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 	// Validate pattern constraints (raw regex)
 	if pattern != "" {
 		if v.Type != StringType {
-			return fmt.Errorf("pattern constraints can only be applied to string types")
+			return errors.New("pattern constraints can only be applied to string types")
 		}
 
 		matched, err := regexp.MatchString(pattern, v.AsString())
@@ -290,7 +284,7 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 	// Validate pattern macro constraints
 	if patternMacro != "" {
 		if v.Type != StringType {
-			return fmt.Errorf("pattern constraints can only be applied to string types")
+			return errors.New("pattern constraints can only be applied to string types")
 		}
 
 		if err := patterns.ValidatePattern(v.AsString(), patternMacro); err != nil {
@@ -301,7 +295,7 @@ func (v *Value) ValidateAdvancedConstraints(minValue, maxValue *float64, pattern
 	// Validate email format
 	if emailFormat {
 		if v.Type != StringType {
-			return fmt.Errorf("email format validation can only be applied to string types")
+			return errors.New("email format validation can only be applied to string types")
 		}
 
 		if !isValidEmail(v.AsString()) {

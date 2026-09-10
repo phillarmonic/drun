@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -73,7 +74,7 @@ func (e *Engine) resolveDockerConditionOperand(operand string, ctx *ExecutionCon
 	}
 	value = strings.Trim(strings.TrimSpace(value), `"'`)
 	if value == "" {
-		return "", fmt.Errorf("value is empty")
+		return "", errors.New("value is empty")
 	}
 	return value, nil
 }

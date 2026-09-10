@@ -8,14 +8,14 @@ import (
 
 // FileStatement represents file system operations
 type FileStatement struct {
-	Token        lexer.Token
+	Replacements map[string]string
 	Action       string
 	Target       string
 	Source       string
 	Content      string
-	IsDir        bool
 	CaptureVar   string
-	Replacements map[string]string
+	Token        lexer.Token
+	IsDir        bool
 }
 
 func (fs *FileStatement) statementNode() {}

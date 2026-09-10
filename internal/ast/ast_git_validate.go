@@ -9,9 +9,9 @@ import (
 // GitValidateStatement represents inline git validation within a task.
 // It validates the current git state against the project's git policy.
 type GitValidateStatement struct {
-	Token  lexer.Token
 	Target string // "branch_name", "commit_message", "signed_commits", "all"
 	Value  string // optional explicit value to validate (e.g. commit message text)
+	Token  lexer.Token
 }
 
 func (gv *GitValidateStatement) statementNode() {}

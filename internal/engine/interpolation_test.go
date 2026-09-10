@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -370,9 +371,7 @@ func TestInterpolateVariablesFunction(t *testing.T) {
 			}
 
 			// Add variables to context
-			for name, value := range tt.vars {
-				ctx.Variables[name] = value
-			}
+			maps.Copy(ctx.Variables, tt.vars)
 
 			// Test interpolation
 			result := engine.interpolateVariables(tt.message, ctx)
@@ -567,18 +566,18 @@ func TestEngine_FolderEmptyConditions(t *testing.T) {
 	nonEmptyDir := filepath.Join(tempDir, "nonempty")
 
 	// Create empty directory
-	err := os.MkdirAll(emptyDir, 0755)
+	err := os.MkdirAll(emptyDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
 
 	// Create non-empty directory with a file
-	err = os.MkdirAll(nonEmptyDir, 0755)
+	err = os.MkdirAll(nonEmptyDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create non-empty directory: %v", err)
 	}
 	testFile := filepath.Join(nonEmptyDir, "test.txt")
-	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

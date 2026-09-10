@@ -40,14 +40,14 @@ const (
 
 // toolCheckFailure describes a single failed tool requirement check.
 type toolCheckFailure struct {
-	kind       toolFailureKind
-	tool       string
-	current    string // installed version, for version mismatches
-	constraint string // unmet constraint, for version mismatches
 	// needsAllowFlag marks mismatches where provisioning was refused because
 	// --allow-tool-version-changes was not passed.
-	needsAllowFlag bool
 	err            error // underlying error, for toolFailureOther
+	tool           string
+	current        string // installed version, for version mismatches
+	constraint     string // unmet constraint, for version mismatches
+	kind           toolFailureKind
+	needsAllowFlag bool
 }
 
 // Error renders the failure as a single-line message, matching the wording

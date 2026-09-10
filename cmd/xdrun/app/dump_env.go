@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/envloader"
@@ -104,7 +105,7 @@ func (a *App) handleDumpEnv(cmd *cobra.Command, args []string) error {
 func (a *App) outputJSON(env map[string]string, result *envloader.LoadResult, showFiles, showSources bool) error {
 	fmt.Println("{")
 	fmt.Println("  \"environment\": \"" + result.Environment + "\",")
-	fmt.Println("  \"host_env_included\": " + fmt.Sprintf("%t", result.HostEnvIncluded) + ",")
+	fmt.Println("  \"host_env_included\": " + strconv.FormatBool(result.HostEnvIncluded) + ",")
 
 	if showFiles {
 		fmt.Println("  \"env_files\": [")

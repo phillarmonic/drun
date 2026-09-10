@@ -179,17 +179,3 @@ func levenshteinDistance(s1, s2 string) int {
 
 	return matrix[len(s1)][len(s2)]
 }
-
-// min returns the minimum of three integers
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
-}

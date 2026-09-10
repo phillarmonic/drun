@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,11 +70,12 @@ If no value is provided, you'll be prompted to enter it securely.`,
 
 			// Get the secret value
 			var secretValue string
-			if len(args) == 2 {
+			switch {
+			case len(args) == 2:
 				secretValue = args[1]
-			} else if value != "" {
+			case value != "":
 				secretValue = value
-			} else {
+			default:
 				// Prompt for value
 				var err error
 				if masked {
@@ -89,7 +91,7 @@ If no value is provided, you'll be prompted to enter it securely.`,
 			// Determine namespace
 			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
 			if ns == "" {
-				return fmt.Errorf("could not determine namespace")
+				return errors.New("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -157,7 +159,7 @@ To override:
 			// Determine namespace
 			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
 			if ns == "" {
-				return fmt.Errorf("could not determine namespace")
+				return errors.New("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -216,7 +218,7 @@ Use --show-values to display secret values (use with caution).`,
 			// Determine namespace
 			ns, isAutoDetected := determineNamespaceWithInfo(namespace, projectScope, globalScope)
 			if ns == "" {
-				return fmt.Errorf("could not determine namespace")
+				return errors.New("could not determine namespace")
 			}
 
 			// Create secrets manager
@@ -421,9 +423,9 @@ func detectWorkspaceNamespace() string {
 // extractProjectName extracts the project name from drun file content
 // Looks for: project "name" version "1.0":
 func extractProjectName(content string) string {
-	lines := strings.Split(content, "\n")
+	lines := strings.SplitSeq(content, "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Skip comments

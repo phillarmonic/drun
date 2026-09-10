@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -107,7 +108,7 @@ func portCheckEndpoint(target, port string) (string, error) {
 	port = strings.TrimSpace(port)
 
 	if target == "" {
-		return "", fmt.Errorf("port check: host is empty")
+		return "", errors.New("port check: host is empty")
 	}
 	if port != "" {
 		return net.JoinHostPort(target, port), nil
@@ -229,22 +230,20 @@ func (e *Engine) executeDownload(downloadStmt *statement.Download, ctx *Executio
 				_, _ = fmt.Fprintf(e.output, "✅  Archive removed\n")
 			}
 		}
-	} else {
+	} else if len(downloadStmt.AllowPermissions) > 0 {
 		// Apply file permissions if specified (only for non-extracted files)
-		if len(downloadStmt.AllowPermissions) > 0 {
-			// Convert domain PermissionSpec to ast.PermissionSpec
-			var astPerms []ast.PermissionSpec
-			for _, perm := range downloadStmt.AllowPermissions {
-				astPerms = append(astPerms, ast.PermissionSpec{
-					Permissions: perm.Permissions,
-					Targets:     perm.Targets,
-				})
-			}
-			err = e.applyFilePermissions(path, astPerms)
-			if err != nil {
-				_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
-				// Don't fail the download, just warn
-			}
+		// Convert domain PermissionSpec to ast.PermissionSpec
+		var astPerms []ast.PermissionSpec
+		for _, perm := range downloadStmt.AllowPermissions {
+			astPerms = append(astPerms, ast.PermissionSpec{
+				Permissions: perm.Permissions,
+				Targets:     perm.Targets,
+			})
+		}
+		err = e.applyFilePermissions(path, astPerms)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.output, "⚠️  Warning: Failed to set permissions: %v\n", err)
+			// Don't fail the download, just warn
 		}
 	}
 

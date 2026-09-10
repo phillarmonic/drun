@@ -9,19 +9,19 @@ import (
 
 // ParameterStatement represents parameter declarations (requires, given, accepts)
 type ParameterStatement struct {
-	Token        lexer.Token
-	Type         string
-	Name         string
-	DefaultValue string
-	HasDefault   bool
-	Constraints  []string
-	DataType     string
-	Required     bool
-	Variadic     bool
 	MinValue     *float64
 	MaxValue     *float64
+	DefaultValue string
+	DataType     string
+	Name         string
+	Type         string
 	Pattern      string
 	PatternMacro string
+	Constraints  []string
+	Token        lexer.Token
+	HasDefault   bool
+	Required     bool
+	Variadic     bool
 	EmailFormat  bool
 }
 
@@ -53,16 +53,16 @@ func (ps *ParameterStatement) String() string {
 
 // ProjectParameterStatement represents a shared parameter defined at project level
 type ProjectParameterStatement struct {
-	Token        lexer.Token
-	Name         string
-	DefaultValue string
-	HasDefault   bool
-	Constraints  []string
-	DataType     string
 	MinValue     *float64
 	MaxValue     *float64
+	Name         string
+	DefaultValue string
+	DataType     string
 	Pattern      string
 	PatternMacro string
+	Constraints  []string
+	Token        lexer.Token
+	HasDefault   bool
 	EmailFormat  bool
 }
 

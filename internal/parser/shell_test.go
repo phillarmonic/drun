@@ -42,20 +42,21 @@ task "shell test":
 
 	// Check each statement type
 	statements := []struct {
-		index    int
 		expected string
+		index    int
 		isShell  bool
 	}{
-		{0, "info", false},
-		{1, "run", true},
-		{2, "exec", true},
-		{3, "shell", true},
-		{4, "capture", true},
-		{5, "success", false},
+		{index: 0, expected: "info", isShell: false},
+		{index: 1, expected: "run", isShell: true},
+		{index: 2, expected: "exec", isShell: true},
+		{index: 3, expected: "shell", isShell: true},
+		{index: 4, expected: "capture", isShell: true},
+		{index: 5, expected: "success", isShell: false},
 	}
 
 	for _, stmt := range statements {
-		if stmt.expected == "capture" {
+		switch {
+		case stmt.expected == "capture":
 			// Capture is now a variable statement
 			varStmt, ok := task.Body[stmt.index].(*ast.VariableStatement)
 			if !ok {
@@ -65,7 +66,7 @@ task "shell test":
 			if varStmt.Operation != "capture_shell" {
 				t.Errorf("Expected operation 'capture_shell', got %s", varStmt.Operation)
 			}
-		} else if stmt.isShell {
+		case stmt.isShell:
 			shellStmt, ok := task.Body[stmt.index].(*ast.ShellStatement)
 			if !ok {
 				t.Errorf("Expected statement %d to be ShellStatement, got %T", stmt.index, task.Body[stmt.index])
@@ -74,7 +75,7 @@ task "shell test":
 			if shellStmt.Action != stmt.expected {
 				t.Errorf("Expected shell action %s, got %s", stmt.expected, shellStmt.Action)
 			}
-		} else {
+		default:
 			actionStmt, ok := task.Body[stmt.index].(*ast.ActionStatement)
 			if !ok {
 				t.Errorf("Expected statement %d to be ActionStatement, got %T", stmt.index, task.Body[stmt.index])

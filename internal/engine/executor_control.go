@@ -2,7 +2,9 @@ package engine
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"strconv"
@@ -194,19 +196,19 @@ func (e *Engine) executeSequentialLoop(stmt *statement.Loop, items []string, ctx
 		for _, bodyStmt := range stmt.Body {
 			if err := e.executeStatement(bodyStmt, loopCtx); err != nil {
 				// Check for break/continue control flow
-				if breakErr, ok := err.(BreakError); ok {
+				if breakErr, ok := errors.AsType[BreakError](err); ok {
 					if e.verbose {
 						_, _ = fmt.Fprintf(e.output, "🔄  Breaking loop: %s\n", breakErr.Error())
 					}
 					return nil // Break out of the entire loop
 				}
-				if continueErr, ok := err.(ContinueError); ok {
+				if continueErr, ok := errors.AsType[ContinueError](err); ok {
 					if e.verbose {
 						_, _ = fmt.Fprintf(e.output, "🔄  Continuing loop: %s\n", continueErr.Error())
 					}
 					break // Break out of the body execution, continue to next item
 				}
-				return fmt.Errorf("error processing item '%s': %v", item, err)
+				return fmt.Errorf("error processing item '%s': %w", item, err)
 			}
 		}
 	}
@@ -240,12 +242,8 @@ func (e *Engine) executeParallelLoop(stmt *statement.Loop, items []string, ctx *
 		}
 
 		// Copy existing parameters and variables
-		for k, v := range ctx.Parameters {
-			loopCtx.Parameters[k] = v
-		}
-		for k, v := range ctx.Variables {
-			loopCtx.Variables[k] = v
-		}
+		maps.Copy(loopCtx.Parameters, ctx.Parameters)
+		maps.Copy(loopCtx.Variables, ctx.Variables)
 
 		// Add the variables from the parallel executor
 		for k, v := range variables {
@@ -313,7 +311,7 @@ func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 		return fmt.Errorf("range loop: step %q is not a valid integer", step)
 	}
 	if stepInt == 0 {
-		return fmt.Errorf("range loop: step cannot be zero (would loop forever)")
+		return errors.New("range loop: step cannot be zero (would loop forever)")
 	}
 
 	// Build the real range. Positive steps count up to (and including) end;
@@ -322,11 +320,11 @@ func (e *Engine) executeRangeLoop(stmt *statement.Loop, ctx *ExecutionContext) e
 	var items []string
 	if stepInt > 0 {
 		for i := startInt; i <= endInt; i += stepInt {
-			items = append(items, fmt.Sprintf("%d", i))
+			items = append(items, strconv.Itoa(i))
 		}
 	} else {
 		for i := startInt; i >= endInt; i += stepInt {
-			items = append(items, fmt.Sprintf("%d", i))
+			items = append(items, strconv.Itoa(i))
 		}
 	}
 
@@ -365,6 +363,7 @@ func (e *Engine) executeLineLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 	// (use-workdir aware), then read the real file line by line.
 	path := e.resolveFilesystemPath(filename, ctx)
 
+	// #nosec G304 -- reading the file named by a spec `for line in <path>` loop is the documented product behavior; the folder-trust gate applies to the spec.
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("line loop: cannot read file %q: %w", filename, err)
@@ -477,10 +476,11 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 	var items []string
 
 	// Check if it's an array literal (starts with '[')
-	if strings.HasPrefix(stmt.Iterable, "[") && strings.HasSuffix(stmt.Iterable, "]") {
+	switch {
+	case strings.HasPrefix(stmt.Iterable, "[") && strings.HasSuffix(stmt.Iterable, "]"):
 		// Parse array literal
 		items = e.parseArrayLiteralString(stmt.Iterable)
-	} else if strings.HasPrefix(stmt.Iterable, "$globals.") {
+	case strings.HasPrefix(stmt.Iterable, "$globals."):
 		// Handle $globals.key syntax for project settings (check this before general $ variables)
 		if ctx.Project != nil && ctx.Project.Settings != nil {
 			key := stmt.Iterable[9:] // Remove "$globals." prefix
@@ -502,9 +502,9 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 				return fmt.Errorf("project setting '%s' not found", key)
 			}
 		} else {
-			return fmt.Errorf("no project defined for $globals access")
+			return errors.New("no project defined for $globals access")
 		}
-	} else if strings.HasPrefix(stmt.Iterable, "$") {
+	case strings.HasPrefix(stmt.Iterable, "$"):
 		// Variable reference
 		var iterableStr string
 		// Try both with and without $ prefix to handle different storage methods
@@ -532,7 +532,7 @@ func (e *Engine) executeEachLoop(stmt *statement.Loop, ctx *ExecutionContext) er
 		} else {
 			items = splitIterableString(iterableStr) // Split iterable string into items
 		}
-	} else {
+	default:
 		// Check if it's a legacy direct project setting access (for backward compatibility)
 		if ctx.Project != nil && ctx.Project.Settings != nil {
 			if projectValue, exists := ctx.Project.Settings[stmt.Iterable]; exists {
@@ -612,7 +612,7 @@ func (e *Engine) applyFilter(items []string, filter *statement.Filter, ctx *Exec
 	filterValue := e.interpolateVariables(filter.Value, ctx)
 
 	for _, item := range items {
-		match := false
+		var match bool
 
 		switch filter.Operator {
 		case "contains":
@@ -655,12 +655,8 @@ func (e *Engine) createLoopContext(ctx *ExecutionContext, variable, value string
 	}
 
 	// Copy existing parameters and variables
-	for k, v := range ctx.Parameters {
-		loopCtx.Parameters[k] = v
-	}
-	for k, v := range ctx.Variables {
-		loopCtx.Variables[k] = v
-	}
+	maps.Copy(loopCtx.Parameters, ctx.Parameters)
+	maps.Copy(loopCtx.Variables, ctx.Variables)
 
 	// Set the loop variable as a string type
 	itemValue, _ := types.NewValue(types.StringType, value)

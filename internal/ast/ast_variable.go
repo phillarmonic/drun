@@ -8,12 +8,12 @@ import (
 
 // VariableStatement represents variable operations (let, set, transform)
 type VariableStatement struct {
-	Token     lexer.Token
+	Value     Expression
 	Operation string
 	Variable  string
-	Value     Expression
 	Function  string
 	Arguments []string
+	Token     lexer.Token
 }
 
 func (vs *VariableStatement) statementNode() {}

@@ -18,7 +18,7 @@ import (
 func TestInferProjectNameFromWorkingDirUsesFolderName(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "sample-service")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -44,7 +44,7 @@ func TestInferProjectNameFromWorkingDirUsesFolderName(t *testing.T) {
 func TestGenerateStarterConfigUsesWorkingDirectoryName(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "starter-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -73,7 +73,7 @@ func TestGenerateStarterConfigUsesWorkingDirectoryName(t *testing.T) {
 func TestGenerateStarterConfigMinimalContainsOnlyWelcomeTask(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "minimal-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -108,7 +108,7 @@ func TestGenerateStarterConfigMinimalContainsOnlyWelcomeTask(t *testing.T) {
 func TestInitializeConfigUsesOfficialManifestWhenTemplateNameProvided(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "official-template-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -122,8 +122,8 @@ func TestInitializeConfigUsesOfficialManifestWhenTemplateNameProvided(t *testing
 		}
 	})
 
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
+	if chdirErr := os.Chdir(projectDir); chdirErr != nil {
+		t.Fatalf("Chdir() error = %v", chdirErr)
 	}
 
 	manifest := `version: "1"
@@ -173,7 +173,7 @@ task "default" means "Welcome":
 func TestInitializeConfigRejectsManifestWithoutTemplateName(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "template-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -187,8 +187,8 @@ func TestInitializeConfigRejectsManifestWithoutTemplateName(t *testing.T) {
 		}
 	})
 
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
+	if chdirErr := os.Chdir(projectDir); chdirErr != nil {
+		t.Fatalf("Chdir() error = %v", chdirErr)
 	}
 
 	err = InitializeConfig("", false, false, "https://example.com/templates.yaml", "", "")
@@ -200,7 +200,7 @@ func TestInitializeConfigRejectsManifestWithoutTemplateName(t *testing.T) {
 func TestInitializeConfigFromTemplateAppliesGoRewrite(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "my-tool")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -242,13 +242,13 @@ task "install" means "Install {{binary_name}}":
 		}
 	})
 
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
+	if chdirErr := os.Chdir(projectDir); chdirErr != nil {
+		t.Fatalf("Chdir() error = %v", chdirErr)
 	}
 
 	goMod := "module github.com/example/my-tool\n\ngo 1.24.0\n"
-	if err := os.WriteFile("go.mod", []byte(goMod), 0600); err != nil {
-		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	if writeErr := os.WriteFile("go.mod", []byte(goMod), 0o600); writeErr != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", writeErr)
 	}
 
 	originalFetcher := initTemplateContentFetcher
@@ -266,8 +266,8 @@ task "install" means "Install {{binary_name}}":
 		initTemplateContentFetcher = originalFetcher
 	})
 
-	if err := InitializeConfig("", false, false, "https://templates.example/templates.yaml", "go-cli", ""); err != nil {
-		t.Fatalf("InitializeConfig() error = %v", err)
+	if initializeErr := InitializeConfig("", false, false, "https://templates.example/templates.yaml", "go-cli", ""); initializeErr != nil {
+		t.Fatalf("InitializeConfig() error = %v", initializeErr)
 	}
 
 	content, err := os.ReadFile(".drun/spec.drun")
@@ -463,12 +463,12 @@ func TestResolveDefaultTemplateManifestUsesTemplatesYAMLForLocalDirectory(t *tes
 func TestInitializeConfigAcceptsLocalTemplateDirectoryViaFromTemplate(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "directory-template-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
 	templateRepo := filepath.Join(tempRoot, "drun-templates")
-	if err := os.Mkdir(templateRepo, 0750); err != nil {
+	if err := os.Mkdir(templateRepo, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -495,8 +495,8 @@ task "default" means "Welcome":
 		}
 	})
 
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("Chdir() error = %v", err)
+	if chdirErr := os.Chdir(projectDir); chdirErr != nil {
+		t.Fatalf("Chdir() error = %v", chdirErr)
 	}
 
 	originalFetcher := initTemplateContentFetcher
@@ -514,8 +514,8 @@ task "default" means "Welcome":
 		initTemplateContentFetcher = originalFetcher
 	})
 
-	if err := InitializeConfig("", false, false, templateRepo, "go-cli", ""); err != nil {
-		t.Fatalf("InitializeConfig() error = %v", err)
+	if initializeErr := InitializeConfig("", false, false, templateRepo, "go-cli", ""); initializeErr != nil {
+		t.Fatalf("InitializeConfig() error = %v", initializeErr)
 	}
 
 	content, err := os.ReadFile(".drun/spec.drun")
@@ -530,12 +530,12 @@ task "default" means "Welcome":
 func TestFindConfigFileFindsInfraDefaultLocation(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "infra-project")
-	if err := os.MkdirAll(filepath.Join(projectDir, "infra", ".drun"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectDir, "infra", ".drun"), 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	specPath := filepath.Join(projectDir, "infra", ".drun", "spec.drun")
-	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -553,12 +553,12 @@ func TestFindConfigFileFindsInfraDefaultLocation(t *testing.T) {
 func TestFindConfigFileFindsInfraDrunDefaultLocation(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "infra-drun-project")
-	if err := os.MkdirAll(filepath.Join(projectDir, "infra", "drun"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectDir, "infra", "drun"), 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	specPath := filepath.Join(projectDir, "infra", "drun", "spec.drun")
-	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -576,7 +576,7 @@ func TestFindConfigFileFindsInfraDrunDefaultLocation(t *testing.T) {
 func TestInitializeMinimalConfigDoesNotCreateWorkspaceDefaultForBuiltInInfraLocation(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "infra-default-init")
-	if err := os.MkdirAll(projectDir, 0750); err != nil {
+	if err := os.MkdirAll(projectDir, 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
@@ -594,7 +594,7 @@ func TestInitializeMinimalConfigDoesNotCreateWorkspaceDefaultForBuiltInInfraLoca
 func TestInitializeConfigCreatesWorkspaceDefaultForCustomLocation(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "custom-default-init")
-	if err := os.MkdirAll(projectDir, 0750); err != nil {
+	if err := os.MkdirAll(projectDir, 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
@@ -617,22 +617,22 @@ func TestInitializeConfigCreatesWorkspaceDefaultForCustomLocation(t *testing.T) 
 func TestFindConfigFileUsesHomeExtraSearchPaths(t *testing.T) {
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "custom-search-project")
-	if err := os.MkdirAll(filepath.Join(projectDir, "automation"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectDir, "automation"), 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	specPath := filepath.Join(projectDir, "automation", "project.drun")
-	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0600); err != nil {
+	if err := os.WriteFile(specPath, []byte("version: 2.0\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
 	homeDir := filepath.Join(tempRoot, "home")
-	if err := os.MkdirAll(filepath.Join(homeDir, ".drun"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(homeDir, ".drun"), 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
 	userConfig := "extraTaskFileSearchPaths:\n  - automation/project.drun\n"
-	if err := os.WriteFile(filepath.Join(homeDir, ".drun", "config.yml"), []byte(userConfig), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(homeDir, ".drun", "config.yml"), []byte(userConfig), 0o600); err != nil {
 		t.Fatalf("WriteFile(config.yml) error = %v", err)
 	}
 

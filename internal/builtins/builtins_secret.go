@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -12,7 +13,7 @@ import (
 //	{secret('key', '', 'namespace')} - get secret from specific namespace
 func getSecret(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("secret key required")
+		return "", errors.New("secret key required")
 	}
 
 	key := args[0]
@@ -40,7 +41,7 @@ func getSecret(ctx Context, args ...string) (string, error) {
 		if defaultValue != "" {
 			return defaultValue, nil
 		}
-		return "", fmt.Errorf("secrets manager not available")
+		return "", errors.New("secrets manager not available")
 	}
 
 	secretsMgr := ctx.GetSecretsManager()

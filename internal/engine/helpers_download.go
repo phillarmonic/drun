@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,14 +33,14 @@ func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, o
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			// Allow up to 10 redirects
 			if len(via) >= 10 {
-				return fmt.Errorf("stopped after 10 redirects")
+				return errors.New("stopped after 10 redirects")
 			}
 			return nil
 		},
 	}
 
 	// Create request
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -76,8 +77,8 @@ func (e *Engine) downloadFileWithProgress(url, filePath string, headers, auth, o
 
 	// Create parent directories if they don't exist
 	if dir := filepath.Dir(filePath); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0750); err != nil {
-			return fmt.Errorf("failed to create parent directory: %w", err)
+		if mkdirErr := os.MkdirAll(dir, 0o750); mkdirErr != nil {
+			return fmt.Errorf("failed to create parent directory: %w", mkdirErr)
 		}
 	}
 
@@ -187,29 +188,29 @@ func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpe
 				case "read":
 					switch target {
 					case "user":
-						permBits = 0400
+						permBits = 0o400
 					case "group":
-						permBits = 0040
+						permBits = 0o040
 					case "others":
-						permBits = 0004
+						permBits = 0o004
 					}
 				case "write":
 					switch target {
 					case "user":
-						permBits = 0200
+						permBits = 0o200
 					case "group":
-						permBits = 0020
+						permBits = 0o020
 					case "others":
-						permBits = 0002
+						permBits = 0o002
 					}
 				case "execute":
 					switch target {
 					case "user":
-						permBits = 0100
+						permBits = 0o100
 					case "group":
-						permBits = 0010
+						permBits = 0o010
 					case "others":
-						permBits = 0001
+						permBits = 0o001
 					}
 				}
 
@@ -234,7 +235,7 @@ func (e *Engine) applyFilePermissions(path string, permSpecs []ast.PermissionSpe
 // extractArchive extracts an archive file to the specified directory using the archives library
 func (e *Engine) extractArchive(archivePath, extractTo string) error {
 	// Create extract directory if it doesn't exist
-	err := os.MkdirAll(extractTo, 0750)
+	err := os.MkdirAll(extractTo, 0o750)
 	if err != nil {
 		return fmt.Errorf("failed to create extract directory: %w", err)
 	}
@@ -274,28 +275,28 @@ func (e *Engine) extractArchive(archivePath, extractTo string) error {
 		}
 
 		// Create parent directories
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0750); err != nil {
-			return fmt.Errorf("failed to create parent directory: %w", err)
+		if mkdirErr := os.MkdirAll(filepath.Dir(outputPath), 0o750); mkdirErr != nil {
+			return fmt.Errorf("failed to create parent directory: %w", mkdirErr)
 		}
 
 		// Open the file in the archive
-		rc, err := f.Open()
-		if err != nil {
-			return fmt.Errorf("failed to open file in archive: %w", err)
+		rc, openErr := f.Open()
+		if openErr != nil {
+			return fmt.Errorf("failed to open file in archive: %w", openErr)
 		}
 		defer func() { _ = rc.Close() }()
 
 		// Create the output file
 		// #nosec G304 -- archive extraction intentionally writes entries beneath the chosen output path.
-		outFile, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+		outFile, openErr := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if openErr != nil {
+			return fmt.Errorf("failed to create output file: %w", openErr)
 		}
 		defer func() { _ = outFile.Close() }()
 
 		// Copy the contents
-		if _, err := io.Copy(outFile, rc); err != nil {
-			return fmt.Errorf("failed to extract file: %w", err)
+		if _, copyErr := io.Copy(outFile, rc); copyErr != nil {
+			return fmt.Errorf("failed to extract file: %w", copyErr)
 		}
 
 		return nil

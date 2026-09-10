@@ -11,8 +11,8 @@ func TestMultiToolAvailability(t *testing.T) {
 	tests := []struct {
 		name          string
 		input         string
-		expectedTools []string // first is Target, rest are Alternatives
 		condition     string
+		expectedTools []string // first is Target, rest are Alternatives
 	}{
 		{
 			name: "single tool available",

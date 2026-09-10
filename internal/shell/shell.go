@@ -3,6 +3,7 @@ package shell
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,22 +18,22 @@ import (
 // Result represents the result of a shell command execution
 type Result struct {
 	Command  string        // The command that was executed
-	ExitCode int           // Exit code of the command
 	Stdout   string        // Standard output
 	Stderr   string        // Standard error
+	ExitCode int           // Exit code of the command
 	Duration time.Duration // How long the command took
 	Success  bool          // Whether the command succeeded (exit code 0)
 }
 
 // Options configures shell command execution
 type Options struct {
-	WorkingDir    string            // Working directory for the command
+	Output        io.Writer         // Where to stream output (if StreamOutput is true)
 	Environment   map[string]string // Additional environment variables
+	WorkingDir    string            // Working directory for the command
+	Shell         string            // Shell to use (default: /bin/sh)
 	Timeout       time.Duration     // Command timeout (0 = no timeout)
 	CaptureOutput bool              // Whether to capture stdout/stderr
 	StreamOutput  bool              // Whether to stream output in real-time
-	Output        io.Writer         // Where to stream output (if StreamOutput is true)
-	Shell         string            // Shell to use (default: /bin/sh)
 	IgnoreErrors  bool              // Whether to ignore non-zero exit codes
 	Attached      bool              // Whether to keep stdin attached and allocate a TTY when possible
 }
@@ -332,10 +333,10 @@ func Execute(command string, opts *Options) (*Result, error) {
 		stderrErr := <-stderrDone
 		err := cmd.Wait()
 
-		if stdoutErr != nil && stdoutErr != io.EOF {
+		if stdoutErr != nil && !errors.Is(stdoutErr, io.EOF) {
 			return nil, fmt.Errorf("failed reading stdout: %w", stdoutErr)
 		}
-		if stderrErr != nil && stderrErr != io.EOF {
+		if stderrErr != nil && !errors.Is(stderrErr, io.EOF) {
 			return nil, fmt.Errorf("failed reading stderr: %w", stderrErr)
 		}
 
@@ -343,7 +344,7 @@ func Execute(command string, opts *Options) (*Result, error) {
 		result.Stderr = strings.TrimRight(stderrBuf.String(), "\r\n")
 
 		if err != nil {
-			if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 				result.ExitCode = exitError.ExitCode()
 			} else {
 				return nil, fmt.Errorf("command execution failed: %w", err)
@@ -351,7 +352,7 @@ func Execute(command string, opts *Options) (*Result, error) {
 		}
 	} else {
 		if err := cmd.Wait(); err != nil {
-			if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 				result.ExitCode = exitError.ExitCode()
 			} else {
 				return nil, fmt.Errorf("command execution failed: %w", err)
@@ -378,9 +379,9 @@ func formatFailureOutput(result *Result) string {
 	case stdout != "" && stderr != "":
 		return fmt.Sprintf(" (stdout: %s; stderr: %s)", stdout, stderr)
 	case stderr != "":
-		return fmt.Sprintf(": %s", stderr)
+		return ": " + stderr
 	case stdout != "":
-		return fmt.Sprintf(": %s", stdout)
+		return ": " + stdout
 	default:
 		return ""
 	}

@@ -20,9 +20,9 @@ func TestValidator_ValidateDataType(t *testing.T) {
 	validator := NewValidator()
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
+		name    string
 		wantErr bool
 	}{
 		{
@@ -69,11 +69,11 @@ func TestValidator_ValidateListOfTypes(t *testing.T) {
 	validator := NewValidator()
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
-		wantErr bool
+		name    string
 		wantMsg string // substring expected in the error message when wantErr
+		wantErr bool
 	}{
 		{
 			name:    "list of strings accepts a list value",
@@ -161,9 +161,9 @@ func TestValidator_ValidateConstraints(t *testing.T) {
 	validator := NewValidator()
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
+		name    string
 		wantErr bool
 	}{
 		{
@@ -211,9 +211,9 @@ func TestValidator_ValidateNumberRange(t *testing.T) {
 	maxVal := 100.0
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
+		name    string
 		wantErr bool
 	}{
 		{
@@ -260,9 +260,9 @@ func TestValidator_ValidatePattern(t *testing.T) {
 	validator := NewValidator()
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
+		name    string
 		wantErr bool
 	}{
 		{
@@ -299,9 +299,9 @@ func TestValidator_ValidateEmail(t *testing.T) {
 	validator := NewValidator()
 
 	tests := []struct {
-		name    string
 		param   *Parameter
 		value   *types.Value
+		name    string
 		wantErr bool
 	}{
 		{

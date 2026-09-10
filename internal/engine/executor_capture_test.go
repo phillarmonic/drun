@@ -72,9 +72,9 @@ task "test":
 // decorations such as the info icon).
 func extractCaptureValue(t *testing.T, output, prefix string) string {
 	t.Helper()
-	for _, line := range strings.Split(output, "\n") {
-		if idx := strings.Index(line, prefix); idx >= 0 {
-			return strings.TrimSpace(line[idx+len(prefix):])
+	for line := range strings.SplitSeq(output, "\n") {
+		if _, after, ok := strings.Cut(line, prefix); ok {
+			return strings.TrimSpace(after)
 		}
 	}
 	t.Fatalf("Expected output line containing %q, but got:\n%s", prefix, output)

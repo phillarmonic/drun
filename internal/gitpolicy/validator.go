@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -11,41 +12,31 @@ var conventionalCommitHeaderPattern = regexp.MustCompile(`^[a-z]+(?:-[a-z]+)*(?:
 
 // Policy represents the project's git conventions.
 type Policy struct {
+	BranchPattern        string
+	CommitPattern        string
 	DefaultBranches      []string
 	ProtectedBranches    []string
-	BranchPattern        string
 	BranchTypes          []string
-	CommitPattern        string
-	ExtractIdentifier    bool
-	CommitMinLength      int
 	CommitBans           []string
+	CommitMinLength      int
+	ExtractIdentifier    bool
 	EnforceSignedCommits bool
 }
 
 // ValidationResult indicates whether validation passed, and if not, the reason.
 type ValidationResult struct {
-	Valid   bool
 	Message string
+	Valid   bool
 }
 
 // IsDefaultBranch returns true if the branch is in the default branches list.
 func (p *Policy) IsDefaultBranch(branchName string) bool {
-	for _, b := range p.DefaultBranches {
-		if b == branchName {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.DefaultBranches, branchName)
 }
 
 // IsProtectedBranch returns true if the branch is explicitly protected.
 func (p *Policy) IsProtectedBranch(branchName string) bool {
-	for _, b := range p.ProtectedBranches {
-		if b == branchName {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.ProtectedBranches, branchName)
 }
 
 // ValidateProtectedBranchCommit rejects local commits on explicitly protected branches.

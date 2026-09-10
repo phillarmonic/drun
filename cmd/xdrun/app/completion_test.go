@@ -59,7 +59,7 @@ func TestCompleteTaskNamesPrefersCmdNamespaceForCmdPrefix(t *testing.T) {
 		t.Fatalf("Chdir() error = %v", err)
 	}
 
-	if err := os.MkdirAll(".drun", 0750); err != nil {
+	if err := os.MkdirAll(".drun", 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(".drun", "spec.drun"), []byte(`
@@ -68,7 +68,7 @@ version: 2.0
 project "completion-test" version "1.0":
 task "ci" means "Run CI":
 	info "ci"
-`), 0600); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -105,10 +105,10 @@ func TestCompleteTaskNamesKeepsTasksBeforeBuiltins(t *testing.T) {
 		t.Fatalf("Chdir() error = %v", err)
 	}
 
-	if err := os.MkdirAll(".drun", 0750); err != nil {
+	if err := os.MkdirAll(".drun", 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(".drun", "spec.drun"), []byte(generateStarterConfig(true)), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(".drun", "spec.drun"), []byte(generateStarterConfig(true)), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -237,11 +237,36 @@ func withCompletionSpec(t *testing.T, source string) {
 	if err := os.Chdir(tempRoot); err != nil {
 		t.Fatalf("Chdir() error = %v", err)
 	}
-	if err := os.MkdirAll(".drun", 0750); err != nil {
+	if err := os.MkdirAll(".drun", 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(".drun", "spec.drun"), []byte(source), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(".drun", "spec.drun"), []byte(source), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
+	}
+}
+
+// isCmdNamespacePrefix deliberately asks whether the *typed text* is a prefix of
+// the "cmd:" namespace (the literal is the haystack, not the needle), which is why
+// gocritic's argOrder check is suppressed at the call site.
+func TestIsCmdNamespacePrefixChecksTypedTextAgainstCmdNamespace(t *testing.T) {
+	cases := []struct {
+		toComplete string
+		want       bool
+	}{
+		{"", false},
+		{"c", true},
+		{"cm", true},
+		{"cmd", true},
+		{"cmd:", true},
+		{"cmd:skill", false},
+		{"x", false},
+		{"stateless", false},
+	}
+
+	for _, tc := range cases {
+		if got := isCmdNamespacePrefix(tc.toComplete); got != tc.want {
+			t.Errorf("isCmdNamespacePrefix(%q) = %v, want %v", tc.toComplete, got, tc.want)
+		}
 	}
 }
 

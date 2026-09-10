@@ -1,6 +1,7 @@
 package scm
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -53,7 +54,7 @@ func NewGitVersionTagContract(preset string, formats []string, pattern string, m
 		forms++
 	}
 	if forms > 1 {
-		return nil, fmt.Errorf("version tags must use exactly one of a preset, format(s), or pattern")
+		return nil, errors.New("version tags must use exactly one of a preset, format(s), or pattern")
 	}
 	if macros == nil {
 		macros = DefaultTagFormatMacroRegistry()
@@ -180,15 +181,15 @@ func simpleTagFormatSuggestion(pattern string) (string, bool) {
 	body := strings.TrimSuffix(strings.TrimPrefix(pattern, "^"), "$")
 	versionPattern := `[0-9]+\.[0-9]+\.[0-9]+`
 	for _, capture := range []string{"(" + versionPattern + ")", "(?P<version>" + versionPattern + ")"} {
-		position := strings.Index(body, capture)
-		if position < 0 {
+		before, after, ok0 := strings.Cut(body, capture)
+		if !ok0 {
 			continue
 		}
-		prefix, ok := literalRegexText(body[:position])
+		prefix, ok := literalRegexText(before)
 		if !ok {
 			return "", false
 		}
-		suffix, ok := literalRegexText(body[position+len(capture):])
+		suffix, ok := literalRegexText(after)
 		if !ok {
 			return "", false
 		}

@@ -15,9 +15,9 @@ func TestEngine_StrictVariableChecking(t *testing.T) {
 		name           string
 		input          string
 		taskName       string
+		errorContains  string
 		allowUndefined bool
 		expectError    bool
-		errorContains  string
 	}{
 		{
 			name: "undefined variable in info statement - strict mode",
@@ -166,9 +166,9 @@ func TestEngine_StrictVariablesInLoops(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
+		errorContains  string
 		allowUndefined bool
 		expectError    bool
-		errorContains  string
 	}{
 		{
 			name: "undefined variable in loop body - strict mode",
@@ -236,9 +236,9 @@ func TestEngine_StrictVariablesInConditionals(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
+		errorContains  string
 		allowUndefined bool
 		expectError    bool
-		errorContains  string
 	}{
 		{
 			name: "undefined variable in when condition - strict mode",
@@ -367,9 +367,9 @@ task "test":
 
 	tests := []struct {
 		name           string
+		errorContains  string
 		allowUndefined bool
 		expectError    bool
-		errorContains  string
 	}{
 		{
 			name:           "undefined global variable - strict mode",

@@ -1,11 +1,13 @@
 package builtins
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,18 +35,18 @@ type BuiltinFunction func(ctx Context, args ...string) (string, error)
 
 // ProgressState holds the state of a progress indicator
 type ProgressState struct {
+	StartTime  time.Time
 	Name       string
 	Message    string
 	Percentage int
-	StartTime  time.Time
 	IsActive   bool
 }
 
 // TimerState holds the state of a timer
 type TimerState struct {
-	Name      string
 	StartTime time.Time
 	EndTime   *time.Time
+	Name      string
 	IsRunning bool
 }
 
@@ -92,7 +94,7 @@ func getAvailableTasks(ctx Context, args ...string) (string, error) {
 		GetTaskNames() []string
 	})
 	if !ok {
-		return "", fmt.Errorf("available tasks requires task listing support")
+		return "", errors.New("available tasks requires task listing support")
 	}
 
 	separator := ", "
@@ -175,7 +177,7 @@ func getNowEpochSeconds(ctx Context, args ...string) (string, error) {
 // checkFileExists checks if a file exists
 func checkFileExists(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "false", fmt.Errorf("file path required")
+		return "false", errors.New("file path required")
 	}
 
 	path := args[0]
@@ -191,7 +193,7 @@ func checkFileExists(ctx Context, args ...string) (string, error) {
 // checkDirExists checks if a directory exists
 func checkDirExists(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "false", fmt.Errorf("directory path required")
+		return "false", errors.New("directory path required")
 	}
 
 	path := args[0]
@@ -212,7 +214,7 @@ func checkDirExists(ctx Context, args ...string) (string, error) {
 // getEnvironmentVariable gets an environment variable
 func getEnvironmentVariable(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("environment variable name required")
+		return "", errors.New("environment variable name required")
 	}
 
 	name := args[0]
@@ -293,14 +295,14 @@ func IsBuiltin(name string) bool {
 
 func getDNSResolve(ctx Context, args ...string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("dns_resolve requires 1 argument (domain)")
+		return "", errors.New("dns_resolve requires 1 argument (domain)")
 	}
 
 	resolver, ok := ctx.(interface {
 		DNSResolve(string) (string, error)
 	})
 	if !ok {
-		return "", fmt.Errorf("dns_resolve requires DNS resolution support")
+		return "", errors.New("dns_resolve requires DNS resolution support")
 	}
 
 	return resolver.DNSResolve(args[0])
@@ -308,14 +310,14 @@ func getDNSResolve(ctx Context, args ...string) (string, error) {
 
 func getDNSCheck(ctx Context, args ...string) (string, error) {
 	if len(args) != 2 {
-		return "", fmt.Errorf("dns_check requires 2 arguments (domain, record_type)")
+		return "", errors.New("dns_check requires 2 arguments (domain, record_type)")
 	}
 
 	checker, ok := ctx.(interface {
 		DNSCheck(string, string) (bool, error)
 	})
 	if !ok {
-		return "", fmt.Errorf("dns_check requires DNS validation support")
+		return "", errors.New("dns_check requires DNS validation support")
 	}
 
 	valid, err := checker.DNSCheck(args[0], args[1])
@@ -330,14 +332,14 @@ func getDNSCheck(ctx Context, args ...string) (string, error) {
 
 func getDNSValidate(ctx Context, args ...string) (string, error) {
 	if len(args) != 2 {
-		return "", fmt.Errorf("dns_validate requires 2 arguments (domain, expected_ip)")
+		return "", errors.New("dns_validate requires 2 arguments (domain, expected_ip)")
 	}
 
 	validator, ok := ctx.(interface {
 		DNSValidate(string, string) (bool, error)
 	})
 	if !ok {
-		return "", fmt.Errorf("dns_validate requires DNS validation support")
+		return "", errors.New("dns_validate requires DNS validation support")
 	}
 
 	valid, err := validator.DNSValidate(args[0], args[1])
@@ -353,7 +355,7 @@ func getDNSValidate(ctx Context, args ...string) (string, error) {
 // startProgress starts a new progress indicator
 func startProgress(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("progress message required")
+		return "", errors.New("progress message required")
 	}
 
 	message := args[0]
@@ -373,13 +375,13 @@ func startProgress(ctx Context, args ...string) (string, error) {
 		IsActive:   true,
 	}
 
-	return fmt.Sprintf("📋 %s", message), nil
+	return "📋 " + message, nil
 }
 
 // updateProgress updates an existing progress indicator
 func updateProgress(ctx Context, args ...string) (string, error) {
 	if len(args) < 2 {
-		return "", fmt.Errorf("percentage and message required")
+		return "", errors.New("percentage and message required")
 	}
 
 	percentageStr := args[0]
@@ -395,7 +397,7 @@ func updateProgress(ctx Context, args ...string) (string, error) {
 	}
 
 	if percentage < 0 || percentage > 100 {
-		return "", fmt.Errorf("percentage must be between 0 and 100")
+		return "", errors.New("percentage must be between 0 and 100")
 	}
 
 	stateMutex.Lock()
@@ -422,7 +424,7 @@ func updateProgress(ctx Context, args ...string) (string, error) {
 // finishProgress completes a progress indicator
 func finishProgress(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("completion message required")
+		return "", errors.New("completion message required")
 	}
 
 	message := args[0]
@@ -455,7 +457,7 @@ func finishProgress(ctx Context, args ...string) (string, error) {
 // startTimer starts a new timer
 func startTimer(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("timer name required")
+		return "", errors.New("timer name required")
 	}
 
 	name := args[0]
@@ -481,7 +483,7 @@ func startTimer(ctx Context, args ...string) (string, error) {
 // stopTimer stops a running timer
 func stopTimer(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("timer name required")
+		return "", errors.New("timer name required")
 	}
 
 	name := args[0]
@@ -510,7 +512,7 @@ func stopTimer(ctx Context, args ...string) (string, error) {
 // showElapsedTime shows the elapsed time for a timer
 func showElapsedTime(ctx Context, args ...string) (string, error) {
 	if len(args) == 0 {
-		return "", fmt.Errorf("timer name required")
+		return "", errors.New("timer name required")
 	}
 
 	name := args[0]
@@ -524,11 +526,12 @@ func showElapsedTime(ctx Context, args ...string) (string, error) {
 	}
 
 	var elapsed time.Duration
-	if timer.IsRunning {
+	switch {
+	case timer.IsRunning:
 		elapsed = time.Since(timer.StartTime)
-	} else if timer.EndTime != nil {
+	case timer.EndTime != nil:
 		elapsed = timer.EndTime.Sub(timer.StartTime)
-	} else {
+	default:
 		return "", fmt.Errorf("timer '%s' has no valid end time", name)
 	}
 
@@ -546,13 +549,15 @@ func createProgressBar(percentage int) string {
 	filled := (percentage * barLength) / 100
 
 	bar := "["
-	for i := 0; i < barLength; i++ {
+	var barSb549 strings.Builder
+	for i := range barLength {
 		if i < filled {
-			bar += "█"
+			barSb549.WriteString("█")
 		} else {
-			bar += "░"
+			barSb549.WriteString("░")
 		}
 	}
+	bar += barSb549.String()
 	bar += "]"
 
 	return bar
@@ -560,7 +565,7 @@ func createProgressBar(percentage int) string {
 
 func getDockerComposeCommand(ctx Context, args ...string) (string, error) {
 	if len(args) > 0 {
-		return "", fmt.Errorf("docker compose command does not accept arguments")
+		return "", errors.New("docker compose command does not accept arguments")
 	}
 
 	composeCmd, err := detectDockerComposeCommand()
@@ -582,6 +587,7 @@ func checkDockerComposeStatus(ctx Context, args ...string) (string, error) {
 	// Detect which Docker Compose command to use (prioritize "docker compose")
 	composeCmd, err := detectDockerComposeCommand()
 	if err != nil {
+		//nolint:nilerr // docker compose absence is reported as the valid "unavailable" status, not a status-check failure
 		return "unavailable", nil
 	}
 
@@ -609,7 +615,7 @@ func detectDockerComposeCommand() ([]string, error) {
 		return []string{"docker-compose"}, nil
 	}
 
-	return nil, fmt.Errorf("neither 'docker compose' nor 'docker-compose' is available")
+	return nil, errors.New("neither 'docker compose' nor 'docker-compose' is available")
 }
 
 // getComposeProjectStatus gets the status of containers in a compose project
@@ -621,16 +627,17 @@ func getComposeProjectStatus(composeCmd []string, projectPath string) (string, e
 	}
 
 	if projectPath != "." {
-		if err := os.Chdir(projectPath); err != nil {
-			return "error", fmt.Errorf("failed to change to project directory: %w", err)
+		if chdirErr := os.Chdir(projectPath); chdirErr != nil {
+			return "error", fmt.Errorf("failed to change to project directory: %w", chdirErr)
 		}
 		defer func() {
 			_ = os.Chdir(originalDir)
 		}()
 	}
 
-	// Run "docker compose ps" to get container status
-	psCmd := append(composeCmd, "ps", "--format", "table")
+	// Run "docker compose ps" to get container status.
+	// Copy explicitly so appending cannot write into composeCmd's backing array.
+	psCmd := slices.Concat(composeCmd, []string{"ps", "--format", "table"})
 	// #nosec G204 -- compose status intentionally runs the detected docker compose command.
 	cmd := exec.Command(psCmd[0], psCmd[1:]...)
 	output, err := cmd.Output()
@@ -661,13 +668,14 @@ func getComposeProjectStatus(composeCmd []string, projectPath string) (string, e
 
 		// Look for status indicators in the line
 		lineLower := strings.ToLower(line)
-		if strings.Contains(lineLower, "up") || strings.Contains(lineLower, "running") {
+		switch {
+		case strings.Contains(lineLower, "up") || strings.Contains(lineLower, "running"):
 			running++
-		} else if strings.Contains(lineLower, "restarting") {
+		case strings.Contains(lineLower, "restarting"):
 			restarting++
-		} else if strings.Contains(lineLower, "exited") {
+		case strings.Contains(lineLower, "exited"):
 			exited++
-		} else if strings.Contains(lineLower, "unhealthy") {
+		case strings.Contains(lineLower, "unhealthy"):
 			unhealthy++
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"gopkg.in/yaml.v3"
@@ -32,7 +33,7 @@ func loadTrustConfig() (*TrustConfig, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
 		return &TrustConfig{}, nil
 	}
 
@@ -57,8 +58,8 @@ func saveTrustConfig(config *TrustConfig) error {
 	}
 
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0750); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+	if mkdirErr := os.MkdirAll(configDir, 0o750); mkdirErr != nil {
+		return fmt.Errorf("failed to create config directory: %w", mkdirErr)
 	}
 
 	data, err := yaml.Marshal(config)
@@ -66,7 +67,7 @@ func saveTrustConfig(config *TrustConfig) error {
 		return fmt.Errorf("failed to marshal trust config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write trust config: %w", err)
 	}
 
@@ -118,10 +119,8 @@ func TrustDir(dir string) error {
 		return err
 	}
 
-	for _, d := range config.TrustedDirs {
-		if d == absDir {
-			return nil // already trusted
-		}
+	if slices.Contains(config.TrustedDirs, absDir) {
+		return nil // already trusted
 	}
 
 	config.TrustedDirs = append(config.TrustedDirs, absDir)

@@ -135,6 +135,7 @@ func (e *Engine) RunGitCommandOutput(args ...string) (string, error) {
 	cmdArgs := append([]string{}, args...)
 
 	// Create command
+	// #nosec G204 -- git is a fixed executable and every call site passes a literal subcommand; no spec or remote input reaches the command name.
 	cmd := exec.Command("git", cmdArgs...)
 
 	// We disable prompt/tty requirements for pure output capture
@@ -142,8 +143,7 @@ func (e *Engine) RunGitCommandOutput(args ...string) (string, error) {
 
 	out, err := cmd.Output()
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), exitErr.Stderr)
 		}
 		return "", err

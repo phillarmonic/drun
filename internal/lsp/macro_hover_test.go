@@ -11,8 +11,8 @@ func TestMacroHover(t *testing.T) {
 	tests := []struct {
 		name   string
 		line   string
-		column int
 		want   []string
+		column int
 	}{
 		{
 			name:   "semver macro",

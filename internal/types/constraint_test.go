@@ -6,28 +6,28 @@ import (
 
 func TestValue_ValidateAdvancedConstraints_RangeValidation(t *testing.T) {
 	tests := []struct {
-		name      string
-		value     string
-		valueType ParameterType
 		minValue  *float64
 		maxValue  *float64
-		wantError bool
+		name      string
+		value     string
 		errorMsg  string
+		valueType ParameterType
+		wantError bool
 	}{
 		{
 			name:      "valid number in range",
 			value:     "5000",
 			valueType: NumberType,
-			minValue:  floatPtr(1000),
-			maxValue:  floatPtr(9999),
+			minValue:  new(float64(1000)),
+			maxValue:  new(float64(9999)),
 			wantError: false,
 		},
 		{
 			name:      "number below minimum",
 			value:     "500",
 			valueType: NumberType,
-			minValue:  floatPtr(1000),
-			maxValue:  floatPtr(9999),
+			minValue:  new(float64(1000)),
+			maxValue:  new(float64(9999)),
 			wantError: true,
 			errorMsg:  "less than minimum",
 		},
@@ -35,8 +35,8 @@ func TestValue_ValidateAdvancedConstraints_RangeValidation(t *testing.T) {
 			name:      "number above maximum",
 			value:     "15000",
 			valueType: NumberType,
-			minValue:  floatPtr(1000),
-			maxValue:  floatPtr(9999),
+			minValue:  new(float64(1000)),
+			maxValue:  new(float64(9999)),
 			wantError: true,
 			errorMsg:  "greater than maximum",
 		},
@@ -44,8 +44,8 @@ func TestValue_ValidateAdvancedConstraints_RangeValidation(t *testing.T) {
 			name:      "range constraint on non-number type",
 			value:     "hello",
 			valueType: StringType,
-			minValue:  floatPtr(1000),
-			maxValue:  floatPtr(9999),
+			minValue:  new(float64(1000)),
+			maxValue:  new(float64(9999)),
 			wantError: true,
 			errorMsg:  "range constraints can only be applied to number types",
 		},
@@ -79,10 +79,10 @@ func TestValue_ValidateAdvancedConstraints_PatternValidation(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     string
-		valueType ParameterType
 		pattern   string
-		wantError bool
 		errorMsg  string
+		valueType ParameterType
+		wantError bool
 	}{
 		{
 			name:      "valid version pattern",
@@ -145,10 +145,10 @@ func TestValue_ValidateAdvancedConstraints_EmailValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		value       string
+		errorMsg    string
 		valueType   ParameterType
 		emailFormat bool
 		wantError   bool
-		errorMsg    string
 	}{
 		{
 			name:        "valid email",
@@ -242,9 +242,6 @@ func TestIsValidEmail(t *testing.T) {
 }
 
 // Helper functions
-func floatPtr(f float64) *float64 {
-	return &f
-}
 
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr ||

@@ -10,14 +10,12 @@ import (
 
 // Parser parses drun v2 source code into an AST
 type Parser struct {
-	lexer *lexer.Lexer
-
-	curToken  lexer.Token
-	peekToken lexer.Token
-
-	errors             []string // Legacy error list for backward compatibility
+	lexer              *lexer.Lexer
 	errorList          *errors.ParseErrorList
+	errors             []string // Legacy error list for backward compatibility
 	pendingAnnotations []ast.Annotation
+	curToken           lexer.Token
+	peekToken          lexer.Token
 }
 
 // New creates a new parser instance

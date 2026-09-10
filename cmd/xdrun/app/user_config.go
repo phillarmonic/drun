@@ -29,7 +29,7 @@ func loadUserConfig() (*UserConfig, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
 		return &UserConfig{}, nil
 	}
 

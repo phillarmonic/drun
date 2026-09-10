@@ -14,8 +14,21 @@ import (
 // Note: Most dependencies use concrete types for simplicity.
 // For testing, use mocks/fakes at the task/executor level instead.
 type EngineOptions struct {
+	// Input reader used by interactive statements (confirm/prompt).
+	// Defaults to os.Stdin.
+	Input io.Reader
+
+	// Secrets manager
+	SecretsManager SecretsManager
+
 	// Output writer (defaults to os.Stdout)
 	Output io.Writer
+
+	// AssumeYes carries the global --yes/--no assumption for confirm/prompt
+	// statements. nil means no assumption was given; non-nil true (--yes) or
+	// false (--no) answers every interactive statement without prompting,
+	// even on a TTY.
+	AssumeYes *bool
 
 	// Task registry (defaults to new registry)
 	TaskRegistry *task.Registry
@@ -29,14 +42,13 @@ type EngineOptions struct {
 	// Cache manager (defaults to nil, created on demand)
 	CacheManager *cache.Manager
 
-	// DryRun mode
-	DryRun bool
-
-	// Verbose mode
-	Verbose bool
-
 	// Runtime task mode override for the invocation
 	TaskModeOverride string
+
+	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
+	UserProvisioningSources []string
+	// Embedded built-in provisioning catalogs shipped with drun.
+	EmbeddedProvisioningSources []provisioning.EmbeddedSource
 
 	// Allow runtime provisioning to change an installed tool's version.
 	AllowToolVersionChanges bool
@@ -44,14 +56,11 @@ type EngineOptions struct {
 	// Skip all tool requirement checks.
 	IgnoreToolRequirements bool
 
-	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
-	UserProvisioningSources []string
+	// Verbose mode
+	Verbose bool
 
-	// Embedded built-in provisioning catalogs shipped with drun.
-	EmbeddedProvisioningSources []provisioning.EmbeddedSource
-
-	// Secrets manager
-	SecretsManager SecretsManager
+	// DryRun mode
+	DryRun bool
 
 	// FolderTrusted indicates whether the folder containing the task file has
 	// been trusted for security-sensitive operations such as open url.
@@ -65,6 +74,24 @@ type Option func(*EngineOptions)
 func WithOutput(w io.Writer) Option {
 	return func(o *EngineOptions) {
 		o.Output = w
+	}
+}
+
+// WithInput sets the input reader used by interactive statements
+// (confirm/prompt). Defaults to os.Stdin.
+func WithInput(r io.Reader) Option {
+	return func(o *EngineOptions) {
+		o.Input = r
+	}
+}
+
+// WithAssumeYes assumes an answer for every confirm/prompt statement without
+// prompting: assume true (--yes) or false (--no). Pass the option twice or
+// not at all to keep no assumption (nil).
+func WithAssumeYes(assume bool) Option {
+	return func(o *EngineOptions) {
+		assumption := assume
+		o.AssumeYes = &assumption
 	}
 }
 
@@ -157,6 +184,10 @@ func WithFolderTrusted(trusted bool) Option {
 func (opts *EngineOptions) applyDefaults() {
 	if opts.Output == nil {
 		opts.Output = os.Stdout
+	}
+
+	if opts.Input == nil {
+		opts.Input = os.Stdin
 	}
 
 	if opts.TaskRegistry == nil {

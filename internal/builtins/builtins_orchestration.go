@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -19,7 +20,7 @@ type OrchestrationContext interface {
 
 	// Orchestration operations
 	GetOrchestrationStatus(name string) (string, error)
-	GetOrchestrationHealthStatus(name string) (map[string]interface{}, error)
+	GetOrchestrationHealthStatus(name string) (map[string]any, error)
 	IsOrchestrationHealthy(name string) (bool, error)
 	IsOrchestrationRunning(name string) (bool, error)
 
@@ -54,48 +55,48 @@ type OrchestrationContext interface {
 	ReadFile(path string) (string, error)
 	GeneratePassword(length int) (string, error)
 	EnvVar(name string) (string, error)
-	ReplaceInFile(path, old, new string) error
+	ReplaceInFile(path, old, newContent string) error
 }
 
 // OrchestrationBuiltins provides built-in functions for orchestration
 // Note: These use a simpler interface (args []string, ctx interface{})
 // for flexibility. They should be adapted to BuiltinFunction when integrated.
-var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (string, error){
+var OrchestrationBuiltins = map[string]func(args []string, ctx any) (string, error){
 	// Service status functions
-	"service_status": func(args []string, ctx interface{}) (string, error) {
+	"service_status": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("service_status requires 1 argument (service_name)")
+			return "", errors.New("service_status requires 1 argument (service_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("service_status requires OrchestrationContext")
+			return "", errors.New("service_status requires OrchestrationContext")
 		}
 
 		return orchCtx.GetServiceStatus(args[0])
 	},
 
-	"service_health": func(args []string, ctx interface{}) (string, error) {
+	"service_health": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("service_health requires 1 argument (service_name)")
+			return "", errors.New("service_health requires 1 argument (service_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("service_health requires OrchestrationContext")
+			return "", errors.New("service_health requires OrchestrationContext")
 		}
 
 		return orchCtx.GetServiceHealth(args[0])
 	},
 
-	"service_healthy": func(args []string, ctx interface{}) (string, error) {
+	"service_healthy": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("service_healthy requires 1 argument (service_name)")
+			return "", errors.New("service_healthy requires 1 argument (service_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("service_healthy requires OrchestrationContext")
+			return "", errors.New("service_healthy requires OrchestrationContext")
 		}
 
 		healthy, err := orchCtx.IsServiceHealthy(args[0])
@@ -109,14 +110,14 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 		return "false", nil
 	},
 
-	"service_running": func(args []string, ctx interface{}) (string, error) {
+	"service_running": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("service_running requires 1 argument (service_name)")
+			return "", errors.New("service_running requires 1 argument (service_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("service_running requires OrchestrationContext")
+			return "", errors.New("service_running requires OrchestrationContext")
 		}
 
 		running, err := orchCtx.IsServiceRunning(args[0])
@@ -131,27 +132,27 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 	},
 
 	// Orchestration status functions
-	"orchestrate_status": func(args []string, ctx interface{}) (string, error) {
+	"orchestrate_status": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("orchestrate_status requires 1 argument (orchestration_name)")
+			return "", errors.New("orchestrate_status requires 1 argument (orchestration_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("orchestrate_status requires OrchestrationContext")
+			return "", errors.New("orchestrate_status requires OrchestrationContext")
 		}
 
 		return orchCtx.GetOrchestrationStatus(args[0])
 	},
 
-	"orchestrate_health_status": func(args []string, ctx interface{}) (string, error) {
+	"orchestrate_health_status": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("orchestrate_health_status requires 1 argument (orchestration_name)")
+			return "", errors.New("orchestrate_health_status requires 1 argument (orchestration_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("orchestrate_health_status requires OrchestrationContext")
+			return "", errors.New("orchestrate_health_status requires OrchestrationContext")
 		}
 
 		status, err := orchCtx.GetOrchestrationHealthStatus(args[0])
@@ -167,14 +168,14 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 		return strings.Join(parts, ", "), nil
 	},
 
-	"orchestrate_healthy": func(args []string, ctx interface{}) (string, error) {
+	"orchestrate_healthy": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("orchestrate_healthy requires 1 argument (orchestration_name)")
+			return "", errors.New("orchestrate_healthy requires 1 argument (orchestration_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("orchestrate_healthy requires OrchestrationContext")
+			return "", errors.New("orchestrate_healthy requires OrchestrationContext")
 		}
 
 		healthy, err := orchCtx.IsOrchestrationHealthy(args[0])
@@ -189,27 +190,27 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 	},
 
 	// DNS functions
-	"dns_resolve": func(args []string, ctx interface{}) (string, error) {
+	"dns_resolve": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("dns_resolve requires 1 argument (domain)")
+			return "", errors.New("dns_resolve requires 1 argument (domain)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("dns_resolve requires OrchestrationContext")
+			return "", errors.New("dns_resolve requires OrchestrationContext")
 		}
 
 		return orchCtx.DNSResolve(args[0])
 	},
 
-	"dns_check": func(args []string, ctx interface{}) (string, error) {
+	"dns_check": func(args []string, ctx any) (string, error) {
 		if len(args) != 2 {
-			return "", fmt.Errorf("dns_check requires 2 arguments (domain, record_type)")
+			return "", errors.New("dns_check requires 2 arguments (domain, record_type)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("dns_check requires OrchestrationContext")
+			return "", errors.New("dns_check requires OrchestrationContext")
 		}
 
 		valid, err := orchCtx.DNSCheck(args[0], args[1])
@@ -223,14 +224,14 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 		return "failed", nil
 	},
 
-	"dns_validate": func(args []string, ctx interface{}) (string, error) {
+	"dns_validate": func(args []string, ctx any) (string, error) {
 		if len(args) != 2 {
-			return "", fmt.Errorf("dns_validate requires 2 arguments (domain, expected_ip)")
+			return "", errors.New("dns_validate requires 2 arguments (domain, expected_ip)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("dns_validate requires OrchestrationContext")
+			return "", errors.New("dns_validate requires OrchestrationContext")
 		}
 
 		valid, err := orchCtx.DNSValidate(args[0], args[1])
@@ -245,108 +246,108 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 	},
 
 	// Git functions
-	"git_status": func(args []string, ctx interface{}) (string, error) {
+	"git_status": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("git_status requires 1 argument (path)")
+			return "", errors.New("git_status requires 1 argument (path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("git_status requires OrchestrationContext")
+			return "", errors.New("git_status requires OrchestrationContext")
 		}
 
 		return orchCtx.GitStatus(args[0])
 	},
 
-	"git_branch": func(args []string, ctx interface{}) (string, error) {
+	"git_branch": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("git_branch requires 1 argument (path)")
+			return "", errors.New("git_branch requires 1 argument (path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("git_branch requires OrchestrationContext")
+			return "", errors.New("git_branch requires OrchestrationContext")
 		}
 
 		return orchCtx.GitBranch(args[0])
 	},
 
-	"git_tag": func(args []string, ctx interface{}) (string, error) {
+	"git_tag": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("git_tag requires 1 argument (path)")
+			return "", errors.New("git_tag requires 1 argument (path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("git_tag requires OrchestrationContext")
+			return "", errors.New("git_tag requires OrchestrationContext")
 		}
 
 		return orchCtx.GitTag(args[0])
 	},
 
 	// Docker functions
-	"docker_ps": func(args []string, ctx interface{}) (string, error) {
+	"docker_ps": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("docker_ps requires 1 argument (service_name)")
+			return "", errors.New("docker_ps requires 1 argument (service_name)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("docker_ps requires OrchestrationContext")
+			return "", errors.New("docker_ps requires OrchestrationContext")
 		}
 
 		return orchCtx.DockerPS(args[0])
 	},
 
-	"docker_logs": func(args []string, ctx interface{}) (string, error) {
+	"docker_logs": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("docker_logs requires 1 argument (container_id)")
+			return "", errors.New("docker_logs requires 1 argument (container_id)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("docker_logs requires OrchestrationContext")
+			return "", errors.New("docker_logs requires OrchestrationContext")
 		}
 
 		return orchCtx.DockerLogs(args[0])
 	},
 
-	"docker_stats": func(args []string, ctx interface{}) (string, error) {
+	"docker_stats": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("docker_stats requires 1 argument (container_id)")
+			return "", errors.New("docker_stats requires 1 argument (container_id)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("docker_stats requires OrchestrationContext")
+			return "", errors.New("docker_stats requires OrchestrationContext")
 		}
 
 		return orchCtx.DockerStats(args[0])
 	},
 
 	// Compose functions
-	"compose_config": func(args []string, ctx interface{}) (string, error) {
+	"compose_config": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("compose_config requires 1 argument (path)")
+			return "", errors.New("compose_config requires 1 argument (path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("compose_config requires OrchestrationContext")
+			return "", errors.New("compose_config requires OrchestrationContext")
 		}
 
 		return orchCtx.ComposeConfig(args[0])
 	},
 
 	// Makefile functions
-	"make_list": func(args []string, ctx interface{}) (string, error) {
+	"make_list": func(args []string, ctx any) (string, error) {
 		if len(args) != 1 {
-			return "", fmt.Errorf("make_list requires 1 argument (path)")
+			return "", errors.New("make_list requires 1 argument (path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("make_list requires OrchestrationContext")
+			return "", errors.New("make_list requires OrchestrationContext")
 		}
 
 		targets, err := orchCtx.MakeList(args[0])
@@ -357,14 +358,14 @@ var OrchestrationBuiltins = map[string]func(args []string, ctx interface{}) (str
 		return strings.Join(targets, ", "), nil
 	},
 
-	"make_dry_run": func(args []string, ctx interface{}) (string, error) {
+	"make_dry_run": func(args []string, ctx any) (string, error) {
 		if len(args) != 2 {
-			return "", fmt.Errorf("make_dry_run requires 2 arguments (target, path)")
+			return "", errors.New("make_dry_run requires 2 arguments (target, path)")
 		}
 
 		orchCtx, ok := ctx.(OrchestrationContext)
 		if !ok {
-			return "", fmt.Errorf("make_dry_run requires OrchestrationContext")
+			return "", errors.New("make_dry_run requires OrchestrationContext")
 		}
 
 		return orchCtx.MakeDryRun(args[0], args[1])

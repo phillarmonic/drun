@@ -3,6 +3,7 @@ package platform
 import (
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -104,10 +105,5 @@ func MatchesCurrent(platforms []string) bool {
 	}
 
 	current := Current()
-	for _, candidate := range platforms {
-		if candidate == current {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(platforms, current)
 }

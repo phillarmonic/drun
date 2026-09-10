@@ -10,8 +10,8 @@ import (
 
 func TestTask_Validate(t *testing.T) {
 	tests := []struct {
-		name    string
 		task    *Task
+		name    string
 		wantErr bool
 	}{
 		{
@@ -139,8 +139,8 @@ func TestTask_GetParameter(t *testing.T) {
 
 func TestTask_HasDependencies(t *testing.T) {
 	tests := []struct {
-		name string
 		task *Task
+		name string
 		want bool
 	}{
 		{

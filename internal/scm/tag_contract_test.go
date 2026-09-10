@@ -37,8 +37,8 @@ func TestPresetTemplateAndPatternAreEquivalent(t *testing.T) {
 	contracts := []*GitVersionTagContract{}
 	for _, input := range []struct {
 		preset  string
-		formats []string
 		pattern string
+		formats []string
 	}{
 		{preset: "semver"},
 		{formats: []string{"v{version}"}},

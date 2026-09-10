@@ -13,8 +13,8 @@ type ValueExpander func(string) (string, error)
 type GitSourceResolver struct {
 	Registry *GitRegistry
 	Adapters map[string]GitProviderAdapter
-	BaseDir  string
 	Expand   ValueExpander
+	BaseDir  string
 }
 
 type ResolvedGitSource struct {
@@ -40,12 +40,14 @@ func (r *GitSourceResolver) Resolve(alias, method string) (*ResolvedGitSource, e
 	resolvedSource.Access = make(map[string]*GitAccessProfile, len(source.Access))
 	resolvedProfile := *profile
 	fields := []struct {
-		value       string
 		destination *string
+		value       string
 	}{
-		{profile.URL, &resolvedProfile.URL}, {profile.Repository, &resolvedProfile.Repository},
-		{profile.Host, &resolvedProfile.Host}, {profile.Key, &resolvedProfile.Key},
-		{profile.Path, &resolvedProfile.Path},
+		{value: profile.URL, destination: &resolvedProfile.URL},
+		{value: profile.Repository, destination: &resolvedProfile.Repository},
+		{value: profile.Host, destination: &resolvedProfile.Host},
+		{value: profile.Key, destination: &resolvedProfile.Key},
+		{value: profile.Path, destination: &resolvedProfile.Path},
 	}
 	for _, field := range fields {
 		value, destination := field.value, field.destination

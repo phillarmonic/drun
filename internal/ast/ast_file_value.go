@@ -8,7 +8,6 @@ import (
 
 // FileValueStatement represents a format-aware scalar read, check, or update.
 type FileValueStatement struct {
-	Token         lexer.Token
 	Operation     string
 	Format        string
 	Selector      string
@@ -19,6 +18,7 @@ type FileValueStatement struct {
 	Value         string
 	MissingPolicy string
 	ValueType     string
+	Token         lexer.Token
 }
 
 func (fs *FileValueStatement) statementNode() {}

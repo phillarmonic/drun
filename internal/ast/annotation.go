@@ -9,9 +9,9 @@ import (
 
 // Annotation represents a declaration decorator like @platform("linux").
 type Annotation struct {
-	Token lexer.Token
 	Name  string
 	Args  []string
+	Token lexer.Token
 }
 
 func (a Annotation) String() string {

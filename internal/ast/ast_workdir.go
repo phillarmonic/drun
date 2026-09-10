@@ -11,8 +11,8 @@ import (
 // The path may contain variable interpolation. Relative paths are resolved
 // against the original working directory (not chained).
 type ChangeWorkdirStatement struct {
-	Token lexer.Token
 	Path  string
+	Token lexer.Token
 }
 
 func (cws *ChangeWorkdirStatement) statementNode() {}

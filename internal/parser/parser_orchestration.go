@@ -1048,7 +1048,7 @@ orchestrateBody:
 			case "dns_checks":
 				stmt.DNSChecks = p.parseOrchestrationStringArray()
 			default:
-				p.addError(fmt.Sprintf("unexpected identifier in orchestration body: %s", p.curToken.Literal))
+				p.addError("unexpected identifier in orchestration body: " + p.curToken.Literal)
 				p.nextToken()
 			}
 		case lexer.COMMENT, lexer.MULTILINE_COMMENT:
@@ -1097,13 +1097,14 @@ func (p *Parser) parseOrchestrationStringArray() []string {
 			continue
 		}
 
-		if p.curToken.Type == lexer.STRING {
+		switch p.curToken.Type {
+		case lexer.STRING:
 			result = append(result, p.curToken.Literal)
-		} else if p.curToken.Type == lexer.COMMA {
+		case lexer.COMMA:
 			// Skip comma, it will be handled below
 			p.nextToken()
 			continue
-		} else {
+		default:
 			p.addError(fmt.Sprintf("expected string in array, got %s", p.curToken.Type))
 			// Advance to avoid infinite loop
 			p.nextToken()
@@ -1160,7 +1161,8 @@ envMapBody:
 			p.nextToken()
 		}
 
-		if p.curToken.Type == lexer.IDENT || p.curToken.Type == lexer.STRING {
+		switch p.curToken.Type {
+		case lexer.IDENT, lexer.STRING:
 			key := p.curToken.Literal
 
 			// Strip quotes if it's a STRING token
@@ -1169,14 +1171,14 @@ envMapBody:
 			}
 
 			if !p.expectPeek(lexer.STRING) {
-				p.addError(fmt.Sprintf("expected value string for environment variable %s", key))
+				p.addError("expected value string for environment variable " + key)
 				return nil
 			}
 			envMap[key] = p.curToken.Literal
 			p.nextToken()
-		} else if p.curToken.Type == lexer.DEDENT {
+		case lexer.DEDENT:
 			break envMapBody
-		} else {
+		default:
 			p.nextToken()
 		}
 	}
@@ -1202,12 +1204,14 @@ func (p *Parser) parseHeadersMap() map[string]string {
 		return nil
 	}
 
+headersLoop:
 	for p.curToken.Type != lexer.DEDENT && p.curToken.Type != lexer.EOF {
 		for p.curToken.Type == lexer.NEWLINE {
 			p.nextToken()
 		}
 
-		if p.curToken.Type == lexer.IDENT || p.curToken.Type == lexer.STRING {
+		switch p.curToken.Type {
+		case lexer.IDENT, lexer.STRING:
 			key := p.curToken.Literal
 
 			// Strip quotes if it's a STRING token
@@ -1216,14 +1220,14 @@ func (p *Parser) parseHeadersMap() map[string]string {
 			}
 
 			if !p.expectPeek(lexer.STRING) {
-				p.addError(fmt.Sprintf("expected value string for header %s", key))
+				p.addError("expected value string for header " + key)
 				return nil
 			}
 			headersMap[key] = p.curToken.Literal
 			p.nextToken()
-		} else if p.curToken.Type == lexer.DEDENT {
-			break
-		} else {
+		case lexer.DEDENT:
+			break headersLoop
+		default:
 			p.nextToken()
 		}
 	}

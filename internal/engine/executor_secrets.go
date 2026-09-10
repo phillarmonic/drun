@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -59,7 +60,7 @@ func (e *Engine) executeSecretSet(secretStmt *statement.Secret, ctx *ExecutionCo
 		}
 		_, _ = fmt.Fprintf(e.output, "🔐  Secret %s stored securely (namespace: %s)\n", secretStmt.Key, namespace)
 	} else {
-		return fmt.Errorf("secrets manager not initialized")
+		return errors.New("secrets manager not initialized")
 	}
 
 	return nil
@@ -100,7 +101,7 @@ func (e *Engine) executeSecretGet(secretStmt *statement.Secret, ctx *ExecutionCo
 			_, _ = fmt.Fprintf(e.output, "🔓 Retrieved secret %s (namespace: %s)\n", secretStmt.Key, namespace)
 		}
 	} else {
-		return fmt.Errorf("secrets manager not initialized")
+		return errors.New("secrets manager not initialized")
 	}
 
 	// Secret get is typically used in variable assignments, but since we're in a domain
@@ -136,7 +137,7 @@ func (e *Engine) executeSecretDelete(secretStmt *statement.Secret, ctx *Executio
 		}
 		_, _ = fmt.Fprintf(e.output, "🗑️  Secret %s deleted (namespace: %s)\n", secretStmt.Key, namespace)
 	} else {
-		return fmt.Errorf("secrets manager not initialized")
+		return errors.New("secrets manager not initialized")
 	}
 
 	return nil
@@ -172,7 +173,7 @@ func (e *Engine) executeSecretExists(secretStmt *statement.Secret, ctx *Executio
 			_, _ = fmt.Fprintf(e.output, "❌  Secret %s does not exist (namespace: %s)\n", secretStmt.Key, namespace)
 		}
 	} else {
-		return fmt.Errorf("secrets manager not initialized")
+		return errors.New("secrets manager not initialized")
 	}
 
 	return nil
@@ -225,7 +226,7 @@ func (e *Engine) executeSecretList(secretStmt *statement.Secret, ctx *ExecutionC
 			}
 		}
 	} else {
-		return fmt.Errorf("secrets manager not initialized")
+		return errors.New("secrets manager not initialized")
 	}
 
 	return nil

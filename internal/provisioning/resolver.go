@@ -44,23 +44,19 @@ type gitFetcher interface {
 }
 
 type Resolver struct {
-	workingDir  string
-	currentOS   string
-	currentArch string
-
-	cacheManager *cache.Manager
-	github       githubFetcher
-	https        httpsFetcher
-	git          gitFetcher
-
-	embedded []EmbeddedSource
-	builtin  []string
-
+	github        githubFetcher
+	git           gitFetcher
+	https         httpsFetcher
+	cacheManager  *cache.Manager
+	manifestCache map[string]*Manifest
+	workingDir    string
+	currentArch   string
+	currentOS     string
+	embedded      []EmbeddedSource
+	builtin       []string
 	fetchTimeout  time.Duration
 	cacheDuration time.Duration
-
 	mu            sync.Mutex
-	manifestCache map[string]*Manifest
 }
 
 type EmbeddedSource struct {
@@ -74,11 +70,11 @@ type SourceSet struct {
 }
 
 type Resolution struct {
-	Source               string
-	Entry                Entry
-	MatchedName          string
 	Target               Target
+	Source               string
+	MatchedName          string
 	ExactVersion         string
+	Entry                Entry
 	UsesVersionedInstall bool
 }
 
@@ -198,8 +194,8 @@ func (m *Manifest) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	var mp struct {
-		Version       string               `yaml:"version"`
 		Provisionings map[string]yaml.Node `yaml:"provisionings"`
+		Version       string               `yaml:"version"`
 	}
 	if err := node.Decode(&mp); err != nil {
 		return err
@@ -255,11 +251,8 @@ func (r *Resolver) ResolveRequirement(ctx context.Context, req statement.ToolReq
 		// Built-in first-party catalogs are opportunistic fallbacks. If the
 		// remote source is unavailable, continue to the bundled embedded
 		// defaults instead of failing the whole requirement.
-		if err != nil && !errors.Is(err, ErrNoProvisioningMatch) {
-			continue
-		}
 		if !errors.Is(err, ErrNoProvisioningMatch) {
-			return nil, err
+			continue
 		}
 	}
 
@@ -363,7 +356,7 @@ func (r *Resolver) loadManifest(ctx context.Context, sourceRef string) (*Manifes
 func (r *Resolver) normalizeSourceRef(sourceRef string) (string, error) {
 	sourceRef = strings.TrimSpace(sourceRef)
 	if sourceRef == "" {
-		return "", fmt.Errorf("source is empty")
+		return "", errors.New("source is empty")
 	}
 
 	if isGitSource(sourceRef) || remote.IsRemoteURL(sourceRef) {
@@ -392,6 +385,7 @@ func (r *Resolver) normalizeSourceRef(sourceRef string) (string, error) {
 
 func (r *Resolver) fetchManifestContent(ctx context.Context, sourceRef string) ([]byte, error) {
 	if !isGitSource(sourceRef) && !remote.IsRemoteURL(sourceRef) {
+		// #nosec G304 -- local provisioning manifests are resolved and cleaned from user-declared source refs; remote sources are handled by the fetchers above.
 		return os.ReadFile(sourceRef)
 	}
 
@@ -464,7 +458,7 @@ func parseManifest(source string, content []byte) (*Manifest, error) {
 
 func validateManifest(manifest *Manifest) error {
 	if len(manifest.Provisionings) == 0 {
-		return fmt.Errorf("manifest contains no provisionings")
+		return errors.New("manifest contains no provisionings")
 	}
 	if manifest.Version != "" && manifest.Version != manifestVersion {
 		return fmt.Errorf("unsupported manifest version %q", manifest.Version)
@@ -475,7 +469,7 @@ func validateManifest(manifest *Manifest) error {
 		entry := &manifest.Provisionings[i]
 		entry.Name = strings.TrimSpace(entry.Name)
 		if entry.Name == "" {
-			return fmt.Errorf("manifest contains a provisioning without a name")
+			return errors.New("manifest contains a provisioning without a name")
 		}
 		if len(entry.Targets) == 0 {
 			return fmt.Errorf("provisioning %q has no targets", entry.Name)
@@ -609,12 +603,9 @@ func deriveExactVersion(constraints []statement.VersionConstraint) (string, bool
 func compareVersions(a, b string) int {
 	left := parseVersion(a)
 	right := parseVersion(b)
-	maxLen := len(left)
-	if len(right) > maxLen {
-		maxLen = len(right)
-	}
+	maxLen := max(len(right), len(left))
 
-	for i := 0; i < maxLen; i++ {
+	for i := range maxLen {
 		li := 0
 		ri := 0
 		if i < len(left) {
@@ -723,9 +714,9 @@ func parseGitSource(source string) (string, string, string, error) {
 type gitCommandFetcher struct{}
 
 func (gitCommandFetcher) FetchManifest(ctx context.Context, repoURL, manifestPath, ref string) ([]byte, error) {
-	tempDir, err := os.MkdirTemp("", "drun-provisioning-*")
-	if err != nil {
-		return nil, fmt.Errorf("create temp directory: %w", err)
+	tempDir, tempErr := os.MkdirTemp("", "drun-provisioning-*")
+	if tempErr != nil {
+		return nil, fmt.Errorf("create temp directory: %w", tempErr)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
@@ -741,5 +732,45 @@ func (gitCommandFetcher) FetchManifest(ctx context.Context, repoURL, manifestPat
 		return nil, fmt.Errorf("git clone failed: %w\n%s", err, strings.TrimSpace(string(output)))
 	}
 
-	return os.ReadFile(filepath.Join(tempDir, manifestPath))
+	// The manifest path is declared by the provisioning source, which may be a
+	// remote URL the user did not author. Confine it to the freshly cloned tree
+	// so a source cannot address files elsewhere on disk via `..`.
+	confined, confineErr := confineToDir(tempDir, manifestPath)
+	if confineErr != nil {
+		return nil, fmt.Errorf("git manifest path %q: %w", manifestPath, confineErr)
+	}
+
+	// #nosec G304 -- path is confined to the temporary clone directory above.
+	return os.ReadFile(confined)
+}
+
+// confineToDir resolves rel against base and guarantees the result stays inside
+// base. It rejects absolute paths, rooted paths, and any path whose cleaned form
+// escapes base with `..`.
+func confineToDir(base, rel string) (string, error) {
+	// Remote and spec-declared manifest paths always use forward slashes, but a
+	// Windows-built source may arrive with backslashes; normalize before checking.
+	normalized := strings.ReplaceAll(strings.TrimSpace(rel), `\`, "/")
+	if normalized == "" {
+		return "", errors.New("empty path")
+	}
+	if path.IsAbs(normalized) || filepath.IsAbs(normalized) {
+		return "", errors.New("absolute paths are not allowed")
+	}
+	// A Windows-style drive prefix (C:/...) is not absolute on Unix, so reject it
+	// explicitly rather than relying on the host-specific check above.
+	if strings.Contains(firstPathSegment(normalized), ":") {
+		return "", errors.New("drive-qualified paths are not allowed")
+	}
+	cleaned := path.Clean(normalized)
+	if !filepath.IsLocal(filepath.FromSlash(cleaned)) {
+		return "", errors.New("path escapes the source directory")
+	}
+	return filepath.Join(base, filepath.FromSlash(cleaned)), nil
+}
+
+// firstPathSegment returns the leading slash-delimited element of a path.
+func firstPathSegment(p string) string {
+	segment, _, _ := strings.Cut(p, "/")
+	return segment
 }

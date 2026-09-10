@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,7 +21,6 @@ import (
 
 // OrchestrationExecutor handles orchestration execution
 type OrchestrationExecutor struct {
-	workDir          string
 	serviceRegistry  *orchestration.ServiceRegistry
 	orchestrRegistry *orchestration.OrchestrationRegistry
 	healthChecker    *healthcheck.Checker
@@ -28,6 +28,7 @@ type OrchestrationExecutor struct {
 	makeExecutor     *makeexec.Executor
 	envFileManager   *envfile.Manager
 	engine           *Engine
+	workDir          string
 }
 
 // NewOrchestrationExecutor creates a new orchestration executor
@@ -423,13 +424,14 @@ func (oe *OrchestrationExecutor) executeTask(ctx context.Context, execCtx *Execu
 	}
 
 	// Execute task
+	//nolint:contextcheck // Engine shell execution is intentionally context-free (executeShell -> executeMultilineShell -> shell.Execute take no context.Context; shell.Execute derives its own Background/timeout ctx). Full ctx threading needs an engine-wide executeStatement/shell.Execute signature change; see decision W04_T04.
 	return oe.engine.executeTask(targetTask, execCtx)
 }
 
 // executeCommand executes a shell command
 func (oe *OrchestrationExecutor) executeCommand(ctx context.Context, cmdStr, workDir string, allocateTTY bool) error {
 	if cmdStr == "" {
-		return fmt.Errorf("empty command")
+		return errors.New("empty command")
 	}
 
 	// Run command through shell to support operators like &&, ||, |, etc.

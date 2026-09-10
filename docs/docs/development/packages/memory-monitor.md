@@ -44,7 +44,30 @@ Human-readable summary containing:
 - Memory usage statistics
 - Runtime information
 - Program metadata (version, task count, project name)
+- The runtime's goroutineleak profile, which lists every goroutine that is
+  blocked forever together with the drun labels of the worker that owns it
+  (see [Goroutine labels](#goroutine-labels))
 - Reference to the full JSON dump file
+
+The same profile is also written next to the dump as
+`drun-goroutineleak-YYYYMMDD-HHMMSS.pprof`, which `go tool pprof` reads.
+
+## Goroutine labels
+
+Every goroutine drun spawns carries pprof labels, so a panic or `SIGQUIT`
+traceback names the worker instead of an anonymous goroutine:
+
+| Label | Meaning |
+| --- | --- |
+| `drun.component` | The subsystem, for example `parallel-worker`, `parallel-feeder`, `parallel-collector`, `memory-monitor`, `orchestration-health`, `orchestration-recovery`, `orchestration-service-start` |
+| `drun.worker` | The 1-based parallel worker index |
+| `drun.variable` | The loop variable a parallel worker is running |
+| `drun.orchestration` | The orchestration an engine goroutine belongs to |
+| `drun.service` | The service an orchestration start goroutine is starting |
+
+Labels are attached once per goroutine, never once per work item, and the
+goroutineleak profile is only captured on the crash path, so nothing is written
+while debug capture is off.
 
 ## Usage
 

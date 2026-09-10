@@ -9,7 +9,6 @@ import (
 
 // TaskStatement represents a task definition
 type TaskStatement struct {
-	Token        lexer.Token
 	Name         string
 	Mode         string
 	Description  string
@@ -17,6 +16,7 @@ type TaskStatement struct {
 	Parameters   []ParameterStatement
 	Dependencies []DependencyGroup
 	Body         []Statement
+	Token        lexer.Token
 }
 
 func (ts *TaskStatement) statementNode() {}
@@ -51,9 +51,9 @@ func (ts *TaskStatement) String() string {
 
 // TaskCallStatement represents calling another task
 type TaskCallStatement struct {
-	Token      lexer.Token
-	TaskName   string
 	Parameters map[string]string
+	TaskName   string
+	Token      lexer.Token
 }
 
 func (tcs *TaskCallStatement) statementNode() {}
@@ -71,8 +71,8 @@ func (tcs *TaskCallStatement) String() string {
 
 // DependencyGroup represents a group of dependencies with execution semantics
 type DependencyGroup struct {
-	Token        lexer.Token
 	Dependencies []DependencyItem
+	Token        lexer.Token
 	Sequential   bool
 }
 
@@ -108,12 +108,12 @@ func (di *DependencyItem) String() string {
 
 // TaskTemplateStatement represents a task template definition
 type TaskTemplateStatement struct {
-	Token       lexer.Token
 	Name        string
 	Description string
 	Annotations []Annotation
 	Parameters  []ParameterStatement
 	Body        []Statement
+	Token       lexer.Token
 }
 
 func (tts *TaskTemplateStatement) statementNode() {}
@@ -141,10 +141,10 @@ func (tts *TaskTemplateStatement) String() string {
 
 // TaskFromTemplateStatement represents a task instantiated from a template
 type TaskFromTemplateStatement struct {
-	Token        lexer.Token
+	Overrides    map[string]string
 	Name         string
 	TemplateName string
-	Overrides    map[string]string
+	Token        lexer.Token
 }
 
 func (tfts *TaskFromTemplateStatement) statementNode() {}

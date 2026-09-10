@@ -4,26 +4,37 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime/pprof"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
 )
 
+// labelGoroutine attaches the pprof labels that Go 1.27 prints next to the
+// goroutine state in tracebacks, so a panic or SIGQUIT dump names the worker
+// instead of an anonymous goroutine. It is called once per goroutine that drun
+// spawns, never once per work item, so the parallel hot path stays untouched.
+// The context must not be nil.
+func labelGoroutine(ctx context.Context, pairs ...string) {
+	pprof.SetGoroutineLabels(pprof.WithLabels(ctx, pprof.Labels(pairs...)))
+}
+
 // ExecutionResult represents the result of a parallel execution
 type ExecutionResult struct {
-	Index    int           // index of the item in the original list
-	Item     string        // the item being processed
 	Error    error         // error if execution failed
-	Duration time.Duration // how long the execution took
+	Item     string        // the item being processed
 	Output   string        // captured output from the execution
+	Index    int           // index of the item in the original list
+	Duration time.Duration // how long the execution took
 }
 
 // ParallelExecutor manages parallel execution of loop bodies
 type ParallelExecutor struct {
+	output     io.Writer
 	maxWorkers int
 	failFast   bool
-	output     io.Writer
 	dryRun     bool
 	verbose    bool
 }
@@ -88,10 +99,7 @@ func (pe *ParallelExecutor) executeParallel(
 	}
 
 	// Determine actual number of workers
-	workers := pe.maxWorkers
-	if workers > numItems {
-		workers = numItems
-	}
+	workers := min(pe.maxWorkers, numItems)
 
 	if pe.verbose {
 		_, _ = fmt.Fprintf(pe.output, "🔄  Starting parallel execution: %d items, %d workers\n", numItems, workers)
@@ -107,13 +115,14 @@ func (pe *ParallelExecutor) executeParallel(
 
 	// Start workers
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		wg.Add(1)
 		go pe.worker(ctx, i+1, workChan, resultChan, variable, body, executor, &wg)
 	}
 
 	// Send work items
 	go func() {
+		labelGoroutine(ctx, "drun.component", "parallel-feeder", "drun.variable", variable)
 		defer close(workChan)
 		for i, item := range items {
 			select {
@@ -129,7 +138,7 @@ func (pe *ParallelExecutor) executeParallel(
 	var firstError error
 	completedCount := 0
 
-	for i := 0; i < numItems; i++ {
+	for range numItems {
 		select {
 		case result := <-resultChan:
 			results[result.Index] = result
@@ -159,6 +168,7 @@ func (pe *ParallelExecutor) executeParallel(
 collectRemaining:
 	// Wait for all workers to finish
 	go func() {
+		labelGoroutine(ctx, "drun.component", "parallel-collector")
 		wg.Wait()
 		close(resultChan)
 	}()
@@ -190,7 +200,7 @@ collectRemaining:
 		}
 
 		if pe.failFast && firstError != nil {
-			return results, fmt.Errorf("parallel execution failed (fail-fast): %v", firstError)
+			return results, fmt.Errorf("parallel execution failed (fail-fast): %w", firstError)
 		}
 
 		return results, fmt.Errorf("parallel execution completed with %d errors", errorCount)
@@ -201,8 +211,8 @@ collectRemaining:
 
 // workItem represents a single item of work
 type workItem struct {
-	index int
 	item  string
+	index int
 }
 
 // worker processes work items from the work channel
@@ -217,6 +227,8 @@ func (pe *ParallelExecutor) worker(
 	wg *sync.WaitGroup,
 ) {
 	defer wg.Done()
+
+	labelGoroutine(ctx, "drun.component", "parallel-worker", "drun.worker", strconv.Itoa(workerID), "drun.variable", variable)
 
 	for {
 		select {
@@ -269,11 +281,11 @@ func (pe *ParallelExecutor) executeWorkItem(
 
 // ProgressTracker tracks progress of parallel execution
 type ProgressTracker struct {
+	output    io.Writer
 	total     int
 	completed int
 	failed    int
 	mu        sync.Mutex
-	output    io.Writer
 }
 
 // NewProgressTracker creates a new progress tracker
@@ -314,12 +326,4 @@ func (pt *ProgressTracker) GetStats() (completed, failed, total int) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 	return pt.completed, pt.failed, pt.total
-}
-
-// Helper function for max
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

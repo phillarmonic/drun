@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -14,9 +15,11 @@ import (
 // Domain: Condition Evaluation Helpers
 // This file contains helper methods for evaluating conditions
 
-var semanticVersionConditionPattern = regexp.MustCompile(`^(.+?)\s+is\s+(older|newer)\s+than\s+version\s+(.+)$`)
-var fileComparisonConditionPattern = regexp.MustCompile(`^file\s+(.+?)\s+(not\s+)?matches\s+file\s+(.+?)\s*$`)
-var portConditionPattern = regexp.MustCompile(`^port\s+(\S+)\s+is\s+(not\s+)?open\s+on\s+(.+?)(?:\s+with\s+timeout\s+(\S+))?\s*$`)
+var (
+	semanticVersionConditionPattern = regexp.MustCompile(`^(.+?)\s+is\s+(older|newer)\s+than\s+version\s+(.+)$`)
+	fileComparisonConditionPattern  = regexp.MustCompile(`^file\s+(.+?)\s+(not\s+)?matches\s+file\s+(.+?)\s*$`)
+	portConditionPattern            = regexp.MustCompile(`^port\s+(\S+)\s+is\s+(not\s+)?open\s+on\s+(.+?)(?:\s+with\s+timeout\s+(\S+))?\s*$`)
+)
 
 // evaluateFileComparisonCondition handles exact file-content comparisons:
 //
@@ -66,7 +69,7 @@ func (e *Engine) resolveFileComparisonOperand(operand string, ctx *ExecutionCont
 	}
 	value = strings.Trim(strings.TrimSpace(value), `"'`)
 	if value == "" {
-		return "", fmt.Errorf("path is empty")
+		return "", errors.New("path is empty")
 	}
 	return value, nil
 }
@@ -177,7 +180,7 @@ func (e *Engine) resolvePortConditionOperand(operand string, ctx *ExecutionConte
 	}
 	value = strings.Trim(strings.TrimSpace(value), `"'`)
 	if value == "" {
-		return "", fmt.Errorf("value is empty")
+		return "", errors.New("value is empty")
 	}
 	return value, nil
 }
@@ -333,8 +336,8 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 	// Handle various patterns like "variable is value", "variable is not empty", etc.
 
 	// Handle environment variable conditionals
-	if strings.HasPrefix(condition, "env ") {
-		return e.evaluateEnvCondition(strings.TrimPrefix(condition, "env "), ctx)
+	if after, ok := strings.CutPrefix(condition, "env "); ok {
+		return e.evaluateEnvCondition(after, ctx)
 	}
 
 	if result, handled := e.evaluateFilesystemExistsCondition(condition, ctx); handled {
@@ -350,11 +353,12 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			// Check if this is a folder/directory path check
 			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
 				var folderPath string
-				if strings.HasPrefix(left, "folder ") {
+				switch {
+				case strings.HasPrefix(left, "folder "):
 					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
-				} else if strings.HasPrefix(left, "directory ") {
+				case strings.HasPrefix(left, "directory "):
 					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
-				} else if strings.HasPrefix(left, "dir ") {
+				case strings.HasPrefix(left, "dir "):
 					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
 				}
 
@@ -462,11 +466,12 @@ func (e *Engine) evaluateCondition(condition string, ctx *ExecutionContext) bool
 			// Check if this is a folder/directory path check
 			if strings.HasPrefix(left, "folder ") || strings.HasPrefix(left, "directory ") || strings.HasPrefix(left, "dir ") {
 				var folderPath string
-				if strings.HasPrefix(left, "folder ") {
+				switch {
+				case strings.HasPrefix(left, "folder "):
 					folderPath = strings.TrimSpace(left[7:]) // Remove "folder "
-				} else if strings.HasPrefix(left, "directory ") {
+				case strings.HasPrefix(left, "directory "):
 					folderPath = strings.TrimSpace(left[10:]) // Remove "directory "
-				} else if strings.HasPrefix(left, "dir ") {
+				case strings.HasPrefix(left, "dir "):
 					folderPath = strings.TrimSpace(left[4:]) // Remove "dir "
 				}
 

@@ -195,8 +195,8 @@ task "deploy":
 	}
 
 	for i, expected := range expectedPlatforms {
-		literal, ok := arrayExpr.Elements[i].(*ast.LiteralExpression)
-		if !ok {
+		literal, literalOK := arrayExpr.Elements[i].(*ast.LiteralExpression)
+		if !literalOK {
 			t.Fatalf("Platform %d is not a LiteralExpression, got %T", i, arrayExpr.Elements[i])
 		}
 		if literal.Value != expected {

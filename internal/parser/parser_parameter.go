@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,13 +34,14 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 	// Check for type declaration: "as type"
 	if p.peekToken.Type == lexer.AS {
 		p.nextToken() // consume AS
-		if p.isTypeToken(p.peekToken.Type) {
+		switch {
+		case p.isTypeToken(p.peekToken.Type):
 			p.nextToken() // consume type token
 			stmt.DataType = p.curToken.Literal
 
 			// Check for advanced constraints after type
 			p.parseAdvancedConstraints(stmt)
-		} else if p.peekToken.Type == lexer.LIST {
+		case p.peekToken.Type == lexer.LIST:
 			p.nextToken() // consume LIST
 			stmt.DataType = "list"
 			stmt.Variadic = true // list parameters are variadic by default
@@ -50,7 +52,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 					stmt.DataType = "list of " + p.curToken.Literal
 				}
 			}
-		} else {
+		default:
 			p.addError("expected type after 'as'")
 			return nil
 		}
@@ -125,13 +127,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 					defaultVal = defaultVal[1 : len(defaultVal)-1]
 				}
 
-				found := false
-				for _, constraint := range stmt.Constraints {
-					if constraint == defaultVal {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(stmt.Constraints, defaultVal)
 
 				if !found {
 					p.addError(fmt.Sprintf("default value '%s' must be one of the allowed values: [%s]",
@@ -225,13 +221,7 @@ func (p *Parser) parseParameterStatement() *ast.ParameterStatement {
 				defaultVal = defaultVal[1 : len(defaultVal)-1]
 			}
 
-			found := false
-			for _, constraint := range stmt.Constraints {
-				if constraint == defaultVal {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(stmt.Constraints, defaultVal)
 
 			if !found {
 				p.addError(fmt.Sprintf("default value '%s' must be one of the allowed values: [%s]",
@@ -280,7 +270,7 @@ func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
 
 	minVal, err := strconv.ParseFloat(p.curToken.Literal, 64)
 	if err != nil {
-		p.addError(fmt.Sprintf("invalid minimum value: %s", p.curToken.Literal))
+		p.addError("invalid minimum value: " + p.curToken.Literal)
 		return
 	}
 	stmt.MinValue = &minVal
@@ -297,7 +287,7 @@ func (p *Parser) parseRangeConstraint(stmt *ast.ParameterStatement) {
 
 	maxVal, err := strconv.ParseFloat(p.curToken.Literal, 64)
 	if err != nil {
-		p.addError(fmt.Sprintf("invalid maximum value: %s", p.curToken.Literal))
+		p.addError("invalid maximum value: " + p.curToken.Literal)
 		return
 	}
 	stmt.MaxValue = &maxVal

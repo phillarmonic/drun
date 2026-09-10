@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -16,12 +17,12 @@ import (
 
 // ServiceProgress tracks the progress of a service operation
 type ServiceProgress struct {
-	Name      string
-	Status    string // "pending", "starting", "healthy", "failed", "stopped"
-	Message   string
 	StartTime time.Time
 	EndTime   time.Time
 	Error     error
+	Name      string
+	Status    string // "pending", "starting", "healthy", "failed", "stopped"
+	Message   string
 	mu        sync.RWMutex
 }
 
@@ -301,19 +302,20 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 			} else {
 				// Repository exists - check if we should update it
 				// Respect the "update on start" setting
-				if !service.Repository.UpdateOnStart {
+				switch {
+				case !service.Repository.UpdateOnStart:
 					// Skip update check if explicitly disabled
 					if e.verbose {
 						_, _ = fmt.Fprintf(e.output, "    [VERBOSE] Repository update disabled for %s (update on start: false)\n", serviceName)
 					}
-				} else if updateRepos {
+				case updateRepos:
 					// For "up" command: check if on default branch and force update
 					currentBranch, err := repoManager.GetCurrentBranch(context.Background(), service.Path)
 					if err == nil && (currentBranch == "main" || currentBranch == "master") {
 						hasRepoUpdates = true
 						_, _ = fmt.Fprintf(e.output, "\n  📥  Updating repository on default branch (%s) for %s\n", currentBranch, serviceName)
 					}
-				} else {
+				default:
 					// For "start" command: only check for updates, don't force
 					progress.UpdateService(serviceName, "checking", "Checking for repository updates...")
 					progress.RenderInline(serviceName)
@@ -464,8 +466,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 					}
 
 					// Stop dependent services in reverse order
-					for i := len(startedServices) - 1; i >= 0; i-- {
-						svcName := startedServices[i]
+					for _, svcName := range slices.Backward(startedServices) {
 						pd.UpdateService(svcName, "stopping", "Rolling back...")
 						pd.RenderInline(svcName)
 						_ = e.stopService(services[svcName]) // Ignore error during rollback
@@ -527,8 +528,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 				}
 
 				// Stop dependent services in reverse order
-				for i := len(startedServices) - 1; i >= 0; i-- {
-					svcName := startedServices[i]
+				for _, svcName := range slices.Backward(startedServices) {
 					pd.UpdateService(svcName, "stopping", "Rolling back...")
 					pd.RenderInline(svcName)
 					_ = e.stopService(services[svcName]) // Ignore error during rollback
@@ -585,8 +585,7 @@ func (e *Engine) orchestrateStartWithProgress(ctx *ExecutionContext, orch *ast.O
 					}
 
 					// Stop dependent services in reverse order
-					for i := len(startedServices) - 1; i >= 0; i-- {
-						svcName := startedServices[i]
+					for _, svcName := range slices.Backward(startedServices) {
 						pd.UpdateService(svcName, "stopping", "Rolling back...")
 						pd.RenderInline(svcName)
 						_ = e.stopService(services[svcName])
@@ -627,8 +626,7 @@ func (e *Engine) orchestrateStopWithProgress(ctx *ExecutionContext, orch *ast.Or
 	progress := NewProgressDisplay(e.output)
 
 	// Reverse order for shutdown
-	for i := len(orderedServices) - 1; i >= 0; i-- {
-		serviceName := orderedServices[i]
+	for _, serviceName := range slices.Backward(orderedServices) {
 		service := services[serviceName]
 
 		progress.StartService(serviceName)

@@ -2,10 +2,13 @@ package healthcheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +54,7 @@ func (c *Checker) Check(ctx context.Context, config *orchestration.HealthCheck) 
 // checkHTTP performs an HTTP health check
 func (c *Checker) checkHTTP(ctx context.Context, config *orchestration.HealthCheck) error {
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, "GET", config.Endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, config.Endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -73,16 +76,14 @@ func (c *Checker) checkHTTP(ctx context.Context, config *orchestration.HealthChe
 	// Check status code
 	if config.Condition != "" {
 		expectedStatus := config.Condition
-		actualStatus := fmt.Sprintf("%d", resp.StatusCode)
+		actualStatus := strconv.Itoa(resp.StatusCode)
 
 		if actualStatus != expectedStatus {
 			return fmt.Errorf("http health check failed: expected status %s, got %s", expectedStatus, actualStatus)
 		}
-	} else {
+	} else if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// Default: check if status is 2xx
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return fmt.Errorf("http health check failed: status code %d", resp.StatusCode)
-		}
+		return fmt.Errorf("http health check failed: status code %d", resp.StatusCode)
 	}
 
 	return nil
@@ -170,18 +171,12 @@ func (c *Checker) checkDNS(ctx context.Context, config *orchestration.HealthChec
 
 	// Check if we got any results
 	if len(ips) == 0 {
-		return fmt.Errorf("DNS resolution returned no results")
+		return errors.New("DNS resolution returned no results")
 	}
 
 	// Validate expected IP if specified
 	if config.ExpectedIP != "" {
-		found := false
-		for _, ip := range ips {
-			if ip == config.ExpectedIP {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(ips, config.ExpectedIP)
 		if !found {
 			return fmt.Errorf("DNS resolution did not return expected IP %s (got: %v)", config.ExpectedIP, ips)
 		}
@@ -191,11 +186,8 @@ func (c *Checker) checkDNS(ctx context.Context, config *orchestration.HealthChec
 	if len(config.ExpectedIPs) > 0 {
 		found := false
 		for _, ip := range ips {
-			for _, expectedIP := range config.ExpectedIPs {
-				if ip == expectedIP {
-					found = true
-					break
-				}
+			if slices.Contains(config.ExpectedIPs, ip) {
+				found = true
 			}
 			if found {
 				break
@@ -214,7 +206,7 @@ func (c *Checker) checkCustom(ctx context.Context, config *orchestration.HealthC
 	// Parse command
 	parts := strings.Fields(config.Command)
 	if len(parts) == 0 {
-		return fmt.Errorf("custom health check command is empty")
+		return errors.New("custom health check command is empty")
 	}
 
 	// Create command

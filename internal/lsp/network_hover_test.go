@@ -9,8 +9,8 @@ func TestNetworkHover(t *testing.T) {
 	tests := []struct {
 		name   string
 		line   string
-		column int
 		want   []string
+		column int
 	}{
 		{
 			name:   "test connection action",

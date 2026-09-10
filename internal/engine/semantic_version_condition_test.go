@@ -25,9 +25,9 @@ task "compare":
 		name          string
 		candidate     string
 		reference     string
+		expectedError string
 		expected      []string
 		notExpected   []string
-		expectedError string
 	}{
 		{name: "older", candidate: "1.0.4", reference: "1.1.0", expected: []string{"OLDER_TRUE", "NEWER_FALSE"}, notExpected: []string{"OLDER_FALSE", "NEWER_TRUE"}},
 		{name: "equal", candidate: "1.0.4", reference: "1.0.4", expected: []string{"OLDER_FALSE", "NEWER_FALSE"}, notExpected: []string{"OLDER_TRUE", "NEWER_TRUE"}},

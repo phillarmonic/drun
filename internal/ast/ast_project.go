@@ -9,21 +9,21 @@ import (
 
 // VersionStatement represents a version declaration
 type VersionStatement struct {
-	Token lexer.Token
 	Value string
+	Token lexer.Token
 }
 
 func (vs *VersionStatement) statementNode() {}
 func (vs *VersionStatement) String() string {
-	return fmt.Sprintf("version: %s", vs.Value)
+	return "version: " + vs.Value
 }
 
 // ProjectStatement represents a project declaration
 type ProjectStatement struct {
-	Token    lexer.Token
 	Name     string
 	Version  string
 	Settings []ProjectSetting
+	Token    lexer.Token
 }
 
 func (ps *ProjectStatement) statementNode() {}
@@ -45,9 +45,9 @@ func (ps *ProjectStatement) String() string {
 
 // SetStatement represents a project setting (set key to value)
 type SetStatement struct {
-	Token lexer.Token
-	Key   string
 	Value Expression
+	Key   string
+	Token lexer.Token
 }
 
 func (ss *SetStatement) statementNode()      {}
@@ -61,10 +61,10 @@ func (ss *SetStatement) String() string {
 
 // IncludeStatement represents an include directive
 type IncludeStatement struct {
-	Token     lexer.Token
 	Path      string
-	Selectors []string
 	Namespace string
+	Selectors []string
+	Token     lexer.Token
 }
 
 func (is *IncludeStatement) statementNode()      {}
@@ -84,8 +84,8 @@ func (is *IncludeStatement) String() string {
 
 // ShellConfigStatement represents shell configuration for different platforms
 type ShellConfigStatement struct {
-	Token     lexer.Token
 	Platforms map[string]*PlatformShellConfig
+	Token     lexer.Token
 }
 
 func (scs *ShellConfigStatement) statementNode()      {}
@@ -114,17 +114,17 @@ func (scs *ShellConfigStatement) String() string {
 
 // PlatformShellConfig represents shell configuration for a specific platform
 type PlatformShellConfig struct {
+	Environment map[string]string
 	Executable  string
 	Args        []string
-	Environment map[string]string
 }
 
 // LifecycleHook represents lifecycle hooks
 type LifecycleHook struct {
-	Token lexer.Token
 	Type  string // "before", "after", "setup", or "teardown"
 	Scope string // "any" for task hooks, "drun" for tool hooks
 	Body  []Statement
+	Token lexer.Token
 }
 
 func (lh *LifecycleHook) statementNode()      {}

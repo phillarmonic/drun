@@ -14,8 +14,8 @@ import (
 )
 
 type fakeGitHubFetcher struct {
-	calls   int
 	content map[string][]byte
+	calls   int
 }
 
 func (f *fakeGitHubFetcher) Fetch(_ context.Context, path, ref string) ([]byte, error) {
@@ -28,8 +28,8 @@ func (f *fakeGitHubFetcher) Fetch(_ context.Context, path, ref string) ([]byte, 
 }
 
 type fakeHTTPSFetcher struct {
-	calls   int
 	content map[string][]byte
+	calls   int
 }
 
 func (f *fakeHTTPSFetcher) Fetch(_ context.Context, path, _ string) ([]byte, error) {
@@ -41,8 +41,8 @@ func (f *fakeHTTPSFetcher) Fetch(_ context.Context, path, _ string) ([]byte, err
 }
 
 type fakeGitFetcher struct {
-	calls   int
 	content map[string][]byte
+	calls   int
 }
 
 func (f *fakeGitFetcher) FetchManifest(_ context.Context, repoURL, manifestPath, ref string) ([]byte, error) {
@@ -354,6 +354,59 @@ func TestParseGitSource_ManifestPathUsesForwardSlashes(t *testing.T) {
 	}
 }
 
+func TestConfineToDir(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+
+	allowed := []struct {
+		name string
+		rel  string
+		want string
+	}{
+		{name: "plain relative path", rel: "catalog/provisionings.yaml", want: filepath.Join(base, "catalog", "provisionings.yaml")},
+		{name: "default manifest name", rel: defaultManifestName, want: filepath.Join(base, defaultManifestName)},
+		{name: "redundant separators are cleaned", rel: "catalog//sub/./provisionings.yaml", want: filepath.Join(base, "catalog", "sub", "provisionings.yaml")},
+		{name: "interior parent that stays inside", rel: "catalog/sub/../provisionings.yaml", want: filepath.Join(base, "catalog", "provisionings.yaml")},
+	}
+	for _, tc := range allowed {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := confineToDir(base, tc.rel)
+			if err != nil {
+				t.Fatalf("confineToDir(%q) error = %v", tc.rel, err)
+			}
+			if got != tc.want {
+				t.Fatalf("confineToDir(%q) = %q, want %q", tc.rel, got, tc.want)
+			}
+		})
+	}
+
+	rejected := []struct {
+		name string
+		rel  string
+	}{
+		{name: "empty", rel: ""},
+		{name: "blank", rel: "   "},
+		{name: "single parent", rel: ".."},
+		{name: "parent traversal", rel: "../../etc/passwd"},
+		{name: "nested traversal", rel: "catalog/../../outside.yaml"},
+		{name: "absolute unix path", rel: "/etc/passwd"},
+		{name: "windows rooted path", rel: `C:\Windows\win.ini`},
+		{name: "backslash traversal", rel: `..\..\etc\passwd`},
+	}
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got, err := confineToDir(base, tc.rel); err == nil {
+				t.Fatalf("confineToDir(%q) = %q, want error", tc.rel, got)
+			}
+		})
+	}
+}
+
 func TestResolverResolveRequirement_FirstMatchingSourceDoesNotFallThrough(t *testing.T) {
 	t.Parallel()
 
@@ -419,7 +472,7 @@ provisionings:
 	}
 
 	duplicate := filepath.Join(projectDir, "duplicate.yaml")
-	if err := os.WriteFile(duplicate, []byte(`version: "1"
+	if writeErr := os.WriteFile(duplicate, []byte(`version: "1"
 provisionings:
   golangci-lint:
     aliases: ["lint"]
@@ -428,8 +481,8 @@ provisionings:
   lint:
     targets:
       - install: "second"
-`), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+`), 0o644); writeErr != nil {
+		t.Fatalf("WriteFile() error = %v", writeErr)
 	}
 
 	_, err = resolver.ResolveRequirement(context.Background(), statement.ToolRequirement{Name: "golangci-lint"}, SourceSet{
@@ -484,8 +537,8 @@ func TestDeriveExactVersion(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		constraints []statement.VersionConstraint
 		exact       string
+		constraints []statement.VersionConstraint
 		ok          bool
 	}{
 		{
@@ -513,7 +566,6 @@ func TestDeriveExactVersion(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

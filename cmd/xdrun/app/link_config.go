@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func loadLinkConfig() (*LinkConfig, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
 		return &LinkConfig{
 			Links: make(map[string]string),
 		}, nil
@@ -62,8 +63,8 @@ func saveLinkConfig(config *LinkConfig) error {
 	}
 
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0750); err != nil {
-		return fmt.Errorf("failed to create link config directory: %w", err)
+	if mkdirErr := os.MkdirAll(configDir, 0o750); mkdirErr != nil {
+		return fmt.Errorf("failed to create link config directory: %w", mkdirErr)
 	}
 
 	data, err := yaml.Marshal(config)
@@ -71,7 +72,7 @@ func saveLinkConfig(config *LinkConfig) error {
 		return fmt.Errorf("failed to marshal link config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write link config: %w", err)
 	}
 
@@ -96,7 +97,7 @@ func clearLinkConfig() error {
 func LinkDirectories(directories []string, taskFile string) error {
 	parsedDirs := parseDirectoryArgs(directories)
 	if len(parsedDirs) == 0 {
-		return fmt.Errorf("no directories provided")
+		return errors.New("no directories provided")
 	}
 
 	var targetFile string
@@ -123,8 +124,8 @@ func LinkDirectories(directories []string, taskFile string) error {
 		}
 	}
 
-	if _, err := os.Stat(targetFile); err != nil {
-		return fmt.Errorf("linked task file '%s' not found: %w", targetFile, err)
+	if _, statErr := os.Stat(targetFile); statErr != nil {
+		return fmt.Errorf("linked task file '%s' not found: %w", targetFile, statErr)
 	}
 
 	config, err := loadLinkConfig()
@@ -165,7 +166,7 @@ func LinkDirectories(directories []string, taskFile string) error {
 func UnlinkDirectories(directories []string) error {
 	parsedDirs := parseDirectoryArgs(directories)
 	if len(parsedDirs) == 0 {
-		return fmt.Errorf("no directories provided")
+		return errors.New("no directories provided")
 	}
 
 	config, err := loadLinkConfig()
@@ -215,7 +216,7 @@ func parseDirectoryArgs(args []string) []string {
 	var result []string
 
 	for _, arg := range args {
-		for _, part := range strings.Split(arg, ",") {
+		for part := range strings.SplitSeq(arg, ",") {
 			trimmed := strings.TrimSpace(part)
 			if trimmed == "" {
 				continue

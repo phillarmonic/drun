@@ -10,10 +10,10 @@ import (
 var stableVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
 type Version struct {
+	Raw   string
 	Major uint64
 	Minor uint64
 	Patch uint64
-	Raw   string
 }
 
 func ParseVersion(value string) (Version, error) {

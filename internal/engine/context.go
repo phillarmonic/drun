@@ -10,21 +10,17 @@ import (
 
 // ExecutionContext holds parameter values and other runtime context
 type ExecutionContext struct {
+	CurrentCaughtError error
 	Parameters         map[string]*types.Value // parameter name -> typed value
 	Variables          map[string]string       // captured variables from shell commands
 	Project            *ProjectContext         // project-level settings and hooks
+	Program            *ast.Program            // the AST program being executed
 	CurrentFile        string                  // path to the current drun file being executed
 	CurrentTask        string                  // name of the currently executing task
 	CurrentTaskMode    string                  // execution mode of the current task (e.g. "ci" or "normal")
 	CurrentNamespace   string                  // namespace of currently executing task/template (for transitive resolution)
-	Program            *ast.Program            // the AST program being executed
 	WorkingDir         string                  // override working directory for shell commands (empty = use process cwd)
 	OriginalWorkingDir string                  // the cwd captured at task start; relative paths are resolved from here
-
-	// CurrentCaughtError holds the error being handled while a catch clause
-	// body executes, so a `rethrow` inside the body can re-raise the original
-	// error with its message intact. Nil outside a catch body.
-	CurrentCaughtError error
 }
 
 // Implement interpolation.Context interface
@@ -65,24 +61,28 @@ func (ctx *ExecutionContext) GetCurrentTask() string {
 
 // ProjectContext holds project-level configuration
 type ProjectContext struct {
-	Name                 string                                    // project name
-	Version              string                                    // project version
-	Settings             map[string]string                         // project settings (set key to value) - accessible via $globals.key
-	Parameters           map[string]*ast.ProjectParameterStatement // project-level shared parameters - accessible via $params.key
-	Snippets             map[string]*ast.SnippetStatement          // reusable code snippets
-	HookManager          *hooks.Manager                            // lifecycle hooks manager
-	ShellConfigs         map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
-	IncludedSnippets     map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
-	IncludedTemplates    map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
-	IncludedTasks        map[string][]*ast.TaskStatement           // namespaced tasks: "docker.deploy"
-	IncludedSettings     map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
-	IncludedParams       map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
-	IncludedFiles        map[string]bool                           // track included files to prevent circular includes
-	RequiredTools        []statement.ToolRequirement               // project-level required tools
-	RequiredToolTaskRefs []string                                  // project-level task refs for inherited required tools
-	ProvisioningSources  []string                                  // ordered project-level provisioning catalogs
-	GitPolicy            *statement.GitPolicy                      // project-level git policy
-	SCMRegistry          *ast.SCMRegistryStatement                 // project-level technology-oriented SCM registry
+	IncludedTemplates map[string]*ast.TaskTemplateStatement     // namespaced templates: "docker.build"
+	IncludedSettings  map[string]string                         // namespaced settings: "docker.api_url" - accessible via $globals.docker.api_url
+	Settings          map[string]string                         // project settings (set key to value) - accessible via $globals.key
+	Parameters        map[string]*ast.ProjectParameterStatement // project-level shared parameters - accessible via $params.key
+	Snippets          map[string]*ast.SnippetStatement          // reusable code snippets
+	HookManager       *hooks.Manager                            // lifecycle hooks manager
+	ShellConfigs      map[string]*ast.PlatformShellConfig       // platform-specific shell configurations
+	IncludedSnippets  map[string]*ast.SnippetStatement          // namespaced snippets: "docker.login-check"
+	SCMRegistry       *ast.SCMRegistryStatement                 // project-level technology-oriented SCM registry
+	GitPolicy         *statement.GitPolicy                      // project-level git policy
+	IncludedTasks     map[string][]*ast.TaskStatement           // namespaced tasks: "docker.deploy"
+	IncludedParams    map[string]*ast.ProjectParameterStatement // namespaced parameters: "docker.registry" - accessible via $params.docker.registry
+	IncludedFiles     map[string]bool                           // track included files to prevent circular includes
+
+	// CurrentCaughtError holds the error being handled while a catch clause
+	// body executes, so a `rethrow` inside the body can re-raise the original
+	// error with its message intact. Nil outside a catch body.
+	Name                 string                      // project name
+	Version              string                      // project version
+	RequiredTools        []statement.ToolRequirement // project-level required tools
+	RequiredToolTaskRefs []string                    // project-level task refs for inherited required tools
+	ProvisioningSources  []string                    // ordered project-level provisioning catalogs
 }
 
 // Implement interpolation.ProjectContext interface
@@ -107,7 +107,7 @@ func (pc *ProjectContext) GetSettings() map[string]string {
 	return pc.Settings
 }
 
-func (pc *ProjectContext) GetParameters() interface{} {
+func (pc *ProjectContext) GetParameters() any {
 	if pc == nil {
 		return nil
 	}

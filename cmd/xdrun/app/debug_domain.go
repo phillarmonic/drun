@@ -18,10 +18,10 @@ import (
 
 // DebugOptions contains options for debugging
 type DebugOptions struct {
-	ShowPlan       bool
 	ExportGraphviz string
 	ExportMermaid  string
 	ExportJSON     string
+	ShowPlan       bool
 }
 
 // debugDomainLayer initializes domain services and shows their state
@@ -45,7 +45,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 			return fmt.Errorf("converting task %s: %w", astTask.Name, err)
 		}
 		if err := taskReg.Register(domainTask); err != nil {
-			return fmt.Errorf("task registration failed: %v", err)
+			return fmt.Errorf("task registration failed: %w", err)
 		}
 	}
 
@@ -176,7 +176,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 				filename := fmt.Sprintf("%s-%s.dot", opts.ExportGraphviz, fullName)
 				cleanFilename := filepath.Clean(filename)
 				// #nosec G703 -- debug exports intentionally write to the user-selected output path.
-				if err := os.WriteFile(cleanFilename, []byte(dot), 0600); err != nil {
+				if err := os.WriteFile(cleanFilename, []byte(dot), 0o600); err != nil {
 					fmt.Printf("    ❌  Failed to write Graphviz file: %v\n", err)
 				} else {
 					fmt.Printf("    ✅  Graphviz exported to: %s\n", filename)
@@ -189,7 +189,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 				filename := fmt.Sprintf("%s-%s.mmd", opts.ExportMermaid, fullName)
 				cleanFilename := filepath.Clean(filename)
 				// #nosec G703 -- debug exports intentionally write to the user-selected output path.
-				if err := os.WriteFile(cleanFilename, []byte(mermaid), 0600); err != nil {
+				if err := os.WriteFile(cleanFilename, []byte(mermaid), 0o600); err != nil {
 					fmt.Printf("    ❌  Failed to write Mermaid file: %v\n", err)
 				} else {
 					fmt.Printf("    ✅  Mermaid exported to: %s\n", filename)
@@ -204,7 +204,7 @@ func debugDomainLayer(program *ast.Program, currentFile string, opts DebugOption
 					filename := fmt.Sprintf("%s-%s.json", opts.ExportJSON, fullName)
 					cleanFilename := filepath.Clean(filename)
 					// #nosec G703 -- debug exports intentionally write to the user-selected output path.
-					if err := os.WriteFile(cleanFilename, []byte(jsonStr), 0600); err != nil {
+					if err := os.WriteFile(cleanFilename, []byte(jsonStr), 0o600); err != nil {
 						fmt.Printf("    ❌  Failed to write JSON file: %v\n", err)
 					} else {
 						fmt.Printf("    ✅  JSON exported to: %s\n", filename)

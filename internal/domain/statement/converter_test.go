@@ -203,3 +203,74 @@ func TestFromAST_Changelog(t *testing.T) {
 		t.Errorf("Date = %v, want 2026-09-01", changelogStmt.Date)
 	}
 }
+
+func TestFromAST_Confirm(t *testing.T) {
+	domainStmt, err := FromAST(&ast.ConfirmStatement{
+		Question:     "Deploy to production?",
+		DefaultValue: "no",
+		HasDefault:   true,
+		ResultVar:    "",
+	})
+	if err != nil {
+		t.Fatalf("FromAST() error = %v", err)
+	}
+	confirmStmt, ok := domainStmt.(*Confirm)
+	if !ok {
+		t.Fatalf("Expected *Confirm, got %T", domainStmt)
+	}
+	if confirmStmt.Type() != TypeConfirm {
+		t.Errorf("Type() = %v, want %v", confirmStmt.Type(), TypeConfirm)
+	}
+	if confirmStmt.Question != "Deploy to production?" {
+		t.Errorf("Question = %v, want Deploy to production?", confirmStmt.Question)
+	}
+	if confirmStmt.DefaultValue != "no" || !confirmStmt.HasDefault {
+		t.Errorf("DefaultValue/HasDefault = %q/%v, want no/true", confirmStmt.DefaultValue, confirmStmt.HasDefault)
+	}
+	if confirmStmt.ResultVar != "" {
+		t.Errorf("ResultVar = %v, want empty (bare gate)", confirmStmt.ResultVar)
+	}
+
+	domainStmt, err = FromAST(&ast.ConfirmStatement{
+		Question:  "Run migrations?",
+		ResultVar: "migrate",
+	})
+	if err != nil {
+		t.Fatalf("FromAST() error = %v", err)
+	}
+	confirmStmt = domainStmt.(*Confirm)
+	if confirmStmt.ResultVar != "migrate" {
+		t.Errorf("ResultVar = %v, want migrate", confirmStmt.ResultVar)
+	}
+	if confirmStmt.HasDefault || confirmStmt.DefaultValue != "" {
+		t.Errorf("HasDefault/DefaultValue = %v/%q, want false/empty", confirmStmt.HasDefault, confirmStmt.DefaultValue)
+	}
+}
+
+func TestFromAST_Prompt(t *testing.T) {
+	domainStmt, err := FromAST(&ast.PromptStatement{
+		Question:     "Release notes?",
+		DefaultValue: "n/a",
+		HasDefault:   true,
+		ResultVar:    "notes",
+	})
+	if err != nil {
+		t.Fatalf("FromAST() error = %v", err)
+	}
+	promptStmt, ok := domainStmt.(*Prompt)
+	if !ok {
+		t.Fatalf("Expected *Prompt, got %T", domainStmt)
+	}
+	if promptStmt.Type() != TypePrompt {
+		t.Errorf("Type() = %v, want %v", promptStmt.Type(), TypePrompt)
+	}
+	if promptStmt.Question != "Release notes?" {
+		t.Errorf("Question = %v, want Release notes?", promptStmt.Question)
+	}
+	if promptStmt.DefaultValue != "n/a" || !promptStmt.HasDefault {
+		t.Errorf("DefaultValue/HasDefault = %q/%v, want n/a/true", promptStmt.DefaultValue, promptStmt.HasDefault)
+	}
+	if promptStmt.ResultVar != "notes" {
+		t.Errorf("ResultVar = %v, want notes", promptStmt.ResultVar)
+	}
+}

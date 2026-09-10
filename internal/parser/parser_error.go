@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
@@ -103,7 +101,7 @@ func (p *Parser) parseThrowStatement() *ast.ThrowStatement {
 	case "ignore":
 		// No additional parameters needed
 	default:
-		p.addError(fmt.Sprintf("unknown throw action: %s", stmt.Action))
+		p.addError("unknown throw action: " + stmt.Action)
 		return nil
 	}
 

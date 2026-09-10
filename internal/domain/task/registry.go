@@ -2,6 +2,7 @@ package task
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -10,11 +11,11 @@ import (
 
 // Registry manages task registration and lookup
 type Registry struct {
-	mu              sync.RWMutex
 	tasks           map[string][]*Task // task name -> variants
 	namespacedTasks map[string][]*Task // namespace.name -> variants
-	taskOrder       []*Task            // preserve insertion order
 	currentPlatform string
+	taskOrder       []*Task // preserve insertion order
+	mu              sync.RWMutex
 }
 
 // NewRegistry creates a new task registry
@@ -209,10 +210,8 @@ func resolveTaskVariant(name string, family []*Task, targetPlatform string) (*Ta
 			}
 			continue
 		}
-		for _, allowed := range candidate.Platforms {
-			if allowed == targetPlatform {
-				return candidate, nil
-			}
+		if slices.Contains(candidate.Platforms, targetPlatform) {
+			return candidate, nil
 		}
 	}
 

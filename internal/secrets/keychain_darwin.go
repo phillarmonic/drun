@@ -3,6 +3,8 @@
 package secrets
 
 import (
+	"errors"
+
 	"github.com/keybase/go-keychain"
 )
 
@@ -43,7 +45,7 @@ func (k *KeychainBackend) Get(key string) (string, error) {
 
 	results, err := keychain.QueryItem(query)
 	if err != nil {
-		if err == keychain.ErrorItemNotFound {
+		if errors.Is(err, keychain.ErrorItemNotFound) {
 			return "", ErrSecretNotFound
 		}
 		return "", err
@@ -63,7 +65,7 @@ func (k *KeychainBackend) Delete(key string) error {
 	item.SetAccount(key)
 
 	err := keychain.DeleteItem(item)
-	if err != nil && err != keychain.ErrorItemNotFound {
+	if err != nil && !errors.Is(err, keychain.ErrorItemNotFound) {
 		return err
 	}
 	return nil
@@ -79,7 +81,7 @@ func (k *KeychainBackend) Exists(key string) (bool, error) {
 
 	results, err := keychain.QueryItem(query)
 	if err != nil {
-		if err == keychain.ErrorItemNotFound {
+		if errors.Is(err, keychain.ErrorItemNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -97,7 +99,7 @@ func (k *KeychainBackend) List() ([]string, error) {
 
 	results, err := keychain.QueryItem(query)
 	if err != nil {
-		if err == keychain.ErrorItemNotFound {
+		if errors.Is(err, keychain.ErrorItemNotFound) {
 			return []string{}, nil
 		}
 		return nil, err

@@ -96,9 +96,9 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 
 		var catchClauses []CatchClause
 		for _, astCatch := range s.CatchClauses {
-			catchBody, err := FromASTList(astCatch.Body)
-			if err != nil {
-				return nil, fmt.Errorf("converting catch body: %w", err)
+			catchBody, fromErr := FromASTList(astCatch.Body)
+			if fromErr != nil {
+				return nil, fmt.Errorf("converting catch body: %w", fromErr)
 			}
 			catchClauses = append(catchClauses, CatchClause{
 				ErrorType: astCatch.ErrorType,
@@ -237,6 +237,22 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 			URL:  s.URL,
 		}, nil
 
+	case *ast.ConfirmStatement:
+		return &Confirm{
+			Question:     s.Question,
+			DefaultValue: s.DefaultValue,
+			HasDefault:   s.HasDefault,
+			ResultVar:    s.ResultVar,
+		}, nil
+
+	case *ast.PromptStatement:
+		return &Prompt{
+			Question:     s.Question,
+			DefaultValue: s.DefaultValue,
+			HasDefault:   s.HasDefault,
+			ResultVar:    s.ResultVar,
+		}, nil
+
 	case *ast.FileStatement:
 		return &File{
 			Action:       s.Action,
@@ -298,6 +314,7 @@ func FromAST(astStmt ast.Statement) (Statement, error) {
 	case *ast.ParameterStatement:
 		// Parameters are handled during task setup, not execution
 		// Return nil to skip them in the body
+		//nolint:nilnil // parameter statements are intentionally skipped during conversion; nil statement is filtered by FromASTList
 		return nil, nil
 
 	case *ast.SecretStatement:

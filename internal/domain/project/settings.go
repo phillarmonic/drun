@@ -1,5 +1,7 @@
 package project
 
+import "maps"
+
 // SettingsManager manages project settings
 type SettingsManager struct {
 	project *Project
@@ -35,8 +37,6 @@ func (sm *SettingsManager) Has(key string) bool {
 func (sm *SettingsManager) All() map[string]string {
 	// Return a copy to prevent external modification
 	settings := make(map[string]string, len(sm.project.Settings))
-	for k, v := range sm.project.Settings {
-		settings[k] = v
-	}
+	maps.Copy(settings, sm.project.Settings)
 	return settings
 }

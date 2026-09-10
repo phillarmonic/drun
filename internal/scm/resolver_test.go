@@ -16,6 +16,7 @@ type fakeAdapter struct {
 func (f *fakeAdapter) Capabilities() GitProviderCapabilities {
 	return GitProviderCapabilities{RemoteRefs: true}
 }
+
 func (f *fakeAdapter) Open(_ context.Context, _ *GitSource, profile *GitAccessProfile, _ bool) (GitRepositorySession, error) {
 	f.opened = profile
 	if f.session == nil {
@@ -59,7 +60,7 @@ func TestResolverUsesExplicitOrDefaultMethodWithoutFallback(t *testing.T) {
 	if resolved.Access.Path != filepath.Clean("/workspace/sources/app") {
 		t.Fatalf("path = %q", resolved.Access.Path)
 	}
-	if _, err := resolver.Resolve("app", "https"); err == nil {
+	if _, resolveErr := resolver.Resolve("app", "https"); resolveErr == nil {
 		t.Fatal("expected missing HTTPS adapter error instead of method fallback")
 	}
 	session, err := resolver.Open(context.Background(), "app", "", false)

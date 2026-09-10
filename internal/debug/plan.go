@@ -3,6 +3,7 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -33,9 +34,9 @@ type TaskInfo struct {
 type ParameterInfo struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
+	DataType   string `json:"data_type,omitempty"`
 	Required   bool   `json:"required"`
 	HasDefault bool   `json:"has_default"`
-	DataType   string `json:"data_type,omitempty"`
 }
 
 // HookInfo represents lifecycle hooks in the plan
@@ -47,7 +48,7 @@ type HookInfo struct {
 }
 
 // DebugExecutionPlan prints detailed execution plan information
-func DebugExecutionPlan(plan interface{}) {
+func DebugExecutionPlan(plan any) {
 	fmt.Println("=== EXECUTION PLAN DEBUG ===")
 	fmt.Println()
 
@@ -161,13 +162,7 @@ func ExportExecutionPlanGraphviz(planInfo ExecutionPlanInfo) string {
 
 		// Check if this is a real dependency or just execution order
 		taskInfo := planInfo.Tasks[to]
-		isDep := false
-		for _, dep := range taskInfo.Dependencies {
-			if dep == from {
-				isDep = true
-				break
-			}
-		}
+		isDep := slices.Contains(taskInfo.Dependencies, from)
 
 		edgeKey := from + "->" + to
 		if !seen[edgeKey] {
@@ -232,13 +227,14 @@ func ExportExecutionPlanMermaid(planInfo ExecutionPlanInfo) string {
 		}
 
 		// Determine node style
-		if taskName == planInfo.TargetTask {
+		switch {
+		case taskName == planInfo.TargetTask:
 			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
 			fmt.Fprintf(&b, "  style %s fill:#90EE90\n", nodeID)
-		} else if taskInfo.Namespace != "" {
+		case taskInfo.Namespace != "":
 			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
 			fmt.Fprintf(&b, "  style %s fill:#FFFFE0\n", nodeID)
-		} else {
+		default:
 			fmt.Fprintf(&b, "  %s[\"%s\"]\n", nodeID, label)
 			fmt.Fprintf(&b, "  style %s fill:#ADD8E6\n", nodeID)
 		}

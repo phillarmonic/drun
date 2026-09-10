@@ -3,6 +3,7 @@ package errors
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
@@ -11,10 +12,10 @@ import (
 // ParseError represents a parsing error with position information
 type ParseError struct {
 	Message  string
-	Token    lexer.Token
 	Filename string
 	Source   string // The original source code
 	HelpText string // Optional custom help text
+	Token    lexer.Token
 }
 
 // Error implements the error interface
@@ -34,7 +35,7 @@ func (e *ParseError) FormatError() string {
 	lines := strings.Split(e.Source, "\n")
 	if e.Token.Line > 0 && e.Token.Line <= len(lines) {
 		sourceLine := lines[e.Token.Line-1]
-		lineNumStr := fmt.Sprintf("%d", e.Token.Line)
+		lineNumStr := strconv.Itoa(e.Token.Line)
 
 		// Show the line with line number
 		fmt.Fprintf(&result, "   \033[34m%s\033[0m | %s\n", lineNumStr, sourceLine)
@@ -101,9 +102,9 @@ func (e *ParseError) getSuggestion() string {
 
 // ParseErrorList represents a collection of parse errors
 type ParseErrorList struct {
-	Errors   []*ParseError
 	Filename string
 	Source   string
+	Errors   []*ParseError
 }
 
 // Error implements the error interface
@@ -139,11 +140,12 @@ func (el *ParseErrorList) FormatErrors() string {
 	}
 
 	// Header
-	if len(el.Errors) == 1 {
+	switch {
+	case len(el.Errors) == 1:
 		result.WriteString("Parse error:\n\n")
-	} else if len(el.Errors) <= maxErrors {
+	case len(el.Errors) <= maxErrors:
 		fmt.Fprintf(&result, "Parse errors (%d):\n\n", len(el.Errors))
-	} else {
+	default:
 		fmt.Fprintf(&result, "Parse errors (showing first %d of %d):\n\n", maxErrors, len(el.Errors))
 	}
 

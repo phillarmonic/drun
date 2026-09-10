@@ -2,7 +2,7 @@ package scm
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -19,7 +19,7 @@ type queuedCLIRunner struct {
 func (r *queuedCLIRunner) Run(_ context.Context, executable string, arguments, _ []string) ([]byte, error) {
 	r.calls = append(r.calls, cliCall{executable: executable, arguments: append([]string(nil), arguments...)})
 	if len(r.outputs) == 0 {
-		return nil, fmt.Errorf("unexpected CLI call")
+		return nil, errors.New("unexpected CLI call")
 	}
 	output := r.outputs[0]
 	r.outputs = r.outputs[1:]

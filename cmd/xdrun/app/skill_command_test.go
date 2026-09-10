@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -24,7 +25,7 @@ func TestInstallProjectSkillCreatesExpectedFiles(t *testing.T) {
 
 	tempRoot := t.TempDir()
 	projectDir := filepath.Join(tempRoot, "sample-app")
-	if err := os.Mkdir(projectDir, 0750); err != nil {
+	if err := os.Mkdir(projectDir, 0o750); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 
@@ -54,8 +55,8 @@ func TestInstallProjectSkillCreatesExpectedFiles(t *testing.T) {
 
 	for _, relativePath := range files {
 		fullPath := filepath.Join(projectDir, relativePath)
-		if _, err := os.Stat(fullPath); err != nil {
-			t.Fatalf("expected %s to exist: %v", relativePath, err)
+		if _, statErr := os.Stat(fullPath); statErr != nil {
+			t.Fatalf("expected %s to exist: %v", relativePath, statErr)
 		}
 	}
 
@@ -96,7 +97,7 @@ func TestInstallProjectSkillSkipsExistingFilesWithoutForce(t *testing.T) {
 	projectDir := t.TempDir()
 	agentsPath := filepath.Join(projectDir, "AGENTS.md")
 	original := "# Existing agent instructions\n\nKeep this line.\n"
-	if err := os.WriteFile(agentsPath, []byte(original), 0600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(original), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -139,7 +140,7 @@ func TestInstallProjectSkillUpdatesExistingManagedBlock(t *testing.T) {
 		"",
 		"Keep this too.",
 	}, "\n")
-	if err := os.WriteFile(agentsPath, []byte(original), 0600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(original), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -189,10 +190,5 @@ func TestUpsertManagedBlockAppendsWhenMissing(t *testing.T) {
 }
 
 func containsPath(paths []string, needle string) bool {
-	for _, path := range paths {
-		if path == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(paths, needle)
 }

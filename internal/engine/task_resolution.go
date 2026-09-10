@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -39,10 +40,8 @@ func selectTaskVariant(name string, tasks []*ast.TaskStatement) (*ast.TaskStatem
 			continue
 		}
 		available = append(available, platform.FormatList(meta.Platforms))
-		for _, allowed := range meta.Platforms {
-			if allowed == current {
-				return task, nil
-			}
+		if slices.Contains(meta.Platforms, current) {
+			return task, nil
 		}
 	}
 

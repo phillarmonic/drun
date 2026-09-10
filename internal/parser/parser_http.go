@@ -90,9 +90,9 @@ func (p *Parser) parseHTTPStatement() ast.Statement {
 					p.nextToken()
 					headerValue := p.curToken.Literal
 					// Parse "key: value" format
-					if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
-						key := strings.TrimSpace(headerValue[:colonIdx])
-						value := strings.TrimSpace(headerValue[colonIdx+1:])
+					if before, after, ok := strings.Cut(headerValue, ":"); ok {
+						key := strings.TrimSpace(before)
+						value := strings.TrimSpace(after)
 						stmt.Headers[key] = value
 					}
 				}
@@ -125,9 +125,9 @@ func (p *Parser) parseHTTPStatement() ast.Statement {
 				p.nextToken()
 				headerValue := p.curToken.Literal
 				// Parse "key: value" format
-				if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
-					key := strings.TrimSpace(headerValue[:colonIdx])
-					value := strings.TrimSpace(headerValue[colonIdx+1:])
+				if before, after, ok := strings.Cut(headerValue, ":"); ok {
+					key := strings.TrimSpace(before)
+					value := strings.TrimSpace(after)
 					stmt.Headers[key] = value
 				}
 			}
@@ -271,6 +271,7 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 				if p.peekToken.Type == lexer.LBRACKET {
 					p.nextToken() // consume [
 
+				permLoop:
 					for {
 						if p.peekToken.Type == lexer.STRING {
 							p.nextToken()
@@ -283,14 +284,15 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 							}
 						}
 
-						if p.peekToken.Type == lexer.COMMA {
+						switch p.peekToken.Type {
+						case lexer.COMMA:
 							p.nextToken() // consume comma
 							continue
-						} else if p.peekToken.Type == lexer.RBRACKET {
+						case lexer.RBRACKET:
 							p.nextToken() // consume ]
-							break
-						} else {
-							break
+							break permLoop
+						default:
+							break permLoop
 						}
 					}
 				}
@@ -303,6 +305,7 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 					if p.peekToken.Type == lexer.LBRACKET {
 						p.nextToken() // consume [
 
+					targetLoop:
 						for {
 							if p.peekToken.Type == lexer.STRING {
 								p.nextToken()
@@ -315,14 +318,15 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 								}
 							}
 
-							if p.peekToken.Type == lexer.COMMA {
+							switch p.peekToken.Type {
+							case lexer.COMMA:
 								p.nextToken() // consume comma
 								continue
-							} else if p.peekToken.Type == lexer.RBRACKET {
+							case lexer.RBRACKET:
 								p.nextToken() // consume ]
-								break
-							} else {
-								break
+								break targetLoop
+							default:
+								break targetLoop
 							}
 						}
 					}
@@ -341,9 +345,9 @@ func (p *Parser) parseDownloadStatement() *ast.DownloadStatement {
 					p.nextToken()
 					headerValue := p.curToken.Literal
 					// Parse "key: value" format
-					if colonIdx := strings.Index(headerValue, ":"); colonIdx != -1 {
-						key := strings.TrimSpace(headerValue[:colonIdx])
-						value := strings.TrimSpace(headerValue[colonIdx+1:])
+					if before, after, ok := strings.Cut(headerValue, ":"); ok {
+						key := strings.TrimSpace(before)
+						value := strings.TrimSpace(after)
 						stmt.Headers[key] = value
 					}
 				}
