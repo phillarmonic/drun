@@ -4,8 +4,10 @@ package secrets
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/zalando/go-keyring"
@@ -50,7 +52,7 @@ func (s *SecretServiceBackend) Set(key, value string) error {
 func (s *SecretServiceBackend) Get(key string) (string, error) {
 	value, err := keyring.Get(s.service, key)
 	if err != nil {
-		if err == keyring.ErrNotFound {
+		if errors.Is(err, keyring.ErrNotFound) {
 			return "", ErrSecretNotFound
 		}
 		return "", err
@@ -61,7 +63,7 @@ func (s *SecretServiceBackend) Get(key string) (string, error) {
 // Delete removes a secret from the secret service
 func (s *SecretServiceBackend) Delete(key string) error {
 	err := keyring.Delete(s.service, key)
-	if err != nil && err != keyring.ErrNotFound {
+	if err != nil && !errors.Is(err, keyring.ErrNotFound) {
 		return err
 	}
 	// Update index
@@ -72,7 +74,7 @@ func (s *SecretServiceBackend) Delete(key string) error {
 func (s *SecretServiceBackend) Exists(key string) (bool, error) {
 	_, err := keyring.Get(s.service, key)
 	if err != nil {
-		if err == keyring.ErrNotFound {
+		if errors.Is(err, keyring.ErrNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -96,10 +98,8 @@ func (s *SecretServiceBackend) addToIndex(key string) error {
 	}
 
 	// Check if key already exists
-	for _, k := range keys {
-		if k == key {
-			return nil // Already in index
-		}
+	if slices.Contains(keys, key) {
+		return nil // Already in index
 	}
 
 	keys = append(keys, key)
