@@ -11,7 +11,7 @@ go mod download
 # Install golangci-lint if not present
 if ! command -v golangci-lint &> /dev/null; then
     echo "⚙️  Installing golangci-lint..."
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.13.2
 fi
 
 # Run linting with timeout (like GHA)
