@@ -8,13 +8,13 @@ import (
 
 // SecretStatement represents secret operations (set, get, delete, exists, list)
 type SecretStatement struct {
-	Token     lexer.Token
+	Value     Expression // For "set" operation
+	Default   Expression // Default value for "get" operation
 	Operation string     // "set", "get", "delete", "exists", "list"
 	Key       string     // Secret key name
-	Value     Expression // For "set" operation
 	Namespace string     // Optional namespace (defaults to current project)
 	Pattern   string     // For "list" with pattern matching
-	Default   Expression // Default value for "get" operation
+	Token     lexer.Token
 }
 
 func (ss *SecretStatement) statementNode() {}
@@ -95,10 +95,10 @@ func (ss *SecretStatement) String() string {
 // SecretExpression represents a secret access in an expression context
 // Example: {secret('github_token')} or {secret('api_key', 'default_value')}
 type SecretExpression struct {
-	Token     lexer.Token
-	Key       string
 	Default   Expression
+	Key       string
 	Namespace string
+	Token     lexer.Token
 }
 
 func (se *SecretExpression) expressionNode() {}

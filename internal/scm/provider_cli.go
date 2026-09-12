@@ -1,8 +1,11 @@
 package scm
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -19,14 +22,15 @@ type cliRunner interface {
 type execCLIRunner struct{}
 
 func (execCLIRunner) Run(ctx context.Context, executable string, arguments, environment []string) ([]byte, error) {
+	// #nosec G204 -- executable is always the literal gh or glab supplied by the call sites; arguments are slice elements, never a shell string.
 	command := exec.CommandContext(ctx, executable, arguments...)
 	command.Env = append(os.Environ(), environment...)
 	return command.Output()
 }
 
 type ProviderCLIAdapter struct {
-	provider string
 	runner   cliRunner
+	provider string
 }
 
 func NewProviderCLIAdapter(provider string) *ProviderCLIAdapter {
@@ -79,8 +83,8 @@ func (s *providerCLISession) githubTags(ctx context.Context, withMetadata bool) 
 			SHA  string `json:"sha"`
 		} `json:"object"`
 	}
-	if err := json.Unmarshal(output, &pages); err != nil {
-		return nil, fmt.Errorf("decoding GitHub tag response: %w", err)
+	if unmarshalErr := json.Unmarshal(output, &pages); unmarshalErr != nil {
+		return nil, fmt.Errorf("decoding GitHub tag response: %w", unmarshalErr)
 	}
 	refs := make([]GitRef, 0)
 	for _, page := range pages {
@@ -109,7 +113,7 @@ func (s *providerCLISession) githubObjectDate(ctx context.Context, objectType, s
 	if err != nil {
 		return time.Time{}, fmt.Errorf("reading GitHub %s metadata failed: %w", objectType, err)
 	}
-	var object map[string]json.RawMessage
+	var object map[string]jsontext.Value
 	if err := json.Unmarshal(output, &object); err != nil {
 		return time.Time{}, err
 	}
@@ -128,19 +132,19 @@ func (s *providerCLISession) gitlabTags(ctx context.Context, withMetadata bool) 
 	if err != nil {
 		return nil, fmt.Errorf("listing GitLab tags with provider CLI failed: %w", err)
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(output)))
+	decoder := jsontext.NewDecoder(bytes.NewReader(output))
 	refs := make([]GitRef, 0)
 	for {
 		var page []struct {
-			Name      string    `json:"name"`
-			Target    string    `json:"target"`
 			CreatedAt time.Time `json:"created_at"`
 			Commit    struct {
 				CommittedDate time.Time `json:"committed_date"`
 			} `json:"commit"`
+			Name   string `json:"name"`
+			Target string `json:"target"`
 		}
-		if err := decoder.Decode(&page); err != nil {
-			if err == io.EOF {
+		if err := json.UnmarshalDecode(decoder, &page); err != nil {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, fmt.Errorf("decoding GitLab tag response: %w", err)

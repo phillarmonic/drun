@@ -6,27 +6,28 @@ import (
 
 // Service represents a microservice definition
 type Service struct {
-	Name         string
-	Path         string
-	Description  string
-	Dependencies []string
-	Repository   *Repository
-	HealthCheck  *HealthCheck
-	Build        *BuildConfig
-	Compose      *ComposeConfig
-	Environment  map[string]string
-	EnvFile      *EnvFileConfig
-	Networks     map[string]*DockerNetwork
-	PreTask      string
-	PostTask     string
-
-	// Runtime state
-	Status          ServiceStatus
-	Container       string
 	LastHealthCheck time.Time
+	Environment     map[string]string
+	Networks        map[string]*DockerNetwork
+	EnvFile         *EnvFileConfig
+	Repository      *Repository
+	HealthCheck     *HealthCheck
+	Build           *BuildConfig
+	Compose         *ComposeConfig
+	Name            string
+	Description     string
+	PreTask         string
+	PostTask        string
+	Status          ServiceStatus
+	Container       string // for docker
+	Path            string
+	Dependencies    []string
 	HealthyCount    int
 	UnhealthyCount  int
 }
+
+// RegistryName returns the name this service is registered under.
+func (s *Service) RegistryName() string { return s.Name }
 
 // ServiceStatus represents the current status of a service
 type ServiceStatus string
@@ -54,71 +55,73 @@ type Repository struct {
 
 // HealthCheck represents health check configuration
 type HealthCheck struct {
-	Type        string // http, tcp, docker, dns, custom
-	Endpoint    string // for http/tcp
-	Domain      string // for dns
-	Container   string // for docker
-	Command     string // for custom
-	Timeout     time.Duration
-	Interval    time.Duration
+	Headers    map[string]string // for http
+	RecordType string            // for dns (A, AAAA, etc)
+	ExpectedIP string            // for dns
+	Container  string
+	Command    string // for custom
+	WorkingDir string // for custom
+	Endpoint   string // for http/tcp
+	Domain     string // for dns
+	Condition  string // for http (status code)
+
+	// Runtime state
+	Type        string   // http, tcp, docker, dns, custom
+	ExpectedIPs []string // for dns with load balancer
 	Retries     int
-	Condition   string            // for http (status code)
-	RecordType  string            // for dns (A, AAAA, etc)
-	ExpectedIP  string            // for dns
-	ExpectedIPs []string          // for dns with load balancer
-	Headers     map[string]string // for http
-	WorkingDir  string            // for custom
-	StartPeriod time.Duration     // wait before first check
+	Interval    time.Duration
+	Timeout     time.Duration
+	StartPeriod time.Duration // wait before first check
 }
 
 // BuildConfig represents build configuration
 type BuildConfig struct {
-	Required         bool
+	FallbackCommand  string
 	Command          string
 	Makefile         string
 	MakeTarget       string
+	WorkingDirectory string
 	MakeArgs         []string
 	PreMakeCommands  []string
 	PostMakeCommands []string
-	WorkingDirectory string
 	MakefileTimeout  time.Duration
 	ParallelJobs     int
-	Verbose          bool
-	RetryOnFailure   bool
 	MaxRetries       int
 	RetryDelay       time.Duration
-	FallbackCommand  string
+	Verbose          bool
+	RetryOnFailure   bool
+	Required         bool
 	AllocateTTY      bool
 }
 
 // ComposeConfig represents Docker Compose configuration
 type ComposeConfig struct {
+	Options *ComposeOptions
 	File    string
 	Project string
-	Options *ComposeOptions
 }
 
 // ComposeOptions represents Docker Compose command options
 type ComposeOptions struct {
-	ForceRecreate bool
-	NoDeps        bool
-	Build         bool
+	CPULimit      string
+	MemoryLimit   string
 	Pull          string // always, missing, never
-	Timeout       time.Duration
 	Scale         string
-	Wait          bool
+	RestartPolicy string
 	WaitTimeout   time.Duration
+	Timeout       time.Duration
+	Wait          bool
 	Detach        bool
 	RemoveOrphans bool
-	RestartPolicy string
-	MemoryLimit   string
-	CPULimit      string
+	ForceRecreate bool
+	Build         bool
+	NoDeps        bool
 }
 
 // EnvFileConfig represents environment file configuration
 type EnvFileConfig struct {
-	Required bool
 	Task     string // Task to call before service start
+	Required bool
 }
 
 // IsHealthy returns true if the service is healthy
@@ -169,10 +172,10 @@ func (s *Service) MarkFailed() {
 
 // DockerNetwork represents Docker network configuration
 type DockerNetwork struct {
+	Options       map[string]string
 	Name          string
+	Driver        string
 	External      bool
 	Required      bool
 	AutoProvision bool
-	Driver        string
-	Options       map[string]string
 }

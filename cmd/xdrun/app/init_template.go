@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -59,8 +60,8 @@ func (m *initTemplateManifest) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	var mp struct {
-		Version   string               `yaml:"version"`
 		Templates map[string]yaml.Node `yaml:"templates"`
+		Version   string               `yaml:"version"`
 	}
 	if err := node.Decode(&mp); err != nil {
 		return err
@@ -126,7 +127,7 @@ func loadInitTemplateManifest(manifestURL string) (*initTemplateManifest, error)
 		return nil, fmt.Errorf("failed to parse template manifest: %w", err)
 	}
 	if len(manifest.Templates) == 0 {
-		return nil, fmt.Errorf("template manifest contains no templates")
+		return nil, errors.New("template manifest contains no templates")
 	}
 	if manifest.Version != "" && manifest.Version != initTemplateManifestVerion {
 		return nil, fmt.Errorf("unsupported template manifest version %q", manifest.Version)
@@ -135,7 +136,7 @@ func loadInitTemplateManifest(manifestURL string) (*initTemplateManifest, error)
 	for i := range manifest.Templates {
 		entry := &manifest.Templates[i]
 		if strings.TrimSpace(entry.Name) == "" {
-			return nil, fmt.Errorf("template manifest contains an entry without a name")
+			return nil, errors.New("template manifest contains an entry without a name")
 		}
 		if strings.TrimSpace(entry.Source) == "" {
 			return nil, fmt.Errorf("template %q is missing a source", entry.Name)
@@ -162,6 +163,7 @@ func (m *initTemplateManifest) templateByName(name string) (*initTemplateEntry, 
 
 func fetchInitTemplateContent(url string) ([]byte, error) {
 	if isLocalTemplatePath(url) {
+		// #nosec G304 -- reading a local template path the user explicitly passed to `xdrun init template`; isLocalTemplatePath gates this branch.
 		content, err := os.ReadFile(url)
 		if err != nil {
 			return nil, err
@@ -181,7 +183,7 @@ func fetchInitTemplateContent(url string) ([]byte, error) {
 	defer func() { _ = cacheManager.Close() }()
 
 	cacheKey := cache.GenerateKey(url, ref)
-	if content, hit, err := cacheManager.Get(cacheKey); err == nil && hit {
+	if content, hit, getErr := cacheManager.Get(cacheKey); getErr == nil && hit {
 		return content, nil
 	}
 
@@ -281,7 +283,7 @@ func ListInitTemplates(fromTemplate, templatesRepo string) error {
 
 func resolveTemplateSource(manifestRef, source string) (string, error) {
 	if source == "" {
-		return "", fmt.Errorf("source is empty")
+		return "", errors.New("source is empty")
 	}
 	if remote.IsRemoteURL(source) || filepath.IsAbs(source) {
 		return source, nil
@@ -370,11 +372,11 @@ func inferGoModuleName(projectName string) string {
 		return projectName
 	}
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "module ") {
-			moduleName := strings.TrimSpace(strings.TrimPrefix(line, "module "))
+		if after, ok := strings.CutPrefix(line, "module "); ok {
+			moduleName := strings.TrimSpace(after)
 			if moduleName != "" {
 				return moduleName
 			}
@@ -394,7 +396,7 @@ func rewriteGoTemplateCommands(input string, vars initTemplateVariables) string 
 	rendered := cmdPathPattern.ReplaceAllString(input, vars.CmdPath)
 
 	binPattern := regexp.MustCompile(`(-o\s+)(\./bin/)([A-Za-z0-9._-]+)`)
-	rendered = binPattern.ReplaceAllString(rendered, fmt.Sprintf(`${1}${2}%s`, vars.BinaryName))
+	rendered = binPattern.ReplaceAllString(rendered, "${1}${2}"+vars.BinaryName)
 
 	return rendered
 }
@@ -405,7 +407,7 @@ func validateGeneratedConfig(config string) error {
 	program := p.ParseProgram()
 
 	if program == nil {
-		return fmt.Errorf("generated config did not parse")
+		return errors.New("generated config did not parse")
 	}
 	if errs := p.Errors(); len(errs) > 0 {
 		return fmt.Errorf("parse errors: %v", errs)

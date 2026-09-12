@@ -2,7 +2,8 @@ package lsp
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -156,19 +157,19 @@ func TestHoverCoversCommonStatementsAndIgnoresStringsAndComments(t *testing.T) {
 	tests := []struct {
 		name   string
 		line   string
-		column int
 		want   string
+		column int
 	}{
-		{"task", `task "build":`, 1, "Task declaration"},
-		{"longest phrase", `  call task "build"`, 8, "Call another task"},
-		{"file value", `  update json "/version" in "package.json" to "2"`, 5, "Update a JSON value"},
-		{"changelog promotion", `  promote changelog "CHANGELOG.md" to version "1.5.0"`, 5, "Promote unreleased changelog entries"},
-		{"control flow", `  for each $item in $items:`, 7, "Collection loop"},
-		{"tool requirements", `  requires tools:`, 12, "Tool requirements"},
-		{"unicode column", `é task "build":`, 3, ""},
-		{"keyword outside statement position", `  set run to true`, 7, ""},
-		{"quoted keyword", `  info "run this later"`, 9, ""},
-		{"comment keyword", `  # run something`, 5, ""},
+		{name: "task", line: `task "build":`, column: 1, want: "Task declaration"},
+		{name: "longest phrase", line: `  call task "build"`, column: 8, want: "Call another task"},
+		{name: "file value", line: `  update json "/version" in "package.json" to "2"`, column: 5, want: "Update a JSON value"},
+		{name: "changelog promotion", line: `  promote changelog "CHANGELOG.md" to version "1.5.0"`, column: 5, want: "Promote unreleased changelog entries"},
+		{name: "control flow", line: `  for each $item in $items:`, column: 7, want: "Collection loop"},
+		{name: "tool requirements", line: `  requires tools:`, column: 12, want: "Tool requirements"},
+		{name: "unicode column", line: `é task "build":`, column: 3, want: ""},
+		{name: "keyword outside statement position", line: `  set run to true`, column: 7, want: ""},
+		{name: "quoted keyword", line: `  info "run this later"`, column: 9, want: ""},
+		{name: "comment keyword", line: `  # run something`, column: 5, want: ""},
 	}
 
 	for _, test := range tests {
@@ -464,10 +465,10 @@ func TestFileValueDiagnosticsAreLocalized(t *testing.T) {
 func TestServerTemplateFilesSupportTemplatePlaceholders(t *testing.T) {
 	tempRoot := t.TempDir()
 	templateDir := filepath.Join(tempRoot, "drun-templates", "templates")
-	if err := os.MkdirAll(templateDir, 0750); err != nil {
+	if err := os.MkdirAll(templateDir, 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tempRoot, "drun-templates", "templates.yaml"), []byte("version: \"1\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(tempRoot, "drun-templates", "templates.yaml"), []byte("version: \"1\"\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -539,6 +540,25 @@ func assertCompletionLabel(t *testing.T, items []completionItem, label string) {
 	t.Fatalf("expected completion label %q in %#v", label, items)
 }
 
+// TestWireShapeMatchesV1Encoding pins the exact bytes of a response frame. The
+// encoding/json/v2 migration changed the JSON library behind these messages, so
+// this guards the protocol-visible shape: a nil `result` is still omitted
+// entirely and the request id round-trips unchanged.
+func TestWireShapeMatchesV1Encoding(t *testing.T) {
+	input := joinFrames(
+		frame(`{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`),
+		frame(`{"jsonrpc":"2.0","method":"exit","params":{}}`),
+	)
+	var output bytes.Buffer
+	if err := NewServer(bytes.NewReader(input), &output).Run(); err != nil {
+		t.Fatal(err)
+	}
+	want := string(frame(`{"jsonrpc":"2.0","id":3}`))
+	if output.String() != want {
+		t.Fatalf("shutdown frame = %q, want %q", output.String(), want)
+	}
+}
+
 func frame(payload string) []byte {
 	return []byte(fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(payload), payload))
 }
@@ -556,7 +576,7 @@ func decodeFrames(t *testing.T, data []byte) []message {
 	for {
 		payload, err := server.readPayload()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			t.Fatalf("read payload: %v", err)

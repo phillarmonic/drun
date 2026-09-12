@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -177,10 +178,8 @@ func (bc *BuiltinContext) DNSValidate(domain, expectedIP string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, addr := range addrs {
-		if addr == expectedIP {
-			return true, nil
-		}
+	if slices.Contains(addrs, expectedIP) {
+		return true, nil
 	}
 	return false, nil
 }

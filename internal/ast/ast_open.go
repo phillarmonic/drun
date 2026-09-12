@@ -9,9 +9,9 @@ import (
 // OpenStatement represents opening a URL or file in the OS default handler
 // (open url "https://example.com", open url "docs/index.html")
 type OpenStatement struct {
-	Token lexer.Token
 	Noun  string // Always "url" today; reserved for future nouns such as "file"
 	URL   string // Raw target; may contain {variable} interpolation
+	Token lexer.Token
 }
 
 func (os *OpenStatement) statementNode() {}

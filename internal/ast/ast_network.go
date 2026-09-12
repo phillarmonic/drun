@@ -2,18 +2,19 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // NetworkStatement represents network operations (health checks, port testing, ping)
 type NetworkStatement struct {
-	Token     lexer.Token
+	Options   map[string]string
 	Action    string
 	Target    string
 	Port      string
-	Options   map[string]string
 	Condition string
+	Token     lexer.Token
 }
 
 func (ns *NetworkStatement) statementNode() {}
@@ -35,12 +36,14 @@ func (ns *NetworkStatement) String() string {
 		out = fmt.Sprintf("ping host \"%s\"", ns.Target)
 	}
 
+	var outSb38 strings.Builder
 	for key, value := range ns.Options {
-		out += fmt.Sprintf(" %s %s", key, value)
+		fmt.Fprintf(&outSb38, " %s %s", key, value)
 	}
+	out += outSb38.String()
 
 	if ns.Condition != "" {
-		out += fmt.Sprintf(" expect %s", ns.Condition)
+		out += " expect " + ns.Condition
 	}
 
 	return out

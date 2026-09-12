@@ -313,7 +313,7 @@ func macroHoverMarkdown(macro patterns.PatternMacro) string {
 		"**Syntax**",
 		"",
 		"```drun",
-		fmt.Sprintf("requires $value as string matching %s", macro.Name),
+		"requires $value as string matching " + macro.Name,
 		"```",
 	}
 	return strings.Join(lines, "\n")

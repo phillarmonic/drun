@@ -192,10 +192,8 @@ func TestExecute_WithWorkingDir(t *testing.T) {
 		} else if lowerPath != "/tmp" && !strings.Contains(lowerPath, "temp") {
 			t.Errorf("Expected output to contain 'temp' directory, got %q", actualPath)
 		}
-	} else {
-		if result.Stdout != expectedDir {
-			t.Errorf("Expected %q, got %q", expectedDir, result.Stdout)
-		}
+	} else if result.Stdout != expectedDir {
+		t.Errorf("Expected %q, got %q", expectedDir, result.Stdout)
 	}
 }
 
@@ -475,18 +473,18 @@ func TestNormalizePath(t *testing.T) {
 	cases := []struct {
 		name  string
 		path  string
-		posix bool
 		want  string
+		posix bool
 	}{
-		{"posix converts backslashes", `C:\Users\lab\xdrun`, true, "C:/Users/lab/xdrun"},
-		{"posix trims trailing backslash", `C:\Users\lab\xdrun\`, true, "C:/Users/lab/xdrun"},
-		{"posix trims trailing slash", "C:/Users/lab/xdrun/", true, "C:/Users/lab/xdrun"},
-		{"posix preserves drive root", `C:\`, true, "C:/"},
-		{"posix preserves lone root", "/", true, "/"},
-		{"windows converts slashes", "C:/Users/lab/xdrun", false, `C:\Users\lab\xdrun`},
-		{"windows trims trailing slash", "C:/Users/lab/xdrun/", false, `C:\Users\lab\xdrun`},
-		{"windows preserves drive root", "C:/", false, `C:\`},
-		{"empty stays empty", "", true, ""},
+		{name: "posix converts backslashes", path: `C:\Users\lab\xdrun`, posix: true, want: "C:/Users/lab/xdrun"},
+		{name: "posix trims trailing backslash", path: `C:\Users\lab\xdrun\`, posix: true, want: "C:/Users/lab/xdrun"},
+		{name: "posix trims trailing slash", path: "C:/Users/lab/xdrun/", posix: true, want: "C:/Users/lab/xdrun"},
+		{name: "posix preserves drive root", path: `C:\`, posix: true, want: "C:/"},
+		{name: "posix preserves lone root", path: "/", posix: true, want: "/"},
+		{name: "windows converts slashes", path: "C:/Users/lab/xdrun", posix: false, want: `C:\Users\lab\xdrun`},
+		{name: "windows trims trailing slash", path: "C:/Users/lab/xdrun/", posix: false, want: `C:\Users\lab\xdrun`},
+		{name: "windows preserves drive root", path: "C:/", posix: false, want: `C:\`},
+		{name: "empty stays empty", path: "", posix: true, want: ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -32,7 +32,7 @@ func requireExistingDockerNetworkName(t *testing.T) string {
 	if err != nil {
 		t.Skip("docker daemon not available")
 	}
-	for _, line := range strings.Split(string(output), "\n") {
+	for line := range strings.SplitSeq(string(output), "\n") {
 		name := strings.TrimSpace(line)
 		if name != "" {
 			return name

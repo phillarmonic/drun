@@ -3,7 +3,8 @@ package remote
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,9 +32,9 @@ func ParseRemoteURL(url string) (protocol, path, ref string, err error) {
 		rest := strings.TrimPrefix(url, "drunhub:")
 
 		// Check for @ref (optional)
-		if idx := strings.Index(rest, "@"); idx != -1 {
-			path = rest[:idx]
-			ref = rest[idx+1:]
+		if before, after, ok := strings.Cut(rest, "@"); ok {
+			path = before
+			ref = after
 		} else {
 			path = rest
 			ref = ""
@@ -47,9 +48,9 @@ func ParseRemoteURL(url string) (protocol, path, ref string, err error) {
 		rest := strings.TrimPrefix(url, "github:")
 
 		// Check for @ref
-		if idx := strings.Index(rest, "@"); idx != -1 {
-			path = rest[:idx]
-			ref = rest[idx+1:]
+		if before, after, ok := strings.Cut(rest, "@"); ok {
+			path = before
+			ref = after
 		} else {
 			path = rest
 			ref = ""
@@ -67,7 +68,7 @@ func ParseRemoteURL(url string) (protocol, path, ref string, err error) {
 
 	// Check for HTTP (reject for security)
 	if strings.HasPrefix(url, "http://") {
-		return "", "", "", fmt.Errorf("insecure HTTP URLs are not allowed, use HTTPS")
+		return "", "", "", errors.New("insecure HTTP URLs are not allowed, use HTTPS")
 	}
 
 	return "", "", "", fmt.Errorf("unsupported protocol in URL: %s", url)
@@ -80,10 +81,10 @@ func IsRemoteURL(url string) bool {
 
 // GitHubFetcher fetches content from GitHub repositories
 type GitHubFetcher struct {
-	token         string
 	client        *http.Client
 	branchCache   map[string]string // Cache for default branches
 	cacheExpiry   map[string]time.Time
+	token         string
 	cacheDuration time.Duration
 }
 
@@ -128,7 +129,7 @@ func (g *GitHubFetcher) Fetch(ctx context.Context, path, ref string) ([]byte, er
 		owner, repo, ref, filePath,
 	)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (g *GitHubFetcher) getDefaultBranch(ctx context.Context, owner, repo, fileP
 
 	// Query GitHub API for repo info
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return g.tryDefaultBranchFallback(ctx, owner, repo, filePath)
 	}
@@ -202,7 +203,7 @@ func (g *GitHubFetcher) getDefaultBranch(ctx context.Context, owner, repo, fileP
 	var repoInfo struct {
 		DefaultBranch string `json:"default_branch"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&repoInfo); err != nil {
+	if err := json.UnmarshalRead(resp.Body, &repoInfo); err != nil {
 		return g.tryDefaultBranchFallback(ctx, owner, repo, filePath)
 	}
 
@@ -235,7 +236,7 @@ func (g *GitHubFetcher) fileExists(ctx context.Context, owner, repo, ref, filePa
 		"https://raw.githubusercontent.com/%s/%s/%s/%s",
 		owner, repo, ref, filePath,
 	)
-	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
 		return false
 	}
@@ -273,7 +274,7 @@ func (h *HTTPSFetcher) Protocol() string {
 
 // Fetch retrieves content from an HTTPS URL
 func (h *HTTPSFetcher) Fetch(ctx context.Context, url, _ string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -351,11 +352,11 @@ func (d *DrunhubFetcher) Fetch(ctx context.Context, path, ref string) ([]byte, e
 
 	// Add .drun extension if not present
 	if !strings.HasSuffix(path, ".drun") {
-		path = path + ".drun"
+		path += ".drun"
 	}
 
 	// Convert to GitHub path: phillarmonic/drun-hub/{path}
-	githubPath := fmt.Sprintf("phillarmonic/drun-hub/%s", path)
+	githubPath := "phillarmonic/drun-hub/" + path
 
 	// Use the GitHub fetcher to retrieve the content
 	return d.githubFetcher.Fetch(ctx, githubPath, ref)

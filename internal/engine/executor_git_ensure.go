@@ -35,8 +35,8 @@ func (e *Engine) executeGitEnsureVersion(guard *statement.GitEnsureVersion, ctx 
 	if method == "" {
 		method = source.Default
 	}
-	if _, err := source.AccessProfile(method); err != nil {
-		return fmt.Errorf("git ensure source %q cannot be resolved: %w", guard.Source, err)
+	if _, accessErr := source.AccessProfile(method); accessErr != nil {
+		return fmt.Errorf("git ensure source %q cannot be resolved: %w", guard.Source, accessErr)
 	}
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would ensure version %s is newer than the latest stable version from Git source %s using %s%s%s\n",

@@ -6,17 +6,17 @@ import "strings"
 
 // Lexer tokenizes drun v2 source code
 type Lexer struct {
-	input        string
-	position     int  // current position in input (points to current char)
-	readPosition int  // current reading position in input (after current char)
-	ch           byte // current char under examination
-	line         int  // current line number
-	column       int  // current column number
+	input string
 
 	// Indentation tracking for Python-style blocks
 	indentStack    []int // stack of indentation levels
-	atLineStart    bool  // true if we're at the start of a line
+	position       int   // current position in input (points to current char)
+	readPosition   int   // current reading position in input (after current char)
+	line           int   // current line number
+	column         int   // current column number
 	pendingDedents int   // number of DEDENT tokens to emit
+	ch             byte  // current char under examination
+	atLineStart    bool  // true if we're at the start of a line
 }
 
 // NewLexer creates a new lexer instance
@@ -200,15 +200,16 @@ func (l *Lexer) NextToken() Token {
 			}
 		}
 	default:
-		if isLetter(l.ch) {
+		switch {
+		case isLetter(l.ch):
 			tok.Literal = l.readIdentifier()
 			tok.Type = LookupIdent(tok.Literal)
 			return tok // Don't call readChar() again
-		} else if isDigit(l.ch) {
+		case isDigit(l.ch):
 			tok.Type = NUMBER
 			tok.Literal = l.readNumber()
 			return tok // Don't call readChar() again
-		} else {
+		default:
 			tok.Type = ILLEGAL
 			tok.Literal = string(l.ch)
 		}

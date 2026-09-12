@@ -7,19 +7,19 @@ import (
 func TestGetMacro(t *testing.T) {
 	tests := []struct {
 		name     string
-		exists   bool
 		expected string
+		exists   bool
 	}{
-		{"semver", true, `^v\d+\.\d+\.\d+$`},
-		{"semver_optional_v", true, `^v?\d+\.\d+\.\d+$`},
-		{"semver_extended", true, `^v\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$`},
-		{"uuid", true, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
-		{"url", true, `https?://[^\s/$.?#].[^\s]*`},
-		{"ipv4", true, `^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`},
-		{"slug", true, `^[a-z0-9]+(?:-[a-z0-9]+)*$`},
-		{"docker_tag", true, `^[a-zA-Z0-9][a-zA-Z0-9._-]*$`},
-		{"git_branch", true, `^[a-zA-Z0-9][a-zA-Z0-9._/-]*[a-zA-Z0-9]$`},
-		{"nonexistent", false, ""},
+		{name: "semver", exists: true, expected: `^v\d+\.\d+\.\d+$`},
+		{name: "semver_optional_v", exists: true, expected: `^v?\d+\.\d+\.\d+$`},
+		{name: "semver_extended", exists: true, expected: `^v\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$`},
+		{name: "uuid", exists: true, expected: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
+		{name: "url", exists: true, expected: `https?://[^\s/$.?#].[^\s]*`},
+		{name: "ipv4", exists: true, expected: `^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`},
+		{name: "slug", exists: true, expected: `^[a-z0-9]+(?:-[a-z0-9]+)*$`},
+		{name: "docker_tag", exists: true, expected: `^[a-zA-Z0-9][a-zA-Z0-9._-]*$`},
+		{name: "git_branch", exists: true, expected: `^[a-zA-Z0-9][a-zA-Z0-9._/-]*[a-zA-Z0-9]$`},
+		{name: "nonexistent", exists: false, expected: ""},
 	}
 
 	for _, tt := range tests {
@@ -113,12 +113,22 @@ func TestValidatePattern_UUID(t *testing.T) {
 		value     string
 		wantError bool
 	}{
-		{"550e8400-e29b-41d4-a716-446655440000", false},
-		{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", false},
-		{"00000000-0000-0000-0000-000000000000", false},
-		{"550e8400-e29b-41d4-a716-44665544000", true},   // too short
-		{"550e8400-e29b-41d4-a716-4466554400000", true}, // too long
-		{"550e8400e29b41d4a716446655440000", true},      // no hyphens
+		// Every RFC 9562 version nibble is accepted; the macro restricts the
+		// textual form, not the variant.
+		{"6ba7b810-9dad-11d1-80b4-00c04fd430c8", false}, // v1
+		{"886313e1-3b8a-5372-9b90-0c9aee199e5d", false}, // v5
+		{"550e8400-e29b-41d4-a716-446655440000", false}, // v4
+		{"01890a5d-ac96-774b-bcce-b302099a8057", false}, // v7
+		{"00000000-0000-0000-0000-000000000000", false}, // nil
+		{"ffffffff-ffff-ffff-ffff-ffffffffffff", false}, // max
+
+		{"550e8400-e29b-41d4-a716-44665544000", true},           // too short
+		{"550e8400-e29b-41d4-a716-4466554400000", true},         // too long
+		{"550e8400e29b41d4a716446655440000", true},              // no hyphens
+		{"550E8400-E29B-41D4-A716-446655440000", true},          // uppercase
+		{"{550e8400-e29b-41d4-a716-446655440000}", true},        // braced
+		{"urn:uuid:550e8400-e29b-41d4-a716-446655440000", true}, // URN
+		{"550e8400-e29b-41d4-a716-44665544000g", true},          // non-hex digit
 		{"not-a-uuid", true},
 	}
 
@@ -258,13 +268,13 @@ func TestValidatePattern_GitBranch(t *testing.T) {
 func TestExpandMacro(t *testing.T) {
 	tests := []struct {
 		name      string
-		wantError bool
 		expected  string
+		wantError bool
 	}{
-		{"semver", false, `^v\d+\.\d+\.\d+$`},
-		{"semver_optional_v", false, `^v?\d+\.\d+\.\d+$`},
-		{"uuid", false, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
-		{"nonexistent", true, ""},
+		{name: "semver", wantError: false, expected: `^v\d+\.\d+\.\d+$`},
+		{name: "semver_optional_v", wantError: false, expected: `^v?\d+\.\d+\.\d+$`},
+		{name: "uuid", wantError: false, expected: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`},
+		{name: "nonexistent", wantError: true, expected: ""},
 	}
 
 	for _, tt := range tests {

@@ -3,6 +3,7 @@ package scm
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ type commandRunner interface {
 type execCommandRunner struct{}
 
 func (execCommandRunner) Run(ctx context.Context, args, environment []string) ([]byte, error) {
+	// #nosec G204 -- git is a fixed executable; arguments are validated URLs, refs, and temp paths passed as slice elements without shell interpretation.
 	command := exec.CommandContext(ctx, "git", args...)
 	command.Env = append(os.Environ(), environment...)
 	return command.Output()
@@ -68,8 +70,8 @@ func (a *RawGitAdapter) openFetchedSession(ctx context.Context, source *GitSourc
 		return nil, fmt.Errorf("fetching metadata for Git source %q failed: %w", source.Alias, err)
 	}
 	return &fetchedGitSession{
-		rawGitSession: rawGitSession{runner: a.runner, path: directory, local: true, environment: environment},
-		directory:     directory,
+		runner: a.runner, path: directory, local: true, environment: environment,
+		directory: directory,
 	}, nil
 }
 
@@ -92,8 +94,8 @@ type rawGitSession struct {
 	runner      commandRunner
 	locator     string
 	path        string
-	local       bool
 	environment []string
+	local       bool
 }
 
 func (s *rawGitSession) Tags(ctx context.Context, withMetadata bool) ([]GitRef, error) {
@@ -101,7 +103,7 @@ func (s *rawGitSession) Tags(ctx context.Context, withMetadata bool) ([]GitRef, 
 		return s.localTags(ctx)
 	}
 	if withMetadata {
-		return nil, fmt.Errorf("object metadata is unavailable from remote refs; declare metadata: fetch and use allow fetch")
+		return nil, errors.New("object metadata is unavailable from remote refs; declare metadata: fetch and use allow fetch")
 	}
 	output, err := s.runner.Run(ctx, []string{"ls-remote", "--tags", "--refs", s.locator}, s.environment)
 	if err != nil {
@@ -117,7 +119,7 @@ func (s *rawGitSession) localTags(ctx context.Context) ([]GitRef, error) {
 		return nil, fmt.Errorf("inspecting local Git tags failed: %w", err)
 	}
 	refs := make([]GitRef, 0)
-	for _, line := range bytes.Split(bytes.TrimSpace(output), []byte{'\n'}) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(output), []byte{'\n'}) {
 		if len(line) == 0 {
 			continue
 		}
@@ -134,8 +136,8 @@ func (s *rawGitSession) localTags(ctx context.Context) ([]GitRef, error) {
 func (s *rawGitSession) Close() error { return nil }
 
 type fetchedGitSession struct {
-	rawGitSession
 	directory string
+	rawGitSession
 }
 
 func (s *fetchedGitSession) Close() error {
@@ -149,7 +151,7 @@ func (s *fetchedGitSession) Close() error {
 
 func parseRemoteRefs(output []byte) []GitRef {
 	refs := make([]GitRef, 0)
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 2 || !strings.HasPrefix(fields[1], "refs/tags/") {
 			continue

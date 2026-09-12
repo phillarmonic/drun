@@ -10,10 +10,10 @@ import (
 
 // BinaryExpression represents binary operations like {a} + {b}, {x} - {y}
 type BinaryExpression struct {
-	Token    lexer.Token
 	Left     Expression
-	Operator string
 	Right    Expression
+	Operator string
+	Token    lexer.Token
 }
 
 func (be *BinaryExpression) expressionNode() {}
@@ -23,8 +23,8 @@ func (be *BinaryExpression) String() string {
 
 // IdentifierExpression represents variable references like {variable_name}
 type IdentifierExpression struct {
-	Token lexer.Token
 	Value string
+	Token lexer.Token
 }
 
 func (ie *IdentifierExpression) expressionNode() {}
@@ -34,8 +34,8 @@ func (ie *IdentifierExpression) String() string {
 
 // LiteralExpression represents literal values like "string", 42, true
 type LiteralExpression struct {
-	Token lexer.Token
 	Value string
+	Token lexer.Token
 }
 
 func (le *LiteralExpression) expressionNode() {}
@@ -45,9 +45,9 @@ func (le *LiteralExpression) String() string {
 
 // FunctionCallExpression represents function calls like now(), current git branch
 type FunctionCallExpression struct {
-	Token     lexer.Token
 	Function  string
 	Arguments []Expression
+	Token     lexer.Token
 }
 
 func (fce *FunctionCallExpression) expressionNode() {}
@@ -64,8 +64,8 @@ func (fce *FunctionCallExpression) String() string {
 
 // ArrayLiteral represents array literals like ["item1", "item2", "item3"]
 type ArrayLiteral struct {
-	Token    lexer.Token
 	Elements []Expression
+	Token    lexer.Token
 }
 
 func (al *ArrayLiteral) expressionNode() {}

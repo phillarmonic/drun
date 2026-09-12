@@ -69,7 +69,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 		}
 
 		if len(toolsToCheck) == 1 {
-			conditionText = fmt.Sprintf("%s is not available", stmt.Target)
+			conditionText = stmt.Target + " is not available"
 		} else {
 			toolNames := strings.Join(toolsToCheck, ", ")
 			conditionText = fmt.Sprintf("any of [%s] is not available", toolNames)
@@ -85,7 +85,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 		}
 
 		if len(toolsToCheck) == 1 {
-			conditionText = fmt.Sprintf("%s is running", stmt.Target)
+			conditionText = stmt.Target + " is running"
 		} else {
 			toolNames := strings.Join(toolsToCheck, ", ")
 			conditionText = fmt.Sprintf("all of [%s] are running", toolNames)
@@ -101,7 +101,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 		}
 
 		if len(toolsToCheck) == 1 {
-			conditionText = fmt.Sprintf("%s is not running", stmt.Target)
+			conditionText = stmt.Target + " is not running"
 		} else {
 			toolNames := strings.Join(toolsToCheck, ", ")
 			conditionText = fmt.Sprintf("any of [%s] is not running", toolNames)
@@ -117,7 +117,7 @@ func (e *Engine) executeIfAvailable(detector *detection.Detector, stmt *statemen
 		}
 
 		if len(toolsToCheck) == 1 {
-			conditionText = fmt.Sprintf("%s is available", stmt.Target)
+			conditionText = stmt.Target + " is available"
 		} else {
 			toolNames := strings.Join(toolsToCheck, ", ")
 			conditionText = fmt.Sprintf("all of [%s] are available", toolNames)

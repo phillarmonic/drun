@@ -18,8 +18,12 @@ func TestGitTagQuerySelectsPHPSeries(t *testing.T) {
 	}
 	source := &GitSource{Alias: "php", VersionTags: contract}
 	session := &querySession{refs: []GitRef{
-		{Name: "php-8.5.9RC1"}, {Name: "php-8.4.24RC"}, {Name: "php-8.6.0-alpha2"},
-		{Name: "php-8.5.8"}, {Name: "php-8.3.32"}, {Name: "php-8.4.23"},
+		{Name: "php-8.5.9RC1"},
+		{Name: "php-8.4.24RC"},
+		{Name: "php-8.6.0-alpha2"},
+		{Name: "php-8.5.8"},
+		{Name: "php-8.3.32"},
+		{Name: "php-8.4.23"},
 	}}
 	result, err := (GitTagQuery{Result: "version", Series: "8.4"}).Execute(context.Background(), session, source)
 	if err != nil {

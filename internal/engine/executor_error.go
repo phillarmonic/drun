@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -90,11 +91,12 @@ func (e *Engine) executeTry(tryStmt *statement.Try, ctx *ExecutionContext) error
 	}
 
 	// Report how the error (if any) resolved.
-	if handled && tryError == nil {
+	switch {
+	case handled && tryError == nil:
 		_, _ = fmt.Fprintf(e.output, "✅  Error handled successfully\n")
-	} else if !handled && tryError != nil {
+	case !handled && tryError != nil:
 		_, _ = fmt.Fprintf(e.output, "❌  Unhandled error: %v\n", tryError)
-	} else if tryError == nil {
+	case tryError == nil:
 		_, _ = fmt.Fprintf(e.output, "✅  Try block completed successfully\n")
 	}
 	// handled && tryError != nil means the matching catch body raised its own
@@ -144,13 +146,13 @@ func (e *Engine) executeThrow(throwStmt *statement.Throw, ctx *ExecutionContext)
 		return fmt.Errorf("thrown error: %s", message)
 	case "rethrow":
 		if ctx == nil || ctx.CurrentCaughtError == nil {
-			return fmt.Errorf("rethrow: no active caught error (rethrow only works inside a catch block)")
+			return errors.New("rethrow: no active caught error (rethrow only works inside a catch block)")
 		}
 		_, _ = fmt.Fprintf(e.output, "🔄  Rethrowing current error: %v\n", ctx.CurrentCaughtError)
 		return ctx.CurrentCaughtError
 	case "ignore":
 		if ctx == nil || ctx.CurrentCaughtError == nil {
-			return fmt.Errorf("ignore: bare 'ignore' only makes sense inside a catch block (it marks the caught error as handled); it cannot suppress a failing statement, because a command that fails already aborts the task")
+			return errors.New("ignore: bare 'ignore' only makes sense inside a catch block (it marks the caught error as handled); it cannot suppress a failing statement, because a command that fails already aborts the task")
 		}
 		_, _ = fmt.Fprintf(e.output, "🤐 Ignoring current error: %v\n", ctx.CurrentCaughtError)
 		return nil // Explicit documentation-only no-op: the caught error is handled

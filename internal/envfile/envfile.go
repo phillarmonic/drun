@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,7 +115,7 @@ func (m *Manager) Write(filePath string, env map[string]string) error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -147,9 +148,7 @@ func (m *Manager) Replace(filePath string, replacements map[string]string) error
 	}
 
 	// Apply replacements
-	for key, value := range replacements {
-		env[key] = value
-	}
+	maps.Copy(env, replacements)
 
 	// Write updated env file
 	if err := m.Write(filePath, env); err != nil {
@@ -271,9 +270,7 @@ func (m *Manager) Merge(outputPath string, inputPaths ...string) error {
 		}
 
 		// Merge into combined map (later files override earlier ones)
-		for key, value := range env {
-			merged[key] = value
-		}
+		maps.Copy(merged, env)
 	}
 
 	// Write merged file
@@ -302,14 +299,14 @@ func (m *Manager) Interpolate(filePath string, variables map[string]string) erro
 		result = strings.ReplaceAll(result, placeholder, value)
 
 		// Also support $VAR syntax
-		placeholder = fmt.Sprintf("$%s", key)
+		placeholder = "$" + key
 		result = strings.ReplaceAll(result, placeholder, value)
 	}
 
 	// Write interpolated content
 	cleanPath := filepath.Clean(fullPath)
 	// #nosec G703 -- env files are intentionally written under the configured workDir.
-	if err := os.WriteFile(cleanPath, []byte(result), 0600); err != nil {
+	if err := os.WriteFile(cleanPath, []byte(result), 0o600); err != nil {
 		return fmt.Errorf("failed to write interpolated file: %w", err)
 	}
 

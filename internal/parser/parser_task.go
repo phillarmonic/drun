@@ -95,6 +95,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 	p.nextToken() // consume INDENT
 
 	// Parse task body (parameters and statements)
+taskBodyLoop:
 	for p.peekToken.Type != lexer.DEDENT && p.peekToken.Type != lexer.EOF {
 		p.nextToken() // Move to the next token
 
@@ -108,12 +109,13 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 			break
 		}
 
-		if p.isDependencyToken(p.curToken.Type) {
+		switch {
+		case p.isDependencyToken(p.curToken.Type):
 			dep := p.parseDependencyStatement()
 			if dep != nil {
 				stmt.Dependencies = append(stmt.Dependencies, *dep)
 			}
-		} else if p.isParameterToken(p.curToken.Type) {
+		case p.isParameterToken(p.curToken.Type):
 			// Check for "requires tools:" block (not a parameter declaration)
 			if p.curToken.Type == lexer.REQUIRES && p.peekToken.Type == lexer.TOOLS {
 				requiresTools := p.parseRequiresToolsStatement()
@@ -126,27 +128,27 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Parameters = append(stmt.Parameters, *param)
 				}
 			}
-		} else if p.isDetectionToken(p.curToken.Type) && p.isDetectionContext() {
+		case p.isDetectionToken(p.curToken.Type) && p.isDetectionContext():
 			detection := p.parseDetectionStatement()
 			if detection != nil {
 				stmt.Body = append(stmt.Body, detection)
 			}
-		} else if p.isControlFlowToken(p.curToken.Type) {
+		case p.isControlFlowToken(p.curToken.Type):
 			controlFlow := p.parseControlFlowStatement()
 			if controlFlow != nil {
 				stmt.Body = append(stmt.Body, controlFlow)
 			}
-		} else if p.isErrorHandlingToken(p.curToken.Type) {
+		case p.isErrorHandlingToken(p.curToken.Type):
 			errorHandling := p.parseErrorHandlingStatement()
 			if errorHandling != nil {
 				stmt.Body = append(stmt.Body, errorHandling)
 			}
-		} else if p.isThrowActionToken(p.curToken.Type) {
+		case p.isThrowActionToken(p.curToken.Type):
 			throw := p.parseThrowStatement()
 			if throw != nil {
 				stmt.Body = append(stmt.Body, throw)
 			}
-		} else if p.isDockerToken(p.curToken.Type) {
+		case p.isDockerToken(p.curToken.Type):
 			// Special handling for RUN token - check context
 			if p.curToken.Type == lexer.RUN {
 				// Look ahead to determine if this is shell or docker command
@@ -169,21 +171,22 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					stmt.Body = append(stmt.Body, docker)
 				}
 			}
-		} else if p.isGitToken(p.curToken.Type) {
+		case p.isGitToken(p.curToken.Type):
 			// Special handling for CREATE token - check context
 			if p.curToken.Type == lexer.CREATE {
 				// Look ahead to determine if this is git or file operation
-				if p.isCreateFileStatementStart() {
+				switch {
+				case p.isCreateFileStatementStart():
 					file := p.parseFileStatement()
 					if file != nil {
 						stmt.Body = append(stmt.Body, file)
 					}
-				} else if p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG {
+				case p.peekToken.Type == lexer.BRANCH || p.peekToken.Type == lexer.TAG:
 					git := p.parseGitStatement()
 					if git != nil {
 						stmt.Body = append(stmt.Body, git)
 					}
-				} else {
+				default:
 					p.addError("ambiguous 'create' statement - specify 'branch', 'tag', 'file', 'dir', 'directory', or 'folder'")
 				}
 			} else {
@@ -198,65 +201,78 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					}
 				}
 			}
-		} else if p.isFileValueStatementStart() {
+		case p.isFileValueStatementStart():
 			fileValue := p.parseFileValueStatement()
 			if fileValue != nil {
 				stmt.Body = append(stmt.Body, fileValue)
 			}
-		} else if p.isChangelogStatementStart() {
+		case p.isChangelogStatementStart():
 			changelog := p.parseChangelogStatement()
 			if changelog != nil {
 				stmt.Body = append(stmt.Body, changelog)
 			}
-		} else if p.isDeleteFileStatementStart() {
+		case p.isDeleteFileStatementStart():
 			file := p.parseFileStatement()
 			if file != nil {
 				stmt.Body = append(stmt.Body, file)
 			}
-		} else if p.isHTTPToken(p.curToken.Type) {
+		case p.isHTTPToken(p.curToken.Type):
 			http := p.parseHTTPStatement()
 			if http != nil {
 				stmt.Body = append(stmt.Body, http)
 			}
-		} else if p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR {
+		case p.curToken.Type == lexer.WAIT && p.peekToken.Type != lexer.FOR:
 			// Fixed-duration wait: wait <n|{var}> second(s)/minute(s)/hour(s)
 			wait := p.parseWaitStatement()
 			if wait != nil {
 				stmt.Body = append(stmt.Body, wait)
 			}
-		} else if p.curToken.Type == lexer.OPEN {
+		case p.curToken.Type == lexer.OPEN:
 			// open url "<target>"
 			openStmt := p.parseOpenStatement()
 			if openStmt != nil {
 				stmt.Body = append(stmt.Body, openStmt)
 			}
-		} else if p.isNetworkToken(p.curToken.Type) {
+		case p.curToken.Type == lexer.CONFIRM:
+			// confirm "<question>" [defaults to <value>] [as $var]
+			confirmStmt := p.parseConfirmStatement()
+			if confirmStmt != nil {
+				stmt.Body = append(stmt.Body, confirmStmt)
+			}
+		case p.curToken.Type == lexer.PROMPT:
+			// prompt "<question>" [defaults to <value>] [as $var]
+			promptStmt := p.parsePromptStatement()
+			if promptStmt != nil {
+				stmt.Body = append(stmt.Body, promptStmt)
+			}
+		case p.isNetworkToken(p.curToken.Type):
 			network := p.parseNetworkStatement()
 			if network != nil {
 				stmt.Body = append(stmt.Body, network)
 			}
-		} else if p.isBreakContinueToken(p.curToken.Type) {
+		case p.isBreakContinueToken(p.curToken.Type):
 			breakContinue := p.parseBreakContinueStatement()
 			if breakContinue != nil {
 				stmt.Body = append(stmt.Body, breakContinue)
 			}
-		} else if p.isVariableOperationToken(p.curToken.Type) {
+		case p.isVariableOperationToken(p.curToken.Type):
 			variable := p.parseVariableStatement()
 			if variable != nil {
 				stmt.Body = append(stmt.Body, variable)
 			}
-		} else if p.curToken.Type == lexer.SECRET {
+		case p.curToken.Type == lexer.SECRET:
 			secret := p.parseSecretStatement()
 			if secret != nil {
 				stmt.Body = append(stmt.Body, secret)
 			}
-		} else if p.isActionToken(p.curToken.Type) {
-			if p.isShellActionToken(p.curToken.Type) {
+		case p.isActionToken(p.curToken.Type):
+			switch {
+			case p.isShellActionToken(p.curToken.Type):
 				shell := p.parseShellStatement()
 				if shell != nil {
 					stmt.Body = append(stmt.Body, shell)
 				}
-			} else if p.isFileActionToken(p.curToken.Type) {
+			case p.isFileActionToken(p.curToken.Type):
 				// Special handling for CHECK token
 				if p.curToken.Type == lexer.CHECK {
 					switch p.peekToken.Type {
@@ -295,20 +311,21 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 						stmt.Body = append(stmt.Body, file)
 					}
 				}
-			} else if p.isThrowActionToken(p.curToken.Type) {
+			case p.isThrowActionToken(p.curToken.Type):
 				throw := p.parseThrowStatement()
 				if throw != nil {
 					stmt.Body = append(stmt.Body, throw)
 				}
-			} else {
+			default:
 				action := p.parseActionStatement()
 				if action != nil {
 					stmt.Body = append(stmt.Body, action)
 				}
 			}
-		} else if p.curToken.Type == lexer.USE {
+		case p.curToken.Type == lexer.USE:
 			// Check for USE snippet or USE workdir
-			if p.peekToken.Type == lexer.WORKDIR {
+			switch p.peekToken.Type {
+			case lexer.WORKDIR:
 				// use workdir "path"
 				p.nextToken() // consume WORKDIR
 				if !p.expectPeek(lexer.STRING) {
@@ -319,7 +336,7 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					Path:  p.curToken.Literal,
 				}
 				stmt.Body = append(stmt.Body, workdirStmt)
-			} else if p.peekToken.Type == lexer.SNIPPET {
+			case lexer.SNIPPET:
 				p.nextToken() // consume SNIPPET
 
 				if !p.expectPeek(lexer.STRING) {
@@ -331,29 +348,29 @@ func (p *Parser) parseTaskStatement() *ast.TaskStatement {
 					SnippetName: p.curToken.Literal,
 				}
 				stmt.Body = append(stmt.Body, useSnippet)
-			} else {
+			default:
 				p.addError(fmt.Sprintf("expected 'snippet' or 'workdir' after 'use', got %s", p.peekToken.Type))
 			}
-		} else if p.isCallToken(p.curToken.Type) {
+		case p.isCallToken(p.curToken.Type):
 			call := p.parseTaskCallStatement()
 			if call != nil {
 				stmt.Body = append(stmt.Body, call)
 			}
-		} else if p.curToken.Type == lexer.ORCHESTRATE {
+		case p.curToken.Type == lexer.ORCHESTRATE:
 			// Parse orchestration action (e.g., orchestrate "group" start)
 			orchAction := p.parseOrchestrationActionStatement()
 			if orchAction != nil {
 				stmt.Body = append(stmt.Body, orchAction)
 			}
-		} else if p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT {
+		case p.curToken.Type == lexer.COMMENT || p.curToken.Type == lexer.MULTILINE_COMMENT:
 			// Skip comments in task body
 			continue
-		} else if p.curToken.Type == lexer.NEWLINE {
+		case p.curToken.Type == lexer.NEWLINE:
 			// Skip newlines in task body
 			continue
-		} else {
+		default:
 			p.addError(fmt.Sprintf("unexpected token in task body: %s (peek: %s) at line %d, column %d", p.curToken.Type, p.peekToken.Type, p.curToken.Line, p.curToken.Column))
-			break // Stop parsing on unexpected token
+			break taskBodyLoop // Stop parsing on unexpected token
 		}
 	}
 
@@ -487,6 +504,10 @@ func (p *Parser) parseStatementInTaskBody() ast.Statement {
 		return p.parseErrorHandlingStatement()
 	case lexer.ORCHESTRATE:
 		return p.parseOrchestrationActionStatement()
+	case lexer.CONFIRM:
+		return p.parseConfirmStatement()
+	case lexer.PROMPT:
+		return p.parsePromptStatement()
 	}
 
 	// Delegate to existing statement parsing logic

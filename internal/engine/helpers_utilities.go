@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -82,10 +83,10 @@ type serviceContextInfo struct {
 
 func (e *Engine) resolveServiceContext(rawName string, isLiteral bool, ctx *ExecutionContext) (*serviceContextInfo, error) {
 	if ctx == nil || ctx.Program == nil {
-		return nil, fmt.Errorf("service-scoped commands require program context")
+		return nil, errors.New("service-scoped commands require program context")
 	}
 	if len(ctx.Program.Services) == 0 {
-		return nil, fmt.Errorf("service-scoped commands require at least one service definition")
+		return nil, errors.New("service-scoped commands require at least one service definition")
 	}
 
 	serviceName, err := e.resolveServiceNameValue(rawName, isLiteral, ctx)
@@ -115,7 +116,7 @@ func (e *Engine) resolveServiceContext(rawName string, isLiteral bool, ctx *Exec
 			}
 		}
 		if baseDir == "" {
-			if cwd, err := os.Getwd(); err == nil {
+			if cwd, getwdErr := os.Getwd(); getwdErr == nil {
 				baseDir = cwd
 			}
 		}
@@ -137,7 +138,7 @@ func (e *Engine) resolveServiceContext(rawName string, isLiteral bool, ctx *Exec
 
 func (e *Engine) resolveServiceNameValue(rawName string, isLiteral bool, ctx *ExecutionContext) (string, error) {
 	if ctx == nil {
-		return "", fmt.Errorf("service-scoped commands require execution context")
+		return "", errors.New("service-scoped commands require execution context")
 	}
 
 	candidate := strings.TrimSpace(rawName)
@@ -149,7 +150,7 @@ func (e *Engine) resolveServiceNameValue(rawName string, isLiteral bool, ctx *Ex
 
 	candidate = strings.TrimSpace(candidate)
 	if candidate == "" {
-		return "", fmt.Errorf("service name resolved to empty")
+		return "", errors.New("service name resolved to empty")
 	}
 
 	return candidate, nil

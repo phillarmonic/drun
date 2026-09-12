@@ -10,11 +10,11 @@ import (
 // OrchestrationActionStatement represents orchestration actions in task bodies
 // Examples: orchestrate "group" start, orchestrate "group" stop
 type OrchestrationActionStatement struct {
-	Token          lexer.Token
-	GroupName      string
-	Action         string // start, stop, restart, health_check, status, logs, etc.
 	Options        map[string]string
+	GroupName      string
+	Action         string   // start, stop, restart, health_check, status, logs, etc.
 	ServiceFilters []string // optional: specific services to act on
+	Token          lexer.Token
 }
 
 func (oas *OrchestrationActionStatement) statementNode() {}
@@ -23,28 +23,30 @@ func (oas *OrchestrationActionStatement) String() string {
 	if len(oas.ServiceFilters) > 0 {
 		out += fmt.Sprintf(" services %v", oas.ServiceFilters)
 	}
+	var outSb26 strings.Builder
 	for key, value := range oas.Options {
-		out += fmt.Sprintf(" %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb26, " %s \"%s\"", key, value)
 	}
+	out += outSb26.String()
 	return out
 }
 
 // ServiceStatement represents a microservice definition
 type ServiceStatement struct {
-	Token        lexer.Token
-	Name         string
-	Path         string
-	Description  string
-	Dependencies []string
-	Repository   *RepositoryConfig
+	Environment  map[string]string
 	HealthCheck  *HealthCheckConfig
 	Build        *BuildConfig
-	Compose      *ComposeConfig
-	Environment  map[string]string
-	EnvFile      *EnvFileConfig
 	Networks     map[string]*DockerNetworkConfig
+	EnvFile      *EnvFileConfig
+	Repository   *RepositoryConfig
+	Compose      *ComposeConfig
 	PreTask      string
+	Name         string
+	Description  string
+	Path         string
 	PostTask     string
+	Dependencies []string
+	Token        lexer.Token
 }
 
 func (ss *ServiceStatement) statementNode()      {}
@@ -131,21 +133,21 @@ func (rc *RepositoryConfig) String() string {
 
 // HealthCheckConfig represents health check configuration
 type HealthCheckConfig struct {
-	Type        string // http, tcp, docker, dns, custom
-	Endpoint    string // for http/tcp
-	Domain      string // for dns
+	Headers     map[string]string // for http
+	Interval    string
+	Condition   string // for http (status code)
 	Container   string // for docker
 	Command     string // for custom
 	Timeout     string
-	Interval    string
+	Type        string   // http, tcp, docker, dns, custom
+	StartPeriod string   // wait before first check
+	Domain      string   // for dns
+	RecordType  string   // for dns (A, AAAA, etc)
+	ExpectedIP  string   // for dns
+	WorkingDir  string   // for custom
+	Endpoint    string   // for http/tcp
+	ExpectedIPs []string // for dns with load balancer
 	Retries     int
-	Condition   string            // for http (status code)
-	RecordType  string            // for dns (A, AAAA, etc)
-	ExpectedIP  string            // for dns
-	ExpectedIPs []string          // for dns with load balancer
-	Headers     map[string]string // for http
-	WorkingDir  string            // for custom
-	StartPeriod string            // wait before first check
 }
 
 func (hc *HealthCheckConfig) String() string {
@@ -197,21 +199,21 @@ func (hc *HealthCheckConfig) String() string {
 
 // BuildConfig represents build configuration
 type BuildConfig struct {
-	Required         bool
+	WorkingDirectory string
 	Command          string
 	Makefile         string
 	MakeTarget       string
-	MakeArgs         []string
-	PreMakeCommands  []string
-	PostMakeCommands []string
-	WorkingDirectory string
+	FallbackCommand  string
+	RetryDelay       string
 	MakefileTimeout  string
+	MakeArgs         []string
+	PostMakeCommands []string
+	PreMakeCommands  []string
 	ParallelJobs     int
+	MaxRetries       int
 	Verbose          bool
 	RetryOnFailure   bool
-	MaxRetries       int
-	RetryDelay       string
-	FallbackCommand  string
+	Required         bool
 	AllocateTTY      bool
 }
 
@@ -239,9 +241,9 @@ func (bc *BuildConfig) String() string {
 
 // ComposeConfig represents Docker Compose configuration
 type ComposeConfig struct {
+	Options *ComposeOptions
 	File    string
 	Project string
-	Options *ComposeOptions
 }
 
 func (cc *ComposeConfig) String() string {
@@ -265,19 +267,19 @@ func (cc *ComposeConfig) String() string {
 
 // ComposeOptions represents Docker Compose command options
 type ComposeOptions struct {
-	ForceRecreate bool
-	NoDeps        bool
-	Build         bool
+	WaitTimeout   string
+	CPULimit      string
+	MemoryLimit   string
 	Pull          string // always, missing, never
 	Timeout       string
 	Scale         string
+	RestartPolicy string
 	Wait          bool
-	WaitTimeout   string
 	Detach        bool
 	RemoveOrphans bool
-	RestartPolicy string
-	MemoryLimit   string
-	CPULimit      string
+	ForceRecreate bool
+	Build         bool
+	NoDeps        bool
 }
 
 func (co *ComposeOptions) String() string {
@@ -309,8 +311,8 @@ func (co *ComposeOptions) String() string {
 
 // EnvFileConfig represents environment file configuration
 type EnvFileConfig struct {
-	Required bool
 	Task     string // Task to call before service start
+	Required bool
 }
 
 func (efc *EnvFileConfig) String() string {
@@ -325,34 +327,34 @@ func (efc *EnvFileConfig) String() string {
 
 // OrchestrateStatement represents an orchestration group
 type OrchestrateStatement struct {
-	Token               lexer.Token
-	Name                string
-	Description         string
-	Services            []string
-	Strategy            string // sequential, parallel, dependency-based
-	CircuitBreaker      bool
-	StopOnFailure       bool
+	ContainerManagement *ContainerManagement
+	Scale               map[string]int
+	Metrics             *MetricsConfig
+	Discovery           *DiscoveryConfig
+	Recovery            *RecoveryConfig
 	HealthCheckInterval string
+	Description         string
+	GitSSHKey           string // Optional: default SSH key for git repository operations
 	StartupTimeout      string
 	ShutdownTimeout     string
 	PreTask             string
 	PostTask            string
-	FailureThreshold    int
-	RecoveryTimeout     string
-	MakefileOrder       []string
-	MakefileTimeout     string
-	CloneOrder          []string
-	CloneTimeout        string
-	ContainerManagement *ContainerManagement
-	Recovery            *RecoveryConfig
-	Discovery           *DiscoveryConfig
-	Metrics             *MetricsConfig
-	Scale               map[string]int
-	UpdateStrategy      string
-	MaxUnavailable      int
 	UpdateTimeout       string
-	GitSSHKey           string   // Optional: default SSH key for git repository operations
+	RecoveryTimeout     string
+	UpdateStrategy      string
+	MakefileTimeout     string
+	Name                string
+	CloneTimeout        string
+	Strategy            string // sequential, parallel, dependency-based
+	Services            []string
+	CloneOrder          []string
+	MakefileOrder       []string
 	DNSChecks           []string // Optional: domains to check DNS resolution for (warns if not resolvable)
+	Token               lexer.Token
+	MaxUnavailable      int
+	FailureThreshold    int
+	CircuitBreaker      bool
+	StopOnFailure       bool
 }
 
 func (os *OrchestrateStatement) statementNode()      {}
@@ -392,20 +394,20 @@ func (os *OrchestrateStatement) String() string {
 
 // ContainerManagement represents container management options
 type ContainerManagement struct {
+	PullPolicy             string
+	HealthCheckTimeout     string
 	ForceRecreateOnStart   bool
 	ForceRecreateOnRestart bool
 	BuildBeforeStart       bool
-	PullPolicy             string
 	WaitForHealth          bool
-	HealthCheckTimeout     string
 }
 
 // RecoveryConfig represents recovery configuration
 type RecoveryConfig struct {
-	MaxRetries         int
 	RetryInterval      string
-	ExponentialBackoff bool
 	FallbackAction     string // restart, stop, ignore
+	MaxRetries         int
+	ExponentialBackoff bool
 }
 
 // DiscoveryConfig represents service discovery configuration
@@ -414,26 +416,26 @@ type DiscoveryConfig struct {
 	Endpoint      string
 	Namespace     string
 	DNSServer     string
+	CacheTimeout  string
 	SearchDomains []string
 	TTLCheck      bool
-	CacheTimeout  string
 }
 
 // MetricsConfig represents metrics collection configuration
 type MetricsConfig struct {
-	Enabled  bool
+	Labels   map[string]string
 	Endpoint string
 	Interval string
-	Labels   map[string]string
+	Enabled  bool
 }
 
 // OrchestrateActionStatement represents actions on orchestration groups
 type OrchestrateActionStatement struct {
-	Token     lexer.Token
+	Options   map[string]string
 	GroupName string
 	Action    string // start, stop, restart, health_check, build, status, etc.
 	Service   string // specific service name (optional)
-	Options   map[string]string
+	Token     lexer.Token
 }
 
 func (oas *OrchestrateActionStatement) statementNode() {}
@@ -457,11 +459,11 @@ func (oas *OrchestrateActionStatement) String() string {
 
 // DockerNetworkConfig represents Docker network configuration
 type DockerNetworkConfig struct {
-	Token         lexer.Token
+	Options       map[string]string
 	Name          string
+	Driver        string
+	Token         lexer.Token
 	External      bool
 	Required      bool
 	AutoProvision bool // defaults to false
-	Driver        string
-	Options       map[string]string
 }

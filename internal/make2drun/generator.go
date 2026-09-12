@@ -109,67 +109,42 @@ func generateCommand(sb *strings.Builder, cmd string, makefile *Makefile) {
 	}
 
 	// Handle special prefixes
-	silent := false
 	ignoreErrors := false
 
-	if strings.HasPrefix(cmd, "@") {
-		silent = true
-		cmd = strings.TrimPrefix(cmd, "@")
-		cmd = strings.TrimSpace(cmd)
+	if after, ok := strings.CutPrefix(cmd, "@"); ok {
+		cmd = strings.TrimSpace(after)
 	}
 
-	if strings.HasPrefix(cmd, "-") {
+	if after, ok := strings.CutPrefix(cmd, "-"); ok {
 		ignoreErrors = true
-		cmd = strings.TrimPrefix(cmd, "-")
-		cmd = strings.TrimSpace(cmd)
+		cmd = strings.TrimSpace(after)
 	}
 
 	// Convert Make variables to drun interpolation
 	cmd = convertMakeVariables(cmd)
 
-	// Check if command contains shell features
-	needsShell := strings.Contains(cmd, "&&") ||
-		strings.Contains(cmd, "||") ||
-		strings.Contains(cmd, "|") ||
-		strings.Contains(cmd, ">") ||
-		strings.Contains(cmd, "<") ||
-		strings.Contains(cmd, "$")
-
 	// Special handling for common commands
-	if strings.HasPrefix(cmd, "echo ") {
+	if after, ok := strings.CutPrefix(cmd, "echo "); ok {
 		// Convert echo to info/echo
-		message := strings.TrimPrefix(cmd, "echo ")
+		message := after
 		message = strings.Trim(message, "\"'")
-		if silent {
-			fmt.Fprintf(sb, "\techo \"%s\"\n", escapeQuotes(message))
-		} else {
-			fmt.Fprintf(sb, "\techo \"%s\"\n", escapeQuotes(message))
-		}
-	} else if strings.HasPrefix(cmd, "mkdir ") {
+		fmt.Fprintf(sb, "\techo \"%s\"\n", escapeQuotes(message))
+	} else if after, ok := strings.CutPrefix(cmd, "mkdir "); ok {
 		// Convert mkdir to create dir
-		dirPath := strings.TrimPrefix(cmd, "mkdir ")
+		dirPath := after
 		dirPath = strings.TrimSpace(strings.TrimPrefix(dirPath, "-p "))
 		dirPath = strings.Trim(dirPath, "\"'")
 		fmt.Fprintf(sb, "\tcreate dir \"%s\"\n", dirPath)
-	} else if strings.HasPrefix(cmd, "rm ") {
+	} else if after, ok := strings.CutPrefix(cmd, "rm "); ok {
 		// Convert rm to delete
-		filePath := strings.TrimPrefix(cmd, "rm ")
+		filePath := after
 		filePath = strings.TrimSpace(strings.TrimPrefix(filePath, "-rf "))
 		filePath = strings.TrimSpace(strings.TrimPrefix(filePath, "-f "))
 		filePath = strings.Trim(filePath, "\"'")
 		fmt.Fprintf(sb, "\tdelete \"%s\"\n", filePath)
-	} else if needsShell || strings.Contains(cmd, "\n") {
-		// Use shell command for complex operations
-		if ignoreErrors {
-			sb.WriteString("\ttry:\n")
-			fmt.Fprintf(sb, "\t\trun \"%s\"\n", escapeQuotes(cmd))
-			sb.WriteString("\tignore:\n")
-			sb.WriteString("\t\twarn \"Command failed but continuing\"\n")
-		} else {
-			fmt.Fprintf(sb, "\trun \"%s\"\n", escapeQuotes(cmd))
-		}
 	} else {
-		// Default to run command
+		// Default to run command; commands with shell features or embedded
+		// newlines produce the same output, so they share this branch.
 		if ignoreErrors {
 			sb.WriteString("\ttry:\n")
 			fmt.Fprintf(sb, "\t\trun \"%s\"\n", escapeQuotes(cmd))

@@ -3,6 +3,7 @@ package parameter
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -48,8 +49,8 @@ func (v *Validator) validateDataType(param *Parameter, value *types.Value) error
 
 	// The parser emits typed lists as "list of <elem>" (parser_parameter.go).
 	// Require a list value, then validate each element against the element type.
-	if strings.HasPrefix(param.DataType, "list of ") {
-		return v.validateTypedList(param, value, strings.TrimPrefix(param.DataType, "list of "))
+	if after, ok := strings.CutPrefix(param.DataType, "list of "); ok {
+		return v.validateTypedList(param, value, after)
 	}
 
 	switch param.DataType {
@@ -88,7 +89,7 @@ func (v *Validator) validateDataType(param *Parameter, value *types.Value) error
 	default:
 		return &ValidationError{
 			Parameter: param.Name,
-			Message:   fmt.Sprintf("unknown data type: %s", param.DataType),
+			Message:   "unknown data type: " + param.DataType,
 		}
 	}
 
@@ -111,7 +112,7 @@ func (v *Validator) validateTypedList(param *Parameter, value *types.Value, elem
 	if err != nil {
 		return &ValidationError{
 			Parameter: param.Name,
-			Message:   fmt.Sprintf("unknown data type: %s", param.DataType),
+			Message:   "unknown data type: " + param.DataType,
 		}
 	}
 
@@ -161,15 +162,13 @@ func (v *Validator) validateConstraints(param *Parameter, value *types.Value) er
 	}
 
 	valueStr := value.String()
-	for _, constraint := range param.Constraints {
-		if valueStr == constraint {
-			return nil // Value matches constraint
-		}
+	if slices.Contains(param.Constraints, valueStr) {
+		return nil // Value matches constraint
 	}
 
 	return &ValidationError{
 		Parameter: param.Name,
-		Message:   fmt.Sprintf("must be one of: %s", strings.Join(param.Constraints, ", ")),
+		Message:   "must be one of: " + strings.Join(param.Constraints, ", "),
 		Value:     valueStr,
 	}
 }
@@ -250,7 +249,7 @@ func (v *Validator) validatePattern(param *Parameter, value *types.Value) error 
 	if !matched {
 		return &ValidationError{
 			Parameter: param.Name,
-			Message:   fmt.Sprintf("must match pattern: %s", param.Pattern),
+			Message:   "must match pattern: " + param.Pattern,
 			Value:     value.String(),
 		}
 	}

@@ -37,7 +37,7 @@ func loadStatelessConfig() (*StatelessConfig, error) {
 	}
 
 	// If file doesn't exist, return empty config
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
 		return &StatelessConfig{
 			Directories: make(map[string]string),
 		}, nil
@@ -70,8 +70,8 @@ func saveStatelessConfig(config *StatelessConfig) error {
 
 	// Create directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0750); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+	if mkdirErr := os.MkdirAll(configDir, 0o750); mkdirErr != nil {
+		return fmt.Errorf("failed to create config directory: %w", mkdirErr)
 	}
 
 	data, err := yaml.Marshal(config)
@@ -79,7 +79,7 @@ func saveStatelessConfig(config *StatelessConfig) error {
 		return fmt.Errorf("failed to marshal stateless config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write stateless config: %w", err)
 	}
 
@@ -162,7 +162,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 	// Create template if requested
 	if createTemplate {
 		configDir := filepath.Dir(configLocation)
-		if err := os.MkdirAll(configDir, 0750); err != nil {
+		if err := os.MkdirAll(configDir, 0o750); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 
@@ -174,7 +174,7 @@ func AddStatelessDirectory(directory string, createTemplate bool) error {
 
 		// Generate starter configuration
 		template := generateStarterConfig(false)
-		if err := os.WriteFile(configLocation, []byte(template), 0600); err != nil {
+		if err := os.WriteFile(configLocation, []byte(template), 0o600); err != nil {
 			return fmt.Errorf("failed to create template: %w", err)
 		}
 

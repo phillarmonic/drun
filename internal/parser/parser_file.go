@@ -36,7 +36,7 @@ func (p *Parser) parseFileStatement() *ast.FileStatement {
 	case "replace":
 		return p.parseReplaceStatement(stmt)
 	default:
-		p.addError(fmt.Sprintf("unknown file operation: %s", stmt.Action))
+		p.addError("unknown file operation: " + stmt.Action)
 		return nil
 	}
 }

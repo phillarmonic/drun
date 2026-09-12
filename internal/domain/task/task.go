@@ -1,6 +1,7 @@
 package task
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -128,17 +129,17 @@ func (t *Task) Validate() error {
 
 // Parameter represents a task parameter
 type Parameter struct {
-	Name         string
+	MaxValue     *float64
+	MinValue     *float64
 	Type         string // "requires", "given", "accepts"
 	DefaultValue string
-	HasDefault   bool
-	Required     bool
-	DataType     string
-	Constraints  []string
-	MinValue     *float64
-	MaxValue     *float64
-	Pattern      string
 	PatternMacro string
+	Pattern      string
+	DataType     string
+	Name         string
+	Constraints  []string
+	Required     bool
+	HasDefault   bool
 	EmailFormat  bool
 	Variadic     bool
 }
@@ -165,7 +166,7 @@ func NewParameter(stmt *ast.ParameterStatement) Parameter {
 // Validate validates the parameter
 func (p *Parameter) Validate() error {
 	if p.Name == "" {
-		return fmt.Errorf("parameter name cannot be empty")
+		return errors.New("parameter name cannot be empty")
 	}
 	return nil
 }
@@ -179,9 +180,9 @@ type Dependency struct {
 
 // TaskError represents a task-related error
 type TaskError struct {
+	Cause   error
 	Task    string
 	Message string
-	Cause   error
 }
 
 func (e *TaskError) Error() string {

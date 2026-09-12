@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func startTestListener(t *testing.T) string {
 		}
 	}()
 
-	return fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+	return strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 }
 
 // unusedTestPort returns a port that was free at call time (listener closed
@@ -44,7 +45,7 @@ func unusedTestPort(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to allocate test port: %v", err)
 	}
-	port := fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 	_ = listener.Close()
 	return port
 }

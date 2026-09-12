@@ -9,11 +9,11 @@ import (
 
 // ConditionalStatement represents when/if statements
 type ConditionalStatement struct {
-	Token     lexer.Token
 	Type      string
 	Condition string
 	Body      []Statement
 	ElseBody  []Statement
+	Token     lexer.Token
 }
 
 func (cs *ConditionalStatement) statementNode() {}
@@ -44,19 +44,19 @@ func (cs *ConditionalStatement) String() string {
 
 // LoopStatement represents for each loops
 type LoopStatement struct {
-	Token      lexer.Token
-	Type       string
+	Filter     *FilterExpression
+	RangeStep  string
 	Variable   string
 	Iterable   string
 	RangeStart string
 	RangeEnd   string
-	RangeStep  string
 	Subject    string // match loops: the $variable the pattern is matched against
-	Filter     *FilterExpression
-	Parallel   bool
-	MaxWorkers int
-	FailFast   bool
+	Type       string
 	Body       []Statement
+	Token      lexer.Token
+	MaxWorkers int
+	Parallel   bool
+	FailFast   bool
 }
 
 func (ls *LoopStatement) statementNode() {}
@@ -122,10 +122,10 @@ func (ls *LoopStatement) String() string {
 
 // TryStatement represents try/catch/finally error handling blocks
 type TryStatement struct {
-	Token        lexer.Token
 	TryBody      []Statement
 	CatchClauses []CatchClause
 	FinallyBody  []Statement
+	Token        lexer.Token
 }
 
 func (ts *TryStatement) statementNode() {}
@@ -156,10 +156,10 @@ func (ts *TryStatement) String() string {
 
 // CatchClause represents a catch clause within a try statement
 type CatchClause struct {
-	Token     lexer.Token
 	ErrorType string
 	ErrorVar  string
 	Body      []Statement
+	Token     lexer.Token
 }
 
 func (cc *CatchClause) String() string {
@@ -188,9 +188,9 @@ func (cc *CatchClause) String() string {
 
 // ThrowStatement represents throw and rethrow statements
 type ThrowStatement struct {
-	Token   lexer.Token
 	Action  string
 	Message string
+	Token   lexer.Token
 }
 
 func (ts *ThrowStatement) statementNode() {}
@@ -209,8 +209,8 @@ func (ts *ThrowStatement) String() string {
 
 // BreakStatement represents break statements in loops
 type BreakStatement struct {
-	Token     lexer.Token
 	Condition string
+	Token     lexer.Token
 }
 
 func (bs *BreakStatement) statementNode() {}
@@ -223,8 +223,8 @@ func (bs *BreakStatement) String() string {
 
 // ContinueStatement represents continue statements in loops
 type ContinueStatement struct {
-	Token     lexer.Token
 	Condition string
+	Token     lexer.Token
 }
 
 func (cs *ContinueStatement) statementNode() {}

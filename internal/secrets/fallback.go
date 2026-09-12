@@ -26,9 +26,9 @@ const (
 
 // FallbackBackend provides encrypted file-based secret storage
 type FallbackBackend struct {
+	secrets  map[string]string
 	filepath string
 	key      []byte
-	secrets  map[string]string
 	mu       sync.RWMutex
 }
 
@@ -46,7 +46,7 @@ func NewFallbackBackend() Backend {
 	}
 
 	secretsDir := filepath.Join(homeDir, ".drun")
-	_ = os.MkdirAll(secretsDir, 0700)
+	_ = os.MkdirAll(secretsDir, 0o700)
 
 	storagePath := filepath.Join(secretsDir, "secrets.enc")
 
@@ -57,7 +57,7 @@ func NewFallbackBackend() Backend {
 func NewFallbackBackendWithPath(storagePath string) Backend {
 	// Ensure directory exists
 	dir := filepath.Dir(storagePath)
-	_ = os.MkdirAll(dir, 0700)
+	_ = os.MkdirAll(dir, 0o700)
 
 	// Generate or load encryption key
 	key := deriveKey()
@@ -137,7 +137,7 @@ func (f *FallbackBackend) save() error {
 		return err
 	}
 
-	return os.WriteFile(f.filepath, encrypted, 0600)
+	return os.WriteFile(f.filepath, encrypted, 0o600)
 }
 
 // load decrypts and loads secrets from disk

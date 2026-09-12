@@ -36,11 +36,11 @@ func TestPlanner_Plan(t *testing.T) {
 	}
 
 	// Register tasks
-	if err := registry.Register(task1); err != nil {
-		t.Fatalf("Failed to register task1: %v", err)
+	if registerErr := registry.Register(task1); registerErr != nil {
+		t.Fatalf("Failed to register task1: %v", registerErr)
 	}
-	if err := registry.Register(task2); err != nil {
-		t.Fatalf("Failed to register task2: %v", err)
+	if registerErr := registry.Register(task2); registerErr != nil {
+		t.Fatalf("Failed to register task2: %v", registerErr)
 	}
 
 	// Create planner

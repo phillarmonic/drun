@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
@@ -98,7 +99,7 @@ func (p *Parser) parseGitQueryStatement() *ast.GitQueryStatement {
 
 func validateGitQuery(stmt *ast.GitQueryStatement) error {
 	if stmt.Source == "" {
-		return fmt.Errorf("git query requires a source alias")
+		return errors.New("git query requires a source alias")
 	}
 	if stmt.AccessMethod != "" {
 		switch stmt.AccessMethod {
@@ -118,7 +119,7 @@ func validateGitQuery(stmt *ast.GitQueryStatement) error {
 		tagForms++
 	}
 	if tagForms > 1 {
-		return fmt.Errorf("matching tags preset, format, and pattern forms are mutually exclusive")
+		return errors.New("matching tags preset, format, and pattern forms are mutually exclusive")
 	}
 	if tagForms > 0 {
 		formats := []string(nil)
@@ -130,7 +131,7 @@ func validateGitQuery(stmt *ast.GitQueryStatement) error {
 		}
 	}
 	if stmt.Series != "" && stmt.VersionMatcher != "" {
-		return fmt.Errorf("in series and matching version are mutually exclusive")
+		return errors.New("in series and matching version are mutually exclusive")
 	}
 	if stmt.Series != "" {
 		if _, err := scm.SeriesConstraint(stmt.Series); err != nil {

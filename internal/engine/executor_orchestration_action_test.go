@@ -106,8 +106,8 @@ func TestBuildServiceWithOutput_NoCacheFlag(t *testing.T) {
 		t.Fatalf("did not expect --no-cache when cache enabled, got args: %s", argsStr)
 	}
 
-	if err := engine.buildServiceWithOutput(service, false); err != nil {
-		t.Fatalf("buildServiceWithOutput without cache failed: %v", err)
+	if buildErr := engine.buildServiceWithOutput(service, false); buildErr != nil {
+		t.Fatalf("buildServiceWithOutput without cache failed: %v", buildErr)
 	}
 
 	data, err = os.ReadFile(argsFile)

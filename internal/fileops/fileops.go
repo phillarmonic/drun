@@ -10,12 +10,12 @@ import (
 
 // FileOperation represents a file system operation
 type FileOperation struct {
+	Replacements map[string]string // replacements for replace operations
 	Type         string            // "create", "copy", "move", "delete", "read", "write", "append"
 	Target       string            // target file/directory path
 	Source       string            // source path (for copy/move operations)
 	Content      string            // content (for write/append operations)
 	IsDir        bool              // whether the operation is on a directory
-	Replacements map[string]string // replacements for replace operations
 }
 
 // Execute performs the file operation
@@ -104,7 +104,7 @@ func (op *FileOperation) executeCreate() (*Result, error) {
 
 	if op.IsDir {
 		// Create directory
-		err := os.MkdirAll(op.Target, 0750)
+		err := os.MkdirAll(op.Target, 0o750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create directory '%s': %v", op.Target, err)
 			return result, err
@@ -115,7 +115,7 @@ func (op *FileOperation) executeCreate() (*Result, error) {
 		// Create file (and parent directories if needed)
 		dir := filepath.Dir(op.Target)
 		if dir != "." {
-			err := os.MkdirAll(dir, 0750)
+			err := os.MkdirAll(dir, 0o750)
 			if err != nil {
 				result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 				return result, err
@@ -201,10 +201,10 @@ func (op *FileOperation) executeMove() (*Result, error) {
 	// Create parent directory for target if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0750)
-		if err != nil {
-			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
-			return result, err
+		mkdirErr := os.MkdirAll(dir, 0o750)
+		if mkdirErr != nil {
+			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, mkdirErr)
+			return result, mkdirErr
 		}
 	}
 
@@ -288,14 +288,14 @@ func (op *FileOperation) executeWrite() (*Result, error) {
 	// Create parent directory if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0750)
+		err := os.MkdirAll(dir, 0o750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 			return result, err
 		}
 	}
 
-	err := os.WriteFile(op.Target, []byte(op.Content), 0600)
+	err := os.WriteFile(op.Target, []byte(op.Content), 0o600)
 	if err != nil {
 		result.Message = fmt.Sprintf("Failed to write to file '%s': %v", op.Target, err)
 		return result, err
@@ -316,14 +316,14 @@ func (op *FileOperation) executeAppend() (*Result, error) {
 	// Create parent directory if needed
 	dir := filepath.Dir(op.Target)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0750)
+		err := os.MkdirAll(dir, 0o750)
 		if err != nil {
 			result.Message = fmt.Sprintf("Failed to create parent directory for '%s': %v", op.Target, err)
 			return result, err
 		}
 	}
 
-	file, err := os.OpenFile(op.Target, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(op.Target, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		result.Message = fmt.Sprintf("Failed to open file '%s' for appending: %v", op.Target, err)
 		return result, err
@@ -375,7 +375,7 @@ func (op *FileOperation) executeReplace() (*Result, error) {
 		return result, nil
 	}
 
-	perm := os.FileMode(0644)
+	perm := os.FileMode(0o644)
 	if info, statErr := os.Stat(op.Target); statErr == nil {
 		perm = info.Mode().Perm()
 	}
@@ -399,7 +399,7 @@ func copyFile(src, dst string) error {
 	// Create parent directory for destination if needed
 	dir := filepath.Dir(dst)
 	if dir != "." {
-		err := os.MkdirAll(dir, 0750)
+		err := os.MkdirAll(dir, 0o750)
 		if err != nil {
 			return err
 		}

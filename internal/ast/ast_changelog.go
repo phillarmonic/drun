@@ -11,10 +11,10 @@ import (
 //	promote changelog "CHANGELOG.md" to version "1.5.0"
 //	promote changelog "CHANGELOG.md" to version "1.5.0" on "2026-09-01"
 type ChangelogStatement struct {
-	Token   lexer.Token
 	Path    string // Raw changelog file path (interpolated at execution)
 	Version string // Raw release version (interpolated at execution)
 	Date    string // Optional release date override (YYYY-MM-DD), empty means today
+	Token   lexer.Token
 }
 
 func (cs *ChangelogStatement) statementNode() {}

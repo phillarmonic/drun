@@ -1,0 +1,70 @@
+version: 2.0
+
+# Example 77: Confirmations & Prompts
+# Demonstrates the interactive input statements:
+#   confirm "<question>"                    bare gate - answering no stops the task gracefully (exit 0)
+#   confirm "<question>" as $var            stores "true"/"false" using drun's string booleans
+#   confirm "<question>" defaults to "no"   default answer used on an empty line or off a TTY
+#   prompt  "<question>" as $var            free-form answer stored in the variable
+#   prompt  "<question>" defaults to "x" as $var
+# Questions and default values support {$var} interpolation.
+# On a real terminal drun asks interactively; everywhere else (no TTY, CI,
+# --dry-run) it never blocks: it resolves the declared default, then the
+# global --yes/--no assumption, and otherwise fails with a clear error.
+
+task "default" means "Describe the confirm and prompt statements":
+	info "Use 'confirm' to gate a task on a yes/no answer and 'prompt' to collect free-form input."
+	info "Both support a 'defaults to' answer and variable interpolation in the question."
+	info "Without a terminal drun never hangs: declared default, then --yes/--no, else a clear error."
+	info "Runnable demos: gate, migrate, cleanup, environment, release, demo."
+
+task "gate" means "Gate a task on a yes/no answer":
+	info "About to deploy to production..."
+	confirm "Deploy to production?"
+	success "Deployment approved and started"
+
+task "migrate" means "Store the answer and branch on it with if":
+	confirm "Run database migrations?" as $migrate
+	if $migrate is "true":
+		info "Running database migrations"
+	else:
+		info "Skipping database migrations"
+
+task "cleanup" means "Bare gate whose default answer is no":
+	confirm "Delete the build cache?" defaults to "no"
+	success "Build cache deleted"
+
+task "environment" means "Collect a free-form answer in a variable":
+	prompt "Which environment?" as $environment
+	info "Deploying to {$environment}"
+
+task "release" means "Prompt with a default answer":
+	prompt "Release notes?" defaults to "n/a" as $notes
+	info "Notes for this release: {$notes}"
+
+task "demo" means "Walk through every confirm/prompt form end to end":
+	# 1. Bare gate: answering no stops the task gracefully with exit code 0
+	confirm "Deploy to production?"
+	success "Deployment confirmed"
+
+	# 2. confirm storing the answer, composed with an if condition
+	confirm "Run database migrations?" as $migrate
+	if $migrate is "true":
+		info "Running database migrations"
+	else:
+		info "Skipping database migrations"
+
+	# 3. confirm with an explicit default, used when the answer is empty
+	confirm "Delete the build cache?" defaults to "no" as $clean
+	if $clean is "true":
+		info "Deleting the build cache"
+	else:
+		info "Keeping the build cache"
+
+	# 4. free-form prompt; the typed answer lands in $environment
+	prompt "Which environment?" as $environment
+	info "Deploying to {$environment}"
+
+	# Prompt with a default; the question interpolates the earlier answer
+	prompt "Release notes for {$environment}?" defaults to "n/a" as $notes
+	info "Notes for this release: {$notes}"

@@ -10,27 +10,27 @@ import (
 
 // SCMRegistryStatement is the project-level SCM → technology → provider registry.
 type SCMRegistryStatement struct {
-	Token        lexer.Token
 	Technologies map[string]*SCMTechnology
+	Token        lexer.Token
 }
 
 type SCMTechnology struct {
-	Name      string
 	Providers map[string]*SCMProvider
+	Name      string
 }
 
 type SCMProvider struct {
-	Name    string
 	Sources map[string]*SCMSource
+	Name    string
 }
 
 type SCMSource struct {
+	Access      map[string]*SCMAccessProfile
+	VersionTags *VersionTagContract
 	Alias       string
 	Provider    string
 	Default     string
 	Metadata    string
-	Access      map[string]*SCMAccessProfile
-	VersionTags *VersionTagContract
 }
 
 type SCMAccessProfile struct {
@@ -45,8 +45,8 @@ type SCMAccessProfile struct {
 
 type VersionTagContract struct {
 	Preset  string
-	Formats []string
 	Pattern string
+	Formats []string
 }
 
 func (s *SCMRegistryStatement) statementNode()      {}
@@ -80,7 +80,6 @@ func sortedKeys[V any](values map[string]V) []string {
 
 // GitQueryStatement captures a value derived from a registered Git source.
 type GitQueryStatement struct {
-	Token          lexer.Token
 	Result         string // tag or version
 	Source         string
 	AccessMethod   string
@@ -90,8 +89,9 @@ type GitQueryStatement struct {
 	Series         string
 	VersionMatcher string
 	OrderBy        string // version or date
-	AllowFetch     bool
 	CaptureVar     string
+	Token          lexer.Token
+	AllowFetch     bool
 }
 
 func (s *GitQueryStatement) statementNode() {}
@@ -100,11 +100,12 @@ func (s *GitQueryStatement) String() string {
 	if s.AccessMethod != "" {
 		out += " using " + s.AccessMethod
 	}
-	if s.TagPattern != "" {
+	switch {
+	case s.TagPattern != "":
 		out += fmt.Sprintf(" matching tags pattern %q", s.TagPattern)
-	} else if s.TagFormat != "" {
+	case s.TagFormat != "":
 		out += fmt.Sprintf(" matching tags %q", s.TagFormat)
-	} else if s.TagPreset != "" {
+	case s.TagPreset != "":
 		out += " matching tags " + s.TagPreset
 	}
 	if s.Series != "" {
@@ -124,15 +125,15 @@ func (s *GitQueryStatement) String() string {
 // GitEnsureVersionStatement atomically guards a candidate against the latest
 // stable version published by a registered Git source.
 type GitEnsureVersionStatement struct {
-	Token               lexer.Token
 	Candidate           string
-	CandidateIsVariable bool
 	Source              string
 	AccessMethod        string
 	TagPreset           string
 	TagFormat           string
 	TagPattern          string
 	CaptureVar          string
+	Token               lexer.Token
+	CandidateIsVariable bool
 }
 
 func (s *GitEnsureVersionStatement) statementNode() {}
@@ -145,11 +146,12 @@ func (s *GitEnsureVersionStatement) String() string {
 	if s.AccessMethod != "" {
 		out += " using " + s.AccessMethod
 	}
-	if s.TagPattern != "" {
+	switch {
+	case s.TagPattern != "":
 		out += fmt.Sprintf(" matching tags pattern %q", s.TagPattern)
-	} else if s.TagFormat != "" {
+	case s.TagFormat != "":
 		out += fmt.Sprintf(" matching tags %q", s.TagFormat)
-	} else if s.TagPreset != "" {
+	case s.TagPreset != "":
 		out += " matching tags " + s.TagPreset
 	}
 	if s.CaptureVar != "" {

@@ -175,9 +175,9 @@ task "demo" means "Trigger embedded fallback":
 }
 
 type xdrunRunResult struct {
+	err    error
 	stdout string
 	stderr string
-	err    error
 }
 
 func runXdrun(t *testing.T, workspace, homeDir, binDir string, args ...string) xdrunRunResult {

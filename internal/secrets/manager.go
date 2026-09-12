@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -55,17 +56,15 @@ type ManagerOption func(*ManagerConfig)
 
 // ManagerConfig holds configuration for the secrets manager
 type ManagerConfig struct {
-	forceFallback bool
 	storagePath   string
+	forceFallback bool
 }
 
 // Option is a functional option for configuring the manager
 type Option func(*DefaultManager)
 
-var (
-	// Valid key pattern: must start with letter, contain only alphanumeric, underscore, or dash
-	validKeyPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
-)
+// Valid key pattern: must start with letter, contain only alphanumeric, underscore, or dash
+var validKeyPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
 
 // NewManager creates a new secrets manager with appropriate backend
 func NewManager(opts ...ManagerOption) (Manager, error) {
@@ -136,6 +135,7 @@ func detectBackendWithType() (Backend, string, error) {
 		backend, err = NewKeychainBackend()
 		if err != nil {
 			// Keychain not available, fall back to encrypted storage
+			//nolint:nilerr // deliberate graceful fallback: keychain unavailable degrades to encrypted file storage; backendType carries the reason
 			return NewFallbackBackend(), "fallback (keychain unavailable)", nil
 		}
 		// Test if keychain is actually accessible
@@ -143,6 +143,7 @@ func detectBackendWithType() (Backend, string, error) {
 		testErr := backend.Set(testKey, "test")
 		if testErr != nil {
 			// Keychain access failed (permissions issue), fall back
+			//nolint:nilerr // deliberate graceful fallback: keychain access denied degrades to encrypted file storage; backendType carries the reason
 			return NewFallbackBackend(), "fallback (keychain permission denied)", nil
 		}
 		// Clean up test
@@ -153,6 +154,7 @@ func detectBackendWithType() (Backend, string, error) {
 		backend, err = NewCredentialBackend()
 		if err != nil {
 			// Credential Manager not available, fall back
+			//nolint:nilerr // deliberate graceful fallback: credential manager unavailable degrades to encrypted file storage; backendType carries the reason
 			return NewFallbackBackend(), "fallback (credential manager unavailable)", nil
 		}
 		return backend, "credential-manager", nil
@@ -161,6 +163,7 @@ func detectBackendWithType() (Backend, string, error) {
 		backend, err = NewSecretServiceBackend()
 		if err != nil {
 			// Secret Service not available, fall back
+			//nolint:nilerr // deliberate graceful fallback: secret service unavailable degrades to encrypted file storage; backendType carries the reason
 			return NewFallbackBackend(), "fallback (secret service unavailable)", nil
 		}
 		return backend, "secret-service", nil
@@ -205,7 +208,7 @@ func (m *DefaultManager) Get(namespace, key string) (string, error) {
 	compositeKey := m.formatKey(namespace, key)
 	value, err := m.backend.Get(compositeKey)
 	if err != nil {
-		if err == ErrSecretNotFound {
+		if errors.Is(err, ErrSecretNotFound) {
 			return "", NewSecretError("get", namespace, key, ErrSecretNotFound)
 		}
 		return "", NewSecretError("get", namespace, key, err)
@@ -263,9 +266,9 @@ func (m *DefaultManager) List(namespace string) ([]string, error) {
 	prefix := namespace + m.separator
 	var keys []string
 	for _, fullKey := range allKeys {
-		if strings.HasPrefix(fullKey, prefix) {
+		if after, ok := strings.CutPrefix(fullKey, prefix); ok {
 			// Extract just the key part (after namespace:)
-			key := strings.TrimPrefix(fullKey, prefix)
+			key := after
 			keys = append(keys, key)
 		}
 	}

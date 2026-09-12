@@ -105,9 +105,9 @@ func (p *Project) HasHooks() bool {
 
 // ShellConfig represents shell configuration for a platform
 type ShellConfig struct {
+	Environment map[string]string
 	Executable  string
 	Args        []string
-	Environment map[string]string
 }
 
 // Hook represents a lifecycle hook

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -33,9 +34,9 @@ func (oc *OrchestrationCoordinator) StartOrchestration(ctx context.Context, exec
 
 	// Run pre-task if specified
 	if orchestr.PreTask != "" {
-		if err := oc.executor.executeTask(ctx, execCtx, orchestr.PreTask); err != nil {
+		if executeErr := oc.executor.executeTask(ctx, execCtx, orchestr.PreTask); executeErr != nil {
 			orchestr.MarkFailed()
-			return fmt.Errorf("orchestration pre-task failed: %w", err)
+			return fmt.Errorf("orchestration pre-task failed: %w", executeErr)
 		}
 	}
 
@@ -151,6 +152,7 @@ func (oc *OrchestrationCoordinator) startServicesParallel(ctx context.Context, e
 		wg.Add(1)
 		go func(name string) {
 			defer wg.Done()
+			labelGoroutine(ctx, "drun.component", "orchestration-service-start", "drun.orchestration", orchestr.Name, "drun.service", name)
 			if err := oc.executor.StartService(ctx, execCtx, name); err != nil {
 				errChan <- fmt.Errorf("failed to start service %s: %w", name, err)
 			}
@@ -254,7 +256,7 @@ func (oc *OrchestrationCoordinator) topologicalSort(services []string, serviceMa
 
 	// Check for cycles
 	if len(result) != len(services) {
-		return nil, fmt.Errorf("circular dependency detected")
+		return nil, errors.New("circular dependency detected")
 	}
 
 	return result, nil
@@ -289,6 +291,8 @@ func (oc *OrchestrationCoordinator) waitForServiceHealthy(ctx context.Context, s
 
 // monitorOrchestrationHealth monitors the health of all services in an orchestration
 func (oc *OrchestrationCoordinator) monitorOrchestrationHealth(ctx context.Context, execCtx *ExecutionContext, orchestr *orchestration.Orchestration) {
+	labelGoroutine(ctx, "drun.component", "orchestration-health", "drun.orchestration", orchestr.Name)
+
 	ticker := time.NewTicker(orchestr.HealthCheckInterval)
 	defer ticker.Stop()
 
@@ -359,6 +363,8 @@ func (oc *OrchestrationCoordinator) checkAllServicesHealth(ctx context.Context, 
 
 // attemptRecovery attempts to recover from failure
 func (oc *OrchestrationCoordinator) attemptRecovery(ctx context.Context, execCtx *ExecutionContext, orchestr *orchestration.Orchestration) {
+	labelGoroutine(ctx, "drun.component", "orchestration-recovery", "drun.orchestration", orchestr.Name)
+
 	// Wait for recovery timeout
 	time.Sleep(orchestr.RecoveryTimeout)
 
@@ -409,11 +415,11 @@ func (oc *OrchestrationCoordinator) GetOrchestrationStatus(orchestrationName str
 
 // OrchestrationStatus represents the status of an orchestration
 type OrchestrationStatus struct {
+	Services     map[string]string
 	Name         string
 	Status       string
 	FailureCount int
 	CircuitOpen  bool
-	Services     map[string]string
 }
 
 // BuildDependencyGraph builds a dependency graph for all services

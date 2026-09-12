@@ -136,7 +136,7 @@ func TestJSONPointerPreservesLayoutAndTypes(t *testing.T) {
 	if string(updated) != want {
 		t.Fatalf("layout changed:\n%s", updated)
 	}
-	if _, _, err := Update("json", "/enabled", data, "not-bool", "fail", ""); err == nil {
+	if _, _, updateErr := Update("json", "/enabled", data, "not-bool", "fail", ""); updateErr == nil {
 		t.Fatal("expected bool type error")
 	}
 	added, _, err := Update("json", "/build", data, "7", "add", "number")
@@ -146,6 +146,44 @@ func TestJSONPointerPreservesLayoutAndTypes(t *testing.T) {
 	value, err := Read("json", "/build", added)
 	if err != nil || value.Kind != Number || value.Text != "7" {
 		t.Fatalf("added = %#v, %v", value, err)
+	}
+}
+
+func TestJSONPointerUsesExactScalarSpans(t *testing.T) {
+	data := []byte(`{"note":"a\"b\\c\u00e9","count":1.50e+3,"ratio":-0.0,"big":112233445566778899112233,"ok":false}`)
+
+	// Reads expose the decoded string and the untouched raw number text.
+	note, err := Read("json", "/note", data)
+	if err != nil || note.Text != "a\"b\\cé" || note.Kind != String {
+		t.Fatalf("note = %#v, %v", note, err)
+	}
+	count, err := Read("json", "/count", data)
+	if err != nil || count.Text != "1.50e+3" || count.Kind != Number {
+		t.Fatalf("count = %#v, %v", count, err)
+	}
+	big, err := Read("json", "/big", data)
+	if err != nil || big.Text != "112233445566778899112233" {
+		t.Fatalf("big = %#v, %v", big, err)
+	}
+
+	// Updates splice the replacement over the exact span of the old scalar and
+	// leave every other byte, including escapes and number notation, alone.
+	updated, _, err := Update("json", "/note", data, "plain", "fail", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"note":"plain","count":1.50e+3,"ratio":-0.0,"big":112233445566778899112233,"ok":false}`
+	if string(updated) != want {
+		t.Fatalf("escape update =\n%s\nwant\n%s", updated, want)
+	}
+
+	updated, _, err = Update("json", "/ratio", data, "-0.5", "fail", "number")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = `{"note":"a\"b\\c\u00e9","count":1.50e+3,"ratio":-0.5,"big":112233445566778899112233,"ok":false}`
+	if string(updated) != want {
+		t.Fatalf("number update =\n%s\nwant\n%s", updated, want)
 	}
 }
 
@@ -393,8 +431,8 @@ func TestYAMLRetainsScalarTypesAndAddsTypedLeaves(t *testing.T) {
 	if err != nil || scalar != (Scalar{Text: "beta", Kind: String}) {
 		t.Fatalf("add = %#v, %v", scalar, err)
 	}
-	if actual, err := Read("yaml", "release.channel", updated); err != nil || actual != scalar {
-		t.Fatalf("read added = %#v, %v", actual, err)
+	if actual, readErr := Read("yaml", "release.channel", updated); readErr != nil || actual != scalar {
+		t.Fatalf("read added = %#v, %v", actual, readErr)
 	}
 	idempotent, _, err := Update("yaml", "release.channel", updated, "beta", "fail", "")
 	if err != nil || !bytes.Equal(idempotent, updated) {

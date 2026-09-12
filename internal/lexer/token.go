@@ -359,6 +359,10 @@ const (
 	FAIL    // fail
 	ECHO    // echo
 
+	// Interactive input keywords
+	CONFIRM // confirm
+	PROMPT  // prompt
+
 	// Parameter keywords
 	REQUIRES // requires
 	GIVEN    // given
@@ -472,8 +476,8 @@ const (
 
 // Token represents a single token
 type Token struct {
-	Type     TokenType
 	Literal  string
+	Type     TokenType
 	Line     int
 	Column   int
 	Position int
@@ -1112,6 +1116,10 @@ func (t TokenType) String() string {
 		return "FAIL"
 	case ECHO:
 		return "ECHO"
+	case CONFIRM:
+		return "CONFIRM"
+	case PROMPT:
+		return "PROMPT"
 	case REQUIRES:
 		return "REQUIRES"
 	case GIVEN:
@@ -1605,6 +1613,8 @@ var keywords = map[string]TokenType{
 	"success":       SUCCESS,
 	"fail":          FAIL,
 	"echo":          ECHO,
+	"confirm":       CONFIRM,
+	"prompt":        PROMPT,
 	"requires":      REQUIRES,
 	"given":         GIVEN,
 	"accepts":       ACCEPTS,

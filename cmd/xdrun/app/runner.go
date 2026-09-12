@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	stderrors "errors"
+
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/engine"
+
 	"github.com/phillarmonic/drun/v2/internal/errors"
 	"github.com/phillarmonic/drun/v2/internal/platform"
 	"github.com/phillarmonic/drun/v2/internal/secrets"
@@ -27,8 +30,15 @@ func ExecuteTask(
 	allowToolVersionChanges bool,
 	ignoreToolRequirements bool,
 	noDrunCache bool,
+	assumeYes bool,
+	assumeNo bool,
 	args []string,
 ) error {
+	// --yes and --no contradict each other; refuse before doing any work.
+	if assumeYes && assumeNo {
+		return stderrors.New("--yes and --no cannot be used together: pass only one of them")
+	}
+
 	taskModeOverride, err := normalizeRuntimeTaskMode(taskModeOverride)
 	if err != nil {
 		return err
@@ -60,7 +70,7 @@ func ExecuteTask(
 	program, err := engine.ParseStringWithFilename(string(content), actualConfigFile)
 	if err != nil {
 		// Check if it's an enhanced error list
-		if errorList, ok := err.(*errors.ParseErrorList); ok {
+		if errorList, ok := stderrors.AsType[*errors.ParseErrorList](err); ok {
 			fmt.Fprint(os.Stderr, errorList.FormatErrors())
 			os.Exit(1)
 		}
@@ -86,15 +96,16 @@ func ExecuteTask(
 	// Check whether the folder is trusted for security-sensitive operations.
 	// When the program uses "open url" and the folder is not already trusted,
 	// prompt the user before proceeding.
-	folderTrusted := false
-	if listTasks || dryRun {
+	var folderTrusted bool
+	switch {
+	case listTasks || dryRun:
 		// Listing tasks and dry runs don't execute anything, so trust is not required.
 		folderTrusted = true
-	} else if ProgramUsesOpenURL(program) {
+	case ProgramUsesOpenURL(program):
 		configDir, _ := filepath.Abs(filepath.Dir(actualConfigFile))
-		trusted, err := IsDirTrusted(configDir)
-		if err != nil {
-			return fmt.Errorf("failed to check folder trust: %w", err)
+		trusted, isErr := IsDirTrusted(configDir)
+		if isErr != nil {
+			return fmt.Errorf("failed to check folder trust: %w", isErr)
 		}
 		if trusted {
 			folderTrusted = true
@@ -103,22 +114,25 @@ func ExecuteTask(
 				"This spec uses 'open url', which can launch programs on your machine.\n"+
 					"The folder %s is not yet trusted.\n", configDir)
 			if askForConfirmation("Trust this folder and continue?") {
-				if err := TrustDir(configDir); err != nil {
-					return fmt.Errorf("failed to trust folder: %w", err)
+				if trustErr := TrustDir(configDir); trustErr != nil {
+					return fmt.Errorf("failed to trust folder: %w", trustErr)
 				}
 				folderTrusted = true
 			} else {
-				return fmt.Errorf("execution aborted: folder not trusted for 'open url'")
+				return stderrors.New("execution aborted: folder not trusted for 'open url'")
 			}
 		}
-	} else {
+	default:
 		// No open url in the program; trust is irrelevant.
 		folderTrusted = true
 	}
 
-	// Create engine with secrets support
-	eng := engine.NewEngineWithOptions(
+	// Create engine with secrets support. Interactive confirm/prompt
+	// statements read from os.Stdin unless --yes/--no already assumed an
+	// answer for every prompt.
+	engineOpts := []engine.Option{
 		engine.WithOutput(os.Stdout),
+		engine.WithInput(os.Stdin),
 		engine.WithDryRun(dryRun),
 		engine.WithVerbose(verbose),
 		engine.WithTaskModeOverride(taskModeOverride),
@@ -127,7 +141,13 @@ func ExecuteTask(
 		engine.WithUserProvisioningSources(userConfig.ProvisioningSources),
 		engine.WithSecretsManager(secretsMgr),
 		engine.WithFolderTrusted(folderTrusted),
-	)
+	}
+	if assumeYes {
+		engineOpts = append(engineOpts, engine.WithAssumeYes(true))
+	} else if assumeNo {
+		engineOpts = append(engineOpts, engine.WithAssumeYes(false))
+	}
+	eng := engine.NewEngineWithOptions(engineOpts...)
 	eng.SetAllowUndefinedVars(allowUndefinedVars)
 
 	if verbose {
@@ -139,8 +159,8 @@ func ExecuteTask(
 	}
 
 	// Initialize cache for remote includes
-	if err := eng.SetCacheEnabled(!noDrunCache); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Warning: Failed to initialize remote include cache: %v\n", err)
+	if setErr := eng.SetCacheEnabled(!noDrunCache); setErr != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Warning: Failed to initialize remote include cache: %v\n", setErr)
 	}
 
 	// Ensure cleanup of temporary files
@@ -166,9 +186,9 @@ func ExecuteTask(
 	} else {
 		// Resolve partial task name to full task name
 		partialName := args[0]
-		resolvedName, err := ResolvePartialTaskName(partialName, program)
-		if err != nil {
-			return fmt.Errorf("%w\n\nRun 'xdrun --list' to see all available tasks", err)
+		resolvedName, resolveErr := ResolvePartialTaskName(partialName, program)
+		if resolveErr != nil {
+			return fmt.Errorf("%w\n\nRun 'xdrun --list' to see all available tasks", resolveErr)
 		}
 		target = resolvedName
 
@@ -184,15 +204,27 @@ func ExecuteTask(
 	err = eng.ExecuteWithParamsAndFile(program, target, params, actualConfigFile)
 	if err != nil {
 		// Check if it's a parameter validation error
-		if paramErr, ok := err.(*errors.ParameterValidationError); ok {
+		if paramErr, ok := stderrors.AsType[*errors.ParameterValidationError](err); ok {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", paramErr.Message)
-			os.Exit(1)
+			return &exitCodeError{code: 1}
 		}
 		fmt.Fprintf(os.Stderr, "Error: execution failed: %v\n", err)
-		os.Exit(1)
+		return &exitCodeError{code: 1}
 	}
 
 	return nil
+}
+
+// exitCodeError reports a failure that has already been written to stderr. It is
+// returned instead of calling os.Exit here so that ExecuteTask's deferred
+// eng.Cleanup() runs, and the command handler terminates with the exit code once
+// that cleanup is done.
+type exitCodeError struct {
+	code int
+}
+
+func (e *exitCodeError) Error() string {
+	return fmt.Sprintf("exit status %d", e.code)
 }
 
 // ListAllTasks lists all available tasks

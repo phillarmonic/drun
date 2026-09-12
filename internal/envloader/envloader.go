@@ -11,27 +11,27 @@ import (
 
 // EnvFileInfo holds information about a loaded .env file
 type EnvFileInfo struct {
+	Error  error             // Any error encountered while loading
+	Vars   map[string]string // Variables loaded from this file
 	Path   string            // Path to the .env file
 	Exists bool              // Whether the file exists
 	Loaded bool              // Whether the file was successfully loaded
-	Vars   map[string]string // Variables loaded from this file
-	Error  error             // Any error encountered while loading
 }
 
 // LoadResult contains the results of loading .env files
 type LoadResult struct {
-	Files           []EnvFileInfo     // Information about all .env files processed
 	FinalEnv        map[string]string // Final merged environment variables
 	Environment     string            // The environment name used
+	Files           []EnvFileInfo     // Information about all .env files processed
 	HostEnvIncluded bool              // Whether host environment variables were included
 }
 
 // Loader handles loading .env files hierarchically
 type Loader struct {
+	output      io.Writer
 	workingDir  string
 	environment string
 	debugMode   bool
-	output      io.Writer
 }
 
 // NewLoader creates a new .env file loader
@@ -89,7 +89,7 @@ func (l *Loader) Load() (*LoadResult, error) {
 	// Add environment-specific files if environment is specified
 	if l.environment != "" {
 		envFiles = append(envFiles,
-			fmt.Sprintf(".env.%s", l.environment),
+			".env."+l.environment,
 			fmt.Sprintf(".env.%s.local", l.environment),
 		)
 	}
@@ -248,11 +248,12 @@ func PrintDebugInfo(result *LoadResult, output io.Writer) {
 	_, _ = fmt.Fprintf(output, "Files Processed:\n")
 	for i, file := range result.Files {
 		_, _ = fmt.Fprintf(output, "  %d. %s\n", i+1, file.Path)
-		if !file.Exists {
+		switch {
+		case !file.Exists:
 			_, _ = fmt.Fprintf(output, "     Status: Not found (skipped)\n")
-		} else if !file.Loaded {
+		case !file.Loaded:
 			_, _ = fmt.Fprintf(output, "     Status: Error loading (%v)\n", file.Error)
-		} else {
+		default:
 			_, _ = fmt.Fprintf(output, "     Status: Loaded successfully\n")
 			_, _ = fmt.Fprintf(output, "     Variables: %d\n", len(file.Vars))
 		}

@@ -2,19 +2,20 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // DockerStatement represents Docker operations
 type DockerStatement struct {
-	Token                lexer.Token
+	Options              map[string]string
 	Operation            string
 	Resource             string
 	Name                 string
-	Options              map[string]string
-	ServiceScoped        bool
 	ServiceName          string
+	Token                lexer.Token
+	ServiceScoped        bool
 	ServiceNameIsLiteral bool
 }
 
@@ -25,16 +26,18 @@ func (ds *DockerStatement) String() string {
 		if ds.ServiceNameIsLiteral {
 			out += fmt.Sprintf(" in service \"%s\"", ds.ServiceName)
 		} else {
-			out += fmt.Sprintf(" in service %s", ds.ServiceName)
+			out += " in service " + ds.ServiceName
 		}
 	}
 	if ds.Name != "" {
 		out += fmt.Sprintf(" \"%s\"", ds.Name)
 	}
 
+	var outSb35 strings.Builder
 	for key, value := range ds.Options {
-		out += fmt.Sprintf(" %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb35, " %s \"%s\"", key, value)
 	}
+	out += outSb35.String()
 
 	return out
 }

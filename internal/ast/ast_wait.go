@@ -8,9 +8,9 @@ import (
 
 // WaitStatement represents a fixed-duration wait (wait 5 seconds, wait {retries} minutes)
 type WaitStatement struct {
-	Token lexer.Token
 	Value string // Raw value: a number literal or a {variable} interpolation
 	Unit  string // Normalized singular unit: "second", "minute", "hour"
+	Token lexer.Token
 }
 
 func (ws *WaitStatement) statementNode() {}

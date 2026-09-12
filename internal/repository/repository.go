@@ -180,6 +180,7 @@ func (m *Manager) GetCurrentTag(ctx context.Context, targetPath string) (string,
 	output, err := cmd.Output()
 	if err != nil {
 		// No tag at HEAD is not an error
+		//nolint:nilerr // no tag at HEAD is an expected outcome; empty tag string is the API's no-tag sentinel
 		return "", nil
 	}
 
@@ -207,8 +208,8 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	if err == nil {
 		// Parse output like "refs/remotes/origin/main" or "refs/remotes/origin/master"
 		ref := strings.TrimSpace(string(output))
-		if strings.HasPrefix(ref, "refs/remotes/origin/") {
-			branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
+		if after, ok := strings.CutPrefix(ref, "refs/remotes/origin/"); ok {
+			branch := after
 			return branch, nil
 		}
 	}
@@ -218,9 +219,9 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	fetchCmd.Dir = fullPath
 
 	if config.SSHKey != "" {
-		sshKeyPath, err := expandPath(config.SSHKey)
-		if err != nil {
-			return "", fmt.Errorf("failed to expand SSH key path: %w", err)
+		sshKeyPath, expandErr := expandPath(config.SSHKey)
+		if expandErr != nil {
+			return "", fmt.Errorf("failed to expand SSH key path: %w", expandErr)
 		}
 		fetchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
 	}
@@ -231,8 +232,8 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	cmd = exec.CommandContext(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	cmd.Dir = fullPath
 	if config.SSHKey != "" {
-		sshKeyPath, err := expandPath(config.SSHKey)
-		if err == nil {
+		sshKeyPath, expandErr := expandPath(config.SSHKey)
+		if expandErr == nil {
 			cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
 		}
 	}
@@ -240,8 +241,8 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	output, err = cmd.Output()
 	if err == nil {
 		ref := strings.TrimSpace(string(output))
-		if strings.HasPrefix(ref, "refs/remotes/origin/") {
-			branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
+		if after, ok := strings.CutPrefix(ref, "refs/remotes/origin/"); ok {
+			branch := after
 			return branch, nil
 		}
 	}
@@ -250,8 +251,8 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	checkBranchCmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", "main")
 	checkBranchCmd.Dir = fullPath
 	if config.SSHKey != "" {
-		sshKeyPath, err := expandPath(config.SSHKey)
-		if err == nil {
+		sshKeyPath, expandErr := expandPath(config.SSHKey)
+		if expandErr == nil {
 			checkBranchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
 		}
 	}
@@ -265,8 +266,8 @@ func (m *Manager) GetDefaultBranch(ctx context.Context, config *orchestration.Re
 	checkBranchCmd = exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", "master")
 	checkBranchCmd.Dir = fullPath
 	if config.SSHKey != "" {
-		sshKeyPath, err := expandPath(config.SSHKey)
-		if err == nil {
+		sshKeyPath, expandErr := expandPath(config.SSHKey)
+		if expandErr == nil {
 			checkBranchCmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath))
 		}
 	}
@@ -345,7 +346,7 @@ func (m *Manager) HasRemoteUpdates(ctx context.Context, config *orchestration.Re
 	// Check if local branch is behind remote
 	// git rev-list HEAD..origin/<branch> --count
 	// #nosec G204 -- repository status checks intentionally compare the selected branch against origin.
-	revListCmd := exec.CommandContext(ctx, "git", "rev-list", fmt.Sprintf("HEAD..origin/%s", branch), "--count")
+	revListCmd := exec.CommandContext(ctx, "git", "rev-list", "HEAD..origin/"+branch, "--count")
 	revListCmd.Dir = fullPath
 
 	output, err := revListCmd.Output()

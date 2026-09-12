@@ -3,6 +3,7 @@ package scm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,8 +15,8 @@ type SCMRegistry struct {
 }
 
 type TechnologyRegistry struct {
-	Name string
 	Git  *GitRegistry
+	Name string
 }
 
 type GitRegistry struct {
@@ -24,12 +25,12 @@ type GitRegistry struct {
 }
 
 type GitSource struct {
+	Access      map[string]*GitAccessProfile
+	VersionTags *GitVersionTagContract
 	Alias       string
 	Provider    string
 	Default     string
 	Metadata    string
-	Access      map[string]*GitAccessProfile
-	VersionTags *GitVersionTagContract
 }
 
 type GitAccessProfile struct {
@@ -49,9 +50,9 @@ type GitProviderCapabilities struct {
 }
 
 type GitRef struct {
+	Date       time.Time
 	Name       string
 	TargetHash string
-	Date       time.Time
 }
 
 // GitProviderAdapter opens a repository without coupling source registration to an operation.
@@ -132,7 +133,7 @@ func (r *SCMRegistry) Git() *GitRegistry {
 
 func (r *GitRegistry) Source(alias string) (*GitSource, error) {
 	if r == nil {
-		return nil, fmt.Errorf("project does not declare scm → git sources")
+		return nil, errors.New("project does not declare scm → git sources")
 	}
 	source, ok := r.Sources[alias]
 	if !ok {

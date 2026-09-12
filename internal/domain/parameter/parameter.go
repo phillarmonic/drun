@@ -3,17 +3,17 @@ package parameter
 // Parameter represents a parameter entity in the domain layer
 // This mirrors the task.Parameter but provides domain-specific operations
 type Parameter struct {
-	Name         string
+	MaxValue     *float64
+	MinValue     *float64
 	Type         string // "requires", "given", "accepts"
 	DefaultValue string
-	HasDefault   bool
-	Required     bool
-	DataType     string
-	Constraints  []string
-	MinValue     *float64
-	MaxValue     *float64
-	Pattern      string
 	PatternMacro string
+	Pattern      string
+	DataType     string
+	Name         string
+	Constraints  []string
+	Required     bool
+	HasDefault   bool
 	EmailFormat  bool
 	Variadic     bool
 }

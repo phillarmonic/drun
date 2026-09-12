@@ -1,8 +1,10 @@
 package engine
 
 import (
+	stderrors "errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"regexp"
 	"sort"
@@ -44,10 +46,14 @@ type SecretsManager interface {
 
 // Engine executes drun v2 programs directly
 type Engine struct {
-	output           io.Writer
-	dryRun           bool
-	verbose          bool
-	taskModeOverride string
+	output io.Writer
+	input  io.Reader // interactive input for confirm/prompt (defaults to os.Stdin)
+
+	// Secrets management
+	secretsManager   SecretsManager
+	httpsFetcher     *remote.HTTPSFetcher
+	includesResolver *includes.Resolver
+	paramArgRegex    *regexp.Regexp
 	interpolator     *interpolation.Interpolator
 
 	// Domain layer services
@@ -60,35 +66,32 @@ type Engine struct {
 	executor *executor.Executor
 
 	// Remote includes support
-	cacheManager     *cache.Manager
-	githubFetcher    *remote.GitHubFetcher
-	httpsFetcher     *remote.HTTPSFetcher
-	drunhubFetcher   *remote.DrunhubFetcher
-	includesResolver *includes.Resolver
-
-	// Secrets management
-	secretsManager SecretsManager
-	folderTrusted  bool
-
-	allowToolVersionChanges bool
-	ignoreToolRequirements  bool
-	userProvisioningSources []string
-	embeddedProvisionings   []provisioning.EmbeddedSource
-	newToolDetector         func() toolDetector
-	newProvisioningResolver func(workingDir string) provisioningResolver
-	provisionCommandRunner  func(command string, execCtx *ExecutionContext) error
+	cacheManager  *cache.Manager
+	githubFetcher *remote.GitHubFetcher
 
 	// Legacy regex patterns (still used by variable operations)
-	quotedArgRegex *regexp.Regexp
-	paramArgRegex  *regexp.Regexp
+	quotedArgRegex          *regexp.Regexp
+	drunhubFetcher          *remote.DrunhubFetcher
+	provisionCommandRunner  func(command string, execCtx *ExecutionContext) error
+	assumeYes               *bool // --yes/--no assumption for confirm/prompt; nil = no assumption
+	newProvisioningResolver func(workingDir string) provisioningResolver
+	newToolDetector         func() toolDetector
+	taskModeOverride        string
+	userProvisioningSources []string
+	embeddedProvisionings   []provisioning.EmbeddedSource
+	ignoreToolRequirements  bool
+	allowToolVersionChanges bool
+	folderTrusted           bool
+	verbose                 bool
+	dryRun                  bool
 }
 
 // lockedWriter serializes writes to a shared io.Writer. Parallel loop bodies
 // and other concurrent components print through the same engine output, so
 // without locking two goroutines can race on an underlying buffer.
 type lockedWriter struct {
-	mu sync.Mutex
 	w  io.Writer
+	mu sync.Mutex
 }
 
 func (l *lockedWriter) Write(p []byte) (int, error) {
@@ -131,6 +134,8 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 
 	e := &Engine{
 		output:           out,
+		input:            options.Input,
+		assumeYes:        options.AssumeYes,
 		dryRun:           options.DryRun,
 		verbose:          options.Verbose,
 		taskModeOverride: options.TaskModeOverride,
@@ -191,7 +196,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 	)
 
 	// Set up interpolator callbacks for variable and builtin operations
-	interp.SetResolveVariableOpsCallback(func(expr string, ctx interface{}) string {
+	interp.SetResolveVariableOpsCallback(func(expr string, ctx any) string {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
 			if chain, err := e.parseVariableOperations(expr); err == nil && chain != nil {
 				// A variable-operation chain stores its base as `$name` (or a bare
@@ -208,7 +213,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		return ""
 	})
 
-	interp.SetResolveBuiltinOpsCallback(func(funcName string, operations string, ctx interface{}) (string, error) {
+	interp.SetResolveBuiltinOpsCallback(func(funcName string, operations string, ctx any) (string, error) {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
 			// Create builtin context
 			builtinCtx := &BuiltinContext{
@@ -222,15 +227,15 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 				}
 			}
 		}
-		return "", fmt.Errorf("failed to resolve builtin operations")
+		return "", stderrors.New("failed to resolve builtin operations")
 	})
 
-	interp.SetResolveBuiltinCallback(func(funcName string, args []string, ctx interface{}) (string, error) {
+	interp.SetResolveBuiltinCallback(func(funcName string, args []string, ctx any) (string, error) {
 		if execCtx, ok := ctx.(*ExecutionContext); ok {
 			switch strings.ToLower(funcName) {
 			case "orchestrate services", "orchestration services":
 				if len(args) == 0 {
-					return "", fmt.Errorf("orchestrate services requires an orchestration name")
+					return "", stderrors.New("orchestrate services requires an orchestration name")
 				}
 				return e.resolveOrchestrateServicesBuiltin(execCtx, args)
 			}
@@ -243,7 +248,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 			}
 			return builtins.CallBuiltin(funcName, builtinCtx, args...)
 		}
-		return "", fmt.Errorf("no execution context available")
+		return "", stderrors.New("no execution context available")
 	})
 
 	return e
@@ -298,7 +303,7 @@ func (e *Engine) ExecuteWithParams(program *ast.Program, taskName string, params
 // ExecuteWithParamsAndFile runs a v2 program with the given parameters and current file path
 func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string, params map[string]string, currentFile string) error {
 	if program == nil {
-		return fmt.Errorf("program is nil")
+		return stderrors.New("program is nil")
 	}
 
 	// Start memory monitor to detect runaway execution
@@ -310,7 +315,7 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	e.taskRegistry.Clear() // Clear registry for fresh execution
 	e.taskRegistry.SetCurrentPlatform(platform.Current())
 	if err := e.registerTasks(program.Tasks, currentFile); err != nil {
-		return fmt.Errorf("task registration failed: %v", err)
+		return fmt.Errorf("task registration failed: %w", err)
 	}
 	if err := task.ResolveInheritedToolRequirements(e.taskRegistry); err != nil {
 		return fmt.Errorf("resolving task tool requirements: %w", err)
@@ -321,13 +326,13 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	if err != nil {
 		return fmt.Errorf("creating project context: %w", err)
 	}
-	if err := e.registerIncludedTasks(projectCtx, currentFile); err != nil {
-		return fmt.Errorf("included task registration failed: %w", err)
+	if registerErr := e.registerIncludedTasks(projectCtx, currentFile); registerErr != nil {
+		return fmt.Errorf("included task registration failed: %w", registerErr)
 	}
 
 	// Check project-level tool requirements before planning/execution starts
-	if err := e.checkProjectToolRequirements(projectCtx); err != nil {
-		return err // Execution fails immediately if project tools are missing
+	if checkErr := e.checkProjectToolRequirements(projectCtx); checkErr != nil {
+		return checkErr // Execution fails immediately if project tools are missing
 	}
 
 	// Build planner context from project
@@ -356,14 +361,14 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 	if projectCtx != nil {
 		projectName = projectCtx.Name
 	}
-	if err := e.validateSecrets(program, plan, projectName); err != nil {
-		return fmt.Errorf("secret validation failed: %w", err)
+	if validateErr := e.validateSecrets(program, plan, projectName); validateErr != nil {
+		return fmt.Errorf("secret validation failed: %w", validateErr)
 	}
 
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution order: %v\n", plan.ExecutionOrder)
 		if e.verbose {
-			if planJSON, err := plan.ToJSON(); err == nil {
+			if planJSON, toErr := plan.ToJSON(); toErr == nil {
 				_, _ = fmt.Fprintf(e.output, "[DRY RUN] Execution plan:\n%s\n", planJSON)
 			}
 		}
@@ -424,7 +429,15 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		for _, stmt := range taskPlan.Body {
 			if err := e.executeStatement(stmt, ctx); err != nil {
 				ctx.WorkingDir = savedWorkingDir // restore on error too
-				return fmt.Errorf("task '%s' failed: %v", currentTaskName, err)
+
+				// A declined bare confirm gate stops the run gracefully:
+				// print a notice and finish with success (exit 0), not as a
+				// task failure.
+				if stderrors.Is(err, errUserAborted) {
+					_, _ = fmt.Fprintf(e.output, "⏹  Confirmation declined — stopping task '%s' (exit 0)\n", currentTaskName)
+					return nil
+				}
+				return fmt.Errorf("task '%s' failed: %w", currentTaskName, err)
 			}
 		}
 
@@ -772,6 +785,7 @@ func (e *Engine) setupTaskParameters(task *ast.TaskStatement, params map[string]
 // BuildProjectContext creates a ProjectContext from a project statement
 func (e *Engine) BuildProjectContext(project *ast.ProjectStatement, currentFile string) (*ProjectContext, error) {
 	if project == nil {
+		//nolint:nilnil // nil project block is a supported input; nil context signals "no project declared" to callers that guard with != nil
 		return nil, nil
 	}
 
@@ -917,10 +931,10 @@ func (e *Engine) executeTask(task *ast.TaskStatement, ctx *ExecutionContext) err
 
 // ExecuteStatement executes a single AST statement (implements executor.StatementExecutor)
 // Converts AST to domain before execution
-func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
+func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx any) error {
 	execCtx, ok := ctx.(*ExecutionContext)
 	if !ok {
-		return fmt.Errorf("invalid execution context type")
+		return stderrors.New("invalid execution context type")
 	}
 	// Convert AST to domain
 	domainStmt, err := statement.FromAST(stmt)
@@ -931,10 +945,10 @@ func (e *Engine) ExecuteStatement(stmt ast.Statement, ctx interface{}) error {
 }
 
 // ExecuteDomainStatement executes a single domain statement (implements executor.DomainStatementExecutor)
-func (e *Engine) ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error {
+func (e *Engine) ExecuteDomainStatement(stmt statement.Statement, ctx any) error {
 	execCtx, ok := ctx.(*ExecutionContext)
 	if !ok {
-		return fmt.Errorf("invalid execution context type")
+		return stderrors.New("invalid execution context type")
 	}
 	return e.executeStatement(stmt, execCtx)
 }
@@ -982,6 +996,10 @@ func (e *Engine) executeStatement(stmt statement.Statement, ctx *ExecutionContex
 		return e.executeWait(s, ctx)
 	case *statement.Open:
 		return e.executeOpen(s, ctx)
+	case *statement.Confirm:
+		return e.executeConfirm(s, ctx)
+	case *statement.Prompt:
+		return e.executePrompt(s, ctx)
 	case *statement.File:
 		return e.executeFile(s, ctx)
 	case *statement.FileValue:
@@ -1108,24 +1126,20 @@ func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionCon
 	}
 
 	// Copy current variables to the new context
-	for k, v := range ctx.Variables {
-		callCtx.Variables[k] = v
-	}
+	maps.Copy(callCtx.Variables, ctx.Variables)
 
 	// Set up parameters for the called task
 	if err := e.setupTaskParameters(targetTask, callStmt.Parameters, callCtx); err != nil {
-		return fmt.Errorf("failed to setup parameters for task '%s': %v", callStmt.TaskName, err)
+		return fmt.Errorf("failed to setup parameters for task '%s': %w", callStmt.TaskName, err)
 	}
 
 	// Execute the called task
 	if err := e.executeTask(targetTask, callCtx); err != nil {
-		return fmt.Errorf("task '%s' failed: %v", callStmt.TaskName, err)
+		return fmt.Errorf("task '%s' failed: %w", callStmt.TaskName, err)
 	}
 
 	// Copy back any new variables that might have been set in the called task
-	for k, v := range callCtx.Variables {
-		ctx.Variables[k] = v
-	}
+	maps.Copy(ctx.Variables, callCtx.Variables)
 
 	return nil
 }
@@ -1244,9 +1258,7 @@ func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *
 	}
 
 	// Copy current variables to the new context
-	for k, v := range ctx.Variables {
-		taskCtx.Variables[k] = v
-	}
+	maps.Copy(taskCtx.Variables, ctx.Variables)
 
 	// Set up parameters from the template with overrides from the instantiation
 	for _, param := range template.Parameters {
@@ -1274,7 +1286,7 @@ func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *
 
 			typedValue, err := types.NewValue(paramType, rawValue)
 			if err != nil {
-				return fmt.Errorf("parameter '%s': invalid %s value '%s': %v",
+				return fmt.Errorf("parameter '%s': invalid %s value '%s': %w",
 					param.Name, paramType, rawValue, err)
 			}
 
@@ -1297,7 +1309,7 @@ func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *
 
 			// Use domain validator
 			if err := e.paramValidator.Validate(domainParam, typedValue); err != nil {
-				return fmt.Errorf("parameter '%s': %v", param.Name, err)
+				return fmt.Errorf("parameter '%s': %w", param.Name, err)
 			}
 
 			taskCtx.Parameters[param.Name] = typedValue
@@ -1316,9 +1328,7 @@ func (e *Engine) executeTaskFromTemplate(tfts *statement.TaskFromTemplate, ctx *
 	}
 
 	// Copy back any new variables that might have been set
-	for k, v := range taskCtx.Variables {
-		ctx.Variables[k] = v
-	}
+	maps.Copy(ctx.Variables, taskCtx.Variables)
 
 	return nil
 }
@@ -1418,9 +1428,9 @@ func (e *Engine) interpolateVariablesWithError(message string, ctx *ExecutionCon
 
 // progressWriter wraps io.Writer to track progress
 type progressWriter struct {
+	onProgress func(int64)
 	total      int64
 	written    int64
-	onProgress func(int64)
 }
 
 func (pw *progressWriter) Write(p []byte) (int, error) {

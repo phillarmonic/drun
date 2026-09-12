@@ -2,8 +2,10 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,46 +16,46 @@ import (
 
 // App represents the CLI application
 type App struct {
-	version string
-	commit  string
-	date    string
-
-	rootCmd *cobra.Command
-
+	rootCmd            *cobra.Command
+	debugExportMermaid string
+	date               string
+	commit             string
 	// Flags
-	configFile              string
-	listTasks               bool
-	dryRun                  bool
-	verbose                 bool
-	taskMode                string
-	showVersion             bool
-	initConfig              bool
-	initMinimalConfig       bool
-	initFromTemplate        string
-	initTemplateName        string
-	templatesRepo           string
-	listTemplates           bool
+	configFile       string
+	debugExportJSON  string
+	templatesRepo    string
+	debugExportGraph string
+	taskMode         string
+	debugInput       string
+	version          string
+	setWorkspace     string
+	initFromTemplate string
+	initTemplateName string
+	selfUpdate       bool
+
+	// Debug flags
+	debugMode               bool
 	saveAsDefault           bool
-	setWorkspace            string
-	selfUpdate              bool
+	initMinimalConfig       bool
+	initConfig              bool
 	allowUndefinedVars      bool
 	allowToolVersionChanges bool
 	ignoreToolRequirements  bool
 	noDrunCache             bool
-
-	// Debug flags
-	debugMode          bool
-	debugTokens        bool
-	debugAST           bool
-	debugJSON          bool
-	debugErrors        bool
-	debugFull          bool
-	debugDomain        bool
-	debugInput         string
-	debugPlan          bool
-	debugExportGraph   string
-	debugExportMermaid string
-	debugExportJSON    string
+	assumeYes               bool
+	assumeNo                bool
+	listTemplates           bool
+	debugTokens             bool
+	debugAST                bool
+	debugJSON               bool
+	debugErrors             bool
+	debugFull               bool
+	debugDomain             bool
+	showVersion             bool
+	debugPlan               bool
+	verbose                 bool
+	dryRun                  bool
+	listTasks               bool
 }
 
 // NewApp creates a new CLI application
@@ -147,8 +149,8 @@ func (a *App) Execute() error {
 		if helpLine != "" {
 			insertIdx := len(otherLines)
 			// Find the directive line (e.g., ":4") which must remain at the very end
-			for i := len(otherLines) - 1; i >= 0; i-- {
-				if otherLines[i] != "" && strings.HasPrefix(otherLines[i], ":") {
+			for i, otherLine := range slices.Backward(otherLines) {
+				if otherLine != "" && strings.HasPrefix(otherLine, ":") {
 					insertIdx = i
 					break
 				}
@@ -191,6 +193,8 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.allowUndefinedVars, "allow-undefined-variables", false, "[xdrun CLI cmd] Allow undefined variables in interpolation (default: strict mode)")
 	flags.BoolVar(&a.allowToolVersionChanges, "allow-tool-version-changes", false, "[xdrun CLI cmd] Allow provisioning to upgrade or downgrade installed tools when versioned requirements opt into provision")
 	flags.BoolVar(&a.ignoreToolRequirements, "ignore-tool-requirements", false, "[xdrun CLI cmd] Skip all tool requirement checks")
+	flags.BoolVarP(&a.assumeYes, "yes", "y", false, "[xdrun CLI cmd] Assume yes for confirm/prompt statements (never prompts)")
+	flags.BoolVar(&a.assumeNo, "no", false, "[xdrun CLI cmd] Assume no for confirm/prompt statements (never prompts)")
 
 	// Debug flags
 	flags.BoolVar(&a.debugMode, "debug", false, "[xdrun CLI cmd] Enable debug mode - shows tokens, AST, and parse information")
@@ -247,10 +251,10 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 
 	if a.listTemplates {
 		if a.initConfig || a.initMinimalConfig {
-			return fmt.Errorf("--list-templates cannot be combined with --init or --init-minimal")
+			return errors.New("--list-templates cannot be combined with --init or --init-minimal")
 		}
 		if a.initTemplateName != "" {
-			return fmt.Errorf("--template cannot be combined with --list-templates")
+			return errors.New("--template cannot be combined with --list-templates")
 		}
 		return ListInitTemplates(a.initFromTemplate, a.templatesRepo)
 	}
@@ -290,7 +294,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Normal execution - run task
-	return ExecuteTask(
+	err := ExecuteTask(
 		a.configFile,
 		a.listTasks,
 		a.dryRun,
@@ -300,8 +304,18 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		a.allowToolVersionChanges,
 		a.ignoreToolRequirements,
 		a.noDrunCache,
+		a.assumeYes,
+		a.assumeNo,
 		args,
 	)
+
+	// ExecuteTask already wrote the failure to stderr; exit here so its deferred
+	// engine cleanup has run instead of being skipped by os.Exit inside it.
+	if exitErr, ok := errors.AsType[*exitCodeError](err); ok {
+		os.Exit(exitErr.code)
+	}
+
+	return err
 }
 
 // createCompletionCommand creates the cmd:completion subcommand

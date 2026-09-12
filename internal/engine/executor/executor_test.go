@@ -2,7 +2,7 @@ package executor
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 	"testing"
 
@@ -18,18 +18,18 @@ type MockStatementExecutor struct {
 	ShouldFail               bool
 }
 
-func (m *MockStatementExecutor) ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error {
+func (m *MockStatementExecutor) ExecuteDomainStatement(stmt statement.Statement, ctx any) error {
 	m.ExecutedDomainStatements = append(m.ExecutedDomainStatements, stmt)
 	if m.ShouldFail {
-		return fmt.Errorf("mock execution error")
+		return errors.New("mock execution error")
 	}
 	return nil
 }
 
 // MockExecutionContext implements ExecutionContext for testing
 type MockExecutionContext struct {
-	CurrentTask string
 	Output      io.Writer
+	CurrentTask string
 }
 
 func (m *MockExecutionContext) GetCurrentTask() string {

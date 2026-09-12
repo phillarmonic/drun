@@ -5,23 +5,24 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
 // MakefileTarget represents a target in a Makefile
 type MakefileTarget struct {
+	Variables    map[string]string
 	Name         string
+	Description  string
 	Dependencies []string
 	Commands     []string
-	Description  string
-	Variables    map[string]string
 	IsPhony      bool
 }
 
 // Makefile represents a parsed Makefile
 type Makefile struct {
-	Targets   []*MakefileTarget
 	Variables map[string]string
+	Targets   []*MakefileTarget
 }
 
 // ParseMakefile parses a Makefile and returns a structured representation
@@ -59,8 +60,8 @@ func ParseMakefile(filepath string) (*Makefile, error) {
 		trimmedLine := strings.TrimSpace(line)
 
 		// Handle line continuation
-		if strings.HasSuffix(trimmedLine, "\\") {
-			continuedLine += strings.TrimSuffix(trimmedLine, "\\") + " "
+		if before, ok := strings.CutSuffix(trimmedLine, "\\"); ok {
+			continuedLine += before + " "
 			continue
 		}
 		if continuedLine != "" {
@@ -110,7 +111,7 @@ func ParseMakefile(filepath string) (*Makefile, error) {
 
 			deps := []string{}
 			if depsStr != "" {
-				for _, dep := range strings.Fields(depsStr) {
+				for dep := range strings.FieldsSeq(depsStr) {
 					deps = append(deps, strings.TrimSpace(dep))
 				}
 			}
@@ -145,11 +146,8 @@ func ParseMakefile(filepath string) (*Makefile, error) {
 
 	// Mark phony targets
 	for _, target := range makefile.Targets {
-		for _, phony := range phonyTargets {
-			if target.Name == phony {
-				target.IsPhony = true
-				break
-			}
+		if slices.Contains(phonyTargets, target.Name) {
+			target.IsPhony = true
 		}
 	}
 

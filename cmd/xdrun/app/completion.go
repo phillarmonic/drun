@@ -168,11 +168,12 @@ func parameterCompletionDescription(parameter ast.ParameterStatement) string {
 	if parameter.MinValue != nil && parameter.MaxValue != nil {
 		description += fmt.Sprintf(", range: %v-%v", *parameter.MinValue, *parameter.MaxValue)
 	}
-	if parameter.PatternMacro != "" {
+	switch {
+	case parameter.PatternMacro != "":
 		description += ", pattern: " + parameter.PatternMacro
-	} else if parameter.Pattern != "" {
+	case parameter.Pattern != "":
 		description += ", pattern: " + parameter.Pattern
-	} else if parameter.EmailFormat {
+	case parameter.EmailFormat:
 		description += ", format: email"
 	}
 	return description
@@ -201,7 +202,11 @@ func isCmdNamespacePrefix(toComplete string) bool {
 		return false
 	}
 
-	return strings.HasPrefix("cmd:", toComplete)
+	// gocritic's argOrder check assumes the literal is the needle. Here it is the
+	// haystack on purpose: we ask whether the text being completed is a prefix of
+	// the "cmd:" namespace (so typing "c", "cm" or "cmd" offers every cmd: builtin).
+	// Behaviour is pinned by TestCompleteTaskNamesPrefersCmdNamespaceForCmdPrefix.
+	return strings.HasPrefix("cmd:", toComplete) //nolint:gocritic // literal is intentionally the haystack
 }
 
 func shouldIncludeBuiltinByDefault(name string) bool {

@@ -22,7 +22,7 @@ func TestSupportedHooksIncludesPreCommit(t *testing.T) {
 
 func TestInstallHookWritesManagedPreCommitScript(t *testing.T) {
 	gitDir := filepath.Join(t.TempDir(), "hooks")
-	if err := os.MkdirAll(gitDir, 0750); err != nil {
+	if err := os.MkdirAll(gitDir, 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
@@ -152,7 +152,7 @@ func initGitRepoWithCommit(t *testing.T, repoDir, branch string) {
 	runGit(t, repoDir, "checkout", "-b", branch)
 	runGit(t, repoDir, "config", "user.email", "test@example.com")
 	runGit(t, repoDir, "config", "user.name", "Test User")
-	if err := os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("test\n"), 0640); err != nil {
+	if err := os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("test\n"), 0o640); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	runGit(t, repoDir, "add", "README.md")
@@ -163,10 +163,10 @@ func writeSpec(t *testing.T, repoDir, spec string) {
 	t.Helper()
 
 	specDir := filepath.Join(repoDir, ".drun")
-	if err := os.MkdirAll(specDir, 0750); err != nil {
+	if err := os.MkdirAll(specDir, 0o750); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(specDir, "spec.drun"), []byte(spec), 0640); err != nil {
+	if err := os.WriteFile(filepath.Join(specDir, "spec.drun"), []byte(spec), 0o640); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 }

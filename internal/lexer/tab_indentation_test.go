@@ -9,26 +9,26 @@ func TestLexer_TabIndentation(t *testing.T) {
 	input := "version: 2.0\n\ntask \"test\":\n\tinfo \"level 1\"\n\t\tinfo \"level 2\"\n\tinfo \"back to level 1\""
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "level 1"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "level 2"},
-		{DEDENT, ""},
-		{INFO, "info"},
-		{STRING, "back to level 1"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "level 1"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "level 2"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "back to level 1"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	lexer := NewLexer(input)
@@ -53,22 +53,22 @@ func TestLexer_MixedIndentation(t *testing.T) {
 	input := "version: 2.0\n\ntask \"test\":\n    info \"4 spaces\"\n\tinfo \"1 tab (equivalent to 4 spaces)\""
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{VERSION, "version"},
-		{COLON, ":"},
-		{NUMBER, "2.0"},
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "4 spaces"},
-		{INFO, "info"},
-		{STRING, "1 tab (equivalent to 4 spaces)"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: VERSION, expectedLiteral: "version"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: NUMBER, expectedLiteral: "2.0"},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "4 spaces"},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "1 tab (equivalent to 4 spaces)"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	lexer := NewLexer(input)
@@ -92,18 +92,18 @@ func TestLexer_IndentedCommentDoesNotEstablishBlockIndentation(t *testing.T) {
 	input := "task \"test\":\n\t  \t# deliberately irregular comment indentation\n    info \"level 1\""
 
 	expectedTokens := []struct {
-		expectedType    TokenType
 		expectedLiteral string
+		expectedType    TokenType
 	}{
-		{TASK, "task"},
-		{STRING, "test"},
-		{COLON, ":"},
-		{COMMENT, "# deliberately irregular comment indentation"},
-		{INDENT, ""},
-		{INFO, "info"},
-		{STRING, "level 1"},
-		{DEDENT, ""},
-		{EOF, ""},
+		{expectedType: TASK, expectedLiteral: "task"},
+		{expectedType: STRING, expectedLiteral: "test"},
+		{expectedType: COLON, expectedLiteral: ":"},
+		{expectedType: COMMENT, expectedLiteral: "# deliberately irregular comment indentation"},
+		{expectedType: INDENT, expectedLiteral: ""},
+		{expectedType: INFO, expectedLiteral: "info"},
+		{expectedType: STRING, expectedLiteral: "level 1"},
+		{expectedType: DEDENT, expectedLiteral: ""},
+		{expectedType: EOF, expectedLiteral: ""},
 	}
 
 	lexer := NewLexer(input)

@@ -7,39 +7,42 @@ import (
 
 // Orchestration represents an orchestration group
 type Orchestration struct {
-	Name                string
-	Description         string
-	Services            []string
-	Strategy            OrchestrationStrategy
-	CircuitBreaker      bool
-	StopOnFailure       bool
-	HealthCheckInterval time.Duration
-	StartupTimeout      time.Duration
-	ShutdownTimeout     time.Duration
-	PreTask             string
-	PostTask            string
-	FailureThreshold    int
-	RecoveryTimeout     time.Duration
-	MakefileOrder       []string
-	MakefileTimeout     time.Duration
-	CloneOrder          []string
-	CloneTimeout        time.Duration
+	LastFailure         time.Time
+	Scale               map[string]int
 	ContainerManagement *ContainerManagement
 	Recovery            *RecoveryConfig
 	Discovery           *DiscoveryConfig
 	Metrics             *MetricsConfig
-	Scale               map[string]int
 	UpdateStrategy      UpdateStrategy
-	MaxUnavailable      int
-	UpdateTimeout       time.Duration
 
 	// Runtime state
-	Status       OrchestrationStatus
-	FailureCount int
-	LastFailure  time.Time
-	CircuitOpen  bool
-	mu           sync.RWMutex
+	Status              OrchestrationStatus
+	Name                string
+	PostTask            string
+	PreTask             string
+	Description         string
+	Strategy            OrchestrationStrategy
+	Services            []string
+	MakefileOrder       []string
+	CloneOrder          []string
+	StartupTimeout      time.Duration
+	MaxUnavailable      int
+	MakefileTimeout     time.Duration
+	RecoveryTimeout     time.Duration
+	FailureThreshold    int
+	ShutdownTimeout     time.Duration
+	HealthCheckInterval time.Duration
+	CloneTimeout        time.Duration
+	UpdateTimeout       time.Duration
+	FailureCount        int
+	mu                  sync.RWMutex
+	StopOnFailure       bool
+	CircuitBreaker      bool
+	CircuitOpen         bool
 }
+
+// RegistryName returns the name this orchestration is registered under.
+func (o *Orchestration) RegistryName() string { return o.Name }
 
 // OrchestrationStatus represents the status of an orchestration group
 type OrchestrationStatus string
@@ -75,20 +78,20 @@ const (
 
 // ContainerManagement represents container management options
 type ContainerManagement struct {
+	PullPolicy             string
+	HealthCheckTimeout     time.Duration
 	ForceRecreateOnStart   bool
 	ForceRecreateOnRestart bool
 	BuildBeforeStart       bool
-	PullPolicy             string
 	WaitForHealth          bool
-	HealthCheckTimeout     time.Duration
 }
 
 // RecoveryConfig represents recovery configuration
 type RecoveryConfig struct {
+	FallbackAction     RecoveryAction
 	MaxRetries         int
 	RetryInterval      time.Duration
 	ExponentialBackoff bool
-	FallbackAction     RecoveryAction
 }
 
 // RecoveryAction represents the action to take on failure
@@ -113,10 +116,10 @@ type DiscoveryConfig struct {
 
 // MetricsConfig represents metrics collection configuration
 type MetricsConfig struct {
-	Enabled  bool
+	Labels   map[string]string
 	Endpoint string
 	Interval time.Duration
-	Labels   map[string]string
+	Enabled  bool
 }
 
 // IsHealthy returns true if all services are healthy

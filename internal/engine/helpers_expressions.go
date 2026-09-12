@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -37,6 +38,7 @@ func (e *Engine) parseBuiltinOperations(operations string) (*VariableOperationCh
 	}
 
 	if len(ops) == 0 {
+		//nolint:nilnil // zero parsed builtin operations is a valid outcome; nil chain is the caller-tested "no operations" sentinel
 		return nil, nil
 	}
 
@@ -49,6 +51,7 @@ func (e *Engine) parseBuiltinOperations(operations string) (*VariableOperationCh
 // parseBuiltinOperation parses a single builtin operation
 func (e *Engine) parseBuiltinOperation(tokens []string) (*VariableOperation, error) {
 	if len(tokens) == 0 {
+		//nolint:nilnil // empty token list yields no builtin operation; callers check op != nil before appending
 		return nil, nil
 	}
 
@@ -91,7 +94,7 @@ func (e *Engine) applyBuiltinOperations(value string, chain *VariableOperationCh
 	for _, op := range chain.Operations {
 		newValue, err := e.applyBuiltinOperation(currentValue, op, ctx)
 		if err != nil {
-			return "", fmt.Errorf("builtin operation '%s' failed: %v", op.Type, err)
+			return "", fmt.Errorf("builtin operation '%s' failed: %w", op.Type, err)
 		}
 		currentValue = newValue
 	}
@@ -106,7 +109,7 @@ func (e *Engine) applyBuiltinOperation(value string, op VariableOperation, ctx *
 		if len(op.Args) >= 2 {
 			return strings.ReplaceAll(value, op.Args[0], op.Args[1]), nil
 		}
-		return "", fmt.Errorf("replace operation requires 2 arguments")
+		return "", errors.New("replace operation requires 2 arguments")
 	case "without":
 		return e.applyWithoutOperation(value, op.Args)
 	case "uppercase":

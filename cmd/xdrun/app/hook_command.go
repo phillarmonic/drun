@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,7 +53,7 @@ If no hook-name is specified, all supported hooks (pre-commit, commit-msg, pre-p
 
 			gitDir := filepath.Join(".git", "hooks")
 			if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-				return fmt.Errorf("not a git repository (or no .git/hooks directory)")
+				return errors.New("not a git repository (or no .git/hooks directory)")
 			}
 
 			for _, h := range hooksToInstall {
@@ -83,7 +84,7 @@ If no hook-name is specified, all drun-managed hooks are removed.`,
 
 			gitDir := filepath.Join(".git", "hooks")
 			if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-				return fmt.Errorf("not a git repository (or no .git/hooks directory)")
+				return errors.New("not a git repository (or no .git/hooks directory)")
 			}
 
 			for _, h := range hooksToRemove {
@@ -105,13 +106,14 @@ func createHookListCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gitDir := filepath.Join(".git", "hooks")
 			if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-				return fmt.Errorf("not a git repository")
+				return errors.New("not a git repository")
 			}
 
 			fmt.Println("Git Hooks Status:")
 			for _, h := range supportedHooks {
 				status := "Not installed"
 				path := filepath.Join(gitDir, h)
+				// #nosec G304 -- path is <repo>/.git/hooks/<hook> built from the fixed supportedHooks list; no external input reaches it.
 				if content, err := os.ReadFile(path); err == nil {
 					if strings.Contains(string(content), "# managed by drun") {
 						status = "Installed (managed by drun)"
@@ -164,7 +166,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 			}
 
 			if ctx.GitPolicy == nil {
-				return fmt.Errorf("no git policy configured in project")
+				return errors.New("no git policy configured in project")
 			}
 
 			policyStmt := ctx.GitPolicy
@@ -198,9 +200,10 @@ func createHookRunCommand(a *App) *cobra.Command {
 
 			case "commit-msg":
 				if len(hookArgs) < 1 {
-					return fmt.Errorf("commit-msg hook requires the commit message file path as argument")
+					return errors.New("commit-msg hook requires the commit message file path as argument")
 				}
 				msgFile := hookArgs[0]
+				// #nosec G304 -- msgFile is the path git itself passes to a commit-msg hook (normally .git/COMMIT_EDITMSG), not user-typed input.
 				msgBytes, err := os.ReadFile(msgFile)
 				if err != nil {
 					return fmt.Errorf("failed to read commit message file: %w", err)
@@ -237,7 +240,7 @@ func createHookRunCommand(a *App) *cobra.Command {
 					sigStatus := strings.TrimSpace(out)
 					if sigStatus != "G" && sigStatus != "U" {
 						fmt.Printf("❌ Commit is not properly signed (signature status: '%s')\n", sigStatus)
-						return fmt.Errorf("unsigned commit")
+						return errors.New("unsigned commit")
 					}
 					fmt.Println("✅ Signed commits check passed.")
 				}
@@ -254,6 +257,7 @@ func installHook(gitDir, hookName string) error {
 	path := filepath.Join(gitDir, hookName)
 
 	// Check if exists and not managed by drun
+	// #nosec G304 -- path is <repo>/.git/hooks/<hook> built from the fixed supportedHooks list; no external input reaches it.
 	if content, err := os.ReadFile(path); err == nil {
 		if !strings.Contains(string(content), "# managed by drun") {
 			return fmt.Errorf("custom hook already exists at %s", path)
@@ -266,12 +270,14 @@ func installHook(gitDir, hookName string) error {
 xdrun cmd:hook run %s "$@"
 `, hookName)
 
-	return os.WriteFile(path, []byte(script), 0755)
+	// #nosec G306 -- git executes these hook scripts directly, so the owner execute bit is required; 0o600 would install a hook git cannot run.
+	return os.WriteFile(path, []byte(script), 0o755)
 }
 
 func uninstallHook(gitDir, hookName string) error {
 	path := filepath.Join(gitDir, hookName)
 
+	// #nosec G304 -- path is <repo>/.git/hooks/<hook> built from the fixed supportedHooks list; no external input reaches it.
 	if content, err := os.ReadFile(path); err == nil {
 		if strings.Contains(string(content), "# managed by drun") {
 			err = os.Remove(path)

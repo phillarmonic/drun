@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -47,8 +48,8 @@ func NewManager(expiration time.Duration, disabled bool) (*Manager, error) {
 
 	// Create ~/.drun directory
 	drunDir := filepath.Join(homeDir, ".drun")
-	if err := os.MkdirAll(drunDir, 0750); err != nil {
-		return nil, fmt.Errorf("failed to create .drun directory: %w", err)
+	if mkdirErr := os.MkdirAll(drunDir, 0o750); mkdirErr != nil {
+		return nil, fmt.Errorf("failed to create .drun directory: %w", mkdirErr)
 	}
 
 	// Open cache database
@@ -87,10 +88,10 @@ func (m *Manager) Get(key string) ([]byte, bool, error) {
 	}
 
 	rc, _, _, err := m.db.GetBlob(key)
-	if err == solodb.ErrNotFound {
+	if errors.Is(err, solodb.ErrNotFound) {
 		return nil, false, nil
 	}
-	if err == solodb.ErrExpired {
+	if errors.Is(err, solodb.ErrExpired) {
 		return nil, false, nil
 	}
 	if err != nil {
@@ -114,10 +115,10 @@ func (m *Manager) GetStale(key string) ([]byte, bool) {
 
 	// Try to get the value, ignoring expiration
 	rc, _, _, err := m.db.GetBlob(key)
-	if err == solodb.ErrNotFound {
+	if errors.Is(err, solodb.ErrNotFound) {
 		return nil, false
 	}
-	if err == solodb.ErrExpired {
+	if errors.Is(err, solodb.ErrExpired) {
 		// For expired entries, we can't get the content anymore
 		// SoloDB's lazy GC removes them from the index
 		return nil, false

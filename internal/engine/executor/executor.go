@@ -12,14 +12,14 @@ import (
 // DomainStatementExecutor defines the interface for executing domain statements
 // The context parameter is intentionally interface{} to avoid circular dependencies
 type DomainStatementExecutor interface {
-	ExecuteDomainStatement(stmt statement.Statement, ctx interface{}) error
+	ExecuteDomainStatement(stmt statement.Statement, ctx any) error
 }
 
 // Executor handles execution of tasks and hooks
 type Executor struct {
 	output             io.Writer
-	dryRun             bool
 	domainStmtExecutor DomainStatementExecutor
+	dryRun             bool
 }
 
 // NewExecutor creates a new task executor
@@ -32,7 +32,7 @@ func NewExecutor(output io.Writer, dryRun bool, domainStmtExecutor DomainStateme
 }
 
 // ExecuteTask executes a single task using domain statements
-func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx interface{}) error {
+func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx any) error {
 	if ex.dryRun {
 		_, _ = fmt.Fprintf(ex.output, "[DRY RUN] Would execute task: %s\n", domainTask.Name)
 		if domainTask.Description != "" {
@@ -51,7 +51,7 @@ func (ex *Executor) ExecuteTask(domainTask *task.Task, ctx interface{}) error {
 }
 
 // ExecuteHooks executes a list of domain statement hooks
-func (ex *Executor) ExecuteHooks(hookType string, domainHooks []statement.Statement, ctx interface{}, failFast bool) error {
+func (ex *Executor) ExecuteHooks(hookType string, domainHooks []statement.Statement, ctx any, failFast bool) error {
 	for _, hook := range domainHooks {
 		if err := ex.domainStmtExecutor.ExecuteDomainStatement(hook, ctx); err != nil {
 			if failFast {
@@ -64,7 +64,7 @@ func (ex *Executor) ExecuteHooks(hookType string, domainHooks []statement.Statem
 }
 
 // ExecuteSetupHooks executes setup hooks (fail-fast)
-func (ex *Executor) ExecuteSetupHooks(hookMgr *hooks.Manager, ctx interface{}) error {
+func (ex *Executor) ExecuteSetupHooks(hookMgr *hooks.Manager, ctx any) error {
 	if hookMgr == nil {
 		return nil
 	}
@@ -72,7 +72,7 @@ func (ex *Executor) ExecuteSetupHooks(hookMgr *hooks.Manager, ctx interface{}) e
 }
 
 // ExecuteTeardownHooks executes teardown hooks (best-effort)
-func (ex *Executor) ExecuteTeardownHooks(hookMgr *hooks.Manager, ctx interface{}) error {
+func (ex *Executor) ExecuteTeardownHooks(hookMgr *hooks.Manager, ctx any) error {
 	if hookMgr == nil {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (ex *Executor) ExecuteTeardownHooks(hookMgr *hooks.Manager, ctx interface{}
 }
 
 // ExecuteBeforeHooks executes before-task hooks (fail-fast)
-func (ex *Executor) ExecuteBeforeHooks(hookMgr *hooks.Manager, ctx interface{}) error {
+func (ex *Executor) ExecuteBeforeHooks(hookMgr *hooks.Manager, ctx any) error {
 	if hookMgr == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (ex *Executor) ExecuteBeforeHooks(hookMgr *hooks.Manager, ctx interface{}) 
 }
 
 // ExecuteAfterHooks executes after-task hooks (best-effort)
-func (ex *Executor) ExecuteAfterHooks(hookMgr *hooks.Manager, ctx interface{}) error {
+func (ex *Executor) ExecuteAfterHooks(hookMgr *hooks.Manager, ctx any) error {
 	if hookMgr == nil {
 		return nil
 	}

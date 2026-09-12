@@ -15,8 +15,8 @@ func TestUnquotedHyphenatedToolAvailability(t *testing.T) {
 	tests := []struct {
 		name          string
 		input         string
-		expectedTools []string // first is Target, rest are Alternatives
 		condition     string
+		expectedTools []string // first is Target, rest are Alternatives
 	}{
 		{
 			name: "single unquoted hyphenated tool available",

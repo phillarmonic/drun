@@ -11,22 +11,19 @@ import (
 
 // Interpolator handles string interpolation for variables and expressions
 type Interpolator struct {
-	allowUndefined bool
-
 	// Cached regex patterns for performance
 	envVarRegex    *regexp.Regexp
 	quotedArgRegex *regexp.Regexp
 	paramArgRegex  *regexp.Regexp
-
 	// Callback functions for complex resolution (provided by engine)
-	resolveVariableOps func(expr string, ctx interface{}) string
-	resolveBuiltinOps  func(funcName string, operations string, ctx interface{}) (string, error)
-	resolveBuiltin     func(funcName string, args []string, ctx interface{}) (string, error)
-
+	resolveVariableOps func(expr string, ctx any) string
+	resolveBuiltinOps  func(funcName string, operations string, ctx any) (string, error)
+	resolveBuiltin     func(funcName string, args []string, ctx any) (string, error)
 	// Future: allowedFailures can be used to allow specific builtins to fail silently
 	// Example: allowedFailures = map[string]bool{"optional_function": true}
 	// Currently unused - all builtin failures cause task failures for predictability
 	allowedFailures map[string]bool //nolint:unused
+	allowUndefined  bool
 }
 
 // NewInterpolator creates a new interpolator
@@ -49,17 +46,17 @@ func (i *Interpolator) IsStrictMode() bool {
 }
 
 // SetResolveVariableOpsCallback sets the callback for resolving variable operations
-func (i *Interpolator) SetResolveVariableOpsCallback(fn func(expr string, ctx interface{}) string) {
+func (i *Interpolator) SetResolveVariableOpsCallback(fn func(expr string, ctx any) string) {
 	i.resolveVariableOps = fn
 }
 
 // SetResolveBuiltinOpsCallback sets the callback for resolving builtin operations
-func (i *Interpolator) SetResolveBuiltinOpsCallback(fn func(funcName string, operations string, ctx interface{}) (string, error)) {
+func (i *Interpolator) SetResolveBuiltinOpsCallback(fn func(funcName string, operations string, ctx any) (string, error)) {
 	i.resolveBuiltinOps = fn
 }
 
 // SetResolveBuiltinCallback sets the callback for resolving builtin function calls
-func (i *Interpolator) SetResolveBuiltinCallback(fn func(funcName string, args []string, ctx interface{}) (string, error)) {
+func (i *Interpolator) SetResolveBuiltinCallback(fn func(funcName string, args []string, ctx any) (string, error)) {
 	i.resolveBuiltin = fn
 }
 
@@ -77,7 +74,7 @@ type ProjectContext interface {
 	GetName() string
 	GetVersion() string
 	GetSettings() map[string]string
-	GetParameters() interface{} // Returns map[string]*ast.ProjectParameterStatement
+	GetParameters() any // Returns map[string]*ast.ProjectParameterStatement
 }
 
 // Interpolate performs variable and environment variable interpolation
@@ -210,7 +207,7 @@ func findBalancedInterpolationSpan(s string, start int) (begin, end int, ok bool
 // expandDrunBraceInterpolations repeatedly expands {$...} placeholders until none change
 // (so a ternary can yield text that still contains {$x}).
 func (i *Interpolator) expandDrunBraceInterpolations(message string, ctx Context, undefinedVars, builtinErrors *[]string) (string, error) {
-	for pass := 0; pass < maxDrunInterpolationPasses; pass++ {
+	for range maxDrunInterpolationPasses {
 		var b strings.Builder
 		pos := 0
 		changed := false

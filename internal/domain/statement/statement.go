@@ -31,6 +31,8 @@ const (
 	TypeNetwork          StatementType = "network"
 	TypeWait             StatementType = "wait"
 	TypeOpen             StatementType = "open"
+	TypeConfirm          StatementType = "confirm"
+	TypePrompt           StatementType = "prompt"
 	TypeFile             StatementType = "file"
 	TypeFileValue        StatementType = "file_value"
 	TypeChangelog        StatementType = "changelog"
@@ -58,13 +60,13 @@ func (a *Action) Type() StatementType { return TypeAction }
 type Shell struct {
 	Action               string
 	Command              string
-	Commands             []string
 	CaptureVar           string
+	ServiceName          string
+	Commands             []string
 	Attached             bool
 	StreamOutput         bool
 	IsMultiline          bool
 	ServiceScoped        bool
-	ServiceName          string
 	ServiceNameIsLiteral bool
 }
 
@@ -93,6 +95,7 @@ func (c *Conditional) Type() StatementType { return TypeConditional }
 
 // Loop represents for each loops
 type Loop struct {
+	Filter     *Filter
 	LoopType   string // "each", "range", "line", "match"
 	Variable   string
 	Iterable   string
@@ -100,11 +103,10 @@ type Loop struct {
 	RangeEnd   string
 	RangeStep  string
 	Subject    string // match loops: the $variable the pattern is matched against
-	Filter     *Filter
-	Parallel   bool
-	MaxWorkers int
-	FailFast   bool
 	Body       []Statement
+	MaxWorkers int
+	Parallel   bool
+	FailFast   bool
 }
 
 func (l *Loop) Type() StatementType { return TypeLoop }
@@ -156,29 +158,29 @@ func (c *Continue) Type() StatementType { return TypeContinue }
 
 // TaskCall represents calling another task
 type TaskCall struct {
-	TaskName   string
 	Parameters map[string]string
+	TaskName   string
 }
 
 func (tc *TaskCall) Type() StatementType { return TypeTaskCall }
 
 // TaskFromTemplate represents a task instantiated from a template
 type TaskFromTemplate struct {
+	Overrides    map[string]string
 	Name         string
 	TemplateName string
-	Overrides    map[string]string
 }
 
 func (tft *TaskFromTemplate) Type() StatementType { return TypeTaskFromTemplate }
 
 // Docker represents Docker operations
 type Docker struct {
+	Options              map[string]string
 	Operation            string
 	Resource             string
 	Name                 string
-	Options              map[string]string
-	ServiceScoped        bool
 	ServiceName          string
+	ServiceScoped        bool
 	ServiceNameIsLiteral bool
 }
 
@@ -186,10 +188,10 @@ func (d *Docker) Type() StatementType { return TypeDocker }
 
 // Git represents Git operations
 type Git struct {
+	Options   map[string]string
 	Operation string
 	Resource  string
 	Name      string
-	Options   map[string]string
 }
 
 func (g *Git) Type() StatementType { return TypeGit }
@@ -205,8 +207,8 @@ type GitQuery struct {
 	Series         string
 	VersionMatcher string
 	OrderBy        string
-	AllowFetch     bool
 	CaptureVar     string
+	AllowFetch     bool
 }
 
 func (g *GitQuery) Type() StatementType { return TypeGitQuery }
@@ -214,25 +216,25 @@ func (g *GitQuery) Type() StatementType { return TypeGitQuery }
 // GitEnsureVersion guards a candidate against a source's latest stable version.
 type GitEnsureVersion struct {
 	Candidate           string
-	CandidateIsVariable bool
 	Source              string
 	AccessMethod        string
 	TagPreset           string
 	TagFormat           string
 	TagPattern          string
 	CaptureVar          string
+	CandidateIsVariable bool
 }
 
 func (g *GitEnsureVersion) Type() StatementType { return TypeGitEnsureVersion }
 
 // HTTP represents HTTP operations
 type HTTP struct {
-	Method  string
-	URL     string
 	Headers map[string]string
-	Body    string
 	Auth    map[string]string
 	Options map[string]string
+	Method  string
+	URL     string
+	Body    string
 }
 
 func (h *HTTP) Type() StatementType { return TypeHTTP }
@@ -245,15 +247,15 @@ type PermissionSpec struct {
 
 // Download represents file download operations
 type Download struct {
-	URL              string
-	Path             string
-	AllowOverwrite   bool
-	AllowPermissions []PermissionSpec
-	ExtractTo        string
-	RemoveArchive    bool
 	Headers          map[string]string
 	Auth             map[string]string
 	Options          map[string]string
+	URL              string
+	Path             string
+	ExtractTo        string
+	AllowPermissions []PermissionSpec
+	AllowOverwrite   bool
+	RemoveArchive    bool
 }
 
 func (d *Download) Type() StatementType { return TypeDownload }
@@ -285,15 +287,41 @@ type Open struct {
 
 func (o *Open) Type() StatementType { return TypeOpen }
 
+// Confirm represents an interactive y/n confirmation gate
+// (confirm "Deploy to production?"). Without a result variable the bare form
+// stops the task gracefully when declined; with `as $var` the answer is stored
+// using drun's string-boolean convention ("true"/"false").
+type Confirm struct {
+	Question     string // Prompt text; may contain {variable} interpolation
+	DefaultValue string // Raw default value (e.g. "no"); empty unless HasDefault is set
+	ResultVar    string // Variable name without the $ prefix; empty for a bare gate
+	HasDefault   bool   // Whether a `defaults to` value was declared
+}
+
+func (c *Confirm) Type() StatementType { return TypeConfirm }
+
+// Prompt represents a free-form interactive text prompt
+// (prompt "Which environment?" as $environment). The typed answer is stored in
+// the result variable; `defaults to` supplies the value used when the user
+// presses enter with no input.
+type Prompt struct {
+	Question     string // Prompt text; may contain {variable} interpolation
+	DefaultValue string // Raw default value; empty unless HasDefault is set
+	ResultVar    string // Variable name without the $ prefix receiving the answer
+	HasDefault   bool   // Whether a `defaults to` value was declared
+}
+
+func (p *Prompt) Type() StatementType { return TypePrompt }
+
 // File represents file operations
 type File struct {
+	Replacements map[string]string
 	Action       string
 	Target       string
 	Source       string
 	Content      string
-	IsDir        bool
 	CaptureVar   string
-	Replacements map[string]string
+	IsDir        bool
 }
 
 func (f *File) Type() StatementType { return TypeFile }
@@ -390,14 +418,14 @@ func (rt *RequiresTools) Type() StatementType { return TypeRequiresTools }
 
 // GitPolicy represents a project-level setting for git conventions.
 type GitPolicy struct {
+	BranchPattern        string
+	CommitPattern        string
 	DefaultBranches      []string
 	ProtectedBranches    []string
-	BranchPattern        string
 	BranchTypes          []string
-	CommitPattern        string
-	ExtractIdentifier    bool
-	CommitMinLength      int
 	CommitBans           []string
+	CommitMinLength      int
+	ExtractIdentifier    bool
 	EnforceSignedCommits bool
 }
 

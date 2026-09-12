@@ -15,13 +15,17 @@ type location struct {
 	Range lspRange `json:"range"`
 }
 
-var callTaskRefPattern = regexp.MustCompile(`call\s+task\s+(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
-var useSnippetRefPattern = regexp.MustCompile(`use\s+snippet\s+(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
-var dependsOnRefPattern = regexp.MustCompile(`depends\s+on\s+(.+)$`)
-var refNameTokenPattern = regexp.MustCompile(`"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*)`)
+var (
+	callTaskRefPattern   = regexp.MustCompile(`call\s+task\s+(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
+	useSnippetRefPattern = regexp.MustCompile(`use\s+snippet\s+(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
+	dependsOnRefPattern  = regexp.MustCompile(`depends\s+on\s+(.+)$`)
+	refNameTokenPattern  = regexp.MustCompile(`"([^"]*)"|([A-Za-z_][A-Za-z0-9_.-]*)`)
+)
 
-var taskDeclPattern = regexp.MustCompile(`^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
-var snippetDeclPattern = regexp.MustCompile(`^\s*snippet\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
+var (
+	taskDeclPattern    = regexp.MustCompile(`^\s*(?:template\s+)?task\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
+	snippetDeclPattern = regexp.MustCompile(`^\s*snippet\s+(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_.-]*))`)
+)
 
 func definitionsForSource(uri, source string, pos position) []location {
 	lines := strings.Split(source, "\n")

@@ -19,8 +19,8 @@ func TestAvailableTasksBuiltin(t *testing.T) {
 
 	tests := []struct {
 		name string
-		args []string
 		want string
+		args []string
 	}{
 		{name: "default separator", want: "default, lint, build"},
 		{name: "custom separator", args: []string{" | "}, want: "default | lint | build"},

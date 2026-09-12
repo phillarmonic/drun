@@ -8,17 +8,17 @@ import (
 
 // DetectionStatement represents smart detection operations
 type DetectionStatement struct {
-	Token        lexer.Token
 	Type         string
 	Target       string
-	Alternatives []string
 	Condition    string
 	Value        string
 	VersionOp    string
 	VersionValue string
 	CaptureVar   string
+	Alternatives []string
 	Body         []Statement
 	ElseBody     []Statement
+	Token        lexer.Token
 }
 
 func (ds *DetectionStatement) statementNode() {}

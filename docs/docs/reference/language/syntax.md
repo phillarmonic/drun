@@ -809,4 +809,40 @@ On headless machines, SSH sessions, and CI environments the statement prints a
 warning with the URL and continues without failing. See
 [Built-in Actions](./built-in-actions.md#opening-a-url-or-file) for details.
 
+### Confirm and Prompt Statements
+
+Interactive input is expressed with `confirm` (a yes/no gate) and `prompt`
+(free-form text input):
+
+```
+confirm "<question>" [defaults to yes|no] [as $var]
+prompt  "<question>" [defaults to <value>] as $var
+```
+
+The question string is required. The optional clauses must appear in the
+documented order: `defaults to <value>` first, then `as $var`. The question
+string and the default value may contain `{variable}` interpolation.
+
+`confirm` accepts a yes/no answer and acts as a gate: without `as $var`, a
+"no" answer stops the task gracefully (drun prints a notice and finishes with
+exit code 0); with `as $var`, the answer is stored using drun's
+`"true"`/`"false"` string-boolean convention and execution continues, so it
+composes with the existing `if`/`when` conditionals. `prompt` always requires
+`as $var` and stores the typed answer verbatim.
+
+```drun
+confirm "Deploy to production?"                        # gate: a "no" stops the task (exit 0)
+confirm "Run database migrations?" as $migrate         # stores "true"/"false"
+confirm "Delete build cache?" defaults to "no"         # default used when no answer is given
+prompt "Which environment?" as $environment            # free-form answer
+prompt "Release notes?" defaults to "n/a" as $notes    # free-form answer with a default
+```
+
+Interactive statements only read from a real terminal. When there is no
+interactive terminal — piped input, CI environments, or dry runs — they never
+block: a declared default or a global `--yes`/`--no` flag resolves the
+statement, and otherwise the run fails with a clear error. See
+[Built-in Actions](./built-in-actions.md#confirmations-and-prompts-interactive-input)
+for the full interactive behavior.
+
 ---

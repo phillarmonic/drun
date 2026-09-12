@@ -3,6 +3,7 @@
 package changelog
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -62,7 +63,7 @@ func Promote(content, rawVersion string, date time.Time) (string, error) {
 		}
 	}
 	if unreleasedAt == -1 {
-		return "", fmt.Errorf("no '## [Unreleased]' section found")
+		return "", errors.New("no '## [Unreleased]' section found")
 	}
 
 	// The Unreleased body runs until the next section heading or the link

@@ -30,6 +30,9 @@ var builtinMacros = map[string]PatternMacro{
 		Pattern:     `^v\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$`,
 		Description: "Extended semantic versioning with pre-release and build metadata (e.g., v2.0.1-RC2, v1.0.0-alpha.1+build.123)",
 	},
+	// uuid deliberately accepts only the canonical lowercase hyphenated form.
+	// uuid.Parse would also take uppercase, braced, urn:uuid: and bare
+	// 32-character spellings, which would widen what drun accepts.
 	"uuid": {
 		Name:        "uuid",
 		Pattern:     `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,

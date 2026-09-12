@@ -8,9 +8,9 @@ import (
 
 // ActionStatement represents an action call (info, step, success, etc.)
 type ActionStatement struct {
-	Token           lexer.Token
 	Action          string
 	Message         string
+	Token           lexer.Token
 	LineBreakBefore bool
 	LineBreakAfter  bool
 }

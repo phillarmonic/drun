@@ -18,6 +18,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [2.30.0] - 2026-09-09
+
+### Added
+
+Interactive mode
+- `xdrun debug` now captures the standard Go 1.27 `goroutineleak` profile (text and binary) on the critical-memory path, and drun's goroutines carry pprof labels (`drun.component`, `drun.worker`, `drun.variable`, `drun.orchestration`, `drun.service`) so panic and SIGQUIT tracebacks identify which pool, worker, or orchestration loop a goroutine belongs to.
+
+### Changed
+
+- Modernized the codebase onto Go 1.27 and drove `golangci-lint` from 801 findings on the go 1.27.1 tree (844 at planning time) to zero across 209 files. Every fix is mechanical or semantics-preserving: formatting (`gofumpt`/`goimports`), `perfsprint`, `modernize`, `usestdlibvars`, `errorlint` (`%v` → `%w` wrapping, and `==`/type-assertion error matching → `errors.Is`/`errors.As`), `govet` `shadow` renames, `fieldalignment` struct reordering, `wastedassign`, `nilness`, and `gocritic`. The 34 findings that remain are deliberate and each is suppressed in place with a written reason.
+- JSON handling uses `encoding/json/v2` where it earns its place: the LSP JSON-RPC envelope (v2 matches member names case-sensitively and rejects duplicate members, as JSON-RPC 2.0 requires), GitHub/GitLab CLI response decoding, and the self-updater's API responses. JSON emitted into user files and small human-facing debug serializations stay on v1 so their bytes are unchanged.
+- Module dependencies refreshed to their current same-major releases: cobra 1.10.2, `x/crypto` 0.57.0 together with `x/term` 0.46.0, `go-keyring` 0.2.8, `figlet` 1.3.1, and the archive-compression stack (`klauspost/compress`, `minlz`, `sevenzip`, `brotli`, `rardecode`, `lz4`, `xz`).
+
+### Fixed
+
+- Engine cleanup now runs when a task fails. `os.Exit` moved out of task execution into the command handler, so `defer eng.Cleanup()` releases remote-include temporary files and closes the include cache manager on the task-execution-failure and parameter-validation-failure paths, where it was previously skipped. The stderr text and exit code are unchanged.
+- `xdrun` workspace config loading only falls back to defaults when the config file is genuinely absent (`fs.ErrNotExist`); permission and I/O failures on that file now surface as errors instead of being silently masked as a missing file.
+
+### Security
+
+- A provisioning manifest fetched from a remote source is now confined to its temporary clone directory: absolute, drive-qualified, and `..`-escaping manifest paths are rejected, so a remote source cannot address files outside its own clone. The remaining `gosec` findings are deliberate authorizations — spec-, CLI-, and hook-declared paths and commands — and each is annotated in place with the provenance of the path or command name.
+
 ## [2.29.0] - 2026-09-03
 
 ### Added

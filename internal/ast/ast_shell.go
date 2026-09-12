@@ -2,22 +2,23 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/lexer"
 )
 
 // ShellStatement represents shell command execution
 type ShellStatement struct {
-	Token                lexer.Token
 	Action               string
 	Command              string
-	Commands             []string
 	CaptureVar           string
+	ServiceName          string
+	Commands             []string
+	Token                lexer.Token
 	Attached             bool
 	StreamOutput         bool
 	IsMultiline          bool
 	ServiceScoped        bool
-	ServiceName          string
 	ServiceNameIsLiteral bool
 }
 
@@ -30,16 +31,18 @@ func (ss *ShellStatement) String() string {
 			if ss.ServiceNameIsLiteral {
 				prefix += fmt.Sprintf(" in service \"%s\"", ss.ServiceName)
 			} else {
-				prefix += fmt.Sprintf(" in service %s", ss.ServiceName)
+				prefix += " in service " + ss.ServiceName
 			}
 		}
 		out = prefix + ":"
 		if ss.CaptureVar != "" {
 			out = fmt.Sprintf("%s as %s:", prefix, ss.CaptureVar)
 		}
+		var outSb40 strings.Builder
 		for _, cmd := range ss.Commands {
-			out += fmt.Sprintf("\n  %s", cmd)
+			outSb40.WriteString("\n  " + cmd)
 		}
+		out += outSb40.String()
 		return out
 	}
 

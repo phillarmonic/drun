@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -55,16 +56,19 @@ var urlSchemePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
 func openerCommand(target string) (*exec.Cmd, error) {
 	switch platform.Current() {
 	case platform.Mac:
+		// #nosec G204 -- hardcoded macOS opener; target is one argument and is never concatenated into a shell string.
 		return exec.Command("open", target), nil
 	case platform.Windows:
 		// The empty first quoted arg is the window title; without it a quoted
 		// URL is misinterpreted by cmd.
+		// #nosec G204 -- hardcoded Windows opener; target is passed as its own argument, so os/exec applies cmd.exe escaping rather than shell interpolation.
 		return exec.Command("cmd", "/c", "start", "", target), nil
 	default: // linux and other unixes
 		path, err := exec.LookPath("xdg-open")
 		if err != nil {
-			return nil, fmt.Errorf("no opener found (xdg-open not in PATH)")
+			return nil, errors.New("no opener found (xdg-open not in PATH)")
 		}
+		// #nosec G204 -- path is the exec.LookPath result for the fixed name xdg-open, not external input.
 		return exec.Command(path, target), nil
 	}
 }
@@ -72,7 +76,7 @@ func openerCommand(target string) (*exec.Cmd, error) {
 // executeOpen executes: open url "<target>"
 func (e *Engine) executeOpen(stmt *statement.Open, ctx *ExecutionContext) error {
 	if !e.folderTrusted {
-		return fmt.Errorf("open url: this folder is not trusted for security-sensitive operations\n" +
+		return errors.New("open url: this folder is not trusted for security-sensitive operations\n" +
 			"Run 'xdrun cmd:trust' in the project directory to allow 'open url' statements")
 	}
 
@@ -82,14 +86,14 @@ func (e *Engine) executeOpen(stmt *statement.Open, ctx *ExecutionContext) error 
 	}
 	target = strings.TrimSpace(target)
 	if target == "" {
-		return fmt.Errorf("open url: target is empty after interpolation")
+		return errors.New("open url: target is empty after interpolation")
 	}
 
 	// No scheme -> local path: resolve to absolute (openers imply file:// for paths)
 	if !urlSchemePattern.MatchString(target) {
-		abs, err := filepath.Abs(target)
-		if err != nil {
-			return fmt.Errorf("open url: cannot resolve path %q: %w", target, err)
+		abs, absErr := filepath.Abs(target)
+		if absErr != nil {
+			return fmt.Errorf("open url: cannot resolve path %q: %w", target, absErr)
 		}
 		target = abs
 	}

@@ -3,7 +3,7 @@
 
 version: 2.0
 
-project "Drun" version "2.29.0":
+project "Drun" version "2.30.0":
 	requires tools:
 		go >= "1.26.5"
 		golangci-lint provision
@@ -113,6 +113,9 @@ task "ci" mode "ci" means "Runs the whole CI pipeline":
 
 task "prepare-release" means "Runs checks related to going to a next release":
     requires $version as string matching semver_optional_v
+    # Interactive gate (dogfooding confirm): declining aborts the release
+    # prep gracefully. Defaults to yes so unattended runs keep going.
+    confirm "Prepare release v{$version}?" defaults to "yes"
     step "Preflight. Proposed version: v{$version}"
     # Byte for byte comparison
     if file "./drun.tmLanguage.json" not matches file "./docs/docs/assets/languages/drun.tmLanguage.json":

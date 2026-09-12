@@ -31,24 +31,23 @@ type TaskPlan struct {
 // ExecutionPlan represents a complete, deterministic execution plan
 // All dependencies, hooks, and includes are resolved upfront
 type ExecutionPlan struct {
-	// Target task being executed
-	TargetTask string
-
-	// Ordered list of tasks to execute (includes dependencies)
-	ExecutionOrder []string
-
 	// Fully resolved task plans (domain-level, no AST)
 	Tasks map[string]*TaskPlan
 
 	// Lifecycle hooks resolved from project
 	Hooks *HookPlan
 
+	// Namespace tracking for includes
+	Namespaces map[string]bool // Set of namespaces used
+
+	// Target task being executed
+	TargetTask string
 	// Project metadata
 	ProjectName    string
 	ProjectVersion string
 
-	// Namespace tracking for includes
-	Namespaces map[string]bool // Set of namespaces used
+	// Ordered list of tasks to execute (includes dependencies)
+	ExecutionOrder []string
 }
 
 // Planner orchestrates dependency resolution and produces execution plans

@@ -35,8 +35,8 @@ func (tr *ToolRequirement) String() string {
 // TaskToolSources represents a "from tasks:" source clause inside a
 // "requires tools:" block.
 type TaskToolSources struct {
-	Token lexer.Token
 	Tasks []string
+	Token lexer.Token
 }
 
 func (tts *TaskToolSources) String() string {
@@ -51,9 +51,9 @@ func (tts *TaskToolSources) String() string {
 // RequiresToolsStatement represents a "requires tools:" block
 // This can appear in both project settings and task bodies.
 type RequiresToolsStatement struct {
-	Token       lexer.Token
 	Tools       []ToolRequirement
 	TaskSources []TaskToolSources
+	Token       lexer.Token
 }
 
 func (rts *RequiresToolsStatement) statementNode()      {}
@@ -75,8 +75,8 @@ func (rts *RequiresToolsStatement) String() string {
 
 // ProvisioningSourcesStatement represents a project-level "provisioning sources:" block.
 type ProvisioningSourcesStatement struct {
-	Token   lexer.Token
 	Sources []string
+	Token   lexer.Token
 }
 
 func (pss *ProvisioningSourcesStatement) statementNode()      {}

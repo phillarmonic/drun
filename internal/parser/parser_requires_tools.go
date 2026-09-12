@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/ast"
 	"github.com/phillarmonic/drun/v2/internal/lexer"
@@ -249,6 +250,7 @@ func (p *Parser) parseToolName() (string, bool) {
 	name := p.curToken.Literal
 
 	// Handle dashed names like "golangci-lint"
+	var nameSb252 strings.Builder
 	for p.peekToken.Type == lexer.MINUS {
 		p.nextToken() // consume MINUS
 
@@ -258,8 +260,9 @@ func (p *Parser) parseToolName() (string, bool) {
 			p.addError("expected identifier after '-' in tool name")
 			return "", false
 		}
-		name += "-" + p.curToken.Literal
+		nameSb252.WriteString("-" + p.curToken.Literal)
 	}
+	name += nameSb252.String()
 
 	// Advance past the tool name to the next token (operator or next line)
 	p.nextToken()

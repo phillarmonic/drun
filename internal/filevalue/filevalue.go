@@ -4,10 +4,14 @@ package filevalue
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +50,7 @@ type adapterFuncs struct {
 func (a adapterFuncs) Read(selector string, data []byte) (Scalar, error) {
 	return a.read(selector, data)
 }
+
 func (a adapterFuncs) Update(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
 	return a.update(selector, data, value, policy, valueType)
 }
@@ -55,7 +60,7 @@ var adapters = map[string]Adapter{
 	"drun":     adapterFuncs{read: readDrun, update: updateDrun},
 	"match": adapterFuncs{read: readMatch, update: func(s string, d []byte, v, p, _ string) ([]byte, Scalar, error) {
 		if p == "add" {
-			return nil, Scalar{}, fmt.Errorf("regex match updates do not support additions")
+			return nil, Scalar{}, errors.New("regex match updates do not support additions")
 		}
 		return updateMatch(s, d, v)
 	}},
@@ -72,7 +77,7 @@ func drunProjectVersionSpan(selector string, data []byte) (int, int, Scalar, err
 	}
 	matches := drunProjectDeclarationPattern.FindAllSubmatchIndex(data, -1)
 	if len(matches) == 0 {
-		return 0, 0, Scalar{}, fmt.Errorf("drun project declaration with a version was not found")
+		return 0, 0, Scalar{}, errors.New("drun project declaration with a version was not found")
 	}
 	if len(matches) != 1 {
 		return 0, 0, Scalar{}, fmt.Errorf("drun project version is ambiguous: found %d project declarations", len(matches))
@@ -92,10 +97,10 @@ func updateDrun(selector string, data []byte, value, missingPolicy, valueType st
 		return nil, Scalar{}, fmt.Errorf("drun project version updates do not support %q", missingPolicy)
 	}
 	if valueType != "" {
-		return nil, Scalar{}, fmt.Errorf("drun project versions do not accept an explicit scalar type")
+		return nil, Scalar{}, errors.New("drun project versions do not accept an explicit scalar type")
 	}
 	if strings.ContainsAny(value, "\"\r\n") {
-		return nil, Scalar{}, fmt.Errorf("drun project version cannot contain quotes or newlines")
+		return nil, Scalar{}, errors.New("drun project version cannot contain quotes or newlines")
 	}
 	start, end, _, err := drunProjectVersionSpan(selector, data)
 	if err != nil {
@@ -370,20 +375,20 @@ func matchCapture(pattern string, data []byte) (*regexp.Regexp, []int, int, erro
 	for i, n := range re.SubexpNames() {
 		if n == "value" {
 			if group >= 0 {
-				return nil, nil, 0, fmt.Errorf("pattern has multiple value captures")
+				return nil, nil, 0, errors.New("pattern has multiple value captures")
 			}
 			group = i
 		}
 	}
 	if group < 1 {
-		return nil, nil, 0, fmt.Errorf("pattern must contain a named value capture")
+		return nil, nil, 0, errors.New("pattern must contain a named value capture")
 	}
 	matches := re.FindAllSubmatchIndex(data, -1)
 	if len(matches) != 1 {
 		return nil, nil, 0, fmt.Errorf("pattern matched %d times", len(matches))
 	}
 	if matches[0][2*group] < 0 {
-		return nil, nil, 0, fmt.Errorf("value capture did not participate in match")
+		return nil, nil, 0, errors.New("value capture did not participate in match")
 	}
 	return re, matches[0], group, nil
 }
@@ -419,155 +424,134 @@ const (
 )
 
 type jsonNode struct {
-	start, end int
-	kind       jsonNodeKind
-	close      int
-	firstKey   int
-	members    map[string][]*jsonNode
+	members  map[string][]*jsonNode
+	start    int
+	end      int
+	kind     jsonNodeKind
+	close    int
+	firstKey int
 }
 
-type jsonScanner struct {
-	data []byte
-	pos  int
+// jsonDecoderOptions keeps the tokenizer's tolerance identical to the previous
+// hand-rolled scanner: duplicate member names are tracked per key (and only
+// rejected when a selector addresses the duplicated key), and invalid UTF-8 is
+// tolerated the way encoding/json v1 tolerated it.
+var jsonDecoderOptions = []jsontext.Options{
+	jsontext.AllowDuplicateNames(true),
+	jsontext.AllowInvalidUTF8(true),
 }
 
-func (s *jsonScanner) ws() {
-	for s.pos < len(s.data) && unicode.IsSpace(rune(s.data[s.pos])) {
-		s.pos++
-	}
-}
-func (s *jsonScanner) stringToken() (string, int, int, error) {
-	s.ws()
-	start := s.pos
-	if start >= len(s.data) || s.data[start] != '"' {
-		return "", 0, 0, fmt.Errorf("expected JSON string")
-	}
-	s.pos++
-	esc := false
-	for s.pos < len(s.data) {
-		c := s.data[s.pos]
-		s.pos++
-		if esc {
-			esc = false
-			continue
-		}
-		if c == '\\' {
-			esc = true
-			continue
-		}
-		if c == '"' {
-			var v string
-			if err := json.Unmarshal(s.data[start:s.pos], &v); err != nil {
-				return "", 0, 0, err
-			}
-			return v, start, s.pos, nil
-		}
-	}
-	return "", 0, 0, fmt.Errorf("unterminated JSON string")
-}
-func (s *jsonScanner) value() (*jsonNode, error) {
-	s.ws()
-	start := s.pos
-	if start >= len(s.data) {
-		return nil, fmt.Errorf("missing JSON value")
-	}
-	switch s.data[s.pos] {
+func scanJSONValue(dec *jsontext.Decoder, data []byte) (*jsonNode, error) {
+	switch dec.PeekKind() {
 	case '{':
-		return s.object()
+		return scanJSONObject(dec, data)
 	case '[':
-		return s.array()
-	case '"':
-		_, a, b, err := s.stringToken()
-		return &jsonNode{start: a, end: b, kind: jsonString, firstKey: -1}, err
-	default:
-		s.pos++
-		for s.pos < len(s.data) && !strings.ContainsRune(",}] \t\r\n", rune(s.data[s.pos])) {
-			s.pos++
-		}
-		raw := string(s.data[start:s.pos])
-		if raw == "true" || raw == "false" {
-			return &jsonNode{start: start, end: s.pos, kind: jsonBoolean, firstKey: -1}, nil
-		}
-		if raw == "null" {
-			return &jsonNode{start: start, end: s.pos, kind: jsonNull, firstKey: -1}, nil
-		}
-		return &jsonNode{start: start, end: s.pos, kind: jsonNumber, firstKey: -1}, nil
+		return scanJSONArray(dec, data)
 	}
+	raw, err := dec.ReadValue()
+	if err != nil {
+		return nil, err
+	}
+	end := int(dec.InputOffset())
+	return &jsonNode{start: end - len(raw), end: end, kind: jsonNodeKindOf(raw.Kind()), firstKey: -1}, nil
 }
 
-func (s *jsonScanner) object() (*jsonNode, error) {
-	start := s.pos
-	s.pos++
-	s.ws()
-	node := &jsonNode{start: start, kind: jsonObject, firstKey: -1, members: map[string][]*jsonNode{}}
-	if s.pos < len(s.data) && s.data[s.pos] == '}' {
-		node.close = s.pos
-		s.pos++
-		node.end = s.pos
-		return node, nil
+func scanJSONObject(dec *jsontext.Decoder, data []byte) (*jsonNode, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return nil, err
+	}
+	afterOpen := int(dec.InputOffset())
+	node := &jsonNode{
+		start:    afterOpen - 1,
+		kind:     jsonObject,
+		firstKey: -1,
+		members:  map[string][]*jsonNode{},
 	}
 	for {
-		s.ws()
-		key, keyStart, _, err := s.stringToken()
-		if err != nil {
-			return nil, err
-		}
-		if node.firstKey < 0 {
-			node.firstKey = keyStart
-		}
-		s.ws()
-		if s.pos >= len(s.data) || s.data[s.pos] != ':' {
-			return nil, fmt.Errorf("expected colon")
-		}
-		s.pos++
-		value, err := s.value()
-		if err != nil {
-			return nil, err
-		}
-		node.members[key] = append(node.members[key], value)
-		s.ws()
-		if s.pos < len(s.data) && s.data[s.pos] == ',' {
-			s.pos++
-			continue
-		}
-		if s.pos < len(s.data) && s.data[s.pos] == '}' {
-			node.close = s.pos
-			s.pos++
-			node.end = s.pos
+		switch dec.PeekKind() {
+		case '}':
+			if _, err := dec.ReadToken(); err != nil {
+				return nil, err
+			}
+			node.close = int(dec.InputOffset()) - 1
+			node.end = int(dec.InputOffset())
 			return node, nil
+		case '"':
+			key, err := dec.ReadToken()
+			if err != nil {
+				return nil, err
+			}
+			// The token borrows the decoder's buffer, so it must be read
+			// before the decoder advances past the member's value.
+			name := key.String()
+			if node.firstKey < 0 {
+				node.firstKey = firstMemberOffset(data, afterOpen)
+			}
+			value, err := scanJSONValue(dec, data)
+			if err != nil {
+				return nil, err
+			}
+			node.members[name] = append(node.members[name], value)
+		default:
+			return nil, errors.New("invalid JSON object")
 		}
-		return nil, fmt.Errorf("invalid JSON object")
 	}
 }
 
-func (s *jsonScanner) array() (*jsonNode, error) {
-	start := s.pos
-	s.pos++
-	s.ws()
-	if s.pos < len(s.data) && s.data[s.pos] == ']' {
-		s.pos++
-		return &jsonNode{start: start, end: s.pos, kind: jsonArray, firstKey: -1}, nil
+func scanJSONArray(dec *jsontext.Decoder, data []byte) (*jsonNode, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return nil, err
 	}
+	node := &jsonNode{start: int(dec.InputOffset()) - 1, kind: jsonArray, firstKey: -1}
 	for {
-		if _, err := s.value(); err != nil {
-			return nil, err
+		switch dec.PeekKind() {
+		case ']':
+			if _, err := dec.ReadToken(); err != nil {
+				return nil, err
+			}
+			node.end = int(dec.InputOffset())
+			return node, nil
+		case 0:
+			return nil, errors.New("invalid JSON array")
+		default:
+			if _, err := scanJSONValue(dec, data); err != nil {
+				return nil, err
+			}
 		}
-		s.ws()
-		if s.pos < len(s.data) && s.data[s.pos] == ',' {
-			s.pos++
-			continue
-		}
-		if s.pos < len(s.data) && s.data[s.pos] == ']' {
-			s.pos++
-			return &jsonNode{start: start, end: s.pos, kind: jsonArray, firstKey: -1}, nil
-		}
-		return nil, fmt.Errorf("invalid JSON array")
 	}
+}
+
+func jsonNodeKindOf(kind jsontext.Kind) jsonNodeKind {
+	switch kind {
+	case '"':
+		return jsonString
+	case 't', 'f':
+		return jsonBoolean
+	case 'n':
+		return jsonNull
+	default:
+		return jsonNumber
+	}
+}
+
+// firstMemberOffset returns the offset of the first object member's name, which
+// is where the first byte that is neither whitespace nor the opening brace
+// sits. It mirrors the offset the previous scanner recorded from its key token.
+func firstMemberOffset(data []byte, from int) int {
+	for i := from; i < len(data); i++ {
+		switch data[i] {
+		case ' ', '\t', '\n', '\r':
+			continue
+		default:
+			return i
+		}
+	}
+	return -1
 }
 
 func decodePointer(pointer string) ([]string, error) {
 	if pointer == "" || pointer[0] != '/' {
-		return nil, fmt.Errorf("JSON selector must be an RFC 6901 pointer")
+		return nil, errors.New("JSON selector must be an RFC 6901 pointer")
 	}
 	parts := strings.Split(pointer[1:], "/")
 	for i, p := range parts {
@@ -578,7 +562,7 @@ func decodePointer(pointer string) ([]string, error) {
 				continue
 			}
 			if j+1 >= len(p) || (p[j+1] != '0' && p[j+1] != '1') {
-				return nil, fmt.Errorf("invalid RFC 6901 escape in JSON selector")
+				return nil, errors.New("invalid RFC 6901 escape in JSON selector")
 			}
 			j++
 			if p[j] == '0' {
@@ -593,24 +577,23 @@ func decodePointer(pointer string) ([]string, error) {
 }
 
 func parseJSON(data []byte) (*jsonNode, error) {
-	if !json.Valid(data) {
-		return nil, fmt.Errorf("invalid JSON document")
+	if !jsontext.Value(data).IsValid(jsonDecoderOptions...) {
+		return nil, errors.New("invalid JSON document")
 	}
-	s := jsonScanner{data: data}
-	root, err := s.value()
+	dec := jsontext.NewDecoder(bytes.NewReader(data), jsonDecoderOptions...)
+	root, err := scanJSONValue(dec, data)
 	if err != nil {
 		return nil, err
 	}
-	s.ws()
-	if s.pos != len(data) {
-		return nil, fmt.Errorf("invalid trailing JSON content")
+	if _, err := dec.ReadToken(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("invalid trailing JSON content")
 	}
 	return root, nil
 }
 
 func jsonMember(object *jsonNode, key string) (*jsonNode, bool, error) {
 	if object.kind != jsonObject {
-		return nil, false, fmt.Errorf("JSON pointer parent is not an object")
+		return nil, false, errors.New("JSON pointer parent is not an object")
 	}
 	values := object.members[key]
 	if len(values) > 1 {
@@ -632,7 +615,7 @@ func findJSONNode(data []byte, pointer string) (*jsonNode, error) {
 		return nil, err
 	}
 	if node.kind != jsonObject {
-		return nil, fmt.Errorf("JSON pointer root is not an object")
+		return nil, errors.New("JSON pointer root is not an object")
 	}
 	for _, part := range parts {
 		next, found, err := jsonMember(node, part)
@@ -657,11 +640,11 @@ func scalarFromJSONNode(data []byte, node *jsonNode) (Scalar, error) {
 	case jsonBoolean:
 		kind = Boolean
 	case jsonObject:
-		return Scalar{}, fmt.Errorf("JSON objects are not scalar")
+		return Scalar{}, errors.New("JSON objects are not scalar")
 	case jsonArray:
-		return Scalar{}, fmt.Errorf("JSON arrays are not supported")
+		return Scalar{}, errors.New("JSON arrays are not supported")
 	default:
-		return Scalar{}, fmt.Errorf("JSON null is not a supported scalar")
+		return Scalar{}, errors.New("JSON null is not a supported scalar")
 	}
 	var text string
 	switch kind {
@@ -701,7 +684,7 @@ func updateJSON(selector string, data []byte, value, policy, valueType string) (
 	out = append(out, enc...)
 	out = append(out, data[node.end:]...)
 	if !json.Valid(out) {
-		return nil, Scalar{}, fmt.Errorf("updated JSON is invalid")
+		return nil, Scalar{}, errors.New("updated JSON is invalid")
 	}
 	return out, next, nil
 }
@@ -712,20 +695,20 @@ func addJSON(selector string, data []byte, value, valueType string) ([]byte, Sca
 		return nil, Scalar{}, err
 	}
 	if valueType == "" {
-		return nil, Scalar{}, fmt.Errorf("added JSON values require an explicit scalar type")
+		return nil, Scalar{}, errors.New("added JSON values require an explicit scalar type")
 	}
 	root, err := parseJSON(data)
 	if err != nil {
 		return nil, Scalar{}, err
 	}
 	if root.kind != jsonObject {
-		return nil, Scalar{}, fmt.Errorf("JSON pointer root is not an object")
+		return nil, Scalar{}, errors.New("JSON pointer root is not an object")
 	}
 	parent := root
 	for _, p := range parts[:len(parts)-1] {
-		child, found, err := jsonMember(parent, p)
-		if err != nil {
-			return nil, Scalar{}, err
+		child, found, jsonErr := jsonMember(parent, p)
+		if jsonErr != nil {
+			return nil, Scalar{}, jsonErr
 		}
 		if !found {
 			return nil, Scalar{}, fmt.Errorf("JSON parent %q does not exist", p)
@@ -736,10 +719,10 @@ func addJSON(selector string, data []byte, value, valueType string) ([]byte, Sca
 		parent = child
 	}
 	leaf := parts[len(parts)-1]
-	if _, found, err := jsonMember(parent, leaf); err != nil {
-		return nil, Scalar{}, err
+	if _, found, jsonErr := jsonMember(parent, leaf); jsonErr != nil {
+		return nil, Scalar{}, jsonErr
 	} else if found {
-		return nil, Scalar{}, fmt.Errorf("JSON value already exists")
+		return nil, Scalar{}, errors.New("JSON value already exists")
 	}
 	scalar, err := scalarFromText(value, valueType)
 	if err != nil {
@@ -803,26 +786,26 @@ func unsupportedSelector(format, selector, reason string) error {
 
 func yamlPath(selector string) ([]string, error) {
 	parts := strings.Split(selector, ".")
-	for _, part := range parts {
-		if part == "" {
-			return nil, unsupportedSelector("YAML", selector, "selectors must be non-empty dot-separated mapping keys")
-		}
+	if slices.Contains(parts, "") {
+		return nil, unsupportedSelector("YAML", selector, "selectors must be non-empty dot-separated mapping keys")
 	}
 	return parts, nil
 }
+
 func yamlRoot(data []byte) (*yaml.Node, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
 	if len(doc.Content) != 1 {
-		return nil, fmt.Errorf("empty YAML document")
+		return nil, errors.New("empty YAML document")
 	}
 	if doc.Content[0].Kind != yaml.MappingNode {
 		return nil, unsupportedSelector("YAML", "", "the document root is not a mapping")
 	}
 	return &doc, nil
 }
+
 func yamlNodeAt(doc *yaml.Node, parts []string) (*yaml.Node, bool, error) {
 	node := doc.Content[0]
 	for _, part := range parts {
@@ -849,6 +832,7 @@ func yamlNodeAt(doc *yaml.Node, parts []string) (*yaml.Node, bool, error) {
 	}
 	return node, true, nil
 }
+
 func scalarFromYAML(n *yaml.Node) (Scalar, error) {
 	if n.Kind != yaml.ScalarNode {
 		return Scalar{}, unsupportedSelector("YAML", "", "selection is not a scalar string, number, or boolean")
@@ -906,6 +890,7 @@ func readYAML(selector string, data []byte) (Scalar, error) {
 	}
 	return scalarFromYAML(n)
 }
+
 func updateYAML(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
 	parts, err := yamlPath(selector)
 	if err != nil {
@@ -942,7 +927,7 @@ func updateYAML(selector string, data []byte, value, policy, valueType string) (
 			return nil, Scalar{}, fmt.Errorf("YAML parent for %q does not exist", selector)
 		}
 		if valueType == "" {
-			return nil, Scalar{}, fmt.Errorf("added YAML values require an explicit scalar type")
+			return nil, Scalar{}, errors.New("added YAML values require an explicit scalar type")
 		}
 		s, e = scalarFromText(value, valueType)
 		if e != nil {
@@ -1057,6 +1042,7 @@ func readTOML(selector string, data []byte) (Scalar, error) {
 	}
 	return scalarFromTOML(value)
 }
+
 func updateTOML(selector string, data []byte, value, policy, valueType string) ([]byte, Scalar, error) {
 	parts, err := tomlParts(selector)
 	if err != nil {
@@ -1072,20 +1058,20 @@ func updateTOML(selector string, data []byte, value, policy, valueType string) (
 	}
 	var scalar Scalar
 	if found {
-		existing, err := scalarFromTOML(current)
-		if err != nil {
-			return nil, Scalar{}, err
+		existing, scalarErr := scalarFromTOML(current)
+		if scalarErr != nil {
+			return nil, Scalar{}, scalarErr
 		}
-		scalar, err = scalarFromText(value, string(existing.Kind))
-		if err != nil {
-			return nil, Scalar{}, err
+		scalar, scalarErr = scalarFromText(value, string(existing.Kind))
+		if scalarErr != nil {
+			return nil, Scalar{}, scalarErr
 		}
 	} else {
 		if policy != "add" {
 			return nil, Scalar{}, fmt.Errorf("TOML key %q does not exist", selector)
 		}
 		if valueType == "" {
-			return nil, Scalar{}, fmt.Errorf("added TOML values require an explicit scalar type")
+			return nil, Scalar{}, errors.New("added TOML values require an explicit scalar type")
 		}
 		scalar, err = scalarFromText(value, valueType)
 		if err != nil {
@@ -1097,11 +1083,12 @@ func updateTOML(selector string, data []byte, value, policy, valueType string) (
 		return nil, Scalar{}, err
 	}
 	var parent map[string]any
-	if len(parts) == 1 {
+	switch {
+	case len(parts) == 1:
 		parent = document
-	} else if !parentFound {
+	case !parentFound:
 		return nil, Scalar{}, fmt.Errorf("TOML parent for %q does not exist", selector)
-	} else {
+	default:
 		var ok bool
 		parent, ok = parentValue.(map[string]any)
 		if !ok {

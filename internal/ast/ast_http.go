@@ -9,13 +9,13 @@ import (
 
 // HTTPStatement represents HTTP operations
 type HTTPStatement struct {
-	Token   lexer.Token
-	Method  string
-	URL     string
-	Body    string
 	Headers map[string]string
 	Auth    map[string]string
 	Options map[string]string
+	Method  string
+	URL     string
+	Body    string
+	Token   lexer.Token
 }
 
 func (hs *HTTPStatement) statementNode() {}
@@ -26,37 +26,43 @@ func (hs *HTTPStatement) String() string {
 		out += fmt.Sprintf(" to \"%s\"", hs.URL)
 	}
 
+	var outSb29 strings.Builder
 	for key, value := range hs.Headers {
-		out += fmt.Sprintf(" with header \"%s: %s\"", key, value)
+		fmt.Fprintf(&outSb29, " with header \"%s: %s\"", key, value)
 	}
+	out += outSb29.String()
 
 	if hs.Body != "" {
 		out += fmt.Sprintf(" with body \"%s\"", hs.Body)
 	}
 
+	var outSb37 strings.Builder
 	for key, value := range hs.Auth {
-		out += fmt.Sprintf(" with %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb37, " with %s \"%s\"", key, value)
 	}
+	out += outSb37.String()
 
+	var outSb41 strings.Builder
 	for key, value := range hs.Options {
-		out += fmt.Sprintf(" %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb41, " %s \"%s\"", key, value)
 	}
+	out += outSb41.String()
 
 	return out
 }
 
 // DownloadStatement represents file download operations (like curl/wget)
 type DownloadStatement struct {
-	Token            lexer.Token
-	URL              string
-	Path             string
-	AllowOverwrite   bool
-	AllowPermissions []PermissionSpec
-	ExtractTo        string
-	RemoveArchive    bool
 	Headers          map[string]string
 	Auth             map[string]string
 	Options          map[string]string
+	URL              string
+	Path             string
+	ExtractTo        string
+	AllowPermissions []PermissionSpec
+	Token            lexer.Token
+	AllowOverwrite   bool
+	RemoveArchive    bool
 }
 
 func (ds *DownloadStatement) statementNode() {}
@@ -76,35 +82,49 @@ func (ds *DownloadStatement) String() string {
 		out += " allow overwrite"
 	}
 
+	var outSb79 strings.Builder
+	var outSb86 strings.Builder
 	for _, perm := range ds.AllowPermissions {
-		out += " allow permissions ["
+		outSb79.WriteString(" allow permissions [")
+		var outSb81 strings.Builder
 		for i, p := range perm.Permissions {
 			if i > 0 {
-				out += ","
+				outSb81.WriteString(",")
 			}
-			out += "\"" + p + "\""
+			outSb81.WriteString("\"" + p + "\"")
 		}
-		out += "] to ["
+		outSb86.WriteString(outSb81.String())
+		outSb79.WriteString("] to [")
+		var outSb88 strings.Builder
 		for i, t := range perm.Targets {
 			if i > 0 {
-				out += ","
+				outSb88.WriteString(",")
 			}
-			out += "\"" + t + "\""
+			outSb88.WriteString("\"" + t + "\"")
 		}
-		out += "]"
+		outSb86.WriteString(outSb88.String())
+		outSb79.WriteString("]")
 	}
+	out += outSb86.String()
+	out += outSb79.String()
 
+	var outSb97 strings.Builder
 	for key, value := range ds.Headers {
-		out += fmt.Sprintf(" with header \"%s: %s\"", key, value)
+		fmt.Fprintf(&outSb97, " with header \"%s: %s\"", key, value)
 	}
+	out += outSb97.String()
 
+	var outSb101 strings.Builder
 	for key, value := range ds.Auth {
-		out += fmt.Sprintf(" with %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb101, " with %s \"%s\"", key, value)
 	}
+	out += outSb101.String()
 
+	var outSb105 strings.Builder
 	for key, value := range ds.Options {
-		out += fmt.Sprintf(" %s \"%s\"", key, value)
+		fmt.Fprintf(&outSb105, " %s \"%s\"", key, value)
 	}
+	out += outSb105.String()
 
 	return out
 }

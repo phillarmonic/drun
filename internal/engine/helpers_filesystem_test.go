@@ -97,17 +97,17 @@ task "create paths":
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
-	if err := NewEngine(io.Discard).Execute(program, "create paths"); err != nil {
-		t.Fatalf("execution failed: %v", err)
+	if executeErr := NewEngine(io.Discard).Execute(program, "create paths"); executeErr != nil {
+		t.Fatalf("execution failed: %v", executeErr)
 	}
 
 	for _, path := range []string{
 		filepath.Join(home, "nested", "from-home"),
 		filepath.Join(environmentRoot, "nested", "braced", "directory"),
 	} {
-		info, err := os.Stat(path)
-		if err != nil || !info.IsDir() {
-			t.Fatalf("expected recursively created directory %q, stat error: %v", path, err)
+		info, statErr := os.Stat(path)
+		if statErr != nil || !info.IsDir() {
+			t.Fatalf("expected recursively created directory %q, stat error: %v", path, statErr)
 		}
 	}
 	file := filepath.Join(environmentRoot, "nested", "unbraced", "file.txt")

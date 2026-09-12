@@ -161,6 +161,7 @@ func writeSkillFile(path, content, managedName string, force bool) (string, erro
 	}
 
 	existed := false
+	// #nosec G304 -- skill installer intentionally inspects generated guidance files under the user-selected repository root.
 	if existing, err := os.ReadFile(path); err == nil {
 		existed = true
 		if string(existing) == content {
@@ -173,11 +174,11 @@ func writeSkillFile(path, content, managedName string, force bool) (string, erro
 		return "", fmt.Errorf("failed to read existing file '%s': %w", path, err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", fmt.Errorf("failed to create directory for '%s': %w", path, err)
 	}
 	// #nosec G306 -- installer intentionally writes generated guidance files under the user-selected repository root.
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write '%s': %w", path, err)
 	}
 
@@ -189,6 +190,7 @@ func writeSkillFile(path, content, managedName string, force bool) (string, erro
 }
 
 func writeManagedBlockFile(path, content, managedName string) (string, error) {
+	// #nosec G304 -- skill installer intentionally updates a drun-managed block within repository guidance files under the user-selected root.
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to read existing file '%s': %w", path, err)
@@ -212,11 +214,11 @@ func writeManagedBlockFile(path, content, managedName string) (string, error) {
 		next = updated
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", fmt.Errorf("failed to create directory for '%s': %w", path, err)
 	}
 	// #nosec G304,G306,G703 -- installer intentionally updates a drun-managed block within repository guidance files under the user-selected root.
-	if err := os.WriteFile(path, []byte(next), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(next), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write '%s': %w", path, err)
 	}
 

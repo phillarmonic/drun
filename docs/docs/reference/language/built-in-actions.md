@@ -1062,6 +1062,120 @@ task "validate_infrastructure":
   success "Infrastructure validation completed!"
 ```
 
+### Confirmations and Prompts (Interactive Input)
+
+Two statements collect input from the person running a task. `confirm` asks a
+yes/no question and acts as a gate; `prompt` collects free-form text into a
+variable. Both interpolate `{variable}` placeholders in the question and the
+default value, and both **never block** when there is no interactive terminal
+(see [Non-interactive behavior](#non-interactive-behavior) below).
+
+#### Confirming with yes/no (`confirm`)
+
+Form:
+
+```
+confirm "<question>" [defaults to yes|no] [as $var]
+```
+
+```drun
+# Bare gate: a "no" answer stops the task gracefully (exit 0)
+confirm "Deploy to production?"
+
+# Store the answer and keep going
+confirm "Continue?" as $proceed
+
+# Declare a default; shown in the prompt and used when no answer is given
+confirm "Delete the build cache?" defaults to "no"
+```
+
+On a terminal the question is rendered with a marker that shows which answer
+is the default (`[y/N]` by default, `[Y/n]` when the default is yes):
+
+```
+❓ Deploy to production? [y/N]
+❓ Continue? [Y/n]
+```
+
+Answers are accepted case-insensitively: `y`/`yes`/`true`/`1` mean yes and
+`n`/`no`/`false`/`0` mean no. Pressing enter with no text selects the default
+answer shown in the marker.
+
+**Gate behavior.** Without `as $var`, confirming acts as a gate. Answering no
+stops the task gracefully — drun prints a notice and finishes with exit code 0
+instead of failing:
+
+```
+⏹  Confirmation declined — stopping task 'deploy' (exit 0)
+```
+
+**Storing the answer.** With `as $var` the answer never aborts the task. It is
+stored using drun's string-boolean convention (`"true"`/`"false"`), so it
+drives the usual conditionals:
+
+```drun
+confirm "Run database migrations?" as $migrate
+if $migrate is "true":
+  info "Running database migrations"
+else:
+  info "Skipping database migrations"
+```
+
+#### Collecting free-form input (`prompt`)
+
+Form:
+
+```
+prompt "<question>" [defaults to <value>] as $var
+```
+
+A result variable is required; the typed line is stored verbatim. On a
+terminal the question is rendered with the default value in brackets when one
+is declared:
+
+```
+❓ Which environment?: 
+❓ Release notes? [n/a]: 
+```
+
+An empty answer selects the declared default, or stores an empty string when
+none is declared.
+
+```drun
+prompt "Which environment?" as $environment
+prompt "Release notes?" defaults to "n/a" as $notes
+info "Deploying {$environment} with notes: {$notes}"
+```
+
+#### Non-interactive behavior
+
+Interactive statements only read from a real terminal. Everywhere else —
+piped or redirected input, SSH sessions, CI environments, and dry runs — they
+never block or hang.
+
+The `--yes`/`-y` and `--no` flags answer every interactive statement in the
+run without prompting, even on a TTY (passing both is an error). On a real
+run a flag takes precedence over a declared default.
+
+Without a flag and without an interactive terminal, the declared default is
+used. A confirm/prompt that declares no default then fails with a clear error
+instead of hanging:
+
+```
+Error: execution failed: task 'deploy' failed:
+  confirm "Deploy to production?": no interactive terminal and no default answer;
+  add `defaults to yes|no` or pass --yes/--no
+```
+
+Dry runs report the question without reading any input and resolve to the
+declared default; when none is declared they fall back to the `--yes`/`--no`
+flag, and with neither, `confirm` assumes yes while `prompt` stores an empty
+string:
+
+```
+[DRY RUN] would ask: "Deploy to production?"
+```
+
 ### Status and Logging Actions
 
 #### Status Messages

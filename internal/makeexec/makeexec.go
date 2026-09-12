@@ -2,6 +2,7 @@ package makeexec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -161,7 +162,7 @@ func (e *Executor) executeWithRetries(ctx context.Context, config *orchestration
 func (e *Executor) executeCommand(ctx context.Context, cmdStr, workDir string) error {
 	parts := strings.Fields(cmdStr)
 	if len(parts) == 0 {
-		return fmt.Errorf("empty command")
+		return errors.New("empty command")
 	}
 
 	// #nosec G204 -- pre/post/fallback commands are explicitly configured build commands.
@@ -201,9 +202,9 @@ func (e *Executor) ListTargets(ctx context.Context, makefilePath string) ([]stri
 
 	// Parse output to extract targets
 	targets := []string{}
-	lines := strings.Split(string(output), "\n")
+	lines := strings.SplitSeq(string(output), "\n")
 
-	for _, line := range lines {
+	for line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Skip comments and empty lines

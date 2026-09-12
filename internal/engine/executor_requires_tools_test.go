@@ -19,11 +19,11 @@ func TestEngine_checkToolRequirements(t *testing.T) {
 	projectCtx := &ProjectContext{}
 
 	tests := []struct {
-		name        string
 		detector    toolDetector
+		name        string
+		errorMsg    string
 		tools       []statement.ToolRequirement
 		expectError bool
-		errorMsg    string
 	}{
 		{
 			name: "Missing tool",

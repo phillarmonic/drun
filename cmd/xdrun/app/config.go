@@ -1,7 +1,9 @@
 package app
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,11 +19,11 @@ const DefaultFilename = ".drun/spec.drun"
 
 // WorkspaceConfig represents the workspace configuration
 type WorkspaceConfig struct {
-	DefaultTaskFile string            `yaml:"defaultTaskFile"`
-	ParallelJobs    int               `yaml:"parallelJobs"`
-	Shell           string            `yaml:"shell"`
 	Variables       map[string]string `yaml:"variables"`
 	Defaults        map[string]string `yaml:"defaults"`
+	DefaultTaskFile string            `yaml:"defaultTaskFile"`
+	Shell           string            `yaml:"shell"`
+	ParallelJobs    int               `yaml:"parallelJobs"`
 }
 
 // findConfigFile finds the drun configuration file to use
@@ -147,7 +149,7 @@ func saveWorkspaceConfig(config WorkspaceConfig) error {
 	workspaceConfigPath := ".drun/.drun_workspace.yml"
 
 	// Create .drun directory if it doesn't exist
-	if err := os.MkdirAll(".drun", 0750); err != nil {
+	if err := os.MkdirAll(".drun", 0o750); err != nil {
 		return fmt.Errorf("failed to create .drun directory: %w", err)
 	}
 
@@ -158,7 +160,7 @@ func saveWorkspaceConfig(config WorkspaceConfig) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(workspaceConfigPath, data, 0600); err != nil {
+	if err := os.WriteFile(workspaceConfigPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write workspace config: %w", err)
 	}
 
@@ -169,7 +171,12 @@ func saveWorkspaceConfig(config WorkspaceConfig) error {
 func loadWorkspaceConfig() (*WorkspaceConfig, error) {
 	workspaceConfigPath := ".drun/.drun_workspace.yml"
 	if _, err := os.Stat(workspaceConfigPath); err != nil {
-		// Return default config if file doesn't exist
+		// Return the default config only when the file is absent; surface
+		// genuine stat failures (e.g. permission denied) instead of
+		// silently treating them as a missing workspace config.
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("failed to stat workspace config: %w", err)
+		}
 		return &WorkspaceConfig{
 			ParallelJobs: 4,
 			Shell:        "/bin/bash",
@@ -208,7 +215,7 @@ func loadWorkspaceConfig() (*WorkspaceConfig, error) {
 // initializeConfig creates a new drun configuration file
 func InitializeConfig(filename string, saveAsDefault bool, minimal bool, fromTemplate, templateName, templatesRepo string) error {
 	if fromTemplate != "" && templateName == "" {
-		return fmt.Errorf("--from-template requires --template")
+		return errors.New("--from-template requires --template")
 	}
 
 	// Determine the target filename
@@ -227,7 +234,7 @@ func InitializeConfig(filename string, saveAsDefault bool, minimal bool, fromTem
 	if targetDir != "." && targetDir != "" {
 		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 			// Create the directory
-			if err := os.MkdirAll(targetDir, 0750); err != nil {
+			if err := os.MkdirAll(targetDir, 0o750); err != nil {
 				return fmt.Errorf("failed to create directory '%s': %w", targetDir, err)
 			}
 			fmt.Printf("📁 Created directory: %s\n", targetDir)
@@ -245,7 +252,7 @@ func InitializeConfig(filename string, saveAsDefault bool, minimal bool, fromTem
 	}
 
 	// Write the file
-	if err := os.WriteFile(targetFile, []byte(config), 0600); err != nil {
+	if err := os.WriteFile(targetFile, []byte(config), 0o600); err != nil {
 		return fmt.Errorf("failed to write task file: %w", err)
 	}
 

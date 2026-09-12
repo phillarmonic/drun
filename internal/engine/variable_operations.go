@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -37,12 +38,14 @@ func (e *Engine) parseVariableOperations(expr string) (*VariableOperationChain, 
 	// Check if this looks like a variable operation
 	if !strings.Contains(firstPart, " ") {
 		// Simple variable reference, no operations
+		//nolint:nilnil // a bare variable reference (no space) is not an ops expression; nil chain routes to plain variable handling
 		return nil, nil
 	}
 
 	// Parse the first part to extract variable and first operation
 	tokens := strings.Fields(firstPart)
 	if len(tokens) < 2 {
+		//nolint:nilnil // malformed expression (fewer than 2 tokens); nil chain means "not an ops expression"
 		return nil, nil
 	}
 
@@ -50,6 +53,7 @@ func (e *Engine) parseVariableOperations(expr string) (*VariableOperationChain, 
 	variable := tokens[0]
 	// Accept $variables or bare identifiers (loop variables)
 	if !strings.HasPrefix(variable, "$") && !isValidIdentifier(variable) {
+		//nolint:nilnil // first token is not a $variable or bare identifier, so this is not an ops expression; nil chain routes to plain handling
 		return nil, nil
 	}
 
@@ -89,6 +93,7 @@ func (e *Engine) parseVariableOperations(expr string) (*VariableOperationChain, 
 // parseOperation parses a single operation from tokens
 func (e *Engine) parseOperation(tokens []string) (*VariableOperation, error) {
 	if len(tokens) == 0 {
+		//nolint:nilnil // empty token list yields no operation; callers check op != nil before appending
 		return nil, nil
 	}
 
@@ -157,7 +162,7 @@ func (e *Engine) applyVariableOperations(value string, chain *VariableOperationC
 	for _, op := range chain.Operations {
 		newValue, err := e.applyVariableOperation(currentValue, op, ctx)
 		if err != nil {
-			return "", fmt.Errorf("operation '%s' failed: %v", op.Type, err)
+			return "", fmt.Errorf("operation '%s' failed: %w", op.Type, err)
 		}
 		currentValue = newValue
 	}
@@ -212,7 +217,7 @@ func (e *Engine) applyVariableOperation(value string, op VariableOperation, ctx 
 // String operations
 func (e *Engine) applyWithoutOperation(value string, args []string) (string, error) {
 	if len(args) < 2 {
-		return "", fmt.Errorf("without operation requires 2 arguments")
+		return "", errors.New("without operation requires 2 arguments")
 	}
 
 	operation := args[0] // "prefix" or "suffix"
@@ -239,7 +244,7 @@ func (e *Engine) applyWithoutOperation(value string, args []string) (string, err
 // Array operations (assuming space-separated values for now)
 func (e *Engine) applyFilteredOperation(value string, args []string) (string, error) {
 	if len(args) < 2 {
-		return "", fmt.Errorf("filtered operation requires 2 arguments")
+		return "", errors.New("filtered operation requires 2 arguments")
 	}
 
 	filterType := args[0]  // "extension", "name", etc.
@@ -384,7 +389,7 @@ func (e *Engine) applyNormalizedForShellOperation(value string, ctx *ExecutionCo
 // String split operation
 func (e *Engine) applySplitOperation(value string, args []string) (string, error) {
 	if len(args) < 1 {
-		return "", fmt.Errorf("split operation requires 1 argument (delimiter)")
+		return "", errors.New("split operation requires 1 argument (delimiter)")
 	}
 
 	delimiter := args[0]

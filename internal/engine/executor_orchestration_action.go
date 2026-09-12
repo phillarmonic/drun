@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -98,7 +100,7 @@ func (e *Engine) executeOrchestration(orchestrStmt *statement.Orchestration, ctx
 	if startingFrom, ok := orchestrStmt.Options["starting_from"]; ok {
 		resolved := e.interpolateVariables(startingFrom, ctx)
 		if resolved == "" {
-			return fmt.Errorf("starting_from service name is empty after interpolation")
+			return errors.New("starting_from service name is empty after interpolation")
 		}
 
 		// Find the index of the starting service
@@ -465,8 +467,7 @@ func (e *Engine) orchestrateStop(ctx *ExecutionContext, orch *ast.OrchestrateSta
 	_, _ = fmt.Fprintf(e.output, "🛑  Stopping orchestration: %s\n", orch.Name)
 
 	// Reverse order for shutdown
-	for i := len(orderedServices) - 1; i >= 0; i-- {
-		serviceName := orderedServices[i]
+	for _, serviceName := range slices.Backward(orderedServices) {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Stopping %s...\n", serviceName)
 
@@ -651,7 +652,7 @@ func (e *Engine) orchestrateCloneRepositories(orch *ast.OrchestrateStatement, or
 	}
 
 	if !e.dryRun {
-		return fmt.Errorf("clone_repositories action currently supported only in dry-run mode")
+		return errors.New("clone_repositories action currently supported only in dry-run mode")
 	}
 
 	return nil
@@ -816,7 +817,7 @@ func (e *Engine) orchestrateListBranches(ctx context.Context, orch *ast.Orchestr
 			if branchFilter == "" {
 				_, _ = fmt.Fprintf(e.output, "  %s: ⚠️  repository not cloned locally\n", serviceName)
 			}
-			errors = append(errors, fmt.Sprintf("%s (not cloned)", serviceName))
+			errors = append(errors, serviceName+" (not cloned)")
 			continue
 		}
 
@@ -1214,8 +1215,7 @@ func (e *Engine) orchestrateDown(ctx *ExecutionContext, orch *ast.OrchestrateSta
 		_, _ = fmt.Fprintf(e.output, "⚠️  %v\n\n", err)
 	}
 
-	for i := len(orderedServices) - 1; i >= 0; i-- {
-		serviceName := orderedServices[i]
+	for _, serviceName := range slices.Backward(orderedServices) {
 		service := services[serviceName]
 		_, _ = fmt.Fprintf(e.output, "  ▸ Taking down %s...\n", serviceName)
 
@@ -1429,9 +1429,7 @@ func (e *Engine) runNamedTask(ctx *ExecutionContext, taskName string) error {
 		Program:          ctx.Program,
 	}
 
-	for k, v := range ctx.Variables {
-		hookCtx.Variables[k] = v
-	}
+	maps.Copy(hookCtx.Variables, ctx.Variables)
 
 	if err := e.setupTaskParameters(task, map[string]string{}, hookCtx); err != nil {
 		return err
@@ -1441,9 +1439,7 @@ func (e *Engine) runNamedTask(ctx *ExecutionContext, taskName string) error {
 		return err
 	}
 
-	for k, v := range hookCtx.Variables {
-		ctx.Variables[k] = v
-	}
+	maps.Copy(ctx.Variables, hookCtx.Variables)
 
 	return nil
 }
@@ -1607,7 +1603,8 @@ func (e *Engine) executeMakefileBuild(ctx *ExecutionContext, service *ast.Servic
 	}
 
 	if lastErr != nil {
-		if service.Build.FallbackCommand != "" {
+		switch {
+		case service.Build.FallbackCommand != "":
 			// Interpolate the fallback command
 			interpolatedFallback, err := e.interpolateVariablesWithError(service.Build.FallbackCommand, ctx)
 			if err != nil {
@@ -1616,9 +1613,9 @@ func (e *Engine) executeMakefileBuild(ctx *ExecutionContext, service *ast.Servic
 			if err := e.runShellCommandInDir(interpolatedFallback, workDir, true, service.Build.AllocateTTY); err != nil {
 				return fmt.Errorf("make command failed and fallback command also failed: %w", err)
 			}
-		} else if service.Build.RetryOnFailure && service.Build.MaxRetries > 0 {
+		case service.Build.RetryOnFailure && service.Build.MaxRetries > 0:
 			return fmt.Errorf("make command failed after %d attempts: %w", attempts, lastErr)
-		} else {
+		default:
 			return lastErr
 		}
 	}
@@ -1690,7 +1687,7 @@ func (e *Engine) runMakeCommand(buildCfg *ast.BuildConfig, workDir string) error
 
 func (e *Engine) runShellCommandInDir(cmdStr, workDir string, verbose bool, allocateTTY bool) error {
 	if cmdStr == "" {
-		return fmt.Errorf("empty command")
+		return errors.New("empty command")
 	}
 
 	// Run command through shell to support operators like &&, ||, |, etc.
@@ -1877,7 +1874,7 @@ func (e *Engine) checkDockerHealth(service *ast.ServiceStatement) (bool, error) 
 	// Parse JSON output and check health status
 	outputStr := strings.TrimSpace(string(output))
 	if outputStr == "" || outputStr == "[]" {
-		return false, fmt.Errorf("container not found")
+		return false, errors.New("container not found")
 	}
 
 	// Check for "healthy" status in output
@@ -1903,9 +1900,7 @@ func (e *Engine) checkAndProvisionNetworks(services map[string]*ast.ServiceState
 	requiredNetworks := make(map[string]*ast.DockerNetworkConfig)
 	for _, service := range services {
 		if service.Networks != nil {
-			for name, networkConfig := range service.Networks {
-				requiredNetworks[name] = networkConfig
-			}
+			maps.Copy(requiredNetworks, service.Networks)
 		}
 	}
 

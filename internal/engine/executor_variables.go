@@ -104,7 +104,7 @@ func (e *Engine) executeTransformStatement(varStmt *statement.Variable, ctx *Exe
 	// Apply the transformation function
 	newValue, err := e.applyTransformation(currentValue, varStmt.Function, varStmt.Arguments, ctx)
 	if err != nil {
-		return fmt.Errorf("transformation failed: %v", err)
+		return fmt.Errorf("transformation failed: %w", err)
 	}
 
 	// Update the variable with the transformed value even in dry run for interpolation
@@ -166,7 +166,7 @@ func (e *Engine) executeCaptureShellStatement(varStmt *statement.Variable, ctx *
 	shellOpts := e.getPlatformShellConfig(ctx)
 	result, err := shell.Execute(command, shellOpts)
 	if err != nil {
-		return fmt.Errorf("failed to capture from shell command '%s': %v", command, err)
+		return fmt.Errorf("failed to capture from shell command '%s': %w", command, err)
 	}
 
 	// Determine the variable name (namespace it if in an included snippet/task)
@@ -232,7 +232,7 @@ func (e *Engine) applyTransformation(value, function string, args []string, ctx 
 		}
 		return value, nil
 	case "length":
-		return fmt.Sprintf("%d", len(value)), nil
+		return strconv.Itoa(len(value)), nil
 	case "slice":
 		if len(interpolatedArgs) >= 2 {
 			start, err1 := strconv.Atoi(interpolatedArgs[0])

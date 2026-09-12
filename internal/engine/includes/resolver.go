@@ -15,14 +15,14 @@ import (
 
 // Resolver handles file inclusion, both local and remote
 type Resolver struct {
-	cacheManager   *cache.Manager
 	githubFetcher  remote.Fetcher
 	httpsFetcher   remote.Fetcher
 	drunhubFetcher remote.Fetcher
-	verbose        bool
 	output         io.Writer
-	tempFiles      []string // Track temp files for cleanup
+	cacheManager   *cache.Manager
 	parseFunc      ParseFunc
+	tempFiles      []string // Track temp files for cleanup
+	verbose        bool
 }
 
 // ParseFunc is a function type for parsing drun files
@@ -238,7 +238,7 @@ func (r *Resolver) fetchRemoteInclude(url string) (string, error) {
 
 	// Check cache (if enabled)
 	if r.cacheManager != nil {
-		if content, hit, err := r.cacheManager.Get(cacheKey); err == nil && hit {
+		if content, hit, getErr := r.cacheManager.Get(cacheKey); getErr == nil && hit {
 			if r.verbose {
 				_, _ = fmt.Fprintf(r.output, "  ✓  Cache hit for %s\n", url)
 			}

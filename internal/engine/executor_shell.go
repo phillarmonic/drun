@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/phillarmonic/drun/v2/internal/domain/statement"
@@ -167,9 +168,7 @@ func (e *Engine) getPlatformShellConfig(ctx *ExecutionContext) *shell.Options {
 		if opts.Environment == nil {
 			opts.Environment = make(map[string]string)
 		}
-		for key, value := range config.Environment {
-			opts.Environment[key] = value
-		}
+		maps.Copy(opts.Environment, config.Environment)
 	}
 
 	return opts

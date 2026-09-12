@@ -21,7 +21,8 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 		// detect available "docker compose" or "docker-compose" as $compose_cmd
 		stmt.Type = "detect"
 
-		if p.peekToken.Type == lexer.AVAILABLE {
+		switch {
+		case p.peekToken.Type == lexer.AVAILABLE:
 			// detect available "tool1" or "tool2" as $var
 			p.nextToken() // consume AVAILABLE
 			stmt.Type = "detect_available"
@@ -59,15 +60,14 @@ func (p *Parser) parseDetectionStatement() *ast.DetectionStatement {
 					return stmt
 				}
 			}
-
-		} else if p.peekToken.Type == lexer.PROJECT {
+		case p.peekToken.Type == lexer.PROJECT:
 			p.nextToken() // consume PROJECT
 			stmt.Target = "project"
 			if p.peekToken.Type == lexer.TYPE {
 				p.nextToken() // consume TYPE
 				stmt.Condition = "type"
 			}
-		} else if p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING {
+		case p.isToolToken(p.peekToken.Type) || p.peekToken.Type == lexer.STRING:
 			p.nextToken()
 			stmt.Target = p.curToken.Literal
 
