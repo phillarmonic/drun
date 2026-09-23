@@ -1100,10 +1100,18 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 
 // executeTaskCall executes a task call statement
 func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionContext) error {
+	// Resolve with-values here so a caller can forward its own parameters
+	// (with app-version="{$app-version}"). The callee does not inherit
+	// those parameters; leaving the placeholder raw makes the lookup return itself.
+	resolvedParams, err := e.resolveCallParameters(callStmt.Parameters, ctx)
+	if err != nil {
+		return fmt.Errorf("call task '%s': %w", callStmt.TaskName, err)
+	}
+
 	if e.dryRun {
 		_, _ = fmt.Fprintf(e.output, "[DRY RUN] Would call task: %s\n", callStmt.TaskName)
-		if len(callStmt.Parameters) > 0 {
-			_, _ = fmt.Fprintf(e.output, "[DRY RUN] With parameters: %v\n", callStmt.Parameters)
+		if len(resolvedParams) > 0 {
+			_, _ = fmt.Fprintf(e.output, "[DRY RUN] With parameters: %v\n", resolvedParams)
 		}
 		return nil
 	}
@@ -1129,7 +1137,7 @@ func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionCon
 	maps.Copy(callCtx.Variables, ctx.Variables)
 
 	// Set up parameters for the called task
-	if err := e.setupTaskParameters(targetTask, callStmt.Parameters, callCtx); err != nil {
+	if err := e.setupTaskParameters(targetTask, resolvedParams, callCtx); err != nil {
 		return fmt.Errorf("failed to setup parameters for task '%s': %w", callStmt.TaskName, err)
 	}
 
@@ -1142,6 +1150,29 @@ func (e *Engine) executeTaskCall(callStmt *statement.TaskCall, ctx *ExecutionCon
 	maps.Copy(ctx.Variables, callCtx.Variables)
 
 	return nil
+}
+
+// resolveCallParameters interpolates call-task arguments in the caller's context.
+func (e *Engine) resolveCallParameters(params map[string]string, ctx *ExecutionContext) (map[string]string, error) {
+	if len(params) == 0 {
+		return params, nil
+	}
+
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	resolved := make(map[string]string, len(params))
+	for _, name := range names {
+		value, err := e.interpolateVariablesWithError(params[name], ctx)
+		if err != nil {
+			return nil, fmt.Errorf("parameter '%s': %w", name, err)
+		}
+		resolved[name] = value
+	}
+	return resolved, nil
 }
 
 // executeUseSnippet executes a snippet by running its body statements
