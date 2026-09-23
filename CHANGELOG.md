@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `call task ... with` arguments being stored raw and interpolated only in the callee. The callee does not inherit the caller's parameters, so forwarding a parameter by the same name (`with app-version="{$app-version}"`) resolved to the placeholder itself, and a shell command then expanded the `$app` portion. Those arguments are now interpolated in the calling task before the call, including hyphenated names, and the callee's constraint checks see the resolved value.
+
 ### Security
 
 ## [2.30.0] - 2026-09-09
