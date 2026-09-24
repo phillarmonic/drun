@@ -326,7 +326,14 @@ task "full-pipeline":
 
 #### Parameter Handling
 
-Parameters passed to called tasks override any default values defined in the called task:
+Values in `with` are interpolated in the calling task before the call. A task can forward its own parameters, including hyphenated names:
+
+```drun
+call task "release" with app-version="{$app-version}"
+call task "deploy" with environment="{$environment}" tag="{$tag}"
+```
+
+The called task receives the resolved strings. Constraint checks (`from [...]`, `matching pattern`, ranges) see those resolved values, and they override any default defined on the called task:
 
 ```drun
 task "greet":
