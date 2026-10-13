@@ -45,6 +45,10 @@ type EngineOptions struct {
 	// Runtime task mode override for the invocation
 	TaskModeOverride string
 
+	// CISummary selects how a ci-mode run renders its per-step summary.
+	// Empty means the default (text). See CISummaryFormat.
+	CISummary string
+
 	// User-level fallback provisioning catalogs loaded from ~/.drun/config.yml.
 	UserProvisioningSources []string
 	// Embedded built-in provisioning catalogs shipped with drun.
@@ -134,6 +138,15 @@ func WithVerbose(verbose bool) Option {
 func WithTaskModeOverride(mode string) Option {
 	return func(o *EngineOptions) {
 		o.TaskModeOverride = mode
+	}
+}
+
+// WithCISummary selects how a ci-mode run renders its per-step summary
+// (text, json, or off). An empty or unrecognized value falls back to the
+// default (text).
+func WithCISummary(format string) Option {
+	return func(o *EngineOptions) {
+		o.CISummary = format
 	}
 }
 

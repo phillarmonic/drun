@@ -140,3 +140,5 @@ AGENTS.md
 docs/.venv
 docs/site
 docs/.cache
+
+.aekf

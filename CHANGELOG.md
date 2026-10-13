@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `xdrun` ci-mode runs now end with a compact per-step summary — one `STEP=<slug> STATUS=passed|failed DURATION_MS=<n>` line per step plus a final `CI_STATUS=` line — so a passing gate carries its own evidence instead of leaving the exit code as the only signal. `--ci-summary=json` emits the same information as a single JSON line and `--ci-summary=off` restores banner-only output. Steps declared in a called task that inherits ci mode are included, in order, and a ci task with no `step` statements is unchanged.
+
 ### Changed
 
 ### Deprecated
