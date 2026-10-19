@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Moved the toolchain floor to Go 1.27.2, which clears eight standard-library advisories that `govulncheck` traces through drun's HTTP client, TLS handshakes, and header parsing (GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608, GO-2026-6610, GO-2026-6611, and two others in the same patch). CI and the release build both read the Go version from `go.mod`, so this also changes the compiler that produces published binaries.
+
 ## [2.30.1] - 2026-09-23
 
 ### Added
