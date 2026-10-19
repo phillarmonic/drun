@@ -83,6 +83,20 @@ xdrun ci                                                                        
 
 In the event a command fails in CI mode, only that command's stdout/stderr is dumped, so, overall, you always have less noise.
 
+In CI mode the run also ends with a per-step summary, so a passing gate carries
+its own evidence instead of leaving the exit code as the only signal:
+
+```log
+CI STEP SUMMARY
+STEP=dependency-vulnerability-checks STATUS=passed DURATION_MS=412
+STEP=linter STATUS=passed DURATION_MS=1203
+STEP=unit-tests STATUS=passed DURATION_MS=8410
+CI_STATUS=passed STEPS=3 PASSED=3 FAILED=0 DURATION_MS=10025
+```
+
+Use `--ci-summary=json` for a single machine-readable line, or
+`--ci-summary=off` to keep banner-only output and rely on the exit code.
+
 You can still inspect everything that's happening on CI mode backed tasks by overriding the default behavior with:
 
 ```bash

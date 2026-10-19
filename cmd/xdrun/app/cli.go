@@ -26,6 +26,7 @@ type App struct {
 	templatesRepo    string
 	debugExportGraph string
 	taskMode         string
+	ciSummary        string
 	debugInput       string
 	version          string
 	setWorkspace     string
@@ -179,6 +180,7 @@ func (a *App) setupFlags() {
 	flags.BoolVar(&a.dryRun, "dry-run", false, "[xdrun CLI cmd] Show what would be executed without running")
 	flags.BoolVarP(&a.verbose, "verbose", "v", false, "[xdrun CLI cmd] Show detailed execution information")
 	flags.StringVar(&a.taskMode, "task-mode", "", "[xdrun CLI cmd] Override task execution mode for this run (supported: ci, normal)")
+	flags.StringVar(&a.ciSummary, "ci-summary", "", "[xdrun CLI cmd] Per-step ci summary format (supported: text, json, off; default text)")
 	flags.BoolVar(&a.noDrunCache, "no-drun-cache", false, "[xdrun CLI cmd] Disable remote include caching (always fetch)")
 	flags.BoolVar(&a.showVersion, "version", false, "[xdrun CLI cmd] Show version information")
 	flags.BoolVar(&a.initConfig, "init", false, "[xdrun CLI cmd] Initialize a new .drun task file")
@@ -300,6 +302,7 @@ func (a *App) run(cmd *cobra.Command, args []string) error {
 		a.dryRun,
 		a.verbose,
 		a.taskMode,
+		a.ciSummary,
 		a.allowUndefinedVars,
 		a.allowToolVersionChanges,
 		a.ignoreToolRequirements,

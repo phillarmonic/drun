@@ -76,7 +76,9 @@ type Engine struct {
 	assumeYes               *bool // --yes/--no assumption for confirm/prompt; nil = no assumption
 	newProvisioningResolver func(workingDir string) provisioningResolver
 	newToolDetector         func() toolDetector
+	ciLedger                *ciStepLedger
 	taskModeOverride        string
+	ciSummary               CISummaryFormat
 	userProvisioningSources []string
 	embeddedProvisionings   []provisioning.EmbeddedSource
 	ignoreToolRequirements  bool
@@ -139,6 +141,7 @@ func NewEngineWithOptions(opts ...Option) *Engine {
 		dryRun:           options.DryRun,
 		verbose:          options.Verbose,
 		taskModeOverride: options.TaskModeOverride,
+		ciSummary:        normalizeCISummaryFormatOrDefault(options.CISummary),
 		interpolator:     interp,
 		githubFetcher:    githubFetcher,
 		httpsFetcher:     httpsFetcher,
@@ -391,6 +394,9 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 		OriginalWorkingDir: originalCwd,
 	}
 
+	// Arm the per-step ci summary when the invoked task runs in ci mode.
+	e.beginCIRun(resolvedTaskMode(plan.Tasks[plan.TargetTask].Mode, "", e.taskModeOverride))
+
 	// Execute drun setup hooks from the execution plan
 	if plan.Hooks != nil && len(plan.Hooks.SetupHooks) > 0 {
 		if err := e.executor.ExecuteHooks("setup", plan.Hooks.SetupHooks, ctx, true); err != nil {
@@ -434,9 +440,11 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 				// print a notice and finish with success (exit 0), not as a
 				// task failure.
 				if stderrors.Is(err, errUserAborted) {
+					e.finishCIRun(taskName, ciStatusPassed)
 					_, _ = fmt.Fprintf(e.output, "⏹  Confirmation declined — stopping task '%s' (exit 0)\n", currentTaskName)
 					return nil
 				}
+				e.finishCIRun(taskName, ciStatusFailed)
 				return fmt.Errorf("task '%s' failed: %w", currentTaskName, err)
 			}
 		}
@@ -452,6 +460,9 @@ func (e *Engine) ExecuteWithParamsAndFile(program *ast.Program, taskName string,
 			}
 		}
 	}
+
+	// Print the per-step ci summary once the full run is known.
+	e.finishCIRun(taskName, ciStatusPassed)
 
 	// Execute drun teardown hooks (best-effort)
 	if plan.Hooks != nil && len(plan.Hooks.TeardownHooks) > 0 {
@@ -1050,6 +1061,9 @@ func (e *Engine) executeAction(action *statement.Action, ctx *ExecutionContext) 
 	case "info":
 		_, _ = fmt.Fprintf(e.output, "ℹ️  %s\n", interpolatedMessage)
 	case "step":
+		// Record the step for the ci-mode summary before printing its banner.
+		e.recordCIStep(interpolatedMessage, ctx)
+
 		// Optional line breaks - only add if explicitly requested
 		if action.LineBreakBefore {
 			_, _ = fmt.Fprintln(e.output)

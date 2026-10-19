@@ -296,7 +296,7 @@ func shouldBufferShellOutput(ctx *ExecutionContext, shellStmt *statement.Shell) 
 	if shellStmt.Attached || shellStmt.Action == "capture" {
 		return false
 	}
-	return strings.EqualFold(ctx.CurrentTaskMode, "ci")
+	return isCIMode(ctx)
 }
 
 func resolvedTaskMode(taskMode, inheritedMode, override string) string {

@@ -73,7 +73,7 @@ func TestExecuteTaskReturnsExitCodeErrorForRuntimeFailure(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	err := ExecuteTask(specPath, false, false, false, "", false, false, false, false, true, false, []string{"boom"})
+	err := ExecuteTask(specPath, false, false, false, "", "", false, false, false, false, true, false, []string{"boom"})
 	if err == nil {
 		t.Fatal("ExecuteTask() error = nil, want a runtime failure")
 	}
@@ -90,7 +90,7 @@ func TestExecuteTaskReturnsExitCodeErrorForRuntimeFailure(t *testing.T) {
 func TestExecuteTaskRejectsYesAndNoTogether(t *testing.T) {
 	// The mutual-exclusion check must fire before any file lookup, so this
 	// call needs no task file on disk.
-	err := ExecuteTask("", false, false, false, "", false, false, false, false, true, true, nil)
+	err := ExecuteTask("", false, false, false, "", "", false, false, false, false, true, true, nil)
 	if err == nil {
 		t.Fatal("ExecuteTask() error = nil, want a mutual-exclusion error")
 	}
