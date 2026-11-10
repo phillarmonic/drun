@@ -126,20 +126,24 @@ clean_artifacts() {
 
 # Install golangci-lint if not present
 install_golangci_lint() {
+    # Pin the same version the CI workflows pin, so a local run cannot drift
+    # from the gate through a different linter release.
+    local golangci_lint_version="v2.14.0"
+
     if ! command -v golangci-lint &> /dev/null; then
         log_info "golangci-lint not found, installing..."
         
         # Try to install golangci-lint
         if command -v go &> /dev/null; then
             # Install using go install
-            if go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; then
-                log_success "golangci-lint installed successfully"
+            if go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@"${golangci_lint_version}"; then
+                log_success "golangci-lint ${golangci_lint_version} installed successfully"
             else
                 log_error "Failed to install golangci-lint via go install"
                 
                 # Try curl installation as fallback
                 log_info "Trying curl installation..."
-                if curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin; then
+                if curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOPATH)/bin" "${golangci_lint_version}"; then
                     log_success "golangci-lint installed via curl"
                 else
                     log_error "Failed to install golangci-lint. Please install it manually:"

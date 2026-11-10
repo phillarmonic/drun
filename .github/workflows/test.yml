@@ -26,6 +26,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# One pin per tool, referenced by every step that installs it.
+env:
+  GOLANGCI_LINT_VERSION: v2.15.0
+  GOVULNCHECK_VERSION: v1.9.0
+
 jobs:
   # Check dependencies before spending compute on linting, tests, or builds.
   vulnerability-check:
@@ -34,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -43,8 +48,18 @@ jobs:
         cache: true
         cache-dependency-path: go.sum
 
+    # govulncheck publishes no release assets, so it compiles from source under
+    # a pin; the cache makes that a cost only when the pin moves.
+    - name: Cache govulncheck
+      id: govulncheck
+      uses: actions/cache@v6
+      with:
+        path: ~/go/bin
+        key: go-tools-${{ runner.os }}-${{ env.GOVULNCHECK_VERSION }}
+
     - name: Install govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      if: steps.govulncheck.outputs.cache-hit != 'true'
+      run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
 
     - name: Run govulncheck
       run: govulncheck ./...
@@ -57,7 +72,7 @@ jobs:
     needs: vulnerability-check
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -72,7 +87,7 @@ jobs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.13.2
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
         args: --timeout=5m
 
   # Test job depends on successful lint
@@ -86,7 +101,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -161,7 +176,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -203,7 +218,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Configure Git line endings (Windows)
       if: runner.os == 'Windows'

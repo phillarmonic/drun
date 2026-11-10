@@ -91,7 +91,7 @@ task "ci" mode "ci" means "Run the language-server CI pipeline":
   call task security
 ```
 
-Running `xdrun ci` checks `golangci-lint`, `gosec`, and the inherited `go` requirement before the CI steps begin. Because the task uses `mode "ci"`, successful shell output stays buffered and only failures print the captured command output.
+Running `xdrun ci` checks `golangci-lint`, `gosec`, and the inherited `go` requirement before the CI steps begin. Because the task uses `mode "ci"`, successful shell output stays buffered and only failures print the captured command output. A ci-mode run also ends with a per-step verdict summary; see [Built-in actions](../language/built-in-actions.md#ci-step-summary).
 
 **Key Features:**
 

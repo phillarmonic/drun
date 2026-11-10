@@ -8,10 +8,13 @@ echo "🧪 Running CI Test Suite..."
 echo "📦 Downloading dependencies..."
 go mod download
 
+# One pin, shared with the workflows: the workflow env overrides the default.
+GOLANGCI_LINT_VERSION="${GOLANGCI_LINT_VERSION:-v2.15.0}"
+
 # Install golangci-lint if not present
 if ! command -v golangci-lint &> /dev/null; then
-    echo "⚙️  Installing golangci-lint..."
-    curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v2.13.2
+    echo "⚙️  Installing golangci-lint ${GOLANGCI_LINT_VERSION}..."
+    curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" "$GOLANGCI_LINT_VERSION"
 fi
 
 # Run linting with timeout (like GHA)

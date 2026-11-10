@@ -26,6 +26,7 @@ func ExecuteTask(
 	dryRun bool,
 	verbose bool,
 	taskModeOverride string,
+	ciSummary string,
 	allowUndefinedVars bool,
 	allowToolVersionChanges bool,
 	ignoreToolRequirements bool,
@@ -40,6 +41,11 @@ func ExecuteTask(
 	}
 
 	taskModeOverride, err := normalizeRuntimeTaskMode(taskModeOverride)
+	if err != nil {
+		return err
+	}
+
+	ciSummary, err = normalizeCISummary(ciSummary)
 	if err != nil {
 		return err
 	}
@@ -136,6 +142,7 @@ func ExecuteTask(
 		engine.WithDryRun(dryRun),
 		engine.WithVerbose(verbose),
 		engine.WithTaskModeOverride(taskModeOverride),
+		engine.WithCISummary(ciSummary),
 		engine.WithAllowToolVersionChanges(allowToolVersionChanges),
 		engine.WithIgnoreToolRequirements(ignoreToolRequirements),
 		engine.WithUserProvisioningSources(userConfig.ProvisioningSources),

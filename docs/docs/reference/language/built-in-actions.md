@@ -65,6 +65,45 @@ xdrun build --task-mode=ci
 - `--task-mode=ci` applies CI-style buffering for the invoked task and any called tasks during that run.
 - Supported runtime override values are `normal` and `ci`.
 
+#### CI step summary
+
+A task that runs in `ci` mode ends with a compact, stable per-step summary. Each
+`step` becomes one grep-friendly line, and the run closes with an aggregate
+line, so the evidence travels with the output instead of being reconstructed
+from a detached exit code:
+
+```log
+CI STEP SUMMARY
+STEP=dependency-vulnerability-checks STATUS=passed DURATION_MS=12
+STEP=linter STATUS=passed DURATION_MS=30
+STEP=unit-tests STATUS=failed DURATION_MS=418
+CI_STATUS=failed STEPS=3 PASSED=2 FAILED=1 DURATION_MS=460
+```
+
+- A step is `passed` when execution reaches the next step (or the end of the run),
+  and `failed` when the run aborts inside it.
+- `STEP=` is a slug of the step message (lowercased, with non-alphanumeric runs
+  collapsed to `-`), so it is stable and safe to parse.
+- Steps declared in a called task that inherits ci mode are included, in order.
+
+Control the format with `--ci-summary`:
+
+```bash
+xdrun ci                       # text summary (default)
+xdrun ci --ci-summary=json     # one JSON object on the final line
+xdrun ci --ci-summary=off      # banners only, no summary
+```
+
+The JSON form is a single line, with `label` present only when it differs from
+the slug:
+
+```json
+{"task":"ci","status":"failed","duration_ms":460,"steps":[{"step":"linter","status":"passed","duration_ms":30},{"step":"unit-tests","label":"Unit tests","status":"failed","duration_ms":418}]}
+```
+
+The summary is printed once, after the target task finishes; a ci task with no
+`step` statements is unchanged.
+
 #### Multiline Commands (Block Syntax)
 
 For complex shell operations, use the block syntax with natural indentation:
