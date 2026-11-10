@@ -359,12 +359,12 @@ func (op *FileOperation) executeReplace() (*Result, error) {
 	updated := original
 	changed := false
 
-	for old, new := range op.Replacements {
+	for old, replacement := range op.Replacements {
 		if old == "" {
 			continue
 		}
 		if strings.Contains(updated, old) {
-			updated = strings.ReplaceAll(updated, old, new)
+			updated = strings.ReplaceAll(updated, old, replacement)
 			changed = true
 		}
 	}
