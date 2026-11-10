@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- CI pins `golangci-lint` (now v2.15.0) and `govulncheck` through one workflow-level `env` block, caches the Go-installed binaries so a pin only costs a compile when it moves, and reads the same `golangci-lint` pin from `scripts/test-ci.sh`. Workflows move to `actions/checkout@v7`, the release build's module cache keys on `go.sum` instead of `go.mod`, and the docs deploy uses `astral-sh/setup-uv@v10.2.0`. The spec's Go floor now matches the `go.mod` toolchain at 1.27.2, and `predeclared` flagged a shadowed `new` in the file-operation replace loop, which is renamed.
+- CI pins `golangci-lint` (now v2.15.0) and `govulncheck` through one workflow-level `env` block, caches the Go-installed binaries so a pin only costs a compile when it moves, and reads the same `golangci-lint` pin from `scripts/test-ci.sh`. Workflows move to `actions/checkout@v7`, the release build's module cache keys on `go.sum` instead of `go.mod`, and the docs deploy uses `astral-sh/setup-uv@v10.2.0`. The spec's Go floor now matches the `go.mod` toolchain at 1.27.3, and `predeclared` flagged a shadowed `new` in the file-operation replace loop, which is renamed.
 
 ### Deprecated
 
@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- Moved the toolchain floor to Go 1.27.2, which clears eight standard-library advisories that `govulncheck` traces through drun's HTTP client, TLS handshakes, and header parsing (GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608, GO-2026-6610, GO-2026-6611, and two others in the same patch). CI and the release build both read the Go version from `go.mod`, so this also changes the compiler that produces published binaries.
+- Moved the toolchain floor to Go 1.27.3, which clears the standard-library advisories that `govulncheck` traces through drun's HTTP client, TLS handshakes, and header parsing: the eight fixed at 1.27.2 (GO-2026-6603, GO-2026-6605, GO-2026-6607, GO-2026-6608, GO-2026-6610, GO-2026-6611, and two others in the same patch) plus GO-2026-6809, the compromised-intermediate-certificate check in `crypto/x509`. CI and the release build both read the Go version from `go.mod`, so this also changes the compiler that produces published binaries.
 - Updated the two compression dependencies `govulncheck` still flagged: `github.com/andybalholm/brotli` to v1.2.7 (GO-2026-6888) and `github.com/klauspost/compress` to v1.20.2 (GO-2026-6865). Both are reached through the remote fetcher's decompression path.
 
 ## [2.30.1] - 2026-09-23

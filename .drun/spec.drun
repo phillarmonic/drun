@@ -5,7 +5,7 @@ version: 2.0
 
 project "Drun" version "2.31.0":
 	requires tools:
-		go >= "1.27.2"
+		go >= "1.27.3"
 		golangci-lint provision
 		gosec provision
 		govulncheck provision
